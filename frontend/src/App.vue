@@ -54,9 +54,11 @@ function markUpdated() {
 }
 
 function applyState(payload) {
-  buttons.value = payload?.buttons ?? []
-  leaderboard.value = payload?.leaderboard ?? []
-  userStats.value = payload?.userStats ?? (nickname.value ? { nickname: nickname.value, clickCount: 0 } : null)
+  buttons.value = payload?.buttons ?? buttons.value
+  leaderboard.value = payload?.leaderboard ?? leaderboard.value
+  if (payload?.userStats) {
+    userStats.value = payload.userStats
+  }
   pendingKeys.value = new Set()
   syncing.value = false
   markUpdated()
@@ -442,5 +444,5 @@ onBeforeUnmount(() => {
         </section>
       </aside>
     </section>
-  </main>
-</template>
+    </main>
+  </template>

@@ -227,7 +227,7 @@ select {
 .stats-band__card strong {
   display: block;
   font-family: var(--display);
-  font-size: clamp(1.9rem, 4vw, 3rem);
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
   line-height: 1;
   color: var(--ink);
 }
@@ -391,7 +391,7 @@ select {
   display: block;
   margin-top: 8px;
   font-family: var(--display);
-  font-size: 2rem;
+  font-size: 1.5rem;
   color: var(--ink);
 }
 
@@ -605,7 +605,7 @@ select {
   max-width: 8ch;
   margin-top: 10px;
   font-family: var(--display);
-  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  font-size: clamp(1.3rem, 3vw, 2rem);
   font-weight: 900;
   line-height: 0.96;
   letter-spacing: -0.04em;
@@ -624,10 +624,10 @@ select {
 .vote-card__count {
   margin-top: auto;
   font-family: var(--display);
-  font-size: clamp(3rem, 8vw, 5.4rem);
+  font-size: clamp(1.2rem, 3.5vw, 2.4rem);
   font-weight: 900;
   line-height: 1;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.04em;
   color: var(--primary);
   transition:
     color 220ms ease,
