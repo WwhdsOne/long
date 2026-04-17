@@ -55,12 +55,10 @@ jobs:
 
       - name: Build Go binary (linux/amd64)
         run: |
-          VERSION=$(git describe --tags --always 2>/dev/null || echo "dev")
-          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go -C backend build \
               -trimpath \
-              -ldflags "-w -s -X main.version=${VERSION} -X main.buildTime=${BUILD_TIME}" \
+              -ldflags "-w -s" \
               -o backend/vote-wall \
               ./cmd/server
 
