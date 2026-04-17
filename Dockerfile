@@ -4,9 +4,9 @@ WORKDIR /app/backend
 
 RUN apk add --no-cache ca-certificates
 
-COPY vote-wall ./
+COPY long ./
 COPY public ./public
 
 EXPOSE 2333
 
-CMD ["./vote-wall"]
+CMD ["./long"]
