@@ -20,11 +20,12 @@ import (
 	"long/internal/config"
 	"long/internal/events"
 	"long/internal/httpapi"
+	"long/internal/nickname"
 	"long/internal/ratelimit"
 	"long/internal/vote"
 )
 
-// snapshotPublisher avoids rebroadcasting identical snapshots during Redis polling.
+// snapshotPublisher 快照发布器，避免 Redis 轮询时重复广播相同状态
 type snapshotPublisher struct {
 	hub  *events.Hub
 	mu   sync.Mutex
@@ -74,7 +75,7 @@ func main() {
 	}
 }
 
-// run wires Redis, HTTP routes, SSE broadcasting, and graceful shutdown together.
+// run 启动服务：连接 Redis、注册路由、启动 SSE 广播、处理优雅关闭
 func run() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -101,10 +102,11 @@ func run() error {
 		return fmt.Errorf("connect redis: %w", err)
 	}
 
+	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
 		CriticalChancePercent: cfg.CriticalHit.ChancePercent,
 		CriticalCount:         cfg.CriticalHit.Count,
-	})
+	}, nicknameValidator)
 	if err := store.EnsureDefaults(startupCtx, config.DefaultButtons); err != nil {
 		return fmt.Errorf("seed default buttons: %w", err)
 	}
@@ -143,7 +145,7 @@ func run() error {
 	defer pollCancel()
 
 	go func() {
-		// Polling keeps dynamically added Redis buttons visible even without clicks.
+		// 定期轮询 Redis，确保动态添加的按钮即使没有点击也能显示
 		ticker := time.NewTicker(cfg.ButtonPollInterval)
 		defer ticker.Stop()
 

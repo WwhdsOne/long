@@ -9,6 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/config"
+	"long/internal/nickname"
 )
 
 func newTestStore(t *testing.T) (*Store, func()) {
@@ -26,7 +27,7 @@ func newTestStore(t *testing.T) (*Store, func()) {
 	return NewStore(client, "vote:button:", StoreOptions{
 			CriticalChancePercent: 5,
 			CriticalCount:         5,
-		}), func() {
+		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
 			_ = client.Close()
 			server.Close()
 		}
@@ -205,6 +206,44 @@ func TestClickButtonRejectsEmptyNickname(t *testing.T) {
 
 	if _, err := store.ClickButton(ctx, "feel", "   "); !errors.Is(err, ErrInvalidNickname) {
 		t.Fatalf("expected invalid nickname error, got %v", err)
+	}
+}
+
+func TestClickButtonRejectsSensitiveNickname(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+
+	if _, err := store.ClickButton(ctx, "feel", "XJP后援会"); !errors.Is(err, ErrSensitiveNickname) {
+		t.Fatalf("expected sensitive nickname error, got %v", err)
+	}
+}
+
+func TestGetStateRejectsSensitiveNickname(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+
+	if _, err := store.GetState(ctx, "我是习近平"); !errors.Is(err, ErrSensitiveNickname) {
+		t.Fatalf("expected sensitive nickname error, got %v", err)
 	}
 }
 

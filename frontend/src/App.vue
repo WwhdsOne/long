@@ -1,24 +1,27 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+// 昵称本地存储键名
 const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
 
-const buttons = ref([])
-const leaderboard = ref([])
-const userStats = ref(null)
-const nickname = ref('')
-const nicknameDraft = ref('')
-const loading = ref(true)
-const syncing = ref(false)
-const errorMessage = ref('')
-const pendingKeys = ref(new Set())
-const lastUpdatedAt = ref('')
-const liveConnected = ref(false)
-const criticalBursts = ref({})
+// 响应式状态
+const buttons = ref([])           // 按钮列表
+const leaderboard = ref([])       // 排行榜
+const userStats = ref(null)       // 个人统计
+const nickname = ref('')          // 当前昵称
+const nicknameDraft = ref('')     // 昵称输入草稿
+const loading = ref(true)         // 加载状态
+const syncing = ref(false)        // 同步状态
+const errorMessage = ref('')      // 错误信息
+const pendingKeys = ref(new Set()) // 正在请求的按钮
+const lastUpdatedAt = ref('')     // 最后更新时间
+const liveConnected = ref(false)  // SSE 连接状态
+const criticalBursts = ref({})    // 暴击特效状态
 
-let eventSource
-const burstTimers = new Map()
+let eventSource                    // SSE 事件源
+const burstTimers = new Map()     // 暴击特效定时器
 
+// 计算属性
 const buttonCount = computed(() => buttons.value.length)
 const totalVotes = computed(() =>
   buttons.value.reduce((total, button) => total + button.count, 0),
@@ -41,10 +44,42 @@ const myRank = computed(() => {
   return matched?.rank ?? null
 })
 
+// 规范化昵称（去除空格）
 function normalizeNickname(value) {
   return value.trim()
 }
 
+async function readErrorMessage(response, fallback) {
+  try {
+    const payload = await response.json()
+    if (payload?.message) {
+      return payload.message
+    }
+  } catch {
+    // Ignore malformed error payloads and keep fallback copy.
+  }
+
+  return fallback
+}
+
+async function validateNicknameWithServer(nextNickname) {
+  const response = await fetch('/api/nickname/validate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      nickname: nextNickname,
+    }),
+  })
+
+  if (!response.ok) {
+    const message = await readErrorMessage(response, '昵称校验失败，请稍后重试。')
+    throw new Error(message)
+  }
+}
+
+// 更新最后刷新时间显示
 function markUpdated() {
   lastUpdatedAt.value = new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
@@ -53,6 +88,7 @@ function markUpdated() {
   }).format(new Date())
 }
 
+// 应用服务器返回的状态数据
 function applyState(payload) {
   buttons.value = payload?.buttons ?? buttons.value
   leaderboard.value = payload?.leaderboard ?? leaderboard.value
@@ -64,6 +100,7 @@ function applyState(payload) {
   markUpdated()
 }
 
+// 清除按钮的暴击特效
 function clearCriticalBurst(key) {
   const timer = burstTimers.get(key)
   if (timer) {
@@ -99,10 +136,12 @@ function triggerCriticalBurst(key, delta) {
   )
 }
 
+// 构建昵称查询参数
 function currentNicknameQuery() {
   return nickname.value ? `?nickname=${encodeURIComponent(nickname.value)}` : ''
 }
 
+// 加载初始状态
 async function loadState() {
   loading.value = true
   syncing.value = true
@@ -123,6 +162,7 @@ async function loadState() {
   }
 }
 
+// 点击按钮投票
 async function clickButton(key) {
   if (!nickname.value || pendingKeys.value.has(key)) {
     return
@@ -174,6 +214,7 @@ async function clickButton(key) {
   }
 }
 
+// 建立 SSE 实时连接
 function connectEventStream() {
   eventSource?.close()
   eventSource = new EventSource(`/api/events${currentNicknameQuery()}`)
@@ -202,6 +243,7 @@ function connectEventStream() {
   }
 }
 
+// 提交昵称并加入投票
 async function submitNickname() {
   const nextNickname = normalizeNickname(nicknameDraft.value)
   if (!nextNickname) {
@@ -209,17 +251,26 @@ async function submitNickname() {
     return
   }
 
-  nickname.value = nextNickname
-  nicknameDraft.value = nextNickname
-  window.localStorage.setItem(NICKNAME_STORAGE_KEY, nextNickname)
-  userStats.value = {
-    nickname: nextNickname,
-    clickCount: userStats.value?.nickname === nextNickname ? userStats.value.clickCount : 0,
+  errorMessage.value = ''
+
+  try {
+    await validateNicknameWithServer(nextNickname)
+
+    nickname.value = nextNickname
+    nicknameDraft.value = nextNickname
+    window.localStorage.setItem(NICKNAME_STORAGE_KEY, nextNickname)
+    userStats.value = {
+      nickname: nextNickname,
+      clickCount: userStats.value?.nickname === nextNickname ? userStats.value.clickCount : 0,
+    }
+    await loadState()
+    connectEventStream()
+  } catch (error) {
+    errorMessage.value = error.message || '昵称校验失败，请稍后重试。'
   }
-  await loadState()
-  connectEventStream()
 }
 
+// 清空昵称退出投票
 async function resetNickname() {
   nickname.value = ''
   nicknameDraft.value = ''
@@ -229,17 +280,25 @@ async function resetNickname() {
   connectEventStream()
 }
 
+// 组件挂载时：恢复昵称、加载状态、建立连接
 onMounted(async () => {
   const savedNickname = normalizeNickname(window.localStorage.getItem(NICKNAME_STORAGE_KEY) || '')
   if (savedNickname) {
-    nickname.value = savedNickname
-    nicknameDraft.value = savedNickname
+    try {
+      await validateNicknameWithServer(savedNickname)
+      nickname.value = savedNickname
+      nicknameDraft.value = savedNickname
+    } catch (error) {
+      window.localStorage.removeItem(NICKNAME_STORAGE_KEY)
+      errorMessage.value = error.message || '已保存昵称不可用，请换一个试试。'
+    }
   }
 
   await loadState()
   connectEventStream()
 })
 
+// 组件卸载时：关闭连接、清理定时器
 onBeforeUnmount(() => {
   eventSource?.close()
   burstTimers.forEach((timer) => window.clearTimeout(timer))

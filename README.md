@@ -12,6 +12,7 @@
 - 你后面只要往 Redis 新增一个新键，前端就会自动展示新按钮。
 - 前端静态页和后端 API/SSE 统一由一个 Go 服务承载，并可打成单一 Docker 镜像。
 - 后端会在内存里做爆发点击限流，超出人类能力的频率会被拉黑 10 分钟。
+- 昵称会在后端统一做敏感词校验，当前接入整个 `konsheng/Sensitive-lexicon` 仓库里的文本词表。
 - 后端运行和测试都会从 Consul 拉取 YAML 配置，本地不需要单独放配置文件。
 
 ## 目录结构
@@ -113,6 +114,13 @@ critical_hit:
 - `rate_limit.blacklist_ms`
 - `critical_hit.chance_percent`
 - `critical_hit.count`
+
+## 昵称敏感词校验
+
+- 昵称校验由后端统一执行，前端只展示后端返回的校验结果。
+- 当前词表来自 `konsheng/Sensitive-lexicon`，仓库内置在 `backend/internal/nickname/lexicon/upstream/`。
+- 当前实现会加载该目录下所有 vendored `.txt` 词表并自动去重，不再只限于政治类词表。
+- 上游许可证文本随仓库一并保存在 `backend/internal/nickname/lexicon/LICENSE.konsheng.txt`。
 
 ## 本地启动
 

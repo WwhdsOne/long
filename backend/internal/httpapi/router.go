@@ -16,24 +16,25 @@ import (
 	"long/internal/vote"
 )
 
-// ButtonStore is the minimal vote storage contract required by the HTTP layer.
+// ButtonStore 投票存储接口，HTTP 层所需的最小契约
 type ButtonStore interface {
 	GetState(context.Context, string) (vote.State, error)
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
+	ValidateNickname(context.Context, string) error
 }
 
-// Broadcaster emits updated snapshots after a successful click.
+// Broadcaster 广播接口，点击成功后推送更新快照
 type Broadcaster interface {
 	BroadcastSnapshot(vote.Snapshot) error
 }
 
-// ClickGuard decides whether the current client may submit another click.
+// ClickGuard 点击频率限制接口
 type ClickGuard interface {
 	Allow(string) (time.Duration, error)
 }
 
-// Options wires business logic, realtime updates, and static assets into one router.
+// Options 路由配置，注入业务逻辑、实时更新和静态资源
 type Options struct {
 	Store       ButtonStore
 	Broadcaster Broadcaster
@@ -42,7 +43,7 @@ type Options struct {
 	PublicDir   string
 }
 
-// NewHandler builds the API routes plus the SPA/static-file fallback handler.
+// NewHandler 构建 API 路由和 SPA 静态文件回退处理器
 func NewHandler(options Options) http.Handler {
 	apiMux := http.NewServeMux()
 
@@ -53,11 +54,37 @@ func NewHandler(options Options) http.Handler {
 	apiMux.HandleFunc("GET /api/buttons", func(w http.ResponseWriter, r *http.Request) {
 		state, err := options.Store.GetState(r.Context(), r.URL.Query().Get("nickname"))
 		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 			return
 		}
 
 		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/nickname/validate", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再试试。",
+			})
+			return
+		}
+
+		if err := options.Store.ValidateNickname(r.Context(), body.Nickname); err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "NICKNAME_VALIDATE_FAILED"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	})
 
 	apiMux.HandleFunc("POST /api/buttons/{slug}/click", func(w http.ResponseWriter, r *http.Request) {
@@ -103,11 +130,7 @@ func NewHandler(options Options) http.Handler {
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": "BUTTON_NOT_FOUND"})
 				return
 			}
-			if errors.Is(err, vote.ErrInvalidNickname) {
-				writeJSON(w, http.StatusBadRequest, map[string]string{
-					"error":   "INVALID_NICKNAME",
-					"message": "昵称还没填好，先起个名字再点。",
-				})
+			if writeNicknameError(w, err) {
 				return
 			}
 
@@ -178,6 +201,26 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func writeNicknameError(w http.ResponseWriter, err error) bool {
+	if errors.Is(err, vote.ErrInvalidNickname) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "INVALID_NICKNAME",
+			"message": "昵称还没填好，先起个名字再点。",
+		})
+		return true
+	}
+
+	if errors.Is(err, vote.ErrSensitiveNickname) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "SENSITIVE_NICKNAME",
+			"message": "昵称包含敏感词，请换一个试试。",
+		})
+		return true
+	}
+
+	return false
 }
 
 // clientIdentifier extracts the best-effort real client address for rate limiting.

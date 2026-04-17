@@ -12,11 +12,17 @@ import (
 )
 
 type mockStore struct {
-	state  vote.State
-	result vote.ClickResult
+	state       vote.State
+	result      vote.ClickResult
+	getStateErr error
+	clickErr    error
+	validateErr error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
+	if m.getStateErr != nil {
+		return vote.State{}, m.getStateErr
+	}
 	state := m.state
 	if nickname == "" {
 		state.UserStats = nil
@@ -32,6 +38,9 @@ func (m *mockStore) GetSnapshot(_ context.Context) (vote.Snapshot, error) {
 }
 
 func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+	if m.clickErr != nil {
+		return vote.ClickResult{}, m.clickErr
+	}
 	for index := range m.state.Buttons {
 		if m.state.Buttons[index].Key == slug {
 			if m.result.Button.Key == "" {
@@ -57,6 +66,10 @@ func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string)
 		}
 	}
 	return vote.ClickResult{}, vote.ErrButtonNotFound
+}
+
+func (m *mockStore) ValidateNickname(_ context.Context, _ string) error {
+	return m.validateErr
 }
 
 type mockBroadcaster struct {
@@ -289,6 +302,48 @@ func TestClickRequiresNickname(t *testing.T) {
 
 	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"   "}`))
 	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.Code)
+	}
+}
+
+func TestValidateNicknameRejectsSensitiveNickname(t *testing.T) {
+	store := &mockStore{
+		validateErr: vote.ErrSensitiveNickname,
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/nickname/validate", strings.NewReader(`{"nickname":"我是习近平"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.Code)
+	}
+	if body := response.Body.String(); !strings.Contains(body, "敏感词") {
+		t.Fatalf("expected sensitive-word message, got %q", body)
+	}
+}
+
+func TestGetButtonsRejectsSensitiveNickname(t *testing.T) {
+	store := &mockStore{
+		getStateErr: vote.ErrSensitiveNickname,
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/buttons?nickname=%E4%B9%A0%E8%BF%91%E5%B9%B3", nil)
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)

@@ -13,80 +13,86 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/config"
+	nicknamefilter "long/internal/nickname"
 )
 
+// 错误定义
 var ErrButtonNotFound = errors.New("button not found")
 var ErrInvalidNickname = errors.New("invalid nickname")
+var ErrSensitiveNickname = errors.New("sensitive nickname")
 
-// Button is the normalized payload returned to the frontend and SSE clients.
+// Button 按钮数据结构，返回给前端和 SSE 客户端
 type Button struct {
-	Key       string `json:"key"`
-	RedisKey  string `json:"redisKey"`
-	Label     string `json:"label"`
-	Count     int64  `json:"count"`
-	Sort      int    `json:"sort"`
-	Enabled   bool   `json:"enabled"`
-	ImagePath string `json:"imagePath,omitempty"`
-	ImageAlt  string `json:"imageAlt,omitempty"`
+	Key       string `json:"key"`                 // 按钮标识
+	RedisKey  string `json:"redisKey"`            // Redis 键名
+	Label     string `json:"label"`               // 显示名称
+	Count     int64  `json:"count"`               // 当前票数
+	Sort      int    `json:"sort"`                // 排序权重
+	Enabled   bool   `json:"enabled"`             // 是否启用
+	ImagePath string `json:"imagePath,omitempty"` // 图片路径
+	ImageAlt  string `json:"imageAlt,omitempty"`  // 图片描述
 }
 
-// UserStats tracks one nickname's total contributions.
+// UserStats 用户统计信息
 type UserStats struct {
-	Nickname   string `json:"nickname"`
-	ClickCount int64  `json:"clickCount"`
+	Nickname   string `json:"nickname"`   // 昵称
+	ClickCount int64  `json:"clickCount"` // 累计点击数
 }
 
-// LeaderboardEntry represents one row in the public ranking board.
+// LeaderboardEntry 排行榜条目
 type LeaderboardEntry struct {
-	Rank       int    `json:"rank"`
-	Nickname   string `json:"nickname"`
-	ClickCount int64  `json:"clickCount"`
+	Rank       int    `json:"rank"`       // 排名
+	Nickname   string `json:"nickname"`   // 昵称
+	ClickCount int64  `json:"clickCount"` // 点击数
 }
 
-// Snapshot is the public real-time state shared with every connected client.
+// Snapshot 公共实时状态，广播给所有连接的客户端
 type Snapshot struct {
-	Buttons     []Button           `json:"buttons"`
-	Leaderboard []LeaderboardEntry `json:"leaderboard"`
+	Buttons     []Button           `json:"buttons"`     // 按钮列表
+	Leaderboard []LeaderboardEntry `json:"leaderboard"` // 排行榜
 }
 
-// State adds optional personal stats to the shared snapshot.
+// State 完整状态，包含个人统计信息
 type State struct {
-	Buttons     []Button           `json:"buttons"`
-	Leaderboard []LeaderboardEntry `json:"leaderboard"`
-	UserStats   *UserStats         `json:"userStats,omitempty"`
+	Buttons     []Button           `json:"buttons"`             // 按钮列表
+	Leaderboard []LeaderboardEntry `json:"leaderboard"`         // 排行榜
+	UserStats   *UserStats         `json:"userStats,omitempty"` // 个人统计
 }
 
-// ClickResult describes the post-click snapshot plus the applied increment.
+// ClickResult 点击结果，包含更新后的快照和增量信息
 type ClickResult struct {
-	Button    Button    `json:"button"`
-	Delta     int64     `json:"delta"`
-	Critical  bool      `json:"critical"`
-	UserStats UserStats `json:"userStats"`
+	Button    Button    `json:"button"`    // 更新后的按钮
+	Delta     int64     `json:"delta"`     // 本次增量（普通点击为1，暴击为更多）
+	Critical  bool      `json:"critical"`  // 是否触发暴击
+	UserStats UserStats `json:"userStats"` // 更新后的用户统计
 }
 
-// StoreOptions controls how much a crit adds and how often it happens.
+// StoreOptions 暴击机制配置
 type StoreOptions struct {
-	CriticalChancePercent int
-	CriticalCount         int64
+	CriticalChancePercent int   // 暴击概率（百分比）
+	CriticalCount         int64 // 暴击时的增量
 }
 
+// buttonFallback 按钮回退数据（用于图片等元数据）
 type buttonFallback struct {
 	Label     string
 	ImagePath string
 	ImageAlt  string
 }
 
-// Store wraps Redis access for listing, incrementing, and seeding buttons.
+// Store Redis 投票存储，管理按钮列表、点击计数和排行榜
 type Store struct {
 	client         redis.UniversalClient
-	prefix         string
-	userPrefix     string
-	leaderboardKey string
-	fallbacks      map[string]buttonFallback
-	critical       StoreOptions
-	roll           func(int) int
+	prefix         string                    // 按钮键前缀
+	userPrefix     string                    // 用户键前缀
+	leaderboardKey string                    // 排行榜键名
+	fallbacks      map[string]buttonFallback // 回退数据
+	critical       StoreOptions              // 暴击配置
+	roll           func(int) int             // 随机数生成器
+	validator      interface{ Validate(string) error }
 }
 
+// hashFields Redis Hash 中存储的字段列表
 var hashFields = []string{
 	"label",
 	"count",
@@ -96,8 +102,8 @@ var hashFields = []string{
 	"image_alt",
 }
 
-// NewStore creates a Redis-backed vote store with fallback image metadata.
-func NewStore(client redis.UniversalClient, prefix string, options StoreOptions) *Store {
+// NewStore 创建 Redis 投票存储实例
+func NewStore(client redis.UniversalClient, prefix string, options StoreOptions, validator interface{ Validate(string) error }) *Store {
 	namespace := deriveNamespace(prefix)
 
 	return &Store{
@@ -115,10 +121,17 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions)
 		roll: func(limit int) int {
 			return rand.IntN(limit)
 		},
+		validator: validator,
 	}
 }
 
-// GetSnapshot returns the shared button wall plus the public ranking board.
+// ValidateNickname checks whether the provided nickname is usable.
+func (s *Store) ValidateNickname(_ context.Context, nickname string) error {
+	_, err := s.validatedNickname(nickname)
+	return err
+}
+
+// GetSnapshot 获取公共快照（按钮列表 + 排行榜）
 func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	buttons, err := s.ListButtons(ctx)
 	if err != nil {
@@ -136,7 +149,7 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	}, nil
 }
 
-// GetState returns the shared snapshot and, when requested, the user's own stats.
+// GetState 获取完整状态（公共快照 + 个人统计）
 func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 	snapshot, err := s.GetSnapshot(ctx)
 	if err != nil {
@@ -148,9 +161,14 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 		Leaderboard: snapshot.Leaderboard,
 	}
 
-	normalizedNickname, hasNickname := normalizeNickname(nickname)
+	trimmedNickname, hasNickname := normalizeNickname(nickname)
 	if !hasNickname {
 		return state, nil
+	}
+
+	normalizedNickname, err := s.validatedNickname(trimmedNickname)
+	if err != nil {
+		return State{}, err
 	}
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
@@ -162,7 +180,7 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 	return state, nil
 }
 
-// ListButtons scans Redis, filters hidden buttons, and returns them in display order.
+// ListButtons 扫描 Redis，过滤禁用按钮，按排序权重返回
 func (s *Store) ListButtons(ctx context.Context) ([]Button, error) {
 	keys, err := s.scanKeys(ctx)
 	if err != nil {
@@ -204,11 +222,11 @@ func (s *Store) ListButtons(ctx context.Context) ([]Button, error) {
 	return buttons, nil
 }
 
-// ClickButton applies a normal or critical increment and returns the new snapshot.
+// ClickButton 处理按钮点击，支持普通点击和暴击
 func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (ClickResult, error) {
-	normalizedNickname, ok := normalizeNickname(nickname)
-	if !ok {
-		return ClickResult{}, ErrInvalidNickname
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return ClickResult{}, err
 	}
 
 	redisKey := s.prefix + slug
@@ -261,7 +279,7 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 	}, nil
 }
 
-// EnsureDefaults seeds the built-in buttons only when Redis is currently empty.
+// EnsureDefaults 在 Redis 为空时初始化默认按钮
 func (s *Store) EnsureDefaults(ctx context.Context, buttons []config.ButtonSeed) error {
 	keys, err := s.scanKeys(ctx)
 	if err != nil {
@@ -292,6 +310,7 @@ func (s *Store) EnsureDefaults(ctx context.Context, buttons []config.ButtonSeed)
 	return err
 }
 
+// normalizeButton 将 Redis 数据转换为 Button 结构
 func (s *Store) normalizeButton(redisKey string, values []any) Button {
 	slug := strings.TrimPrefix(redisKey, s.prefix)
 	fallback := s.fallbacks[slug]
@@ -327,6 +346,7 @@ func (s *Store) normalizeButton(redisKey string, values []any) Button {
 	}
 }
 
+// scanKeys 扫描 Redis 中匹配前缀的所有键
 func (s *Store) scanKeys(ctx context.Context) ([]string, error) {
 	var (
 		cursor uint64
@@ -349,6 +369,7 @@ func (s *Store) scanKeys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
+// nextIncrement 计算本次点击的增量值和是否暴击
 func (s *Store) nextIncrement() (int64, bool) {
 	if s.critical.CriticalChancePercent <= 0 || s.critical.CriticalCount <= 1 {
 		return 1, false
@@ -361,7 +382,7 @@ func (s *Store) nextIncrement() (int64, bool) {
 	return 1, false
 }
 
-// ListLeaderboard returns the top active nicknames sorted by total clicks.
+// ListLeaderboard 获取排行榜前 N 名
 func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]LeaderboardEntry, error) {
 	if limit <= 0 {
 		limit = 10
@@ -389,11 +410,11 @@ func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]Leaderboard
 	return leaderboard, nil
 }
 
-// GetUserStats returns the current total for one nickname.
+// GetUserStats 获取指定用户的统计信息
 func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, error) {
-	normalizedNickname, ok := normalizeNickname(nickname)
-	if !ok {
-		return UserStats{}, ErrInvalidNickname
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return UserStats{}, err
 	}
 
 	values, err := s.client.HMGet(ctx, s.userPrefix+normalizedNickname, "nickname", "click_count").Result()
@@ -407,6 +428,25 @@ func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, e
 	}, nil
 }
 
+func (s *Store) validatedNickname(nickname string) (string, error) {
+	normalizedNickname, ok := normalizeNickname(nickname)
+	if !ok {
+		return "", ErrInvalidNickname
+	}
+
+	if s.validator != nil {
+		if err := s.validator.Validate(normalizedNickname); err != nil {
+			if errors.Is(err, nicknamefilter.ErrSensitiveNickname) {
+				return "", ErrSensitiveNickname
+			}
+			return "", err
+		}
+	}
+
+	return normalizedNickname, nil
+}
+
+// deriveNamespace 从按钮前缀推导命名空间
 func deriveNamespace(prefix string) string {
 	if strings.HasSuffix(prefix, "button:") {
 		return strings.TrimSuffix(prefix, "button:")
@@ -415,6 +455,7 @@ func deriveNamespace(prefix string) string {
 	return prefix
 }
 
+// normalizeNickname 规范化昵称（去除首尾空格）
 func normalizeNickname(nickname string) (string, bool) {
 	trimmed := strings.TrimSpace(nickname)
 	if trimmed == "" {
