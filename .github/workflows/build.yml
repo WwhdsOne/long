@@ -59,7 +59,7 @@ jobs:
             go -C backend build \
               -trimpath \
               -ldflags "-w -s" \
-              -o backend/long \
+              -o long \
               ./cmd/server
 
       - name: Prepare deploy artifacts
