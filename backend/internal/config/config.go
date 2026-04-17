@@ -16,13 +16,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ButtonSeed describes one built-in button that should exist in an empty Redis.
+// ButtonSeed 内置按钮种子数据
 type ButtonSeed struct {
-	Slug      string
-	Label     string
-	Sort      int
-	ImagePath string
-	ImageAlt  string
+	Slug      string // 按钮标识
+	Label     string // 显示名称
+	Sort      int    // 排序权重
+	ImagePath string // 图片路径
+	ImageAlt  string // 图片描述
 }
 
 // RedisConfig holds the connection settings for the Redis instance.
@@ -42,13 +42,13 @@ type RateLimitConfig struct {
 	BlacklistDuration time.Duration
 }
 
-// CriticalHitConfig controls the optional crit mechanic for button clicks.
+// CriticalHitConfig 暴击机制配置
 type CriticalHitConfig struct {
-	ChancePercent int
-	Count         int64
+	ChancePercent int   // 暴击概率（百分比）
+	Count         int64 // 暴击时的增量倍数
 }
 
-// Config bundles every runtime setting needed by the backend service.
+// Config 运行时配置集合
 type Config struct {
 	Port               int
 	Redis              RedisConfig
@@ -86,6 +86,7 @@ type consulKV struct {
 	Value string `json:"Value"`
 }
 
+// DefaultButtons 内置默认按钮列表
 var DefaultButtons = []ButtonSeed{
 	{Slug: "feel", Label: "有感觉吗", Sort: 10},
 	{Slug: "understand", Label: "有没有懂的", Sort: 20},
@@ -100,7 +101,7 @@ var DefaultButtons = []ButtonSeed{
 
 var exitProcess = os.Exit
 
-// Load reads the runtime configuration from Consul and starts a config watcher.
+// Load 从 Consul 加载运行时配置
 func Load() (Config, error) {
 	cfg, source, err := loadFromConsul()
 	if err != nil {

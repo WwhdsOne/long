@@ -16,6 +16,7 @@ long.tar.gz
 vendor/
 
 # IDE
+*/.idea
 .idea/
 .vscode/
 **/.vscode/
