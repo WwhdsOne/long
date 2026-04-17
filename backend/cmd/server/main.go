@@ -24,6 +24,11 @@ import (
 	"long/internal/vote"
 )
 
+var (
+	version   = "dev"
+	buildTime = "unknown"
+)
+
 // snapshotPublisher avoids rebroadcasting identical snapshots during Redis polling.
 type snapshotPublisher struct {
 	hub  *events.Hub
