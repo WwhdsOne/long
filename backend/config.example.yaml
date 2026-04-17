@@ -1,0 +1,21 @@
+port: 2333
+
+redis:
+  host: 127.0.0.1
+  port: 6379
+  username: ""
+  password: ""
+  db: 0
+  tls_enabled: false
+
+redis_prefix: "vote:button:"
+button_poll_interval_ms: 3000
+
+rate_limit:
+  limit: 12
+  window_ms: 2000
+  blacklist_ms: 600000
+
+critical_hit:
+  chance_percent: 5
+  count: 5

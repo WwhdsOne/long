@@ -1,0 +1,44 @@
+# 构建产物
+/bin/
+/build/
+/dist/
+*.exe
+*.test
+*.out
+/server
+/backend/vote-wall
+node_modules/
+long.tar.gz
+
+# 依赖
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 临时/日志
+*.log
+*.tmp
+*.bak
+
+# 测试覆盖率
+coverage.out
+coverage.html
+
+# 配置（含敏感信息）
+configs/dev.yaml
+configs/*.env
+*.env
+/backend/config.yaml
+/backend/config.local.yaml
+/backend/config.test.yaml
+
+# Git hooks
+.git/hooks/
