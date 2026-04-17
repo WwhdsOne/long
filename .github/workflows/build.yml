@@ -98,7 +98,7 @@ jobs:
           username: ${{ env.SSH_USER }}
           password: ${{ env.SSH_PASSWORD }}
           port: ${{ env.SERVER_PORT }}
-          source: "deploy-artifacts/Dockerfile,deploy-artifacts/long,deploy-artifacts/public"
+          source: "deploy-artifacts"
           target: ${{ env.DEPLOY_PATH }}
 
       - name: Build image and start container
@@ -110,7 +110,7 @@ jobs:
           port: ${{ env.SERVER_PORT }}
           script: |
             set -e
-            cd "${{ env.DEPLOY_PATH }}"
+            cd "${{ env.DEPLOY_PATH }}/deploy-artifacts"
 
             docker build -t ${{ env.IMAGE_NAME }}:latest .
 
