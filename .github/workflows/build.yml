@@ -53,6 +53,18 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Build Go binary (linux/amd64)
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go -C backend build -o backend/vote-wall ./cmd/server
+
+      - name: Prepare deploy artifacts
+        run: |
+          mkdir -p deploy-artifacts
+          cp Dockerfile deploy-artifacts/
+          cp backend/vote-wall deploy-artifacts/
+          cp -r backend/public deploy-artifacts/
+
       - name: Prepare remote deploy directory and clean old container/image
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -75,14 +87,14 @@ jobs:
               docker rmi -f "$IMAGE_ID" || true
             fi
 
-      - name: Upload build context to server
+      - name: Upload build artifacts to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SSH_USER }}
           password: ${{ env.SSH_PASSWORD }}
           port: ${{ env.SERVER_PORT }}
-          source: ".dockerignore,Dockerfile,backend,frontend"
+          source: "deploy-artifacts/"
           target: ${{ env.DEPLOY_PATH }}
 
       - name: Build image and start container
@@ -94,7 +106,7 @@ jobs:
           port: ${{ env.SERVER_PORT }}
           script: |
             set -e
-            cd "${{ env.DEPLOY_PATH }}"
+            cd "${{ env.DEPLOY_PATH }}/deploy-artifacts"
 
             docker build -t ${{ env.IMAGE_NAME }}:latest .
 
