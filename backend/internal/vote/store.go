@@ -85,6 +85,7 @@ type Store struct {
 	client         redis.UniversalClient
 	prefix         string                    // 按钮键前缀
 	userPrefix     string                    // 用户键前缀
+	userAbilityKey string                    // 用户能力键前缀
 	leaderboardKey string                    // 排行榜键名
 	fallbacks      map[string]buttonFallback // 回退数据
 	critical       StoreOptions              // 暴击配置
@@ -110,6 +111,7 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		client:         client,
 		prefix:         prefix,
 		userPrefix:     namespace + "user:",
+		userAbilityKey: namespace + "user-ability:",
 		leaderboardKey: namespace + "leaderboard",
 		fallbacks: map[string]buttonFallback{
 			"wechat-pity": {
@@ -249,7 +251,10 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 		return ClickResult{}, ErrButtonNotFound
 	}
 
-	delta, critical := s.nextIncrement()
+	delta, critical, err := s.nextIncrement(ctx, normalizedNickname)
+	if err != nil {
+		return ClickResult{}, err
+	}
 	pipe := s.client.TxPipeline()
 	pipe.HIncrBy(ctx, redisKey, "count", delta)
 	userCountCmd := pipe.HIncrBy(ctx, s.userPrefix+normalizedNickname, "click_count", delta)
@@ -370,16 +375,25 @@ func (s *Store) scanKeys(ctx context.Context) ([]string, error) {
 }
 
 // nextIncrement 计算本次点击的增量值和是否暴击
-func (s *Store) nextIncrement() (int64, bool) {
-	if s.critical.CriticalChancePercent <= 0 || s.critical.CriticalCount <= 1 {
-		return 1, false
+func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool, error) {
+	chancePercent, err := s.userCriticalChancePercent(ctx, nickname)
+	if err != nil {
+		return 0, false, err
+	}
+	criticalCount, err := s.userCriticalCount(ctx, nickname)
+	if err != nil {
+		return 0, false, err
 	}
 
-	if s.roll(100) < s.critical.CriticalChancePercent {
-		return s.critical.CriticalCount, true
+	if chancePercent <= 0 || criticalCount <= 1 {
+		return 1, false, nil
 	}
 
-	return 1, false
+	if s.roll(100) < chancePercent {
+		return criticalCount, true, nil
+	}
+
+	return 1, false, nil
 }
 
 // ListLeaderboard 获取排行榜前 N 名
@@ -444,6 +458,44 @@ func (s *Store) validatedNickname(nickname string) (string, error) {
 	}
 
 	return normalizedNickname, nil
+}
+
+func (s *Store) userCriticalChancePercent(ctx context.Context, nickname string) (int, error) {
+	if s.critical.CriticalChancePercent <= 0 || s.critical.CriticalChancePercent > 100 {
+		return 0, nil
+	}
+
+	return s.userAbilityIntValue(ctx, nickname, "critical_chance_percent", s.critical.CriticalChancePercent, 0, 100)
+}
+
+func (s *Store) userCriticalCount(ctx context.Context, nickname string) (int64, error) {
+	if s.critical.CriticalCount <= 1 {
+		return 1, nil
+	}
+
+	value, err := s.userAbilityIntValue(ctx, nickname, "critical_count", int(s.critical.CriticalCount), 2, 1<<31-1)
+	if err != nil {
+		return 0, err
+	}
+
+	return int64(value), nil
+}
+
+func (s *Store) userAbilityIntValue(ctx context.Context, nickname string, field string, fallback int, min int, max int) (int, error) {
+	rawValue, err := s.client.HGet(ctx, s.userAbilityKey+nickname, field).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return fallback, nil
+		}
+		return 0, err
+	}
+
+	override, parseErr := strconv.Atoi(strings.TrimSpace(rawValue))
+	if parseErr != nil || override < min || override > max {
+		return fallback, nil
+	}
+
+	return override, nil
 }
 
 // deriveNamespace 从按钮前缀推导命名空间

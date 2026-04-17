@@ -58,6 +58,7 @@ redis-cli HSET vote:button:new-one label "新按钮" count 0 sort 40 enabled 1
 
 ```text
 vote:user:<nickname>
+vote:user-ability:<nickname>
 vote:leaderboard
 ```
 
@@ -65,9 +66,15 @@ vote:leaderboard
   - `nickname`
   - `click_count`
   - `updated_at`
+- `vote:user-ability:<nickname>` 是 `Hash`
+  - `critical_chance_percent`
+  - `critical_count`
+  - 后续可继续扩展别的能力字段
 - `vote:leaderboard` 是 `Sorted Set`
   - member = 昵称
   - score = 个人累计点击数
+
+用户能力配置和现有统计数据分开存储，后端不会回写或迁移已经存在的 `vote:user:<nickname>` 数据。
 
 ## Consul 配置
 
@@ -114,6 +121,25 @@ critical_hit:
 - `rate_limit.blacklist_ms`
 - `critical_hit.chance_percent`
 - `critical_hit.count`
+
+## 用户能力覆盖
+
+- 默认所有用户都使用 Consul 里的全局暴击配置。
+- 如果 Redis 里存在 `vote:user-ability:<nickname>`，后端会优先读取其中的能力字段。
+- 当前支持两个用户能力覆盖字段：
+  - `critical_chance_percent`：允许设置为 `0-100`
+  - `critical_count`：允许设置为 `2` 及以上
+- 如果字段不存在、为空或值非法，会自动回退到全局默认值。
+
+示例：
+
+```bash
+redis-cli HSET vote:user-ability:阿明 critical_chance_percent 80 critical_count 12
+redis-cli HSET vote:user-ability:阿明 critical_count 20
+redis-cli HDEL vote:user-ability:阿明 critical_chance_percent
+redis-cli HDEL vote:user-ability:阿明 critical_count
+redis-cli DEL vote:user-ability:阿明
+```
 
 ## 昵称敏感词校验
 

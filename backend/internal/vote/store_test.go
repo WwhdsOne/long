@@ -140,6 +140,187 @@ func TestClickButtonAppliesCriticalHitWhenRollMatches(t *testing.T) {
 	}
 }
 
+func TestClickButtonUsesUserAbilityCriticalChanceOverride(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 20 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "2",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
+		"critical_chance_percent": "30",
+	}).Err(); err != nil {
+		t.Fatalf("seed user ability: %v", err)
+	}
+
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if updated.Delta != 5 || !updated.Critical {
+		t.Fatalf("expected critical click from user ability override, got delta=%d critical=%v", updated.Delta, updated.Critical)
+	}
+}
+
+func TestClickButtonFallsBackToDefaultCriticalChanceWhenUserAbilityMissing(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 20 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "2",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if updated.Delta != 1 || updated.Critical {
+		t.Fatalf("expected default non-critical click without user ability override, got delta=%d critical=%v", updated.Delta, updated.Critical)
+	}
+}
+
+func TestClickButtonIgnoresInvalidUserAbilityCriticalChance(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 20 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "2",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
+		"critical_chance_percent": "200",
+	}).Err(); err != nil {
+		t.Fatalf("seed invalid user ability: %v", err)
+	}
+
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if updated.Delta != 1 || updated.Critical {
+		t.Fatalf("expected invalid user ability to fall back to default non-critical click, got delta=%d critical=%v", updated.Delta, updated.Critical)
+	}
+}
+
+func TestClickButtonAllowsUserAbilityToDisableCriticalChance(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 0 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "2",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
+		"critical_chance_percent": "0",
+	}).Err(); err != nil {
+		t.Fatalf("seed zero user ability: %v", err)
+	}
+
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if updated.Delta != 1 || updated.Critical {
+		t.Fatalf("expected zero critical chance override to disable critical, got delta=%d critical=%v", updated.Delta, updated.Critical)
+	}
+}
+
+func TestClickButtonUsesUserAbilityCriticalCountOverride(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 0 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "2",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
+		"critical_count": "9",
+	}).Err(); err != nil {
+		t.Fatalf("seed user ability critical count: %v", err)
+	}
+
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if updated.Delta != 9 || !updated.Critical {
+		t.Fatalf("expected critical count override to apply, got delta=%d critical=%v", updated.Delta, updated.Critical)
+	}
+}
+
+func TestClickButtonIgnoresInvalidUserAbilityCriticalCount(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 0 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "2",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
+		"critical_count": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed invalid user ability critical count: %v", err)
+	}
+
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if updated.Delta != 5 || !updated.Critical {
+		t.Fatalf("expected invalid critical count override to fall back to default, got delta=%d critical=%v", updated.Delta, updated.Critical)
+	}
+}
+
 func TestGetStateReturnsLeaderboardAndUserStats(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
