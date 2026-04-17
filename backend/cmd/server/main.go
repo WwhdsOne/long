@@ -35,22 +35,22 @@ func newSnapshotPublisher(hub *events.Hub) *snapshotPublisher {
 	return &snapshotPublisher{hub: hub}
 }
 
-func (p *snapshotPublisher) BroadcastSnapshot(buttons []vote.Button) error {
-	_, err := p.broadcast(buttons, false)
+func (p *snapshotPublisher) BroadcastSnapshot(snapshot vote.Snapshot) error {
+	_, err := p.broadcast(snapshot, false)
 	return err
 }
 
-func (p *snapshotPublisher) BroadcastSnapshotIfChanged(buttons []vote.Button) (bool, error) {
-	return p.broadcast(buttons, false)
+func (p *snapshotPublisher) BroadcastSnapshotIfChanged(snapshot vote.Snapshot) (bool, error) {
+	return p.broadcast(snapshot, false)
 }
 
-func (p *snapshotPublisher) ForceSnapshot(buttons []vote.Button) error {
-	_, err := p.broadcast(buttons, true)
+func (p *snapshotPublisher) ForceSnapshot(snapshot vote.Snapshot) error {
+	_, err := p.broadcast(snapshot, true)
 	return err
 }
 
-func (p *snapshotPublisher) broadcast(buttons []vote.Button, force bool) (bool, error) {
-	signatureBytes, err := json.Marshal(buttons)
+func (p *snapshotPublisher) broadcast(snapshot vote.Snapshot, force bool) (bool, error) {
+	signatureBytes, err := json.Marshal(snapshot)
 	if err != nil {
 		return false, err
 	}
@@ -65,7 +65,7 @@ func (p *snapshotPublisher) broadcast(buttons []vote.Button, force bool) (bool, 
 	p.last = signature
 	p.mu.Unlock()
 
-	return true, p.hub.BroadcastSnapshot(buttons)
+	return true, p.hub.BroadcastSnapshot()
 }
 
 func main() {
@@ -111,7 +111,7 @@ func run() error {
 
 	hub := events.NewHub()
 	publisher := newSnapshotPublisher(hub)
-	eventHandler := events.NewHandler(hub, store.ListButtons)
+	eventHandler := events.NewHandler(hub, store.GetState)
 	clickLimiter := ratelimit.NewLimiter(ratelimit.Config{
 		Limit:             cfg.RateLimit.Limit,
 		Window:            cfg.RateLimit.Window,
@@ -152,24 +152,24 @@ func run() error {
 			case <-pollCtx.Done():
 				return
 			case <-ticker.C:
-				buttons, err := store.ListButtons(pollCtx)
+				snapshot, err := store.GetSnapshot(pollCtx)
 				if err != nil {
-					log.Printf("Failed to sync buttons from Redis: %v", err)
+					log.Printf("Failed to sync state from Redis: %v", err)
 					continue
 				}
-				if _, err := publisher.BroadcastSnapshotIfChanged(buttons); err != nil {
-					log.Printf("Failed to publish buttons: %v", err)
+				if _, err := publisher.BroadcastSnapshotIfChanged(snapshot); err != nil {
+					log.Printf("Failed to publish state: %v", err)
 				}
 			}
 		}
 	}()
 
-	initialButtons, err := store.ListButtons(startupCtx)
+	initialSnapshot, err := store.GetSnapshot(startupCtx)
 	if err != nil {
-		return fmt.Errorf("load initial buttons: %w", err)
+		return fmt.Errorf("load initial state: %w", err)
 	}
-	if err := publisher.ForceSnapshot(initialButtons); err != nil {
-		return fmt.Errorf("broadcast initial buttons: %w", err)
+	if err := publisher.ForceSnapshot(initialSnapshot); err != nil {
+		return fmt.Errorf("broadcast initial state: %w", err)
 	}
 
 	sigCh := make(chan os.Signal, 1)

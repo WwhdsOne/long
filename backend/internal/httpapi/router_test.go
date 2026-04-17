@@ -12,26 +12,47 @@ import (
 )
 
 type mockStore struct {
-	buttons []vote.Button
-	result  vote.ClickResult
+	state  vote.State
+	result vote.ClickResult
 }
 
-func (m *mockStore) ListButtons(context.Context) ([]vote.Button, error) {
-	return m.buttons, nil
+func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
+	state := m.state
+	if nickname == "" {
+		state.UserStats = nil
+	}
+	return state, nil
 }
 
-func (m *mockStore) ClickButton(_ context.Context, slug string) (vote.ClickResult, error) {
-	for index := range m.buttons {
-		if m.buttons[index].Key == slug {
+func (m *mockStore) GetSnapshot(_ context.Context) (vote.Snapshot, error) {
+	return vote.Snapshot{
+		Buttons:     m.state.Buttons,
+		Leaderboard: m.state.Leaderboard,
+	}, nil
+}
+
+func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+	for index := range m.state.Buttons {
+		if m.state.Buttons[index].Key == slug {
 			if m.result.Button.Key == "" {
-				m.buttons[index].Count++
+				m.state.Buttons[index].Count++
+				if m.state.UserStats == nil && nickname != "" {
+					m.state.UserStats = &vote.UserStats{Nickname: nickname}
+				}
+				if m.state.UserStats != nil {
+					m.state.UserStats.ClickCount++
+				}
 				return vote.ClickResult{
-					Button:   m.buttons[index],
+					Button:   m.state.Buttons[index],
 					Delta:    1,
 					Critical: false,
+					UserStats: vote.UserStats{
+						Nickname:   nickname,
+						ClickCount: 1,
+					},
 				}, nil
 			}
-			m.buttons[index].Count = m.result.Button.Count
+			m.state.Buttons[index].Count = m.result.Button.Count
 			return m.result, nil
 		}
 	}
@@ -39,25 +60,29 @@ func (m *mockStore) ClickButton(_ context.Context, slug string) (vote.ClickResul
 }
 
 type mockBroadcaster struct {
-	snapshots [][]vote.Button
+	snapshots []vote.Snapshot
 }
 
-func (m *mockBroadcaster) BroadcastSnapshot(buttons []vote.Button) error {
-	copied := append([]vote.Button(nil), buttons...)
-	m.snapshots = append(m.snapshots, copied)
+func (m *mockBroadcaster) BroadcastSnapshot(snapshot vote.Snapshot) error {
+	m.snapshots = append(m.snapshots, snapshot)
 	return nil
 }
 
 func TestGetButtonsReturnsCurrentList(t *testing.T) {
 	store := &mockStore{
-		buttons: []vote.Button{
-			{
-				Key:      "feel",
-				RedisKey: "vote:button:feel",
-				Label:    "有感觉吗",
-				Count:    2,
-				Sort:     10,
-				Enabled:  true,
+		state: vote.State{
+			Buttons: []vote.Button{
+				{
+					Key:      "feel",
+					RedisKey: "vote:button:feel",
+					Label:    "有感觉吗",
+					Count:    2,
+					Sort:     10,
+					Enabled:  true,
+				},
+			},
+			Leaderboard: []vote.LeaderboardEntry{
+				{Rank: 1, Nickname: "阿明", ClickCount: 9},
 			},
 		},
 	}
@@ -77,7 +102,8 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 	}
 
 	var payload struct {
-		Buttons []vote.Button `json:"buttons"`
+		Buttons     []vote.Button           `json:"buttons"`
+		Leaderboard []vote.LeaderboardEntry `json:"leaderboard"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -85,6 +111,9 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 
 	if len(payload.Buttons) != 1 || payload.Buttons[0].Count != 2 {
 		t.Fatalf("unexpected buttons payload: %+v", payload.Buttons)
+	}
+	if len(payload.Leaderboard) != 1 || payload.Leaderboard[0].Nickname != "阿明" {
+		t.Fatalf("unexpected leaderboard payload: %+v", payload.Leaderboard)
 	}
 
 	if len(broadcaster.snapshots) != 0 {
@@ -94,15 +123,21 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 
 func TestClickButtonBroadcastsLatestSnapshot(t *testing.T) {
 	store := &mockStore{
-		buttons: []vote.Button{
-			{
-				Key:      "feel",
-				RedisKey: "vote:button:feel",
-				Label:    "有感觉吗",
-				Count:    2,
-				Sort:     10,
-				Enabled:  true,
+		state: vote.State{
+			Buttons: []vote.Button{
+				{
+					Key:      "feel",
+					RedisKey: "vote:button:feel",
+					Label:    "有感觉吗",
+					Count:    2,
+					Sort:     10,
+					Enabled:  true,
+				},
 			},
+			Leaderboard: []vote.LeaderboardEntry{
+				{Rank: 1, Nickname: "阿明", ClickCount: 3},
+			},
+			UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 2},
 		},
 	}
 	broadcaster := &mockBroadcaster{}
@@ -111,7 +146,8 @@ func TestClickButtonBroadcastsLatestSnapshot(t *testing.T) {
 		Broadcaster: broadcaster,
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(""))
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -121,10 +157,12 @@ func TestClickButtonBroadcastsLatestSnapshot(t *testing.T) {
 	}
 
 	var payload struct {
-		Button   vote.Button   `json:"button"`
-		Buttons  []vote.Button `json:"buttons"`
-		Delta    int64         `json:"delta"`
-		Critical bool          `json:"critical"`
+		Button      vote.Button             `json:"button"`
+		Buttons     []vote.Button           `json:"buttons"`
+		Delta       int64                   `json:"delta"`
+		Critical    bool                    `json:"critical"`
+		UserStats   vote.UserStats          `json:"userStats"`
+		Leaderboard []vote.LeaderboardEntry `json:"leaderboard"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -136,23 +174,32 @@ func TestClickButtonBroadcastsLatestSnapshot(t *testing.T) {
 	if payload.Delta != 1 || payload.Critical {
 		t.Fatalf("expected normal click payload, got delta=%d critical=%v", payload.Delta, payload.Critical)
 	}
+	if payload.UserStats.Nickname != "阿明" {
+		t.Fatalf("expected user stats for 阿明, got %+v", payload.UserStats)
+	}
 
-	if len(broadcaster.snapshots) != 1 || broadcaster.snapshots[0][0].Count != 3 {
+	if len(broadcaster.snapshots) != 1 || broadcaster.snapshots[0].Buttons[0].Count != 3 {
 		t.Fatalf("unexpected broadcast payload: %+v", broadcaster.snapshots)
 	}
 }
 
 func TestClickButtonReturnsCriticalMetadata(t *testing.T) {
 	store := &mockStore{
-		buttons: []vote.Button{
-			{
-				Key:      "feel",
-				RedisKey: "vote:button:feel",
-				Label:    "有感觉吗",
-				Count:    2,
-				Sort:     10,
-				Enabled:  true,
+		state: vote.State{
+			Buttons: []vote.Button{
+				{
+					Key:      "feel",
+					RedisKey: "vote:button:feel",
+					Label:    "有感觉吗",
+					Count:    2,
+					Sort:     10,
+					Enabled:  true,
+				},
 			},
+			Leaderboard: []vote.LeaderboardEntry{
+				{Rank: 1, Nickname: "阿明", ClickCount: 7},
+			},
+			UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 7},
 		},
 		result: vote.ClickResult{
 			Button: vote.Button{
@@ -165,6 +212,10 @@ func TestClickButtonReturnsCriticalMetadata(t *testing.T) {
 			},
 			Delta:    5,
 			Critical: true,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 7,
+			},
 		},
 	}
 
@@ -173,7 +224,8 @@ func TestClickButtonReturnsCriticalMetadata(t *testing.T) {
 		Broadcaster: &mockBroadcaster{},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(""))
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -197,11 +249,13 @@ func TestClickButtonReturnsCriticalMetadata(t *testing.T) {
 
 func TestClickMissingButtonReturnsNotFound(t *testing.T) {
 	store := &mockStore{
-		buttons: []vote.Button{
-			{
-				Key:     "feel",
-				Label:   "有感觉吗",
-				Enabled: true,
+		state: vote.State{
+			Buttons: []vote.Button{
+				{
+					Key:     "feel",
+					Label:   "有感觉吗",
+					Enabled: true,
+				},
 			},
 		},
 	}
@@ -210,12 +264,36 @@ func TestClickMissingButtonReturnsNotFound(t *testing.T) {
 		Broadcaster: &mockBroadcaster{},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/buttons/missing/click", nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/missing/click", strings.NewReader(`{"nickname":"阿明"}`))
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", response.Code)
+	}
+}
+
+func TestClickRequiresNickname(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Enabled: true},
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"   "}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.Code)
 	}
 }

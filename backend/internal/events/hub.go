@@ -5,31 +5,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	"long/internal/vote"
 )
 
-// SnapshotProvider fetches the latest button list for a newly connected stream.
-type SnapshotProvider func(context.Context) ([]vote.Button, error)
+// StateProvider fetches the latest state for one browser subscriber.
+type StateProvider func(context.Context, string) (vote.State, error)
 
 // Hub broadcasts live SSE snapshots to all connected clients.
 type Hub struct {
 	mu      sync.RWMutex
-	clients map[chan []byte]struct{}
+	clients map[chan struct{}]struct{}
 }
 
 // NewHub creates an in-memory broadcaster for browser subscribers.
 func NewHub() *Hub {
 	return &Hub{
-		clients: make(map[chan []byte]struct{}),
+		clients: make(map[chan struct{}]struct{}),
 	}
 }
 
 // Subscribe registers a new client channel and returns a cleanup callback.
-func (h *Hub) Subscribe() (<-chan []byte, func()) {
-	ch := make(chan []byte, 1)
+func (h *Hub) Subscribe() (<-chan struct{}, func()) {
+	ch := make(chan struct{}, 1)
 
 	h.mu.Lock()
 	h.clients[ch] = struct{}{}
@@ -48,24 +49,19 @@ func (h *Hub) Subscribe() (<-chan []byte, func()) {
 }
 
 // BroadcastSnapshot sends the newest vote wall snapshot to every listener.
-func (h *Hub) BroadcastSnapshot(buttons []vote.Button) error {
-	payload, err := snapshotPayload(buttons)
-	if err != nil {
-		return err
-	}
-
+func (h *Hub) BroadcastSnapshot() error {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	for client := range h.clients {
-		deliverSnapshot(client, payload)
+		deliverSnapshot(client)
 	}
 
 	return nil
 }
 
 // NewHandler exposes the SSE endpoint used by the frontend EventSource client.
-func NewHandler(hub *Hub, current SnapshotProvider) http.HandlerFunc {
+func NewHandler(hub *Hub, current StateProvider) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -78,15 +74,16 @@ func NewHandler(hub *Hub, current SnapshotProvider) http.HandlerFunc {
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("X-Accel-Buffering", "no")
 
-		buttons, err := current(r.Context())
+		nickname := strings.TrimSpace(r.URL.Query().Get("nickname"))
+		state, err := current(r.Context(), nickname)
 		if err != nil {
-			http.Error(w, "BUTTONS_FETCH_FAILED", http.StatusInternalServerError)
+			http.Error(w, "STATE_FETCH_FAILED", http.StatusInternalServerError)
 			return
 		}
 
-		initialPayload, err := snapshotPayload(buttons)
+		initialPayload, err := snapshotPayload(state)
 		if err != nil {
-			http.Error(w, "BUTTONS_FETCH_FAILED", http.StatusInternalServerError)
+			http.Error(w, "STATE_FETCH_FAILED", http.StatusInternalServerError)
 			return
 		}
 
@@ -105,8 +102,16 @@ func NewHandler(hub *Hub, current SnapshotProvider) http.HandlerFunc {
 			select {
 			case <-r.Context().Done():
 				return
-			case payload, ok := <-client:
+			case _, ok := <-client:
 				if !ok {
+					return
+				}
+				state, err := current(r.Context(), nickname)
+				if err != nil {
+					return
+				}
+				payload, err := snapshotPayload(state)
+				if err != nil {
 					return
 				}
 				if err := writeEvent(w, payload); err != nil {
@@ -123,11 +128,9 @@ func NewHandler(hub *Hub, current SnapshotProvider) http.HandlerFunc {
 	}
 }
 
-func deliverSnapshot(client chan []byte, payload []byte) {
-	cloned := append([]byte(nil), payload...)
-
+func deliverSnapshot(client chan struct{}) {
 	select {
-	case client <- cloned:
+	case client <- struct{}{}:
 	default:
 		select {
 		case <-client:
@@ -135,18 +138,14 @@ func deliverSnapshot(client chan []byte, payload []byte) {
 		}
 
 		select {
-		case client <- cloned:
+		case client <- struct{}{}:
 		default:
 		}
 	}
 }
 
-func snapshotPayload(buttons []vote.Button) ([]byte, error) {
-	return json.Marshal(struct {
-		Buttons []vote.Button `json:"buttons"`
-	}{
-		Buttons: buttons,
-	})
+func snapshotPayload(state vote.State) ([]byte, error) {
+	return json.Marshal(state)
 }
 
 func writeEvent(w http.ResponseWriter, payload []byte) error {

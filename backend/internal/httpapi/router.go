@@ -18,13 +18,14 @@ import (
 
 // ButtonStore is the minimal vote storage contract required by the HTTP layer.
 type ButtonStore interface {
-	ListButtons(context.Context) ([]vote.Button, error)
-	ClickButton(context.Context, string) (vote.ClickResult, error)
+	GetState(context.Context, string) (vote.State, error)
+	GetSnapshot(context.Context) (vote.Snapshot, error)
+	ClickButton(context.Context, string, string) (vote.ClickResult, error)
 }
 
 // Broadcaster emits updated snapshots after a successful click.
 type Broadcaster interface {
-	BroadcastSnapshot([]vote.Button) error
+	BroadcastSnapshot(vote.Snapshot) error
 }
 
 // ClickGuard decides whether the current client may submit another click.
@@ -50,17 +51,34 @@ func NewHandler(options Options) http.Handler {
 	})
 
 	apiMux.HandleFunc("GET /api/buttons", func(w http.ResponseWriter, r *http.Request) {
-		buttons, err := options.Store.ListButtons(r.Context())
+		state, err := options.Store.GetState(r.Context(), r.URL.Query().Get("nickname"))
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BUTTONS_FETCH_FAILED"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 			return
 		}
 
-		writeJSON(w, http.StatusOK, map[string]any{"buttons": buttons})
+		writeJSON(w, http.StatusOK, state)
 	})
 
 	apiMux.HandleFunc("POST /api/buttons/{slug}/click", func(w http.ResponseWriter, r *http.Request) {
 		slug := r.PathValue("slug")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再开点。",
+			})
+			return
+		}
+		if strings.TrimSpace(body.Nickname) == "" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_NICKNAME",
+				"message": "昵称还没填好，先起个名字再点。",
+			})
+			return
+		}
 
 		if options.ClickGuard != nil {
 			retryAfter, err := options.ClickGuard.Allow(clientIdentifier(r))
@@ -79,10 +97,17 @@ func NewHandler(options Options) http.Handler {
 			}
 		}
 
-		result, err := options.Store.ClickButton(r.Context(), slug)
+		result, err := options.Store.ClickButton(r.Context(), slug, body.Nickname)
 		if err != nil {
 			if errors.Is(err, vote.ErrButtonNotFound) {
 				writeJSON(w, http.StatusNotFound, map[string]string{"error": "BUTTON_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, vote.ErrInvalidNickname) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "INVALID_NICKNAME",
+					"message": "昵称还没填好，先起个名字再点。",
+				})
 				return
 			}
 
@@ -90,18 +115,23 @@ func NewHandler(options Options) http.Handler {
 			return
 		}
 
-		buttons, err := options.Store.ListButtons(r.Context())
+		state, err := options.Store.GetState(r.Context(), body.Nickname)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BUTTONS_FETCH_FAILED"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 			return
 		}
 
-		_ = options.Broadcaster.BroadcastSnapshot(buttons)
+		_ = options.Broadcaster.BroadcastSnapshot(vote.Snapshot{
+			Buttons:     state.Buttons,
+			Leaderboard: state.Leaderboard,
+		})
 		writeJSON(w, http.StatusOK, map[string]any{
-			"button":   result.Button,
-			"buttons":  buttons,
-			"delta":    result.Delta,
-			"critical": result.Critical,
+			"button":      result.Button,
+			"buttons":     state.Buttons,
+			"leaderboard": state.Leaderboard,
+			"userStats":   result.UserStats,
+			"delta":       result.Delta,
+			"critical":    result.Critical,
 		})
 	})
 

@@ -2,6 +2,7 @@
 /bin/
 /build/
 /dist/
+/backend/public/
 *.exe
 *.test
 *.out
@@ -9,6 +10,7 @@
 /backend/vote-wall
 node_modules/
 long.tar.gz
+*.tar.gz
 
 # 依赖
 vendor/
@@ -16,6 +18,7 @@ vendor/
 # IDE
 .idea/
 .vscode/
+**/.vscode/
 *.swp
 *.swo
 

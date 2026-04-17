@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,14 +22,16 @@ func (b blockingLimiter) Allow(string) (time.Duration, error) {
 
 func TestClickButtonReturnsTooManyRequestsWhenClientIsBlocked(t *testing.T) {
 	store := &mockStore{
-		buttons: []vote.Button{
-			{
-				Key:      "feel",
-				RedisKey: "vote:button:feel",
-				Label:    "有感觉吗",
-				Count:    2,
-				Sort:     10,
-				Enabled:  true,
+		state: vote.State{
+			Buttons: []vote.Button{
+				{
+					Key:      "feel",
+					RedisKey: "vote:button:feel",
+					Label:    "有感觉吗",
+					Count:    2,
+					Sort:     10,
+					Enabled:  true,
+				},
 			},
 		},
 	}
@@ -42,9 +45,10 @@ func TestClickButtonReturnsTooManyRequestsWhenClientIsBlocked(t *testing.T) {
 		},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明"}`))
 	request.RemoteAddr = "203.0.113.30:4567"
 	request.Header.Set("X-Forwarded-For", "198.51.100.24, 203.0.113.30")
+	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)

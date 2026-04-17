@@ -2,6 +2,7 @@ package vote
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -90,7 +91,7 @@ func TestClickButtonUsesNormalCountAndAppliesFallbackImage(t *testing.T) {
 		t.Fatalf("seed button: %v", err)
 	}
 
-	updated, err := store.ClickButton(ctx, "wechat-pity")
+	updated, err := store.ClickButton(ctx, "wechat-pity", "阿明")
 	if err != nil {
 		t.Fatalf("click button: %v", err)
 	}
@@ -103,6 +104,9 @@ func TestClickButtonUsesNormalCountAndAppliesFallbackImage(t *testing.T) {
 	}
 	if updated.Button.ImagePath != "/images/emojipedia-wechat-whimper.png" {
 		t.Fatalf("expected fallback image path, got %q", updated.Button.ImagePath)
+	}
+	if updated.UserStats.Nickname != "阿明" || updated.UserStats.ClickCount != 1 {
+		t.Fatalf("unexpected user stats: %+v", updated.UserStats)
 	}
 }
 
@@ -122,7 +126,7 @@ func TestClickButtonAppliesCriticalHitWhenRollMatches(t *testing.T) {
 		t.Fatalf("seed button: %v", err)
 	}
 
-	updated, err := store.ClickButton(ctx, "feel")
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
 	if err != nil {
 		t.Fatalf("click button: %v", err)
 	}
@@ -132,6 +136,75 @@ func TestClickButtonAppliesCriticalHitWhenRollMatches(t *testing.T) {
 	}
 	if updated.Delta != 5 || !updated.Critical {
 		t.Fatalf("expected critical click, got delta=%d critical=%v", updated.Delta, updated.Critical)
+	}
+}
+
+func TestGetStateReturnsLeaderboardAndUserStats(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 99 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:button:understand", map[string]any{
+		"label":   "有没有懂的",
+		"count":   "0",
+		"sort":    "20",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed understand: %v", err)
+	}
+
+	if _, err := store.ClickButton(ctx, "feel", "阿明"); err != nil {
+		t.Fatalf("click feel by 阿明: %v", err)
+	}
+	if _, err := store.ClickButton(ctx, "understand", "小红"); err != nil {
+		t.Fatalf("click understand by 小红: %v", err)
+	}
+	if _, err := store.ClickButton(ctx, "understand", "小红"); err != nil {
+		t.Fatalf("second click understand by 小红: %v", err)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state: %v", err)
+	}
+
+	if len(state.Leaderboard) != 2 {
+		t.Fatalf("expected 2 leaderboard entries, got %d", len(state.Leaderboard))
+	}
+	if state.Leaderboard[0].Nickname != "小红" || state.Leaderboard[0].ClickCount != 2 {
+		t.Fatalf("unexpected leaderboard winner: %+v", state.Leaderboard[0])
+	}
+	if state.UserStats == nil || state.UserStats.Nickname != "阿明" || state.UserStats.ClickCount != 1 {
+		t.Fatalf("unexpected user stats: %+v", state.UserStats)
+	}
+}
+
+func TestClickButtonRejectsEmptyNickname(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+
+	if _, err := store.ClickButton(ctx, "feel", "   "); !errors.Is(err, ErrInvalidNickname) {
+		t.Fatalf("expected invalid nickname error, got %v", err)
 	}
 }
 

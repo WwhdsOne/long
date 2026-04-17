@@ -1,7 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
+
 const buttons = ref([])
+const leaderboard = ref([])
+const userStats = ref(null)
+const nickname = ref('')
+const nicknameDraft = ref('')
 const loading = ref(true)
 const syncing = ref(false)
 const errorMessage = ref('')
@@ -24,6 +30,20 @@ const syncLabel = computed(() => {
 
   return liveConnected.value ? '全员在线' : '正在重连'
 })
+const isLoggedIn = computed(() => nickname.value !== '')
+const myClicks = computed(() => userStats.value?.clickCount ?? 0)
+const myRank = computed(() => {
+  if (!nickname.value) {
+    return null
+  }
+
+  const matched = leaderboard.value.find((entry) => entry.nickname === nickname.value)
+  return matched?.rank ?? null
+})
+
+function normalizeNickname(value) {
+  return value.trim()
+}
 
 function markUpdated() {
   lastUpdatedAt.value = new Intl.DateTimeFormat('zh-CN', {
@@ -33,8 +53,10 @@ function markUpdated() {
   }).format(new Date())
 }
 
-function applySnapshot(nextButtons) {
-  buttons.value = nextButtons
+function applyState(payload) {
+  buttons.value = payload?.buttons ?? []
+  leaderboard.value = payload?.leaderboard ?? []
+  userStats.value = payload?.userStats ?? (nickname.value ? { nickname: nickname.value, clickCount: 0 } : null)
   pendingKeys.value = new Set()
   syncing.value = false
   markUpdated()
@@ -75,18 +97,22 @@ function triggerCriticalBurst(key, delta) {
   )
 }
 
-async function loadButtons() {
+function currentNicknameQuery() {
+  return nickname.value ? `?nickname=${encodeURIComponent(nickname.value)}` : ''
+}
+
+async function loadState() {
   loading.value = true
   syncing.value = true
 
   try {
-    const response = await fetch('/api/buttons')
+    const response = await fetch(`/api/buttons${currentNicknameQuery()}`)
     if (!response.ok) {
       throw new Error('按钮列表加载失败')
     }
 
     const data = await response.json()
-    applySnapshot(data.buttons)
+    applyState(data)
   } catch (error) {
     errorMessage.value = error.message || '加载失败，请稍后重试。'
   } finally {
@@ -96,7 +122,7 @@ async function loadButtons() {
 }
 
 async function clickButton(key) {
-  if (pendingKeys.value.has(key)) {
+  if (!nickname.value || pendingKeys.value.has(key)) {
     return
   }
 
@@ -111,6 +137,9 @@ async function clickButton(key) {
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        nickname: nickname.value,
+      }),
     })
 
     if (!response.ok) {
@@ -132,7 +161,7 @@ async function clickButton(key) {
     if (data.critical) {
       triggerCriticalBurst(key, data.delta)
     }
-    applySnapshot(data.buttons)
+    applyState(data)
     liveConnected.value = true
     errorMessage.value = ''
   } catch (error) {
@@ -144,7 +173,8 @@ async function clickButton(key) {
 }
 
 function connectEventStream() {
-  eventSource = new EventSource('/api/events')
+  eventSource?.close()
+  eventSource = new EventSource(`/api/events${currentNicknameQuery()}`)
 
   eventSource.onopen = () => {
     liveConnected.value = true
@@ -155,7 +185,7 @@ function connectEventStream() {
     try {
       const payload = JSON.parse(event.data)
       if (payload?.buttons) {
-        applySnapshot(payload.buttons)
+        applyState(payload)
         liveConnected.value = true
         errorMessage.value = ''
       }
@@ -170,8 +200,41 @@ function connectEventStream() {
   }
 }
 
+async function submitNickname() {
+  const nextNickname = normalizeNickname(nicknameDraft.value)
+  if (!nextNickname) {
+    errorMessage.value = '先给自己起个名字，再上墙。'
+    return
+  }
+
+  nickname.value = nextNickname
+  nicknameDraft.value = nextNickname
+  window.localStorage.setItem(NICKNAME_STORAGE_KEY, nextNickname)
+  userStats.value = {
+    nickname: nextNickname,
+    clickCount: userStats.value?.nickname === nextNickname ? userStats.value.clickCount : 0,
+  }
+  await loadState()
+  connectEventStream()
+}
+
+async function resetNickname() {
+  nickname.value = ''
+  nicknameDraft.value = ''
+  userStats.value = null
+  window.localStorage.removeItem(NICKNAME_STORAGE_KEY)
+  await loadState()
+  connectEventStream()
+}
+
 onMounted(async () => {
-  await loadButtons()
+  const savedNickname = normalizeNickname(window.localStorage.getItem(NICKNAME_STORAGE_KEY) || '')
+  if (savedNickname) {
+    nickname.value = savedNickname
+    nicknameDraft.value = savedNickname
+  }
+
+  await loadState()
   connectEventStream()
 })
 
@@ -191,9 +254,9 @@ onBeforeUnmount(() => {
     <section class="hero">
       <div class="hero__copy">
         <p class="hero__eyebrow">Long Vote Wall</p>
-        <h1>来都来了，按一下再走。</h1>
+        <h1>报个名，再狠狠干一票。</h1>
         <p class="hero__lede">
-          谁都能点，数字会立刻弹上去。这个页面就该像现场一样热闹一点。
+          昵称只当现场外号用，同名直接算同一个人。点得越猛，榜单爬得越快。
         </p>
       </div>
 
@@ -216,83 +279,168 @@ onBeforeUnmount(() => {
         <strong>{{ totalVotes }}</strong>
       </article>
       <article class="stats-band__card">
-        <span class="stats-band__label">现在状态</span>
-        <strong>{{ syncing ? '正在拉新数据' : '可以开点' }}</strong>
+        <span class="stats-band__label">我的点击</span>
+        <strong>{{ isLoggedIn ? myClicks : '先登录' }}</strong>
+      </article>
+      <article class="stats-band__card">
+        <span class="stats-band__label">我的排名</span>
+        <strong>{{ isLoggedIn ? `#${myRank ?? '--'}` : '--' }}</strong>
       </article>
     </section>
 
-    <section class="vote-stage">
-      <div class="vote-stage__head">
-        <div>
-          <p class="vote-stage__eyebrow">现场投票墙</p>
-          <h2>看见哪个想按，就直接拍下去。</h2>
+    <section class="stage-layout">
+      <section class="vote-stage">
+        <div class="vote-stage__head">
+          <div>
+            <p class="vote-stage__eyebrow">现场投票墙</p>
+            <h2>看见哪个想按，就直接拍下去。</h2>
+          </div>
+          <p v-if="!errorMessage" class="vote-stage__hint">
+            {{ isLoggedIn ? `现在上墙的是 ${nickname}` : '先报个名，再开始冲榜。' }}
+          </p>
         </div>
-        <p v-if="!errorMessage" class="vote-stage__hint">
-          所有人看到的是同一份实时总数。
-        </p>
-      </div>
 
-      <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
+        <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
 
-      <div v-if="loading" class="feedback-panel">
-        <p>正在把现场按钮搬上来...</p>
-      </div>
+        <div v-if="loading" class="feedback-panel">
+          <p>正在把现场按钮搬上来...</p>
+        </div>
 
-      <div v-else-if="buttons.length === 0" class="feedback-panel">
-        <p>还没有按钮上墙，先加一个再回来看看。</p>
-      </div>
+        <div v-else-if="buttons.length === 0" class="feedback-panel">
+          <p>还没有按钮上墙，先加一个再回来看看。</p>
+        </div>
 
-      <div v-else class="button-grid">
-        <button
-          v-for="button in buttons"
-          :key="button.key"
-          class="vote-card"
-          :class="{
-            'vote-card--image': button.imagePath,
-            'vote-card--pending': pendingKeys.has(button.key),
-            'vote-card--critical': Boolean(criticalBursts[button.key]),
-          }"
-          type="button"
-          :disabled="pendingKeys.has(button.key)"
-          :aria-label="`${button.label}，当前 ${button.count} 票`"
-          @click="clickButton(button.key)"
-        >
-          <span class="vote-card__shine"></span>
-          <span
-            v-if="criticalBursts[button.key]"
-            :key="criticalBursts[button.key].nonce"
-            class="vote-card__burst"
-            aria-hidden="true"
-          ></span>
-          <span
-            v-if="criticalBursts[button.key]"
-            :key="`${criticalBursts[button.key].nonce}-label`"
-            class="vote-card__critical-text"
-            aria-hidden="true"
+        <div v-else class="button-grid">
+          <button
+            v-for="button in buttons"
+            :key="button.key"
+            class="vote-card"
+            :class="{
+              'vote-card--image': button.imagePath,
+              'vote-card--pending': pendingKeys.has(button.key),
+              'vote-card--critical': Boolean(criticalBursts[button.key]),
+              'vote-card--locked': !isLoggedIn,
+            }"
+            type="button"
+            :disabled="pendingKeys.has(button.key) || !isLoggedIn"
+            :aria-label="`${button.label}，当前 ${button.count} 票`"
+            @click="clickButton(button.key)"
           >
-            {{ criticalBursts[button.key].label }}
-          </span>
-          <span class="vote-card__badge">
-            {{
-              pendingKeys.has(button.key)
-                ? '正在记票'
-                : criticalBursts[button.key]
-                  ? '这下真暴击了'
-                  : '拍一下 +1'
-            }}
-          </span>
+            <span class="vote-card__shine"></span>
+            <span
+              v-if="criticalBursts[button.key]"
+              :key="criticalBursts[button.key].nonce"
+              class="vote-card__burst"
+              aria-hidden="true"
+            ></span>
+            <span
+              v-if="criticalBursts[button.key]"
+              :key="`${criticalBursts[button.key].nonce}-label`"
+              class="vote-card__critical-text"
+              aria-hidden="true"
+            >
+              {{ criticalBursts[button.key].label }}
+            </span>
+            <span class="vote-card__badge">
+              {{
+                !isLoggedIn
+                  ? '先报个名'
+                  : pendingKeys.has(button.key)
+                    ? '正在记票'
+                    : criticalBursts[button.key]
+                      ? '这下真暴击了'
+                      : '拍一下 +1'
+              }}
+            </span>
 
-          <img
-            v-if="button.imagePath"
-            class="vote-card__image"
-            :src="button.imagePath"
-            :alt="button.imageAlt || button.label"
-          />
-          <strong v-else class="vote-card__label">{{ button.label }}</strong>
+            <img
+              v-if="button.imagePath"
+              class="vote-card__image"
+              :src="button.imagePath"
+              :alt="button.imageAlt || button.label"
+            />
+            <strong v-else class="vote-card__label">{{ button.label }}</strong>
 
-          <span class="vote-card__count">{{ button.count }}</span>
-        </button>
-      </div>
+            <span class="vote-card__count">{{ button.count }}</span>
+          </button>
+        </div>
+      </section>
+
+      <aside class="social-panel">
+        <section class="social-card login-card">
+          <div class="social-card__head">
+            <p class="vote-stage__eyebrow">昵称登录</p>
+            <strong>{{ isLoggedIn ? '已经上墙' : '先报个名' }}</strong>
+          </div>
+
+          <p class="social-card__copy">
+            {{ isLoggedIn ? `你现在用的是 ${nickname}。同名会直接并成同一个人。` : '随便起个现场外号就能开点，不设密码。' }}
+          </p>
+
+          <form class="nickname-form" @submit.prevent="submitNickname">
+            <input
+              v-model="nicknameDraft"
+              class="nickname-form__input"
+              type="text"
+              maxlength="20"
+              placeholder="比如：阿明"
+            />
+            <button class="nickname-form__submit" type="submit">
+              {{ isLoggedIn ? '切换昵称' : '进入现场' }}
+            </button>
+          </form>
+
+          <button
+            v-if="isLoggedIn"
+            class="nickname-form__ghost"
+            type="button"
+            @click="resetNickname"
+          >
+            清空昵称
+          </button>
+        </section>
+
+        <section class="social-card me-card">
+          <div class="social-card__head">
+            <p class="vote-stage__eyebrow">个人战绩</p>
+            <strong>{{ isLoggedIn ? nickname : '未登录' }}</strong>
+          </div>
+
+          <div class="me-card__stats">
+            <article>
+              <span>我的点击</span>
+              <strong>{{ isLoggedIn ? myClicks : '--' }}</strong>
+            </article>
+            <article>
+              <span>当前排名</span>
+              <strong>{{ isLoggedIn ? `#${myRank ?? '--'}` : '--' }}</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="social-card leaderboard-card">
+          <div class="social-card__head">
+            <p class="vote-stage__eyebrow">实时排行榜</p>
+            <strong>前 {{ leaderboard.length || 0 }} 名</strong>
+          </div>
+
+          <ol v-if="leaderboard.length > 0" class="leaderboard-list">
+            <li
+              v-for="entry in leaderboard"
+              :key="entry.nickname"
+              class="leaderboard-list__item"
+              :class="{ 'leaderboard-list__item--me': entry.nickname === nickname }"
+            >
+              <span class="leaderboard-list__rank">#{{ entry.rank }}</span>
+              <span class="leaderboard-list__name">{{ entry.nickname }}</span>
+              <strong class="leaderboard-list__count">{{ entry.clickCount }}</strong>
+            </li>
+          </ol>
+          <div v-else class="leaderboard-list leaderboard-list--empty">
+            <p>还没人上榜，等你来开张。</p>
+          </div>
+        </section>
+      </aside>
     </section>
   </main>
 </template>

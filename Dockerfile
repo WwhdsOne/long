@@ -1,7 +1,7 @@
 FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
+COPY frontend/package*.json frontend/.npmrc ./
 RUN npm install
 COPY frontend/ ./
 RUN npm run build
@@ -23,7 +23,6 @@ WORKDIR /app/backend
 RUN apk add --no-cache ca-certificates
 
 COPY --from=go-builder /out/vote-wall /app/backend/vote-wall
-COPY backend/config.yaml /app/backend/config.yaml
 COPY --from=frontend-builder /app/backend/public /app/backend/public
 
 EXPOSE 2333

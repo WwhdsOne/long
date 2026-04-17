@@ -1,11 +1,18 @@
 package config
 
 import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -77,6 +84,10 @@ type fileConfig struct {
 	} `yaml:"critical_hit"`
 }
 
+type consulKV struct {
+	Value string `json:"Value"`
+}
+
 var DefaultButtons = []ButtonSeed{
 	{Slug: "feel", Label: "有感觉吗", Sort: 10},
 	{Slug: "understand", Label: "有没有懂的", Sort: 20},
@@ -89,58 +100,81 @@ var DefaultButtons = []ButtonSeed{
 	},
 }
 
-// Load reads the runtime configuration from backend/config.yaml.
+var exitProcess = os.Exit
+
+// Load reads the runtime configuration from Consul and starts a config watcher.
 func Load() (Config, error) {
-	return loadFromFile("config.yaml")
-}
-
-// LoadTest reads the dedicated test configuration from backend/config.test.yaml.
-func LoadTest() (Config, error) {
-	return loadFromFile("config.test.yaml")
-}
-
-func loadFromFile(filename string) (Config, error) {
-	configPath := resolveConfigPath(filename)
-
-	payload, err := os.ReadFile(configPath)
+	cfg, source, err := loadFromConsul()
 	if err != nil {
-		return Config{}, fmt.Errorf("read %s: %w", filename, err)
+		return Config{}, err
 	}
 
-	var source fileConfig
-	if err := yaml.Unmarshal(payload, &source); err != nil {
-		return Config{}, fmt.Errorf("parse %s: %w", filename, err)
+	go watchConsulConfig(source.addr, source.key, source.index)
+
+	return cfg, nil
+}
+
+// LoadTest reads configuration from Consul without starting the watcher.
+func LoadTest() (Config, error) {
+	cfg, _, err := loadFromConsul()
+	return cfg, err
+}
+
+type consulSource struct {
+	addr  string
+	key   string
+	index string
+}
+
+func loadFromConsul() (Config, consulSource, error) {
+	source, err := consulSourceFromEnv()
+	if err != nil {
+		return Config{}, consulSource{}, err
+	}
+
+	payload, index, err := fetchConfigPayload(context.Background(), source.addr, source.key, "")
+	if err != nil {
+		return Config{}, consulSource{}, err
+	}
+
+	var parsed fileConfig
+	if err := yaml.Unmarshal(payload, &parsed); err != nil {
+		return Config{}, consulSource{}, fmt.Errorf("parse consul config: %w", err)
 	}
 
 	config := Config{
-		Port: source.Port,
+		Port: parsed.Port,
 		Redis: RedisConfig{
-			Host:       source.Redis.Host,
-			Port:       source.Redis.Port,
-			Username:   source.Redis.Username,
-			Password:   source.Redis.Password,
-			DB:         source.Redis.DB,
-			TLSEnabled: source.Redis.TLSEnabled,
+			Host:       parsed.Redis.Host,
+			Port:       parsed.Redis.Port,
+			Username:   parsed.Redis.Username,
+			Password:   parsed.Redis.Password,
+			DB:         parsed.Redis.DB,
+			TLSEnabled: parsed.Redis.TLSEnabled,
 		},
 		RateLimit: RateLimitConfig{
-			Limit:             source.RateLimit.Limit,
-			Window:            time.Duration(source.RateLimit.WindowMS) * time.Millisecond,
-			BlacklistDuration: time.Duration(source.RateLimit.BlacklistMS) * time.Millisecond,
+			Limit:             parsed.RateLimit.Limit,
+			Window:            time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
+			BlacklistDuration: time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
 		},
 		CriticalHit: CriticalHitConfig{
-			ChancePercent: source.CriticalHit.ChancePercent,
-			Count:         source.CriticalHit.Count,
+			ChancePercent: parsed.CriticalHit.ChancePercent,
+			Count:         parsed.CriticalHit.Count,
 		},
-		RedisPrefix:        source.RedisPrefix,
-		ButtonPollInterval: time.Duration(source.ButtonPollIntervalMS) * time.Millisecond,
+		RedisPrefix:        parsed.RedisPrefix,
+		ButtonPollInterval: time.Duration(parsed.ButtonPollIntervalMS) * time.Millisecond,
 		PublicDir:          resolvePublicDir(),
 	}
 
 	if err := validate(config); err != nil {
-		return Config{}, fmt.Errorf("validate %s: %w", filename, err)
+		return Config{}, consulSource{}, fmt.Errorf("validate consul config: %w", err)
 	}
 
-	return config, nil
+	return config, consulSource{
+		addr:  source.addr,
+		key:   source.key,
+		index: index,
+	}, nil
 }
 
 func validate(config Config) error {
@@ -170,13 +204,89 @@ func validate(config Config) error {
 	return nil
 }
 
-func resolveConfigPath(filename string) string {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		return filename
+func consulSourceFromEnv() (consulSource, error) {
+	addr := strings.TrimSpace(os.Getenv("CONSUL_ADDR"))
+	if addr == "" {
+		return consulSource{}, errors.New("CONSUL_ADDR is required")
 	}
 
-	return filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", filename))
+	key := strings.TrimSpace(os.Getenv("CONSUL_CONFIG_KEY"))
+	if key == "" {
+		return consulSource{}, errors.New("CONSUL_CONFIG_KEY is required")
+	}
+
+	return consulSource{
+		addr: normalizeConsulAddr(addr),
+		key:  strings.TrimPrefix(key, "/"),
+	}, nil
+}
+
+func normalizeConsulAddr(addr string) string {
+	if strings.HasPrefix(addr, "http://") || strings.HasPrefix(addr, "https://") {
+		return strings.TrimRight(addr, "/")
+	}
+
+	return "http://" + strings.TrimRight(addr, "/")
+}
+
+func fetchConfigPayload(ctx context.Context, consulAddr, configKey, index string) ([]byte, string, error) {
+	requestURL := fmt.Sprintf("%s/v1/kv/%s", consulAddr, configKey)
+	if index != "" {
+		requestURL = fmt.Sprintf("%s?wait=5m&index=%s", requestURL, index)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("build consul request: %w", err)
+	}
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, "", fmt.Errorf("fetch consul config: %w", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("consul returned status %d", response.StatusCode)
+	}
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("read consul response: %w", err)
+	}
+
+	var kvs []consulKV
+	if err := json.Unmarshal(body, &kvs); err != nil {
+		return nil, "", fmt.Errorf("decode consul response: %w", err)
+	}
+	if len(kvs) == 0 {
+		return nil, "", errors.New("consul response is empty")
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(kvs[0].Value)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode consul config value: %w", err)
+	}
+
+	return decoded, response.Header.Get("X-Consul-Index"), nil
+}
+
+func watchConsulConfig(consulAddr, configKey, lastIndex string) {
+	for {
+		_, nextIndex, err := fetchConfigPayload(context.Background(), consulAddr, configKey, lastIndex)
+		if err != nil {
+			log.Printf("watch consul config failed: %v", err)
+			time.Sleep(10 * time.Second)
+			continue
+		}
+
+		if nextIndex == "" || nextIndex == lastIndex {
+			continue
+		}
+
+		log.Printf("consul config changed, exiting for restart")
+		exitProcess(0)
+	}
 }
 
 func resolvePublicDir() string {

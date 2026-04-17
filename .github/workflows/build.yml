@@ -1,0 +1,107 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: long
+      CONTAINER_NAME: long
+      DEPLOY_PATH: /home/docker-images/long
+      DOCKER_NETWORK: docker-compose_app-net
+      CONSUL_ADDR: ${{ secrets.CONSUL_ADDR }}
+      CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
+      SERVER_IP: ${{ secrets.SERVER_IP }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT }}
+      SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Go 1.26
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm --prefix frontend ci
+
+      - name: Run backend tests and vet
+        run: |
+          go -C backend test ./...
+          go -C backend vet ./...
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Prepare remote deploy directory and clean old container/image
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.SERVER_IP }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SERVER_PORT }}
+          script: |
+            set -e
+            mkdir -p "${{ env.DEPLOY_PATH }}"
+            rm -rf "${{ env.DEPLOY_PATH }}"/*
+
+            CONTAINER_ID=$(docker ps -a -q --filter "name=^/${{ env.CONTAINER_NAME }}$")
+            if [ -n "$CONTAINER_ID" ]; then
+              docker rm -f "$CONTAINER_ID" || true
+            fi
+
+            IMAGE_ID=$(docker images -q ${{ env.IMAGE_NAME }}:latest)
+            if [ -n "$IMAGE_ID" ]; then
+              docker rmi -f "$IMAGE_ID" || true
+            fi
+
+      - name: Upload build context to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SERVER_IP }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SERVER_PORT }}
+          source: ".dockerignore,Dockerfile,backend,frontend"
+          target: ${{ env.DEPLOY_PATH }}
+
+      - name: Build image and start container
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.SERVER_IP }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SERVER_PORT }}
+          script: |
+            set -e
+            cd "${{ env.DEPLOY_PATH }}"
+
+            docker build -t ${{ env.IMAGE_NAME }}:latest .
+
+            docker run -d \
+              --name ${{ env.CONTAINER_NAME }} \
+              --network ${{ env.DOCKER_NETWORK }} \
+              --restart unless-stopped \
+              -e CONSUL_ADDR="${{ env.CONSUL_ADDR }}" \
+              -e CONSUL_CONFIG_KEY="${{ env.CONSUL_CONFIG_KEY }}" \
+              ${{ env.IMAGE_NAME }}:latest
