@@ -10,8 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -290,10 +288,5 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 }
 
 func resolvePublicDir() string {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		return filepath.Clean(filepath.Join("..", "..", "public"))
-	}
-
-	return filepath.Clean(filepath.Join(filepath.Dir(currentFile), "..", "..", "public"))
+	return "public"
 }
