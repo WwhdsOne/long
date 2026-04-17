@@ -59,14 +59,14 @@ jobs:
             go -C backend build \
               -trimpath \
               -ldflags "-w -s" \
-              -o backend/vote-wall \
+              -o backend/long \
               ./cmd/server
 
       - name: Prepare deploy artifacts
         run: |
           mkdir -p deploy-artifacts
           cp Dockerfile deploy-artifacts/
-          cp backend/vote-wall deploy-artifacts/
+          cp backend/long deploy-artifacts/
           cp -r backend/public deploy-artifacts/
 
       - name: Prepare remote deploy directory and clean old container/image
