@@ -12,7 +12,6 @@ jobs:
       IMAGE_NAME: long
       CONTAINER_NAME: long
       DEPLOY_PATH: /home/docker-images/long
-      DOCKER_NETWORK: docker-compose_app-net
       CONSUL_ADDR: ${{ secrets.CONSUL_ADDR }}
       CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
       SERVER_IP: ${{ secrets.SERVER_IP }}
@@ -116,7 +115,7 @@ jobs:
 
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
-              --network ${{ env.DOCKER_NETWORK }} \
+              --network host \
               --restart unless-stopped \
               -e CONSUL_ADDR="${{ env.CONSUL_ADDR }}" \
               -e CONSUL_CONFIG_KEY="${{ env.CONSUL_CONFIG_KEY }}" \
