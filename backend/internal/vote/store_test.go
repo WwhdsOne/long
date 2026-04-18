@@ -468,3 +468,155 @@ func TestEnsureDefaultsSeedsOnlyWhenNoButtonsExist(t *testing.T) {
 		t.Fatalf("expected 4 buttons, got %d", len(buttons))
 	}
 }
+
+func TestEquipItemAndClickButtonApplyEquippedBonusWithoutBoss(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 99 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
+		"name":         "木剑",
+		"slot":         "weapon",
+		"bonus_clicks": "2",
+	}).Err(); err != nil {
+		t.Fatalf("seed equipment definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-inventory:阿明", map[string]any{
+		"wood-sword": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+
+	state, err := store.EquipItem(ctx, "阿明", "wood-sword")
+	if err != nil {
+		t.Fatalf("equip item: %v", err)
+	}
+
+	if state.Loadout.Weapon == nil || state.Loadout.Weapon.ItemID != "wood-sword" {
+		t.Fatalf("expected weapon slot to equip wood-sword, got %+v", state.Loadout.Weapon)
+	}
+	if state.CombatStats.EffectiveIncrement != 3 {
+		t.Fatalf("expected effective increment 3 after equip, got %+v", state.CombatStats)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click feel: %v", err)
+	}
+
+	if result.Delta != 3 || result.Critical {
+		t.Fatalf("expected non-critical delta 3, got delta=%d critical=%v", result.Delta, result.Critical)
+	}
+	if result.Button.Count != 3 {
+		t.Fatalf("expected button count 3, got %d", result.Button.Count)
+	}
+	if result.UserStats.ClickCount != 3 {
+		t.Fatalf("expected user click count 3, got %+v", result.UserStats)
+	}
+}
+
+func TestClickButtonDefeatsActiveBossAndAwardsLootOnce(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 99 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
+		"name":         "木剑",
+		"slot":         "weapon",
+		"bonus_clicks": "2",
+	}).Err(); err != nil {
+		t.Fatalf("seed wood-sword definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed cloth-armor definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-inventory:阿明", map[string]any{
+		"wood-sword": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-loadout:阿明", map[string]any{
+		"weapon": "wood-sword",
+	}).Err(); err != nil {
+		t.Fatalf("seed loadout: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:boss:current", map[string]any{
+		"id":         "slime-king",
+		"name":       "史莱姆王",
+		"status":     "active",
+		"max_hp":     "3",
+		"current_hp": "3",
+	}).Err(); err != nil {
+		t.Fatalf("seed boss: %v", err)
+	}
+	if err := store.client.ZAdd(ctx, "vote:boss:slime-king:loot", redis.Z{
+		Score:  1,
+		Member: "cloth-armor",
+	}).Err(); err != nil {
+		t.Fatalf("seed boss loot: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click feel: %v", err)
+	}
+
+	if result.Delta != 3 {
+		t.Fatalf("expected delta 3 from equipped clicks, got %d", result.Delta)
+	}
+	if result.Boss == nil || result.Boss.Status != "defeated" || result.Boss.CurrentHP != 0 {
+		t.Fatalf("expected defeated boss payload, got %+v", result.Boss)
+	}
+	if result.LastReward == nil || result.LastReward.ItemID != "cloth-armor" {
+		t.Fatalf("expected cloth-armor reward, got %+v", result.LastReward)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state after boss kill: %v", err)
+	}
+
+	if state.Boss == nil || state.Boss.Status != "defeated" {
+		t.Fatalf("expected defeated boss in state, got %+v", state.Boss)
+	}
+	if len(state.BossLeaderboard) != 1 || state.BossLeaderboard[0].Damage != 3 {
+		t.Fatalf("expected boss leaderboard damage 3, got %+v", state.BossLeaderboard)
+	}
+	if state.Inventory[0].ItemID == "" {
+		t.Fatalf("expected inventory entries, got %+v", state.Inventory)
+	}
+
+	var foundReward bool
+	for _, item := range state.Inventory {
+		if item.ItemID == "cloth-armor" && item.Quantity == 1 {
+			foundReward = true
+		}
+	}
+	if !foundReward {
+		t.Fatalf("expected rewarded cloth-armor in inventory, got %+v", state.Inventory)
+	}
+}

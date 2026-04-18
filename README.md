@@ -7,8 +7,12 @@
 - 页面会展示所有符合规则的 Redis 按钮键。
 - 访问者先输入昵称，之后点击都会记到这个昵称名下。
 - 任意访问者点击按钮后，总数立即 `+1`。
+- 玩家可以穿戴装备，装备会让平时点击直接获得额外次数增量。
 - 所有在线用户都会通过 SSE 实时看到最新计数。
 - 页面会实时展示个人累计点击和排行榜。
+- 支持单个全服世界 Boss：Boss 活动期间，同一次点击会同时记票并造成 Boss 伤害。
+- Boss 击杀后会按掉落池给参与玩家发装备，装备进入各自背包。
+- 提供 `/admin` 管理后台，可登录后配置 Boss、装备、掉落池和前台按钮。
 - 你后面只要往 Redis 新增一个新键，前端就会自动展示新按钮。
 - 前端静态页和后端 API/SSE 统一由一个 Go 服务承载，并可打成单一 Docker 镜像。
 - 后端会在内存里做爆发点击限流，超出人类能力的频率会被拉黑 10 分钟。
@@ -76,6 +80,51 @@ vote:leaderboard
 
 用户能力配置和现有统计数据分开存储，后端不会回写或迁移已经存在的 `vote:user:<nickname>` 数据。
 
+世界 Boss、装备与掉落使用：
+
+```text
+vote:boss:current
+vote:boss:<bossId>:damage
+vote:boss:<bossId>:loot
+vote:equip:def:<itemId>
+vote:user-inventory:<nickname>
+vote:user-loadout:<nickname>
+vote:user-last-reward:<nickname>
+```
+
+- `vote:boss:current` 是 `Hash`
+  - `id`
+  - `name`
+  - `status`
+  - `max_hp`
+  - `current_hp`
+  - `started_at`
+  - `defeated_at`
+- `vote:boss:<bossId>:damage` 是 `Sorted Set`
+  - member = 昵称
+  - score = 对该 Boss 的累计伤害
+- `vote:boss:<bossId>:loot` 是 `Sorted Set`
+  - member = 装备 `itemId`
+  - score = 掉落权重
+- `vote:equip:def:<itemId>` 是 `Hash`
+  - `name`
+  - `slot` (`weapon` / `armor` / `accessory`)
+  - `bonus_clicks`
+  - `bonus_critical_chance_percent`
+  - `bonus_critical_count`
+- `vote:user-inventory:<nickname>` 是 `Hash`
+  - field = `itemId`
+  - value = 库存数量
+- `vote:user-loadout:<nickname>` 是 `Hash`
+  - `weapon`
+  - `armor`
+  - `accessory`
+- `vote:user-last-reward:<nickname>` 是 `Hash`
+  - `boss_id`
+  - `item_id`
+  - `item_name`
+  - `granted_at`
+
 ## Consul 配置
 
 后端启动时只认这两个环境变量：
@@ -105,6 +154,10 @@ rate_limit:
 critical_hit:
   chance_percent: 5
   count: 5
+admin:
+  username: "admin"
+  password: "change-me"
+  session_secret: "change-this-too"
 ```
 
 ## 限流规则
@@ -121,6 +174,9 @@ critical_hit:
 - `rate_limit.blacklist_ms`
 - `critical_hit.chance_percent`
 - `critical_hit.count`
+- `admin.username`
+- `admin.password`
+- `admin.session_secret`
 
 ## 用户能力覆盖
 
@@ -174,6 +230,7 @@ npm run dev
 
 - 前端开发页：`http://localhost:5173`
 - Go 后端接口：`http://localhost:2333`
+- 管理后台：`http://localhost:5173/admin`（构建后由 Go 服务统一托管）
 
 ## 构建
 

@@ -48,12 +48,20 @@ type CriticalHitConfig struct {
 	Count         int64 // 暴击时的增量倍数
 }
 
+// AdminConfig 管理后台鉴权配置
+type AdminConfig struct {
+	Username      string
+	Password      string
+	SessionSecret string
+}
+
 // Config 运行时配置集合
 type Config struct {
 	Port               int
 	Redis              RedisConfig
 	RateLimit          RateLimitConfig
 	CriticalHit        CriticalHitConfig
+	Admin              AdminConfig
 	RedisPrefix        string
 	ButtonPollInterval time.Duration
 	PublicDir          string
@@ -80,6 +88,11 @@ type fileConfig struct {
 		ChancePercent int   `yaml:"chance_percent"`
 		Count         int64 `yaml:"count"`
 	} `yaml:"critical_hit"`
+	Admin struct {
+		Username      string `yaml:"username"`
+		Password      string `yaml:"password"`
+		SessionSecret string `yaml:"session_secret"`
+	} `yaml:"admin"`
 }
 
 type consulKV struct {
@@ -160,6 +173,11 @@ func loadFromConsul() (Config, consulSource, error) {
 			ChancePercent: parsed.CriticalHit.ChancePercent,
 			Count:         parsed.CriticalHit.Count,
 		},
+		Admin: AdminConfig{
+			Username:      parsed.Admin.Username,
+			Password:      parsed.Admin.Password,
+			SessionSecret: parsed.Admin.SessionSecret,
+		},
 		RedisPrefix:        parsed.RedisPrefix,
 		ButtonPollInterval: time.Duration(parsed.ButtonPollIntervalMS) * time.Millisecond,
 		PublicDir:          resolvePublicDir(),
@@ -198,6 +216,12 @@ func validate(config Config) error {
 		return errors.New("critical_hit.chance_percent must be between 1 and 100")
 	case config.CriticalHit.Count <= 1:
 		return errors.New("critical_hit.count must be greater than 1")
+	case strings.TrimSpace(config.Admin.Username) == "":
+		return errors.New("admin.username is required")
+	case strings.TrimSpace(config.Admin.Password) == "":
+		return errors.New("admin.password is required")
+	case strings.TrimSpace(config.Admin.SessionSecret) == "":
+		return errors.New("admin.session_secret is required")
 	}
 
 	return nil

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	adminauth "long/internal/admin"
 	"long/internal/ratelimit"
 	"long/internal/vote"
 )
@@ -22,6 +23,16 @@ type ButtonStore interface {
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
 	ValidateNickname(context.Context, string) error
+	EquipItem(context.Context, string, string) (vote.State, error)
+	UnequipItem(context.Context, string, string) (vote.State, error)
+	GetAdminState(context.Context) (vote.AdminState, error)
+	SaveButton(context.Context, vote.ButtonUpsert) error
+	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
+	DeleteEquipmentDefinition(context.Context, string) error
+	ActivateBoss(context.Context, vote.BossUpsert) (*vote.Boss, error)
+	DeactivateBoss(context.Context) error
+	SetBossLoot(context.Context, string, []vote.BossLootEntry) error
+	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
 }
 
 // Broadcaster 广播接口，点击成功后推送更新快照
@@ -36,12 +47,15 @@ type ClickGuard interface {
 
 // Options 路由配置，注入业务逻辑、实时更新和静态资源
 type Options struct {
-	Store       ButtonStore
-	Broadcaster Broadcaster
-	ClickGuard  ClickGuard
-	Events      http.Handler
-	PublicDir   string
+	Store              ButtonStore
+	Broadcaster        Broadcaster
+	ClickGuard         ClickGuard
+	Events             http.Handler
+	PublicDir          string
+	AdminAuthenticator *adminauth.Authenticator
 }
+
+const adminSessionCookieName = "long_admin_session"
 
 // NewHandler 构建 API 路由和 SPA 静态文件回退处理器
 func NewHandler(options Options) http.Handler {
@@ -149,14 +163,322 @@ func NewHandler(options Options) http.Handler {
 			Leaderboard: state.Leaderboard,
 		})
 		writeJSON(w, http.StatusOK, map[string]any{
-			"button":      result.Button,
-			"buttons":     state.Buttons,
-			"leaderboard": state.Leaderboard,
-			"userStats":   result.UserStats,
-			"delta":       result.Delta,
-			"critical":    result.Critical,
+			"button":          result.Button,
+			"buttons":         state.Buttons,
+			"leaderboard":     state.Leaderboard,
+			"userStats":       result.UserStats,
+			"delta":           result.Delta,
+			"critical":        result.Critical,
+			"boss":            state.Boss,
+			"bossLeaderboard": state.BossLeaderboard,
+			"myBossStats":     state.MyBossStats,
+			"inventory":       state.Inventory,
+			"loadout":         state.Loadout,
+			"combatStats":     state.CombatStats,
+			"lastReward":      state.LastReward,
 		})
 	})
+
+	apiMux.HandleFunc("POST /api/equipment/{itemId}/equip", func(w http.ResponseWriter, r *http.Request) {
+		itemID := r.PathValue("itemId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再穿装备。",
+			})
+			return
+		}
+
+		state, err := options.Store.EquipItem(r.Context(), body.Nickname, itemID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotFound) {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_OWNED",
+					"message": "这件装备还不在你的背包里。",
+				})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "EQUIP_FAILED"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/equipment/{itemId}/unequip", func(w http.ResponseWriter, r *http.Request) {
+		itemID := r.PathValue("itemId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再卸装备。",
+			})
+			return
+		}
+
+		state, err := options.Store.UnequipItem(r.Context(), body.Nickname, itemID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotFound) {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "UNEQUIP_FAILED"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	if options.AdminAuthenticator != nil {
+		apiMux.HandleFunc("POST /api/admin/login", func(w http.ResponseWriter, r *http.Request) {
+			var body struct {
+				Username string `json:"username"`
+				Password string `json:"password"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			token, ok := options.AdminAuthenticator.Login(body.Username, body.Password)
+			if !ok {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{
+					"error":   "INVALID_CREDENTIALS",
+					"message": "账号或口令不对。",
+				})
+				return
+			}
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     adminSessionCookieName,
+				Value:    token,
+				Path:     "/",
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("POST /api/admin/logout", func(w http.ResponseWriter, _ *http.Request) {
+			http.SetCookie(w, &http.Cookie{
+				Name:     adminSessionCookieName,
+				Value:    "",
+				Path:     "/",
+				HttpOnly: true,
+				MaxAge:   -1,
+				SameSite: http.SameSiteLaxMode,
+			})
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("GET /api/admin/session", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"authenticated": true})
+		})
+
+		apiMux.HandleFunc("GET /api/admin/state", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			state, err := options.Store.GetAdminState(r.Context())
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ADMIN_STATE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, state)
+		})
+
+		apiMux.HandleFunc("POST /api/admin/boss/activate", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.BossUpsert
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			boss, err := options.Store.ActivateBoss(r.Context(), body)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_ACTIVATE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, boss)
+		})
+
+		apiMux.HandleFunc("POST /api/admin/boss/deactivate", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			if err := options.Store.DeactivateBoss(r.Context()); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_DEACTIVATE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("PUT /api/admin/boss/loot", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body struct {
+				BossID string               `json:"bossId"`
+				Loot   []vote.BossLootEntry `json:"loot"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			if err := options.Store.SetBossLoot(r.Context(), body.BossID, body.Loot); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_LOOT_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("GET /api/admin/boss/history", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			history, err := options.Store.ListBossHistory(r.Context())
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_HISTORY_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, history)
+		})
+
+		apiMux.HandleFunc("POST /api/admin/buttons", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.ButtonUpsert
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			if err := options.Store.SaveButton(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BUTTON_SAVE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("PUT /api/admin/buttons/{slug}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.ButtonUpsert
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+			body.Slug = r.PathValue("slug")
+
+			if err := options.Store.SaveButton(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BUTTON_SAVE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("POST /api/admin/equipment", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.EquipmentDefinition
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			if err := options.Store.SaveEquipmentDefinition(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SAVE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("PUT /api/admin/equipment/{itemId}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.EquipmentDefinition
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+			body.ItemID = r.PathValue("itemId")
+
+			if err := options.Store.SaveEquipmentDefinition(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SAVE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("DELETE /api/admin/equipment/{itemId}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			if err := options.Store.DeleteEquipmentDefinition(r.Context(), r.PathValue("itemId")); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_DELETE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+	}
 
 	if options.Events != nil {
 		apiMux.Handle("GET /api/events", options.Events)
@@ -241,4 +563,17 @@ func clientIdentifier(request *http.Request) string {
 	}
 
 	return request.RemoteAddr
+}
+
+func isAdminAuthenticated(request *http.Request, authenticator *adminauth.Authenticator) bool {
+	if authenticator == nil {
+		return false
+	}
+
+	cookie, err := request.Cookie(adminSessionCookieName)
+	if err != nil {
+		return false
+	}
+
+	return authenticator.Verify(cookie.Value)
 }

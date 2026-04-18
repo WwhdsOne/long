@@ -17,6 +17,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"long/internal/admin"
 	"long/internal/config"
 	"long/internal/events"
 	"long/internal/httpapi"
@@ -125,6 +126,11 @@ func run() error {
 		ClickGuard:  clickLimiter,
 		Events:      eventHandler,
 		PublicDir:   cfg.PublicDir,
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      cfg.Admin.Username,
+			Password:      cfg.Admin.Password,
+			SessionSecret: cfg.Admin.SessionSecret,
+		}),
 	})
 
 	server := &http.Server{

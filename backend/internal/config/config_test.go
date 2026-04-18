@@ -35,6 +35,10 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
             critical_hit:
               chance_percent: 5
               count: 5
+            admin:
+              username: "admin"
+              password: "secret"
+              session_secret: "session-secret"
         `))
 
 		w.Header().Set("X-Consul-Index", "7")
@@ -63,6 +67,15 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.CriticalHit.Count != 5 {
 		t.Fatalf("expected critical count 5, got %d", cfg.CriticalHit.Count)
+	}
+	if cfg.Admin.Username != "admin" {
+		t.Fatalf("expected admin username admin, got %q", cfg.Admin.Username)
+	}
+	if cfg.Admin.Password != "secret" {
+		t.Fatalf("expected admin password secret, got %q", cfg.Admin.Password)
+	}
+	if cfg.Admin.SessionSecret != "session-secret" {
+		t.Fatalf("expected admin session secret session-secret, got %q", cfg.Admin.SessionSecret)
 	}
 }
 
