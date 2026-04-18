@@ -7,6 +7,7 @@ const buttons = ref([])
 const leaderboard = ref([])
 const boss = ref(null)
 const bossLeaderboard = ref([])
+const bossLoot = ref([])
 const myBossStats = ref(null)
 const inventory = ref([])
 const loadout = ref(emptyLoadout())
@@ -20,9 +21,15 @@ const syncing = ref(false)
 const errorMessage = ref('')
 const pendingKeys = ref(new Set())
 const actioningItemId = ref('')
+const activeHudTab = ref('inventory')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
 const criticalBursts = ref({})
+const bossHistory = ref([])
+const bossHistoryQuery = ref('')
+const loadingBossHistory = ref(false)
+const bossHistoryLoaded = ref(false)
+const bossHistoryError = ref('')
 
 let eventSource
 const burstTimers = new Map()
@@ -50,6 +57,8 @@ const myRank = computed(() => {
 })
 const myBossDamage = computed(() => myBossStats.value?.damage ?? 0)
 const effectiveIncrement = computed(() => combatStats.value?.effectiveIncrement ?? 1)
+const normalDamage = computed(() => combatStats.value?.normalDamage ?? effectiveIncrement.value)
+const criticalDamage = computed(() => combatStats.value?.criticalDamage ?? normalDamage.value)
 const bossStatusLabel = computed(() => {
   if (!boss.value) {
     return '休战中'
@@ -70,6 +79,16 @@ const bossProgress = computed(() => {
   return Math.max(0, Math.min(100, (boss.value.currentHp / boss.value.maxHp) * 100))
 })
 const equippedItems = computed(() => [loadout.value.weapon, loadout.value.armor, loadout.value.accessory].filter(Boolean))
+const filteredBossHistory = computed(() => {
+  const query = normalizeNickname(bossHistoryQuery.value).toLowerCase()
+  if (!query) {
+    return bossHistory.value.slice(0, 12)
+  }
+
+  return bossHistory.value
+    .filter((entry) => [entry.name, entry.id].some((value) => String(value || '').toLowerCase().includes(query)))
+    .slice(0, 12)
+})
 
 function emptyLoadout() {
   return {
@@ -84,13 +103,44 @@ function defaultCombatStats() {
     baseIncrement: 1,
     bonusClicks: 0,
     effectiveIncrement: 1,
+    normalDamage: 1,
+    criticalDamage: 1,
     criticalChancePercent: 0,
     criticalCount: 1,
   }
 }
 
+function formatItemStats(item) {
+  return `点击+${item?.bonusClicks ?? 0} 暴击率+${item?.bonusCriticalChancePercent ?? 0}% 暴击+${item?.bonusCriticalCount ?? 0}`
+}
+
+function formatItemStatLines(item) {
+  return [
+    `点击 +${item?.bonusClicks ?? 0}`,
+    `暴击率 +${item?.bonusCriticalChancePercent ?? 0}%`,
+    `暴击 +${item?.bonusCriticalCount ?? 0}`,
+  ]
+}
+
 function normalizeNickname(value) {
   return value.trim()
+}
+
+function formatBossTime(timestamp) {
+  if (!timestamp) {
+    return '未记录'
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(timestamp * 1000))
+}
+
+function topBossDamage(entry) {
+  return entry?.damage?.[0] ?? null
 }
 
 async function readErrorMessage(response, fallback) {
@@ -123,6 +173,38 @@ async function validateNicknameWithServer(nextNickname) {
   }
 }
 
+async function loadBossHistory(force = false) {
+  if ((bossHistoryLoaded.value || loadingBossHistory.value) && !force) {
+    return
+  }
+
+  loadingBossHistory.value = true
+  bossHistoryError.value = ''
+
+  try {
+    const response = await fetch('/api/boss/history')
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('历史 Boss 接口还没生效，请重启后端服务。')
+      }
+      throw new Error(`历史 Boss 加载失败（${response.status}）`)
+    }
+
+    const payload = await response.json()
+    bossHistory.value = Array.isArray(payload) ? payload : []
+    bossHistoryLoaded.value = true
+  } catch (error) {
+    if (error instanceof TypeError) {
+      bossHistoryError.value = '历史 Boss 接口不可达，请确认后端服务已启动。'
+      return
+    }
+
+    bossHistoryError.value = error.message || '历史 Boss 加载失败'
+  } finally {
+    loadingBossHistory.value = false
+  }
+}
+
 function markUpdated() {
   lastUpdatedAt.value = new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
@@ -131,12 +213,20 @@ function markUpdated() {
   }).format(new Date())
 }
 
+function selectHudTab(tab) {
+  activeHudTab.value = tab
+  if (tab === 'info') {
+    loadBossHistory()
+  }
+}
+
 function applyState(payload) {
   buttons.value = payload?.buttons ?? []
   leaderboard.value = payload?.leaderboard ?? []
   userStats.value = payload?.userStats ?? null
   boss.value = payload?.boss ?? null
   bossLeaderboard.value = payload?.bossLeaderboard ?? []
+  bossLoot.value = payload?.bossLoot ?? []
   myBossStats.value = payload?.myBossStats ?? null
   inventory.value = payload?.inventory ?? []
   loadout.value = payload?.loadout ?? emptyLoadout()
@@ -169,7 +259,7 @@ function triggerCriticalBurst(key, delta) {
   criticalBursts.value = {
     ...criticalBursts.value,
     [key]: {
-      label: `暴击 +${delta}`,
+      label: `暴击伤害 ${delta}`,
       nonce: `${key}-${Date.now()}`,
     },
   }
@@ -336,6 +426,7 @@ async function resetNickname() {
   loadout.value = emptyLoadout()
   combatStats.value = defaultCombatStats()
   myBossStats.value = null
+  bossLoot.value = []
   window.localStorage.removeItem(NICKNAME_STORAGE_KEY)
   await loadState()
   connectEventStream()
@@ -442,12 +533,311 @@ onBeforeUnmount(() => {
         <div class="boss-stage__stats">
           <span>我的伤害 {{ myBossDamage }}</span>
           <span>当前 Boss 榜 {{ bossLeaderboard.length }} 人</span>
+          <span>掉落池 {{ bossLoot.length }} 件</span>
           <span v-if="lastReward">最近掉落 {{ lastReward.itemName }}</span>
         </div>
+      </div>
+
+      <div v-if="boss" class="boss-stage__drops">
+        <div class="boss-stage__drops-head">
+          <div>
+            <p class="vote-stage__eyebrow">Boss 掉落池</p>
+            <strong>{{ bossLoot.length }} 件</strong>
+          </div>
+        </div>
+
+        <div v-if="bossLoot.length === 0" class="leaderboard-list leaderboard-list--empty">
+          <p>当前 Boss 还没配置掉落池。</p>
+        </div>
+        <ul v-else class="inventory-list inventory-list--loot">
+          <li
+            v-for="item in bossLoot"
+            :key="item.itemId"
+            class="inventory-item inventory-item--stacked inventory-item--loot"
+          >
+            <div>
+              <strong>{{ item.itemName || item.itemId }}</strong>
+              <p>{{ item.slot || '未分类' }} · 权重 {{ item.weight }}</p>
+              <p>{{ formatItemStats(item) }}</p>
+            </div>
+          </li>
+        </ul>
       </div>
     </section>
 
     <section class="stage-layout">
+      <aside class="player-hud">
+        <section class="player-hud__shell">
+          <div class="player-hud__head">
+            <div>
+              <p class="vote-stage__eyebrow">Player HUD</p>
+              <strong>{{ isLoggedIn ? nickname : '未登录角色' }}</strong>
+            </div>
+            <span class="player-hud__pill">{{ isLoggedIn ? '已上墙' : '访客' }}</span>
+          </div>
+
+          <p class="player-hud__copy">
+            {{ isLoggedIn ? `你现在用的是 ${nickname}。同名会直接并成同一个人。` : '先报个名，HUD 里的背包、属性和装备栏就都会跟你走。' }}
+          </p>
+
+          <form class="nickname-form player-hud__form" @submit.prevent="submitNickname">
+            <input
+              v-model="nicknameDraft"
+              class="nickname-form__input"
+              type="text"
+              maxlength="20"
+              placeholder="比如：阿明"
+            />
+            <button class="nickname-form__submit" type="submit">
+              {{ isLoggedIn ? '切换昵称' : '进入现场' }}
+            </button>
+          </form>
+
+          <button
+            v-if="isLoggedIn"
+            class="nickname-form__ghost player-hud__reset"
+            type="button"
+            @click="resetNickname"
+          >
+            清空昵称
+          </button>
+
+          <div class="player-hud__tabs">
+            <button
+              class="player-hud__tab"
+              :class="{ 'player-hud__tab--active': activeHudTab === 'inventory' }"
+              type="button"
+              @click="selectHudTab('inventory')"
+            >
+              背包
+            </button>
+            <button
+              class="player-hud__tab"
+              :class="{ 'player-hud__tab--active': activeHudTab === 'stats' }"
+              type="button"
+              @click="selectHudTab('stats')"
+            >
+              属性
+            </button>
+            <button
+              class="player-hud__tab"
+              :class="{ 'player-hud__tab--active': activeHudTab === 'loadout' }"
+              type="button"
+              @click="selectHudTab('loadout')"
+            >
+              装备栏
+            </button>
+            <button
+              class="player-hud__tab"
+              :class="{ 'player-hud__tab--active': activeHudTab === 'info' }"
+              type="button"
+              @click="selectHudTab('info')"
+            >
+              信息
+            </button>
+          </div>
+
+          <div class="player-hud__content">
+            <section v-if="activeHudTab === 'inventory'" class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">背包</p>
+                <strong>{{ inventory.length }} 件</strong>
+              </div>
+
+              <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
+                <p>先去打 Boss 或等后台发装备，背包就会慢慢满起来。</p>
+              </div>
+
+              <ul v-else class="inventory-list">
+                <li v-for="item in inventory" :key="item.itemId" class="inventory-item">
+                  <div>
+                    <strong>{{ item.name }}</strong>
+                    <p>{{ item.slot || '未分类' }} · 库存 {{ item.quantity }}</p>
+                    <p>{{ formatItemStats(item) }}</p>
+                  </div>
+                  <button
+                    class="inventory-item__action"
+                    type="button"
+                    :disabled="!isLoggedIn || actioningItemId === item.itemId"
+                    @click="item.equipped ? postEquipmentAction(item.itemId, 'unequip') : postEquipmentAction(item.itemId, 'equip')"
+                  >
+                    {{ item.equipped ? '卸下' : '穿戴' }}
+                  </button>
+                </li>
+              </ul>
+            </section>
+
+            <section v-else-if="activeHudTab === 'stats'" class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">战斗属性</p>
+                <strong>{{ isLoggedIn ? nickname : '未登录' }}</strong>
+              </div>
+
+              <div class="me-card__stats">
+                <article>
+                  <span>普通伤害</span>
+                  <strong>{{ normalDamage }}</strong>
+                </article>
+                <article>
+                  <span>暴击伤害</span>
+                  <strong>{{ criticalDamage }}</strong>
+                </article>
+                <article>
+                  <span>暴击率</span>
+                  <strong>{{ combatStats.criticalChancePercent }}%</strong>
+                </article>
+                <article>
+                  <span>我的 Boss 伤害</span>
+                  <strong>{{ myBossDamage }}</strong>
+                </article>
+                <article>
+                  <span>我的点击</span>
+                  <strong>{{ isLoggedIn ? myClicks : '--' }}</strong>
+                </article>
+                <article>
+                  <span>我的排名</span>
+                  <strong>{{ isLoggedIn ? `#${myRank ?? '--'}` : '--' }}</strong>
+                </article>
+              </div>
+            </section>
+
+            <section v-else-if="activeHudTab === 'loadout'" class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">装备栏</p>
+                <strong>{{ equippedItems.length }} / 3</strong>
+              </div>
+
+              <div class="loadout-grid">
+                <article class="loadout-slot">
+                  <div class="loadout-slot__main">
+                    <span>武器</span>
+                    <strong>{{ loadout.weapon?.name || '未穿戴' }}</strong>
+                  </div>
+                  <ul v-if="loadout.weapon" class="loadout-slot__attrs">
+                    <li v-for="line in formatItemStatLines(loadout.weapon)" :key="line">
+                      {{ line }}
+                    </li>
+                  </ul>
+                  <p v-else class="loadout-slot__empty">暂无属性</p>
+                </article>
+                <article class="loadout-slot">
+                  <div class="loadout-slot__main">
+                    <span>护甲</span>
+                    <strong>{{ loadout.armor?.name || '未穿戴' }}</strong>
+                  </div>
+                  <ul v-if="loadout.armor" class="loadout-slot__attrs">
+                    <li v-for="line in formatItemStatLines(loadout.armor)" :key="line">
+                      {{ line }}
+                    </li>
+                  </ul>
+                  <p v-else class="loadout-slot__empty">暂无属性</p>
+                </article>
+                <article class="loadout-slot">
+                  <div class="loadout-slot__main">
+                    <span>饰品</span>
+                    <strong>{{ loadout.accessory?.name || '未穿戴' }}</strong>
+                  </div>
+                  <ul v-if="loadout.accessory" class="loadout-slot__attrs">
+                    <li v-for="line in formatItemStatLines(loadout.accessory)" :key="line">
+                      {{ line }}
+                    </li>
+                  </ul>
+                  <p v-else class="loadout-slot__empty">暂无属性</p>
+                </article>
+              </div>
+            </section>
+
+            <section v-else class="player-hud__panel player-hud__panel--info">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">信息</p>
+                <strong>{{ bossHistory.length }} 条战报</strong>
+              </div>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>最近掉落</span>
+                  <strong>{{ lastReward?.itemName || '暂无' }}</strong>
+                </div>
+                <p class="player-hud__note">
+                  {{
+                    lastReward
+                      ? `来自 ${lastReward.bossName || lastReward.bossId || '当前 Boss'}，已经放进你的背包。`
+                      : '还没有新的掉落记录。'
+                  }}
+                </p>
+              </section>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>装备获取</span>
+                  <strong>{{ bossLoot.length }} 件</strong>
+                </div>
+                <div v-if="bossLoot.length === 0" class="leaderboard-list leaderboard-list--empty">
+                  <p>当前 Boss 还没配置掉落池。</p>
+                </div>
+                <ul v-else class="inventory-list inventory-list--hud-loot">
+                  <li
+                    v-for="item in bossLoot"
+                    :key="item.itemId"
+                    class="inventory-item inventory-item--stacked inventory-item--loot"
+                  >
+                    <div>
+                      <strong>{{ item.itemName || item.itemId }}</strong>
+                      <p>{{ item.slot || '未分类' }} · 权重 {{ item.weight }}</p>
+                      <p>{{ formatItemStats(item) }}</p>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>往届 Boss 查询</span>
+                  <strong>{{ filteredBossHistory.length }} 条</strong>
+                </div>
+                <input
+                  v-model="bossHistoryQuery"
+                  class="nickname-form__input"
+                  type="text"
+                  placeholder="按 Boss 名称或 ID 搜索"
+                />
+                <div v-if="loadingBossHistory" class="leaderboard-list leaderboard-list--empty">
+                  <p>历史 Boss 加载中...</p>
+                </div>
+                <div v-else-if="bossHistoryError" class="leaderboard-list leaderboard-list--empty">
+                  <p>{{ bossHistoryError }}</p>
+                  <button
+                    class="nickname-form__ghost player-hud__retry"
+                    type="button"
+                    @click="loadBossHistory(true)"
+                  >
+                    重新加载
+                  </button>
+                </div>
+                <div v-else-if="filteredBossHistory.length === 0" class="leaderboard-list leaderboard-list--empty">
+                  <p>没有匹配的 Boss 记录。</p>
+                </div>
+                <ul v-else class="history-list">
+                  <li v-for="entry in filteredBossHistory" :key="entry.id" class="history-item">
+                    <div class="history-item__head">
+                      <strong>{{ entry.name || entry.id }}</strong>
+                      <span>{{ formatBossTime(entry.startedAt) }}</span>
+                    </div>
+                    <p>
+                      {{ entry.status === 'defeated' ? '已击败' : '已结束' }} · 掉落 {{ entry.loot?.length ?? 0 }} 件
+                    </p>
+                    <p v-if="topBossDamage(entry)">
+                      伤害第一 {{ topBossDamage(entry).nickname }} · {{ topBossDamage(entry).damage }}
+                    </p>
+                    <p v-else>暂无伤害记录。</p>
+                  </li>
+                </ul>
+              </section>
+            </section>
+          </div>
+        </section>
+      </aside>
+
       <section class="vote-stage">
         <div class="vote-stage__head">
           <div>
@@ -460,6 +850,25 @@ onBeforeUnmount(() => {
         </div>
 
         <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
+
+        <section v-if="boss" class="vote-stage__boss-hud">
+          <div class="vote-stage__boss-hud-head">
+            <div>
+              <p class="vote-stage__eyebrow">当前 Boss</p>
+              <strong>{{ boss.name }}</strong>
+            </div>
+            <strong>HP {{ boss.currentHp }} / {{ boss.maxHp }}</strong>
+          </div>
+          <div class="boss-stage__bar boss-stage__bar--compact">
+            <span class="boss-stage__bar-fill" :style="{ width: `${bossProgress}%` }"></span>
+          </div>
+          <div class="vote-stage__boss-hud-stats">
+            <span>我的伤害 {{ myBossDamage }}</span>
+            <span>Boss 榜 {{ bossLeaderboard.length }} 人</span>
+            <span>掉落池 {{ bossLoot.length }} 件</span>
+            <span v-if="lastReward">最近掉落 {{ lastReward.itemName }}</span>
+          </div>
+        </section>
 
         <div v-if="loading" class="feedback-panel">
           <p>正在把现场按钮搬上来...</p>
@@ -525,130 +934,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <aside class="social-panel">
-        <section class="social-card login-card">
-          <div class="social-card__head">
-            <p class="vote-stage__eyebrow">昵称登录</p>
-            <strong>{{ isLoggedIn ? '已经上墙' : '先报个名' }}</strong>
-          </div>
-
-          <p class="social-card__copy">
-            {{ isLoggedIn ? `你现在用的是 ${nickname}。同名会直接并成同一个人。` : '随便起个现场外号就能开点，不设密码。' }}
-          </p>
-
-          <form class="nickname-form" @submit.prevent="submitNickname">
-            <input
-              v-model="nicknameDraft"
-              class="nickname-form__input"
-              type="text"
-              maxlength="20"
-              placeholder="比如：阿明"
-            />
-            <button class="nickname-form__submit" type="submit">
-              {{ isLoggedIn ? '切换昵称' : '进入现场' }}
-            </button>
-          </form>
-
-          <button
-            v-if="isLoggedIn"
-            class="nickname-form__ghost"
-            type="button"
-            @click="resetNickname"
-          >
-            清空昵称
-          </button>
-        </section>
-
-        <section class="social-card me-card">
-          <div class="social-card__head">
-            <p class="vote-stage__eyebrow">战斗属性</p>
-            <strong>{{ isLoggedIn ? nickname : '未登录' }}</strong>
-          </div>
-
-          <div class="me-card__stats">
-            <article>
-              <span>单击增量</span>
-              <strong>+{{ effectiveIncrement }}</strong>
-            </article>
-            <article>
-              <span>暴击率</span>
-              <strong>{{ combatStats.criticalChancePercent }}%</strong>
-            </article>
-            <article>
-              <span>暴击总增量</span>
-              <strong>+{{ combatStats.criticalCount }}</strong>
-            </article>
-            <article>
-              <span>我的 Boss 伤害</span>
-              <strong>{{ myBossDamage }}</strong>
-            </article>
-          </div>
-        </section>
-
-        <section class="social-card loadout-card">
-          <div class="social-card__head">
-            <p class="vote-stage__eyebrow">装备栏</p>
-            <strong>{{ equippedItems.length }} / 3</strong>
-          </div>
-
-          <div class="loadout-grid">
-            <article class="loadout-slot">
-              <span>武器</span>
-              <strong>{{ loadout.weapon?.name || '未穿戴' }}</strong>
-              <p v-if="loadout.weapon" class="loadout-slot__attrs">
-                点击+{{ loadout.weapon.bonusClicks }} 暴击率+{{ loadout.weapon.bonusCriticalChancePercent }}% 暴击+{{ loadout.weapon.bonusCriticalCount }}
-              </p>
-            </article>
-            <article class="loadout-slot">
-              <span>护甲</span>
-              <strong>{{ loadout.armor?.name || '未穿戴' }}</strong>
-              <p v-if="loadout.armor" class="loadout-slot__attrs">
-                点击+{{ loadout.armor.bonusClicks }} 暴击率+{{ loadout.armor.bonusCriticalChancePercent }}% 暴击+{{ loadout.armor.bonusCriticalCount }}
-              </p>
-            </article>
-            <article class="loadout-slot">
-              <span>饰品</span>
-              <strong>{{ loadout.accessory?.name || '未穿戴' }}</strong>
-              <p v-if="loadout.accessory" class="loadout-slot__attrs">
-                点击+{{ loadout.accessory.bonusClicks }} 暴击率+{{ loadout.accessory.bonusCriticalChancePercent }}% 暴击+{{ loadout.accessory.bonusCriticalCount }}
-              </p>
-            </article>
-          </div>
-        </section>
-
-        <section class="social-card inventory-card">
-          <div class="social-card__head">
-            <p class="vote-stage__eyebrow">背包</p>
-            <strong>{{ inventory.length }} 件</strong>
-          </div>
-
-          <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
-            <p>先去打 Boss 或等后台发装备，背包就会慢慢满起来。</p>
-          </div>
-
-          <ul v-else class="inventory-list">
-            <li v-for="item in inventory" :key="item.itemId" class="inventory-item">
-              <div>
-                <strong>{{ item.name }}</strong>
-                <p>
-                  {{ item.slot || '未分类' }} · 库存 {{ item.quantity }}
-                </p>
-                <p>
-                  点击+{{ item.bonusClicks }} 暴击率+{{ item.bonusCriticalChancePercent }}% 暴击+{{ item.bonusCriticalCount }}
-                </p>
-              </div>
-              <button
-                class="inventory-item__action"
-                type="button"
-                :disabled="!isLoggedIn || actioningItemId === item.itemId"
-                @click="item.equipped ? postEquipmentAction(item.itemId, 'unequip') : postEquipmentAction(item.itemId, 'equip')"
-              >
-                {{ item.equipped ? '卸下' : '穿戴' }}
-              </button>
-            </li>
-          </ul>
-        </section>
-
+      <aside class="social-panel social-panel--ranking">
         <section class="social-card leaderboard-card">
           <div class="social-card__head">
             <p class="vote-stage__eyebrow">实时排行榜</p>
@@ -693,16 +979,6 @@ onBeforeUnmount(() => {
           <div v-else class="leaderboard-list leaderboard-list--empty">
             <p>当前 Boss 还没人动手，或者正在休战。</p>
           </div>
-        </section>
-
-        <section v-if="lastReward" class="social-card reward-card">
-          <div class="social-card__head">
-            <p class="vote-stage__eyebrow">最近掉落</p>
-            <strong>{{ lastReward.itemName }}</strong>
-          </div>
-          <p class="social-card__copy">
-            来自 {{ lastReward.bossId || '当前 Boss' }}，已经放进你的背包。
-          </p>
         </section>
       </aside>
     </section>

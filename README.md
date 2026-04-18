@@ -6,12 +6,13 @@
 
 - 页面会展示所有符合规则的 Redis 按钮键。
 - 访问者先输入昵称，之后点击都会记到这个昵称名下。
-- 任意访问者点击按钮后，总数立即 `+1`。
+- 任意访问者点击按钮后，总数会按当前装备与暴击结算出的实际增量上涨。
 - 玩家可以穿戴装备，装备会让平时点击直接获得额外次数增量。
 - 所有在线用户都会通过 SSE 实时看到最新计数。
 - 页面会实时展示个人累计点击和排行榜。
 - 支持单个全服世界 Boss：Boss 活动期间，同一次点击会同时记票并造成 Boss 伤害。
 - Boss 击杀后会按掉落池给参与玩家发装备，装备进入各自背包。
+- 前台会展示当前 Boss 的掉落池，以及每件装备的属性。
 - 提供 `/admin` 管理后台，可登录后配置 Boss、装备、掉落池和前台按钮。
 - 你后面只要往 Redis 新增一个新键，前端就会自动展示新按钮。
 - 前端静态页和后端 API/SSE 统一由一个 Go 服务承载，并可打成单一 Docker 镜像。
@@ -62,7 +63,6 @@ redis-cli HSET vote:button:new-one label "新按钮" count 0 sort 40 enabled 1
 
 ```text
 vote:user:<nickname>
-vote:user-ability:<nickname>
 vote:leaderboard
 ```
 
@@ -70,15 +70,9 @@ vote:leaderboard
   - `nickname`
   - `click_count`
   - `updated_at`
-- `vote:user-ability:<nickname>` 是 `Hash`
-  - `critical_chance_percent`
-  - `critical_count`
-  - 后续可继续扩展别的能力字段
 - `vote:leaderboard` 是 `Sorted Set`
   - member = 昵称
   - score = 个人累计点击数
-
-用户能力配置和现有统计数据分开存储，后端不会回写或迁移已经存在的 `vote:user:<nickname>` 数据。
 
 世界 Boss、装备与掉落使用：
 
@@ -121,6 +115,7 @@ vote:user-last-reward:<nickname>
   - `accessory`
 - `vote:user-last-reward:<nickname>` 是 `Hash`
   - `boss_id`
+  - `boss_name`
   - `item_id`
   - `item_name`
   - `granted_at`
@@ -177,25 +172,6 @@ admin:
 - `admin.username`
 - `admin.password`
 - `admin.session_secret`
-
-## 用户能力覆盖
-
-- 默认所有用户都使用 Consul 里的全局暴击配置。
-- 如果 Redis 里存在 `vote:user-ability:<nickname>`，后端会优先读取其中的能力字段。
-- 当前支持两个用户能力覆盖字段：
-  - `critical_chance_percent`：允许设置为 `0-100`
-  - `critical_count`：允许设置为 `2` 及以上
-- 如果字段不存在、为空或值非法，会自动回退到全局默认值。
-
-示例：
-
-```bash
-redis-cli HSET vote:user-ability:阿明 critical_chance_percent 80 critical_count 12
-redis-cli HSET vote:user-ability:阿明 critical_count 20
-redis-cli HDEL vote:user-ability:阿明 critical_chance_percent
-redis-cli HDEL vote:user-ability:阿明 critical_count
-redis-cli DEL vote:user-ability:阿明
-```
 
 ## 昵称敏感词校验
 

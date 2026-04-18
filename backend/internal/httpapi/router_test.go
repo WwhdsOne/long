@@ -16,6 +16,7 @@ type mockStore struct {
 	state       vote.State
 	equipState  vote.State
 	adminState  vote.AdminState
+	bossHistory []vote.BossHistoryEntry
 	result      vote.ClickResult
 	lastButton  vote.ButtonUpsert
 	lastBoss    vote.BossUpsert
@@ -135,7 +136,7 @@ func (m *mockStore) SetBossLoot(_ context.Context, _ string, _ []vote.BossLootEn
 }
 
 func (m *mockStore) ListBossHistory(_ context.Context) ([]vote.BossHistoryEntry, error) {
-	return []vote.BossHistoryEntry{}, nil
+	return m.bossHistory, nil
 }
 
 type mockBroadcaster struct {
@@ -163,6 +164,23 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 			Leaderboard: []vote.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 9},
 			},
+			Boss: &vote.Boss{
+				ID:        "slime-king",
+				Name:      "史莱姆王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 80,
+			},
+			BossLoot: []vote.BossLootEntry{
+				{
+					ItemID:                     "cloth-armor",
+					ItemName:                   "布甲",
+					Slot:                       "armor",
+					Weight:                     3,
+					BonusClicks:                1,
+					BonusCriticalChancePercent: 2,
+				},
+			},
 		},
 	}
 	broadcaster := &mockBroadcaster{}
@@ -183,6 +201,7 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 	var payload struct {
 		Buttons     []vote.Button           `json:"buttons"`
 		Leaderboard []vote.LeaderboardEntry `json:"leaderboard"`
+		BossLoot    []vote.BossLootEntry    `json:"bossLoot"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -194,9 +213,61 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 	if len(payload.Leaderboard) != 1 || payload.Leaderboard[0].Nickname != "阿明" {
 		t.Fatalf("unexpected leaderboard payload: %+v", payload.Leaderboard)
 	}
+	if len(payload.BossLoot) != 1 || payload.BossLoot[0].ItemID != "cloth-armor" || payload.BossLoot[0].BonusClicks != 1 {
+		t.Fatalf("unexpected boss loot payload: %+v", payload.BossLoot)
+	}
 
 	if len(broadcaster.snapshots) != 0 {
 		t.Fatalf("expected no broadcasts, got %d", len(broadcaster.snapshots))
+	}
+}
+
+func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
+	store := &mockStore{
+		bossHistory: []vote.BossHistoryEntry{
+			{
+				Boss: vote.Boss{
+					ID:         "slime-king",
+					Name:       "史莱姆王",
+					Status:     "defeated",
+					MaxHP:      100,
+					CurrentHP:  0,
+					StartedAt:  1710000000,
+					DefeatedAt: 1710000300,
+				},
+				Loot: []vote.BossLootEntry{
+					{ItemID: "cloth-armor", ItemName: "布甲", Weight: 3},
+				},
+				Damage: []vote.BossLeaderboardEntry{
+					{Rank: 1, Nickname: "阿明", Damage: 42},
+				},
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/boss/history", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload []vote.BossHistoryEntry
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(payload) != 1 || payload[0].Name != "史莱姆王" {
+		t.Fatalf("unexpected history payload: %+v", payload)
+	}
+	if len(payload[0].Damage) != 1 || payload[0].Damage[0].Nickname != "阿明" {
+		t.Fatalf("unexpected history damage payload: %+v", payload[0].Damage)
 	}
 }
 
@@ -353,6 +424,8 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 				BaseIncrement:      1,
 				BonusClicks:        2,
 				EffectiveIncrement: 3,
+				NormalDamage:       3,
+				CriticalDamage:     7,
 			},
 		},
 	}
@@ -387,6 +460,9 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 	}
 	if payload.CombatStats.EffectiveIncrement != 3 {
 		t.Fatalf("expected effective increment 3, got %+v", payload.CombatStats)
+	}
+	if payload.CombatStats.NormalDamage != 3 || payload.CombatStats.CriticalDamage != 7 {
+		t.Fatalf("expected actual damage 3/7, got %+v", payload.CombatStats)
 	}
 }
 

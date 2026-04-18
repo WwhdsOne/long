@@ -113,6 +113,8 @@ type CombatStats struct {
 	BaseIncrement         int64 `json:"baseIncrement"`
 	BonusClicks           int64 `json:"bonusClicks"`
 	EffectiveIncrement    int64 `json:"effectiveIncrement"`
+	NormalDamage          int64 `json:"normalDamage"`
+	CriticalDamage        int64 `json:"criticalDamage"`
 	CriticalChancePercent int   `json:"criticalChancePercent"`
 	CriticalCount         int64 `json:"criticalCount"`
 }
@@ -120,6 +122,7 @@ type CombatStats struct {
 // Reward 最近一次掉落
 type Reward struct {
 	BossID    string `json:"bossId"`
+	BossName  string `json:"bossName"`
 	ItemID    string `json:"itemId"`
 	ItemName  string `json:"itemName"`
 	GrantedAt int64  `json:"grantedAt"`
@@ -127,10 +130,13 @@ type Reward struct {
 
 // BossLootEntry Boss 掉落池条目
 type BossLootEntry struct {
-	ItemID   string `json:"itemId"`
-	ItemName string `json:"itemName"`
-	Slot     string `json:"slot"`
-	Weight   int64  `json:"weight"`
+	ItemID                     string `json:"itemId"`
+	ItemName                   string `json:"itemName"`
+	Slot                       string `json:"slot"`
+	Weight                     int64  `json:"weight"`
+	BonusClicks                int64  `json:"bonusClicks"`
+	BonusCriticalChancePercent int    `json:"bonusCriticalChancePercent"`
+	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
 }
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
@@ -138,7 +144,8 @@ type Snapshot struct {
 	Buttons         []Button               `json:"buttons"`
 	Leaderboard     []LeaderboardEntry     `json:"leaderboard"`
 	Boss            *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
+	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
+	BossLoot        []BossLootEntry        `json:"bossLoot"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -147,7 +154,8 @@ type State struct {
 	Leaderboard     []LeaderboardEntry     `json:"leaderboard"`
 	UserStats       *UserStats             `json:"userStats,omitempty"`
 	Boss            *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
+	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
+	BossLoot        []BossLootEntry        `json:"bossLoot"`
 	MyBossStats     *BossUserStats         `json:"myBossStats,omitempty"`
 	Inventory       []InventoryItem        `json:"inventory"`
 	Loadout         Loadout                `json:"loadout"`
@@ -186,7 +194,6 @@ type Store struct {
 	prefix             string
 	namespace          string
 	userPrefix         string
-	userAbilityKey     string
 	leaderboardKey     string
 	bossCurrentKey     string
 	bossHistoryKey     string
@@ -220,7 +227,6 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		prefix:             prefix,
 		namespace:          namespace,
 		userPrefix:         namespace + "user:",
-		userAbilityKey:     namespace + "user-ability:",
 		leaderboardKey:     namespace + "leaderboard",
 		bossCurrentKey:     namespace + "boss:current",
 		bossHistoryKey:     namespace + "boss:history",
@@ -266,9 +272,14 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 
-	var bossLeaderboard []BossLeaderboardEntry
+	bossLeaderboard := []BossLeaderboardEntry{}
+	bossLoot := []BossLootEntry{}
 	if boss != nil {
 		bossLeaderboard, err = s.ListBossLeaderboard(ctx, boss.ID, 10)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		bossLoot, err = s.loadBossLoot(ctx, boss.ID)
 		if err != nil {
 			return Snapshot{}, err
 		}
@@ -279,6 +290,7 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 		Leaderboard:     leaderboard,
 		Boss:            boss,
 		BossLeaderboard: bossLeaderboard,
+		BossLoot:        bossLoot,
 	}, nil
 }
 
@@ -294,6 +306,7 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 		Leaderboard:     snapshot.Leaderboard,
 		Boss:            snapshot.Boss,
 		BossLeaderboard: snapshot.BossLeaderboard,
+		BossLoot:        snapshot.BossLoot,
 		Inventory:       []InventoryItem{},
 		Loadout:         Loadout{},
 		CombatStats:     s.baseCombatStats(),
@@ -663,7 +676,7 @@ func (s *Store) applyVoteOnlyClick(ctx context.Context, redisKey string, nicknam
 }
 
 func (s *Store) applyBossClick(ctx context.Context, redisKey string, nickname string, delta int64, critical bool) (ClickResult, error) {
-	for attempt := 0; attempt < 6; attempt++ {
+	for range 6 {
 		var result ClickResult
 		err := s.client.Watch(ctx, func(tx *redis.Tx) error {
 			boss, err := s.currentBossFromCmdable(ctx, tx)
@@ -738,7 +751,7 @@ func (s *Store) applyBossClick(ctx context.Context, redisKey string, nickname st
 		}, s.bossCurrentKey)
 		if err == nil {
 			if result.Boss != nil && result.Boss.Status == bossStatusDefeated {
-				if finalizeErr := s.finalizeBossKill(ctx, result.Boss.ID); finalizeErr != nil {
+				if finalizeErr := s.finalizeBossKill(ctx, result.Boss); finalizeErr != nil {
 					return ClickResult{}, finalizeErr
 				}
 			}
@@ -753,10 +766,12 @@ func (s *Store) applyBossClick(ctx context.Context, redisKey string, nickname st
 	return ClickResult{}, redis.TxFailedErr
 }
 
-func (s *Store) finalizeBossKill(ctx context.Context, bossID string) error {
-	if strings.TrimSpace(bossID) == "" {
+func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) error {
+	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil
 	}
+	bossID := strings.TrimSpace(boss.ID)
+	bossName := strings.TrimSpace(boss.Name)
 
 	acquired, err := s.client.SetNX(ctx, s.bossRewardLockKey(bossID), "1", 0).Result()
 	if err != nil || !acquired {
@@ -795,6 +810,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, bossID string) error {
 		pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
 		pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
 			"boss_id":    bossID,
+			"boss_name":  bossName,
 			"item_id":    reward.ItemID,
 			"item_name":  reward.ItemName,
 			"granted_at": strconv.FormatInt(now, 10),
@@ -838,11 +854,6 @@ func (s *Store) chooseLoot(entries []BossLootEntry) *BossLootEntry {
 }
 
 func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool, error) {
-	combatStats, err := s.combatStatsForNickname(ctx, nickname, Loadout{})
-	if err != nil {
-		return 0, false, err
-	}
-
 	quantities, err := s.inventoryQuantities(ctx, nickname)
 	if err != nil {
 		return 0, false, err
@@ -851,12 +862,12 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 	if err != nil {
 		return 0, false, err
 	}
-	combatStats, err = s.combatStatsForNickname(ctx, nickname, loadout)
+	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout)
 	if err != nil {
 		return 0, false, err
 	}
 
-	delta := combatStats.EffectiveIncrement
+	delta := combatStats.NormalDamage
 	if delta <= 0 {
 		delta = 1
 	}
@@ -866,58 +877,30 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 	}
 
 	if s.roll(100) < combatStats.CriticalChancePercent {
-		delta += combatStats.CriticalCount - 1
-		return delta, true, nil
+		return combatStats.CriticalDamage, true, nil
 	}
 
 	return delta, false, nil
 }
 
-func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loadout Loadout) (CombatStats, error) {
+func (s *Store) combatStatsForNickname(_ context.Context, _ string, loadout Loadout) (CombatStats, error) {
 	stats := s.baseCombatStats()
-
-	if strings.TrimSpace(nickname) == "" {
-		return stats, nil
-	}
-
-	chancePercent, err := s.userCriticalChancePercent(ctx, nickname)
-	if err != nil {
-		return CombatStats{}, err
-	}
-	criticalCount, err := s.userCriticalCount(ctx, nickname)
-	if err != nil {
-		return CombatStats{}, err
-	}
 
 	bonusClicks, bonusChance, bonusCount := loadoutBonuses(loadout)
 	stats.BonusClicks = bonusClicks
-	stats.EffectiveIncrement = stats.BaseIncrement + bonusClicks
-	if stats.EffectiveIncrement <= 0 {
-		stats.EffectiveIncrement = 1
-	}
+	stats.CriticalChancePercent = clampInt(stats.CriticalChancePercent+bonusChance, 0, 100)
+	stats.CriticalCount += bonusCount
 
-	stats.CriticalChancePercent = clampInt(chancePercent+bonusChance, 0, 100)
-	stats.CriticalCount = criticalCount + bonusCount
-	if stats.CriticalCount <= 1 {
-		stats.CriticalCount = 1
-	}
-
-	return stats, nil
+	return deriveCombatStats(stats), nil
 }
 
 func (s *Store) baseCombatStats() CombatStats {
-	criticalCount := s.critical.CriticalCount
-	if criticalCount <= 1 {
-		criticalCount = 1
-	}
-
-	return CombatStats{
+	return deriveCombatStats(CombatStats{
 		BaseIncrement:         1,
 		BonusClicks:           0,
-		EffectiveIncrement:    1,
 		CriticalChancePercent: clampInt(s.critical.CriticalChancePercent, 0, 100),
-		CriticalCount:         criticalCount,
-	}
+		CriticalCount:         s.critical.CriticalCount,
+	})
 }
 
 func loadoutBonuses(loadout Loadout) (int64, int, int64) {
@@ -934,6 +917,26 @@ func loadoutBonuses(loadout Loadout) (int64, int, int64) {
 		bonusCount += item.BonusCriticalCount
 	}
 	return bonusClicks, bonusChance, bonusCount
+}
+
+func deriveCombatStats(stats CombatStats) CombatStats {
+	if stats.BaseIncrement <= 0 {
+		stats.BaseIncrement = 1
+	}
+
+	stats.EffectiveIncrement = stats.BaseIncrement + stats.BonusClicks
+	if stats.EffectiveIncrement <= 0 {
+		stats.EffectiveIncrement = 1
+	}
+
+	stats.NormalDamage = stats.EffectiveIncrement
+	if stats.CriticalCount <= 1 {
+		stats.CriticalCount = 1
+	}
+
+	stats.CriticalDamage = max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
+
+	return stats
 }
 
 func (s *Store) currentBoss(ctx context.Context) (*Boss, error) {
@@ -1121,6 +1124,7 @@ func (s *Store) lastRewardForNickname(ctx context.Context, nickname string) (*Re
 
 	return &Reward{
 		BossID:    strings.TrimSpace(values["boss_id"]),
+		BossName:  strings.TrimSpace(values["boss_name"]),
 		ItemID:    strings.TrimSpace(values["item_id"]),
 		ItemName:  strings.TrimSpace(values["item_name"]),
 		GrantedAt: int64FromString(values["granted_at"]),
@@ -1154,10 +1158,13 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 		}
 
 		loot = append(loot, BossLootEntry{
-			ItemID:   itemID,
-			ItemName: definition.Name,
-			Slot:     definition.Slot,
-			Weight:   int64(entry.Score),
+			ItemID:                     itemID,
+			ItemName:                   definition.Name,
+			Slot:                       definition.Slot,
+			Weight:                     int64(entry.Score),
+			BonusClicks:                definition.BonusClicks,
+			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
+			BonusCriticalCount:         definition.BonusCriticalCount,
 		})
 	}
 
@@ -1241,44 +1248,6 @@ func (s *Store) validatedNickname(nickname string) (string, error) {
 	return normalizedNickname, nil
 }
 
-func (s *Store) userCriticalChancePercent(ctx context.Context, nickname string) (int, error) {
-	if s.critical.CriticalChancePercent < 0 || s.critical.CriticalChancePercent > 100 {
-		return 0, nil
-	}
-
-	return s.userAbilityIntValue(ctx, nickname, "critical_chance_percent", clampInt(s.critical.CriticalChancePercent, 0, 100), 0, 100)
-}
-
-func (s *Store) userCriticalCount(ctx context.Context, nickname string) (int64, error) {
-	if s.critical.CriticalCount <= 1 {
-		return 1, nil
-	}
-
-	value, err := s.userAbilityIntValue(ctx, nickname, "critical_count", int(s.critical.CriticalCount), 2, 1<<31-1)
-	if err != nil {
-		return 0, err
-	}
-
-	return int64(value), nil
-}
-
-func (s *Store) userAbilityIntValue(ctx context.Context, nickname string, field string, fallback int, min int, max int) (int, error) {
-	rawValue, err := s.client.HGet(ctx, s.userAbilityKey+nickname, field).Result()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return fallback, nil
-		}
-		return 0, err
-	}
-
-	override, parseErr := strconv.Atoi(strings.TrimSpace(rawValue))
-	if parseErr != nil || override < min || override > max {
-		return fallback, nil
-	}
-
-	return override, nil
-}
-
 func (s *Store) inventoryKey(nickname string) string {
 	return s.inventoryPrefix + nickname
 }
@@ -1309,8 +1278,8 @@ func (s *Store) bossRewardLockKey(bossID string) string {
 
 // deriveNamespace 从按钮前缀推导命名空间
 func deriveNamespace(prefix string) string {
-	if strings.HasSuffix(prefix, "button:") {
-		return strings.TrimSuffix(prefix, "button:")
+	if before, ok := strings.CutSuffix(prefix, "button:"); ok {
+		return before
 	}
 
 	return prefix

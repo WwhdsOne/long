@@ -15,7 +15,7 @@ import (
 type AdminState struct {
 	Buttons         []Button               `json:"buttons"`
 	Boss            *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
+	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
 	Equipment       []EquipmentDefinition  `json:"equipment"`
 	Loot            []BossLootEntry        `json:"loot"`
 	Players         []AdminPlayerOverview  `json:"players"`
@@ -63,8 +63,8 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		return AdminState{}, err
 	}
 
-	var bossLeaderboard []BossLeaderboardEntry
-	var loot []BossLootEntry
+	bossLeaderboard := []BossLeaderboardEntry{}
+	loot := []BossLootEntry{}
 	if boss != nil {
 		bossLeaderboard, err = s.ListBossLeaderboard(ctx, boss.ID, 20)
 		if err != nil {

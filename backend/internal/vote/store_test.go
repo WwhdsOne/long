@@ -140,7 +140,7 @@ func TestClickButtonAppliesCriticalHitWhenRollMatches(t *testing.T) {
 	}
 }
 
-func TestClickButtonUsesUserAbilityCriticalChanceOverride(t *testing.T) {
+func TestClickButtonAppliesEquippedCriticalChanceBonus(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -155,10 +155,22 @@ func TestClickButtonUsesUserAbilityCriticalChanceOverride(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed button: %v", err)
 	}
-	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
-		"critical_chance_percent": "30",
+	if err := store.client.HSet(ctx, "vote:equip:def:lucky-ring", map[string]any{
+		"name":                          "幸运戒指",
+		"slot":                          "accessory",
+		"bonus_critical_chance_percent": "30",
 	}).Err(); err != nil {
-		t.Fatalf("seed user ability: %v", err)
+		t.Fatalf("seed equipment definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-inventory:阿明", map[string]any{
+		"lucky-ring": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user-loadout:阿明", map[string]any{
+		"accessory": "lucky-ring",
+	}).Err(); err != nil {
+		t.Fatalf("seed loadout: %v", err)
 	}
 
 	updated, err := store.ClickButton(ctx, "feel", "阿明")
@@ -167,11 +179,11 @@ func TestClickButtonUsesUserAbilityCriticalChanceOverride(t *testing.T) {
 	}
 
 	if updated.Delta != 5 || !updated.Critical {
-		t.Fatalf("expected critical click from user ability override, got delta=%d critical=%v", updated.Delta, updated.Critical)
+		t.Fatalf("expected equipped critical chance bonus to trigger crit, got delta=%d critical=%v", updated.Delta, updated.Critical)
 	}
 }
 
-func TestClickButtonFallsBackToDefaultCriticalChanceWhenUserAbilityMissing(t *testing.T) {
+func TestClickButtonUsesGlobalCriticalChanceWhenNoEquipmentBonus(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -197,38 +209,7 @@ func TestClickButtonFallsBackToDefaultCriticalChanceWhenUserAbilityMissing(t *te
 	}
 }
 
-func TestClickButtonIgnoresInvalidUserAbilityCriticalChance(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	store.roll = func(int) int { return 20 }
-
-	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
-		"label":   "有感觉吗",
-		"count":   "2",
-		"sort":    "10",
-		"enabled": "1",
-	}).Err(); err != nil {
-		t.Fatalf("seed button: %v", err)
-	}
-	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
-		"critical_chance_percent": "200",
-	}).Err(); err != nil {
-		t.Fatalf("seed invalid user ability: %v", err)
-	}
-
-	updated, err := store.ClickButton(ctx, "feel", "阿明")
-	if err != nil {
-		t.Fatalf("click button: %v", err)
-	}
-
-	if updated.Delta != 1 || updated.Critical {
-		t.Fatalf("expected invalid user ability to fall back to default non-critical click, got delta=%d critical=%v", updated.Delta, updated.Critical)
-	}
-}
-
-func TestClickButtonAllowsUserAbilityToDisableCriticalChance(t *testing.T) {
+func TestClickButtonAppliesEquippedCriticalCountBonus(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -243,41 +224,22 @@ func TestClickButtonAllowsUserAbilityToDisableCriticalChance(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed button: %v", err)
 	}
-	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
-		"critical_chance_percent": "0",
+	if err := store.client.HSet(ctx, "vote:equip:def:berserk-ring", map[string]any{
+		"name":                 "狂暴戒指",
+		"slot":                 "accessory",
+		"bonus_critical_count": "4",
 	}).Err(); err != nil {
-		t.Fatalf("seed zero user ability: %v", err)
+		t.Fatalf("seed equipment definition: %v", err)
 	}
-
-	updated, err := store.ClickButton(ctx, "feel", "阿明")
-	if err != nil {
-		t.Fatalf("click button: %v", err)
-	}
-
-	if updated.Delta != 1 || updated.Critical {
-		t.Fatalf("expected zero critical chance override to disable critical, got delta=%d critical=%v", updated.Delta, updated.Critical)
-	}
-}
-
-func TestClickButtonUsesUserAbilityCriticalCountOverride(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	store.roll = func(int) int { return 0 }
-
-	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
-		"label":   "有感觉吗",
-		"count":   "2",
-		"sort":    "10",
-		"enabled": "1",
+	if err := store.client.HSet(ctx, "vote:user-inventory:阿明", map[string]any{
+		"berserk-ring": "1",
 	}).Err(); err != nil {
-		t.Fatalf("seed button: %v", err)
+		t.Fatalf("seed inventory: %v", err)
 	}
-	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
-		"critical_count": "9",
+	if err := store.client.HSet(ctx, "vote:user-loadout:阿明", map[string]any{
+		"accessory": "berserk-ring",
 	}).Err(); err != nil {
-		t.Fatalf("seed user ability critical count: %v", err)
+		t.Fatalf("seed loadout: %v", err)
 	}
 
 	updated, err := store.ClickButton(ctx, "feel", "阿明")
@@ -286,38 +248,7 @@ func TestClickButtonUsesUserAbilityCriticalCountOverride(t *testing.T) {
 	}
 
 	if updated.Delta != 9 || !updated.Critical {
-		t.Fatalf("expected critical count override to apply, got delta=%d critical=%v", updated.Delta, updated.Critical)
-	}
-}
-
-func TestClickButtonIgnoresInvalidUserAbilityCriticalCount(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	store.roll = func(int) int { return 0 }
-
-	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
-		"label":   "有感觉吗",
-		"count":   "2",
-		"sort":    "10",
-		"enabled": "1",
-	}).Err(); err != nil {
-		t.Fatalf("seed button: %v", err)
-	}
-	if err := store.client.HSet(ctx, "vote:user-ability:阿明", map[string]any{
-		"critical_count": "1",
-	}).Err(); err != nil {
-		t.Fatalf("seed invalid user ability critical count: %v", err)
-	}
-
-	updated, err := store.ClickButton(ctx, "feel", "阿明")
-	if err != nil {
-		t.Fatalf("click button: %v", err)
-	}
-
-	if updated.Delta != 5 || !updated.Critical {
-		t.Fatalf("expected invalid critical count override to fall back to default, got delta=%d critical=%v", updated.Delta, updated.Critical)
+		t.Fatalf("expected equipped critical count bonus to raise crit damage, got delta=%d critical=%v", updated.Delta, updated.Critical)
 	}
 }
 
@@ -508,6 +439,9 @@ func TestEquipItemAndClickButtonApplyEquippedBonusWithoutBoss(t *testing.T) {
 	if state.CombatStats.EffectiveIncrement != 3 {
 		t.Fatalf("expected effective increment 3 after equip, got %+v", state.CombatStats)
 	}
+	if state.CombatStats.NormalDamage != 3 || state.CombatStats.CriticalDamage != 7 {
+		t.Fatalf("expected actual damage 3/7 after equip, got %+v", state.CombatStats)
+	}
 
 	result, err := store.ClickButton(ctx, "feel", "阿明")
 	if err != nil {
@@ -594,6 +528,9 @@ func TestClickButtonDefeatsActiveBossAndAwardsLootOnce(t *testing.T) {
 	if result.LastReward == nil || result.LastReward.ItemID != "cloth-armor" {
 		t.Fatalf("expected cloth-armor reward, got %+v", result.LastReward)
 	}
+	if result.LastReward.BossName != "史莱姆王" {
+		t.Fatalf("expected reward boss name 史莱姆王, got %+v", result.LastReward)
+	}
 
 	state, err := store.GetState(ctx, "阿明")
 	if err != nil {
@@ -603,8 +540,17 @@ func TestClickButtonDefeatsActiveBossAndAwardsLootOnce(t *testing.T) {
 	if state.Boss == nil || state.Boss.Status != "defeated" {
 		t.Fatalf("expected defeated boss in state, got %+v", state.Boss)
 	}
+	if state.LastReward == nil || state.LastReward.BossName != "史莱姆王" {
+		t.Fatalf("expected persisted reward boss name 史莱姆王, got %+v", state.LastReward)
+	}
 	if len(state.BossLeaderboard) != 1 || state.BossLeaderboard[0].Damage != 3 {
 		t.Fatalf("expected boss leaderboard damage 3, got %+v", state.BossLeaderboard)
+	}
+	if len(state.BossLoot) != 1 || state.BossLoot[0].ItemID != "cloth-armor" {
+		t.Fatalf("expected current boss loot to be returned, got %+v", state.BossLoot)
+	}
+	if state.BossLoot[0].ItemName != "布甲" || state.BossLoot[0].BonusClicks != 1 {
+		t.Fatalf("expected boss loot attributes to include equipment stats, got %+v", state.BossLoot[0])
 	}
 	if state.Inventory[0].ItemID == "" {
 		t.Fatalf("expected inventory entries, got %+v", state.Inventory)
@@ -618,5 +564,32 @@ func TestClickButtonDefeatsActiveBossAndAwardsLootOnce(t *testing.T) {
 	}
 	if !foundReward {
 		t.Fatalf("expected rewarded cloth-armor in inventory, got %+v", state.Inventory)
+	}
+}
+
+func TestGetAdminStateReturnsEmptyCollectionsWithoutBoss(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+
+	state, err := store.GetAdminState(ctx)
+	if err != nil {
+		t.Fatalf("get admin state: %v", err)
+	}
+
+	if state.BossLeaderboard == nil {
+		t.Fatalf("expected empty boss leaderboard slice, got nil")
+	}
+	if state.Loot == nil {
+		t.Fatalf("expected empty loot slice, got nil")
 	}
 }

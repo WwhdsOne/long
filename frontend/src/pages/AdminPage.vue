@@ -30,6 +30,8 @@ const loadingHistory = ref(false)
 
 const hasBoss = computed(() => Boolean(adminState.value.boss))
 const currentBossId = computed(() => adminState.value.boss?.id || '')
+const equipmentOptions = computed(() => adminState.value.equipment ?? [])
+const hasEquipmentTemplates = computed(() => equipmentOptions.value.length > 0)
 
 function emptyAdminState() {
   return {
@@ -40,6 +42,56 @@ function emptyAdminState() {
     loot: [],
     players: [],
   }
+}
+
+function normalizeLoadout(loadout) {
+  return {
+    weapon: loadout?.weapon ?? null,
+    armor: loadout?.armor ?? null,
+    accessory: loadout?.accessory ?? null,
+  }
+}
+
+function normalizeLootEntry(entry) {
+  return {
+    itemId: entry?.itemId || '',
+    itemName: entry?.itemName || '',
+    slot: entry?.slot || '',
+    weight: Number(entry?.weight ?? 0),
+    bonusClicks: Number(entry?.bonusClicks ?? 0),
+    bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
+    bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
+  }
+}
+
+function normalizeAdminState(payload) {
+  return {
+    buttons: Array.isArray(payload?.buttons) ? payload.buttons : [],
+    boss: payload?.boss ?? null,
+    bossLeaderboard: Array.isArray(payload?.bossLeaderboard) ? payload.bossLeaderboard : [],
+    equipment: Array.isArray(payload?.equipment) ? payload.equipment : [],
+    loot: Array.isArray(payload?.loot) ? payload.loot.map(normalizeLootEntry) : [],
+    players: Array.isArray(payload?.players)
+      ? payload.players.map((player) => ({
+          nickname: player?.nickname || '',
+          clickCount: Number(player?.clickCount ?? 0),
+          inventory: Array.isArray(player?.inventory) ? player.inventory : [],
+          loadout: normalizeLoadout(player?.loadout),
+        }))
+      : [],
+  }
+}
+
+function normalizeBossHistory(payload) {
+  if (!Array.isArray(payload)) {
+    return []
+  }
+
+  return payload.map((entry) => ({
+    ...entry,
+    loot: Array.isArray(entry?.loot) ? entry.loot.map(normalizeLootEntry) : [],
+    damage: Array.isArray(entry?.damage) ? entry.damage : [],
+  }))
 }
 
 function emptyEquipmentForm() {
@@ -62,6 +114,18 @@ function emptyButtonForm() {
     imagePath: '',
     imageAlt: '',
   }
+}
+
+function formatItemStats(item) {
+  return `点击+${item?.bonusClicks ?? 0} 暴击率+${item?.bonusCriticalChancePercent ?? 0}% 暴击+${item?.bonusCriticalCount ?? 0}`
+}
+
+function findEquipmentTemplate(itemId) {
+  if (!itemId) {
+    return null
+  }
+
+  return adminState.value.equipment.find((entry) => entry.itemId === itemId) ?? null
 }
 
 async function readErrorMessage(response, fallback) {
@@ -91,7 +155,7 @@ async function fetchAdminState() {
       throw new Error(await readErrorMessage(response, '后台状态加载失败'))
     }
 
-    adminState.value = await response.json()
+    adminState.value = normalizeAdminState(await response.json())
     lootRows.value = adminState.value.loot.length > 0
       ? adminState.value.loot.map((entry) => ({
           itemId: entry.itemId,
@@ -113,7 +177,7 @@ async function fetchBossHistory() {
     if (!response.ok) {
       throw new Error('历史 Boss 加载失败')
     }
-    bossHistory.value = await response.json()
+    bossHistory.value = normalizeBossHistory(await response.json())
   } catch (error) {
     errorMessage.value = error.message || '历史 Boss 加载失败'
   } finally {
@@ -166,6 +230,7 @@ async function logout() {
   await fetch('/api/admin/logout', { method: 'POST' })
   authenticated.value = false
   adminState.value = emptyAdminState()
+  bossHistory.value = []
   checkingSession.value = false
   successMessage.value = ''
 }
@@ -395,7 +460,7 @@ onMounted(() => {
         <p class="hero__eyebrow">Long Control Room</p>
         <h1>管理现场、Boss 与掉落。</h1>
         <p class="hero__lede">
-          这里负责开启世界 Boss、配置装备与掉落池，并直接维护前台按钮内容。
+          这里先准备装备模板，再开启当前 Boss、配置它的掉落池，也能直接维护前台按钮内容。
         </p>
       </div>
 
@@ -497,17 +562,46 @@ onMounted(() => {
                   <div>
                     <strong>{{ item.itemName || item.itemId }}</strong>
                     <p>{{ item.itemId }} · {{ item.slot }} · 权重 {{ item.weight }}</p>
+                    <p>{{ formatItemStats(item) }}</p>
                   </div>
                 </li>
               </ul>
 
               <p class="feedback" style="margin-bottom: 0.75rem;">
-                先配好掉落池，再开启 Boss。Boss 被击败时立即结算奖励，之后补配不会补发。
+                当前流程是先开启 Boss，再给这只 Boss 保存掉落池。掉落只会从已有装备模板里选；Boss 被击败后再补配不会补发。
+              </p>
+
+              <p v-if="!hasEquipmentTemplates" class="feedback" style="margin-bottom: 0.75rem;">
+                当前还没有装备模板，先去“装备”页创建装备，再回来配置掉落池。
               </p>
 
               <div class="admin-form admin-form--tight">
                 <div v-for="(entry, index) in lootRows" :key="`${index}-${entry.itemId}`" class="admin-inline-row">
-                  <input v-model="entry.itemId" class="nickname-form__input" type="text" placeholder="掉落的装备 ID" />
+                  <div class="admin-loot-select">
+                    <select
+                      v-model="entry.itemId"
+                      class="nickname-form__input"
+                      :disabled="!hasEquipmentTemplates && !entry.itemId"
+                    >
+                      <option value="">选择已有装备</option>
+                      <option
+                        v-if="entry.itemId && !findEquipmentTemplate(entry.itemId)"
+                        :value="entry.itemId"
+                      >
+                        {{ entry.itemId }}（已删除的装备）
+                      </option>
+                      <option
+                        v-for="item in equipmentOptions"
+                        :key="item.itemId"
+                        :value="item.itemId"
+                      >
+                        {{ item.name }} · {{ item.itemId }} · {{ item.slot }}
+                      </option>
+                    </select>
+                    <p v-if="findEquipmentTemplate(entry.itemId)" class="admin-loot-select__meta">
+                      {{ formatItemStats(findEquipmentTemplate(entry.itemId)) }}
+                    </p>
+                  </div>
                   <input v-model="entry.weight" class="nickname-form__input" type="number" min="1" placeholder="掉率权重，越大越容易掉落" />
                   <button class="nickname-form__ghost" type="button" @click="removeLootRow(index)">删</button>
                 </div>
@@ -552,7 +646,8 @@ onMounted(() => {
                 <li v-for="item in adminState.equipment" :key="item.itemId" class="inventory-item">
                   <div>
                     <strong>{{ item.name }}</strong>
-                    <p>{{ item.itemId }} · {{ item.slot }} · 点击 +{{ item.bonusClicks }}</p>
+                    <p>{{ item.itemId }} · {{ item.slot }}</p>
+                    <p>{{ formatItemStats(item) }}</p>
                   </div>
                   <div class="admin-inline-actions">
                     <button class="inventory-item__action" type="button" @click="editEquipment(item)">编辑</button>
@@ -626,6 +721,7 @@ onMounted(() => {
                     <div>
                       <strong>{{ item.itemName || item.itemId }}</strong>
                       <p>{{ item.itemId }} · {{ item.slot }} · 权重 {{ item.weight }}</p>
+                      <p>{{ formatItemStats(item) }}</p>
                     </div>
                   </li>
                 </ul>

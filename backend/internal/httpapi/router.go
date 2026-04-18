@@ -78,6 +78,16 @@ func NewHandler(options Options) http.Handler {
 		writeJSON(w, http.StatusOK, state)
 	})
 
+	apiMux.HandleFunc("GET /api/boss/history", func(w http.ResponseWriter, r *http.Request) {
+		history, err := options.Store.ListBossHistory(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_HISTORY_FAILED"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, history)
+	})
+
 	apiMux.HandleFunc("POST /api/nickname/validate", func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			Nickname string `json:"nickname"`
@@ -159,8 +169,11 @@ func NewHandler(options Options) http.Handler {
 		}
 
 		_ = options.Broadcaster.BroadcastSnapshot(vote.Snapshot{
-			Buttons:     state.Buttons,
-			Leaderboard: state.Leaderboard,
+			Buttons:         state.Buttons,
+			Leaderboard:     state.Leaderboard,
+			Boss:            state.Boss,
+			BossLeaderboard: state.BossLeaderboard,
+			BossLoot:        state.BossLoot,
 		})
 		writeJSON(w, http.StatusOK, map[string]any{
 			"button":          result.Button,
@@ -171,6 +184,7 @@ func NewHandler(options Options) http.Handler {
 			"critical":        result.Critical,
 			"boss":            state.Boss,
 			"bossLeaderboard": state.BossLeaderboard,
+			"bossLoot":        state.BossLoot,
 			"myBossStats":     state.MyBossStats,
 			"inventory":       state.Inventory,
 			"loadout":         state.Loadout,
