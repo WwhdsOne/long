@@ -350,6 +350,13 @@ select {
   line-height: 1.55;
 }
 
+.player-hud__note--multiline,
+.social-card__copy--multiline,
+.history-item__content--multiline {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .player-hud__form {
   margin-top: 0;
 }
@@ -448,11 +455,11 @@ select {
 }
 
 .history-item__head span,
-.history-item p {
+.history-item__content {
   color: var(--ink-soft);
 }
 
-.history-item p {
+.history-item__content {
   margin: 6px 0 0;
   line-height: 1.5;
 }
@@ -1198,11 +1205,15 @@ select {
   display: grid;
   gap: 14px;
   width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
   padding: 28px;
   border-radius: 28px;
   background: rgba(255, 252, 253, 0.97);
   border: 1px solid rgba(183, 53, 97, 0.16);
   box-shadow: 0 28px 80px rgba(42, 18, 34, 0.22);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .announcement-modal__time {

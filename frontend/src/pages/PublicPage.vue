@@ -654,7 +654,7 @@ onBeforeUnmount(() => {
         <p class="vote-stage__eyebrow">更新内容公告</p>
         <strong>{{ latestAnnouncement.title }}</strong>
         <p class="announcement-modal__time">{{ formatTime(latestAnnouncement.publishedAt) }}</p>
-        <p class="social-card__copy">{{ latestAnnouncement.content }}</p>
+        <p class="social-card__copy social-card__copy--multiline">{{ latestAnnouncement.content }}</p>
         <div class="announcement-modal__actions">
           <button class="nickname-form__submit" type="button" @click="closeAnnouncementModal">我知道了</button>
         </div>
@@ -977,7 +977,7 @@ onBeforeUnmount(() => {
                   <span>最新公告</span>
                   <strong>{{ latestAnnouncement?.title || '暂无' }}</strong>
                 </div>
-                <p class="player-hud__note">
+                <p class="player-hud__note player-hud__note--multiline">
                   {{ latestAnnouncement?.content || '当前还没有新的站内公告。' }}
                 </p>
                 <button
@@ -1044,7 +1044,7 @@ onBeforeUnmount(() => {
                       <strong>{{ item.title }}</strong>
                       <span>{{ formatTime(item.publishedAt) }}</span>
                     </div>
-                    <p>{{ item.content }}</p>
+                    <p class="history-item__content history-item__content--multiline">{{ item.content }}</p>
                   </li>
                 </ul>
                 <div v-else class="leaderboard-list leaderboard-list--empty">
@@ -1130,7 +1130,7 @@ onBeforeUnmount(() => {
                     <strong>{{ item.nickname }}</strong>
                     <span>{{ formatTime(item.createdAt) }}</span>
                   </div>
-                  <p>{{ item.content }}</p>
+                  <p class="history-item__content history-item__content--multiline">{{ item.content }}</p>
                 </li>
               </ul>
 

@@ -996,7 +996,7 @@ onMounted(() => {
                   <div>
                     <strong>{{ item.title }}</strong>
                     <p>{{ item.active ? '生效中' : '未生效' }} · {{ formatTime(item.publishedAt) }}</p>
-                    <p>{{ item.content }}</p>
+                    <p class="history-item__content history-item__content--multiline">{{ item.content }}</p>
                   </div>
                   <button class="nickname-form__ghost" type="button" @click="deleteAnnouncement(item.id)">删除</button>
                 </li>
@@ -1017,7 +1017,7 @@ onMounted(() => {
                   <div>
                     <strong>{{ item.nickname }}</strong>
                     <p>{{ formatTime(item.createdAt) }}</p>
-                    <p>{{ item.content }}</p>
+                    <p class="history-item__content history-item__content--multiline">{{ item.content }}</p>
                   </div>
                   <button class="nickname-form__ghost" type="button" @click="deleteMessage(item.id)">删除</button>
                 </li>
