@@ -2,12 +2,15 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
+const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 
 const buttons = ref([])
 const leaderboard = ref([])
 const boss = ref(null)
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
+const latestAnnouncement = ref(null)
+const announcements = ref([])
 const myBossStats = ref(null)
 const inventory = ref([])
 const loadout = ref(emptyLoadout())
@@ -30,6 +33,16 @@ const bossHistoryQuery = ref('')
 const loadingBossHistory = ref(false)
 const bossHistoryLoaded = ref(false)
 const bossHistoryError = ref('')
+const loadingAnnouncements = ref(false)
+const announcementsLoaded = ref(false)
+const announcementError = ref('')
+const announcementModalOpen = ref(false)
+const messages = ref([])
+const messageNextCursor = ref('')
+const loadingMessages = ref(false)
+const postingMessage = ref(false)
+const messageDraft = ref('')
+const messageError = ref('')
 
 let eventSource
 const burstTimers = new Map()
@@ -143,6 +156,23 @@ function topBossDamage(entry) {
   return entry?.damage?.[0] ?? null
 }
 
+function formatTime(timestamp) {
+  if (!timestamp) {
+    return '未记录'
+  }
+
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(timestamp * 1000))
+}
+
+function canSynthesize(item) {
+  return Boolean(isLoggedIn.value && item && item.quantity >= 3 && (item.starLevel ?? 0) < 5)
+}
+
 async function readErrorMessage(response, fallback) {
   try {
     const payload = await response.json()
@@ -154,6 +184,105 @@ async function readErrorMessage(response, fallback) {
   }
 
   return fallback
+}
+
+function maybePromptAnnouncement() {
+  if (!latestAnnouncement.value?.id) {
+    return
+  }
+
+  const readId = window.localStorage.getItem(ANNOUNCEMENT_READ_KEY)
+  if (readId !== latestAnnouncement.value.id) {
+    announcementModalOpen.value = true
+  }
+}
+
+function closeAnnouncementModal() {
+  if (latestAnnouncement.value?.id) {
+    window.localStorage.setItem(ANNOUNCEMENT_READ_KEY, latestAnnouncement.value.id)
+  }
+  announcementModalOpen.value = false
+}
+
+async function loadAnnouncements(force = false) {
+  if ((announcementsLoaded.value || loadingAnnouncements.value) && !force) {
+    return
+  }
+
+  loadingAnnouncements.value = true
+  announcementError.value = ''
+  try {
+    const response = await fetch('/api/announcements')
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '公告加载失败'))
+    }
+    const payload = await response.json()
+    announcements.value = Array.isArray(payload) ? payload : []
+    announcementsLoaded.value = true
+  } catch (error) {
+    announcementError.value = error.message || '公告加载失败'
+  } finally {
+    loadingAnnouncements.value = false
+  }
+}
+
+async function loadMessages(cursor = '', append = false) {
+  if (loadingMessages.value) {
+    return
+  }
+
+  loadingMessages.value = true
+  messageError.value = ''
+  try {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+    const response = await fetch(`/api/messages${query}`)
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '留言加载失败'))
+    }
+
+    const payload = await response.json()
+    const items = Array.isArray(payload?.items) ? payload.items : []
+    messages.value = append ? [...messages.value, ...items] : items
+    messageNextCursor.value = payload?.nextCursor || ''
+  } catch (error) {
+    messageError.value = error.message || '留言加载失败'
+  } finally {
+    loadingMessages.value = false
+  }
+}
+
+async function submitMessage() {
+  if (!nickname.value) {
+    messageError.value = '先报个名再留言。'
+    return
+  }
+
+  postingMessage.value = true
+  messageError.value = ''
+  try {
+    const response = await fetch('/api/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nickname: nickname.value,
+        content: messageDraft.value,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '留言发送失败'))
+    }
+
+    const payload = await response.json()
+    messages.value = [payload, ...messages.value]
+    messageDraft.value = ''
+  } catch (error) {
+    messageError.value = error.message || '留言发送失败'
+  } finally {
+    postingMessage.value = false
+  }
 }
 
 async function validateNicknameWithServer(nextNickname) {
@@ -217,6 +346,10 @@ function selectHudTab(tab) {
   activeHudTab.value = tab
   if (tab === 'info') {
     loadBossHistory()
+    loadAnnouncements()
+  }
+  if (tab === 'messages') {
+    loadMessages()
   }
 }
 
@@ -227,6 +360,7 @@ function applyState(payload) {
   boss.value = payload?.boss ?? null
   bossLeaderboard.value = payload?.bossLeaderboard ?? []
   bossLoot.value = payload?.bossLoot ?? []
+  latestAnnouncement.value = payload?.latestAnnouncement ?? null
   myBossStats.value = payload?.myBossStats ?? null
   inventory.value = payload?.inventory ?? []
   loadout.value = payload?.loadout ?? emptyLoadout()
@@ -235,6 +369,7 @@ function applyState(payload) {
   pendingKeys.value = new Set()
   syncing.value = false
   markUpdated()
+  maybePromptAnnouncement()
 }
 
 function clearCriticalBurst(key) {
@@ -368,6 +503,38 @@ async function postEquipmentAction(itemId, action) {
   }
 }
 
+async function synthesizeItem(itemId) {
+  if (!nickname.value || !itemId) {
+    return
+  }
+
+  actioningItemId.value = itemId
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/synthesize`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nickname: nickname.value,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '升星失败，请稍后重试。'))
+    }
+
+    const data = await response.json()
+    applyState(data)
+  } catch (error) {
+    errorMessage.value = error.message || '升星失败，请稍后重试。'
+  } finally {
+    actioningItemId.value = ''
+  }
+}
+
 function connectEventStream() {
   eventSource?.close()
   eventSource = new EventSource(`/api/events${currentNicknameQuery()}`)
@@ -479,6 +646,19 @@ onBeforeUnmount(() => {
         <span class="hero__time">最近刷新 {{ lastUpdatedAt || '--:--:--' }}</span>
         <a class="hero__admin-link" href="/admin">管理后台</a>
       </div>
+    </section>
+
+    <section v-if="announcementModalOpen && latestAnnouncement" class="announcement-modal" aria-label="更新公告">
+      <div class="announcement-modal__backdrop" @click="closeAnnouncementModal"></div>
+      <article class="announcement-modal__card">
+        <p class="vote-stage__eyebrow">更新内容公告</p>
+        <strong>{{ latestAnnouncement.title }}</strong>
+        <p class="announcement-modal__time">{{ formatTime(latestAnnouncement.publishedAt) }}</p>
+        <p class="social-card__copy">{{ latestAnnouncement.content }}</p>
+        <div class="announcement-modal__actions">
+          <button class="nickname-form__submit" type="button" @click="closeAnnouncementModal">我知道了</button>
+        </div>
+      </article>
     </section>
 
     <section class="stats-band stats-band--wide" aria-label="实时统计">
@@ -635,6 +815,14 @@ onBeforeUnmount(() => {
             >
               信息
             </button>
+            <button
+              class="player-hud__tab"
+              :class="{ 'player-hud__tab--active': activeHudTab === 'messages' }"
+              type="button"
+              @click="selectHudTab('messages')"
+            >
+              留言
+            </button>
           </div>
 
           <div class="player-hud__content">
@@ -649,20 +837,51 @@ onBeforeUnmount(() => {
               </div>
 
               <ul v-else class="inventory-list">
-                <li v-for="item in inventory" :key="item.itemId" class="inventory-item">
-                  <div>
-                    <strong>{{ item.name }}</strong>
-                    <p>{{ item.slot || '未分类' }} · 库存 {{ item.quantity }}</p>
-                    <p>{{ formatItemStats(item) }}</p>
+                <li v-for="item in inventory" :key="item.itemId" class="inventory-item inventory-item--panel">
+                  <div class="inventory-item__top">
+                    <div class="inventory-item__main">
+                      <strong>{{ item.name }}</strong>
+                      <div class="inventory-item__meta">
+                        <span class="inventory-item__chip">类型:{{ item.slot || '未分类' }}</span>
+                        <span class="inventory-item__chip">库存:{{ item.quantity }}</span>
+                        <span class="inventory-item__chip">星级:{{ item.starLevel ? `+${item.starLevel}` : '未升星' }}</span>
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    class="inventory-item__action"
-                    type="button"
-                    :disabled="!isLoggedIn || actioningItemId === item.itemId"
-                    @click="item.equipped ? postEquipmentAction(item.itemId, 'unequip') : postEquipmentAction(item.itemId, 'equip')"
-                  >
-                    {{ item.equipped ? '卸下' : '穿戴' }}
-                  </button>
+
+                  <ul class="inventory-item__stats inventory-item__stats--stacked">
+                    <li v-for="line in formatItemStatLines(item)" :key="line">
+                      {{ line }}
+                    </li>
+                  </ul>
+
+                  <div class="inventory-item__footer">
+                    <span
+                      class="inventory-item__state"
+                      :class="{ 'inventory-item__state--active': item.equipped }"
+                    >
+                      {{ item.equipped ? '已穿戴' : '待命中' }}
+                    </span>
+
+                    <div class="inventory-item__actions">
+                      <button
+                        class="inventory-item__action"
+                        type="button"
+                        :disabled="!isLoggedIn || actioningItemId === item.itemId"
+                        @click="item.equipped ? postEquipmentAction(item.itemId, 'unequip') : postEquipmentAction(item.itemId, 'equip')"
+                      >
+                        {{ item.equipped ? '卸下' : '穿戴' }}
+                      </button>
+                      <button
+                        class="nickname-form__ghost"
+                        type="button"
+                        :disabled="!canSynthesize(item) || actioningItemId === item.itemId"
+                        @click="synthesizeItem(item.itemId)"
+                      >
+                        {{ item.starLevel >= 5 ? '已满星' : '3 合 1 升星' }}
+                      </button>
+                    </div>
+                  </div>
                 </li>
               </ul>
             </section>
@@ -747,11 +966,29 @@ onBeforeUnmount(() => {
               </div>
             </section>
 
-            <section v-else class="player-hud__panel player-hud__panel--info">
+            <section v-else-if="activeHudTab === 'info'" class="player-hud__panel player-hud__panel--info">
               <div class="player-hud__section-head">
                 <p class="vote-stage__eyebrow">信息</p>
                 <strong>{{ bossHistory.length }} 条战报</strong>
               </div>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>最新公告</span>
+                  <strong>{{ latestAnnouncement?.title || '暂无' }}</strong>
+                </div>
+                <p class="player-hud__note">
+                  {{ latestAnnouncement?.content || '当前还没有新的站内公告。' }}
+                </p>
+                <button
+                  v-if="latestAnnouncement"
+                  class="nickname-form__ghost player-hud__retry"
+                  type="button"
+                  @click="announcementModalOpen = true"
+                >
+                  再看一遍
+                </button>
+              </section>
 
               <section class="player-hud__info-block">
                 <div class="player-hud__mini-head">
@@ -788,6 +1025,31 @@ onBeforeUnmount(() => {
                     </div>
                   </li>
                 </ul>
+              </section>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>公告历史</span>
+                  <strong>{{ announcements.length }} 条</strong>
+                </div>
+                <div v-if="loadingAnnouncements" class="leaderboard-list leaderboard-list--empty">
+                  <p>公告加载中...</p>
+                </div>
+                <div v-else-if="announcementError" class="leaderboard-list leaderboard-list--empty">
+                  <p>{{ announcementError }}</p>
+                </div>
+                <ul v-else-if="announcements.length > 0" class="history-list">
+                  <li v-for="item in announcements" :key="item.id" class="history-item">
+                    <div class="history-item__head">
+                      <strong>{{ item.title }}</strong>
+                      <span>{{ formatTime(item.publishedAt) }}</span>
+                    </div>
+                    <p>{{ item.content }}</p>
+                  </li>
+                </ul>
+                <div v-else class="leaderboard-list leaderboard-list--empty">
+                  <p>暂无公告历史。</p>
+                </div>
               </section>
 
               <section class="player-hud__info-block">
@@ -833,6 +1095,54 @@ onBeforeUnmount(() => {
                   </li>
                 </ul>
               </section>
+            </section>
+
+            <section v-else class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">公共留言墙</p>
+                <strong>{{ messages.length }} 条</strong>
+              </div>
+
+              <form class="admin-form player-hud__message-form" @submit.prevent="submitMessage">
+                <textarea
+                  v-model="messageDraft"
+                  class="nickname-form__input admin-textarea"
+                  rows="4"
+                  maxlength="200"
+                  placeholder="说点什么，所有人都能看到。"
+                ></textarea>
+                <button class="nickname-form__submit" type="submit" :disabled="postingMessage || !isLoggedIn">
+                  {{ postingMessage ? '发送中...' : '发送留言' }}
+                </button>
+              </form>
+
+              <p v-if="messageError" class="feedback feedback--error">{{ messageError }}</p>
+
+              <div v-if="loadingMessages" class="leaderboard-list leaderboard-list--empty">
+                <p>留言加载中...</p>
+              </div>
+              <div v-else-if="messages.length === 0" class="leaderboard-list leaderboard-list--empty">
+                <p>还没有留言，先写第一条。</p>
+              </div>
+              <ul v-else class="history-list">
+                <li v-for="item in messages" :key="item.id" class="history-item">
+                  <div class="history-item__head">
+                    <strong>{{ item.nickname }}</strong>
+                    <span>{{ formatTime(item.createdAt) }}</span>
+                  </div>
+                  <p>{{ item.content }}</p>
+                </li>
+              </ul>
+
+              <button
+                v-if="messageNextCursor"
+                class="nickname-form__ghost player-hud__retry"
+                type="button"
+                :disabled="loadingMessages"
+                @click="loadMessages(messageNextCursor, true)"
+              >
+                加载更多
+              </button>
             </section>
           </div>
         </section>

@@ -289,7 +289,7 @@ func (s *Store) ListPlayerOverviews(ctx context.Context) ([]AdminPlayerOverview,
 		if err != nil {
 			return nil, err
 		}
-		inventory, err := s.inventoryForNickname(ctx, quantities, equipped)
+		inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped)
 		if err != nil {
 			return nil, err
 		}

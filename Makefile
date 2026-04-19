@@ -1,0 +1,64 @@
+SHELL := /bin/sh
+GO ?= go
+NPM ?= npm
+MAKEFLAGS += --no-print-directory
+
+.DEFAULT_GOAL := help
+
+.PHONY: help deps deps-ci dev build test check \
+	backend-run backend-test backend-vet \
+	frontend-dev frontend-build frontend-preview
+
+help: ## 显示可用命令
+	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "%-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+deps: ## 安装前端依赖
+	$(NPM) --prefix frontend install
+
+deps-ci: ## 以 CI 模式安装前端依赖
+	$(NPM) --prefix frontend ci
+
+dev: ## 同时启动后端和前端开发环境
+	@backend_pid=''; frontend_pid=''; status=0; \
+	trap 'test -n "$$backend_pid" && kill $$backend_pid 2>/dev/null || true; test -n "$$frontend_pid" && kill $$frontend_pid 2>/dev/null || true' INT TERM EXIT; \
+	$(GO) -C backend run ./cmd/server & backend_pid=$$!; \
+	$(NPM) --prefix frontend run dev & frontend_pid=$$!; \
+	while :; do \
+		if ! kill -0 $$backend_pid 2>/dev/null; then \
+			wait $$backend_pid || status=$$?; \
+			break; \
+		fi; \
+		if ! kill -0 $$frontend_pid 2>/dev/null; then \
+			wait $$frontend_pid || status=$$?; \
+			break; \
+		fi; \
+		sleep 1; \
+	done; \
+	kill $$backend_pid $$frontend_pid 2>/dev/null || true; \
+	wait $$backend_pid 2>/dev/null || true; \
+	wait $$frontend_pid 2>/dev/null || true; \
+	exit $$status
+
+build: frontend-build ## 构建前端产物到 backend/public
+
+test: backend-test ## 运行后端测试
+
+check: test backend-vet build ## 执行 CI 校验
+
+backend-run: ## 单独启动后端服务
+	$(GO) -C backend run ./cmd/server
+
+backend-test: ## 运行后端测试
+	$(GO) -C backend test ./...
+
+backend-vet: ## 运行 go vet
+	$(GO) -C backend vet ./...
+
+frontend-dev: ## 单独启动前端开发服务器
+	$(NPM) --prefix frontend run dev
+
+frontend-build: ## 构建前端产物
+	$(NPM) --prefix frontend run build
+
+frontend-preview: ## 预览前端产物
+	$(NPM) --prefix frontend run preview

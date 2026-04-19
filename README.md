@@ -8,12 +8,15 @@
 - 访问者先输入昵称，之后点击都会记到这个昵称名下。
 - 任意访问者点击按钮后，总数会按当前装备与暴击结算出的实际增量上涨。
 - 玩家可以穿戴装备，装备会让平时点击直接获得额外次数增量。
+- 玩家可以对同装备类型做 `3 合 1` 升星，最高 `+5`；升星不会生成新装备，而是强化该账号下这个装备类型的属性。
 - 所有在线用户都会通过 SSE 实时看到最新计数。
 - 页面会实时展示个人累计点击和排行榜。
 - 支持单个全服世界 Boss：Boss 活动期间，同一次点击会同时记票并造成 Boss 伤害。
 - Boss 击杀后会按掉落池给参与玩家发装备，装备进入各自背包。
 - 前台会展示当前 Boss 的掉落池，以及每件装备的属性。
+- 前台支持更新公告提醒、公告历史和全站公共留言墙。
 - 提供 `/admin` 管理后台，可登录后配置 Boss、装备、掉落池和前台按钮。
+- 后台支持为按钮图片申请阿里云 OSS 直传凭证，前端可直传 OSS 后回填公共图片 URL。
 - 你后面只要往 Redis 新增一个新键，前端就会自动展示新按钮。
 - 前端静态页和后端 API/SSE 统一由一个 Go 服务承载，并可打成单一 Docker 镜像。
 - 后端会在内存里做爆发点击限流，超出人类能力的频率会被拉黑 10 分钟。
@@ -22,6 +25,7 @@
 
 ## 目录结构
 
+- `Makefile`: 项目顶层命令入口，统一开发、构建、测试流程
 - `frontend/`: Vue 页面、样式和 Vite 配置
 - `backend/`: Go 服务、Redis 读写、SSE、限流和测试
 - `scripts/`: Docker 重建和镜像导出脚本
@@ -40,7 +44,7 @@ vote:button:<slug>
 - `count`: 当前总数
 - `sort`: 排序值，越小越靠前
 - `enabled`: `1` 为展示，`0` 为隐藏
-- `image_path`: 可选，本地静态图或可访问图片地址
+- `image_path`: 可选，任意可访问图片地址，推荐填 OSS/CDN 公共 URL
 - `image_alt`: 可选，图片说明文本
 
 示例：
@@ -84,6 +88,11 @@ vote:equip:def:<itemId>
 vote:user-inventory:<nickname>
 vote:user-loadout:<nickname>
 vote:user-last-reward:<nickname>
+vote:user-equip-upgrade:<nickname>:<itemId>
+vote:announcements
+vote:announcement:<id>
+vote:messages
+vote:message:<id>
 ```
 
 - `vote:boss:current` 是 `Hash`
@@ -119,6 +128,26 @@ vote:user-last-reward:<nickname>
   - `item_id`
   - `item_name`
   - `granted_at`
+- `vote:user-equip-upgrade:<nickname>:<itemId>` 是 `Hash`
+  - `star_level`
+  - `bonus_clicks`
+  - `bonus_critical_chance_percent`
+  - `bonus_critical_count`
+- `vote:announcements` 是 `Sorted Set`
+  - member = 公告 `id`
+  - score = 公告顺序 ID（越大越新）
+- `vote:announcement:<id>` 是 `Hash`
+  - `title`
+  - `content`
+  - `published_at`
+  - `active`
+- `vote:messages` 是 `Sorted Set`
+  - member = 留言 `id`
+  - score = 留言顺序 ID（越大越新）
+- `vote:message:<id>` 是 `Hash`
+  - `nickname`
+  - `content`
+  - `created_at`
 
 ## Consul 配置
 
@@ -153,6 +182,14 @@ admin:
   username: "admin"
   password: "change-me"
   session_secret: "change-this-too"
+oss:
+  access_key_id: "your-ak"
+  access_key_secret: "your-secret"
+  bucket: "your-bucket"
+  region: "cn-beijing"
+  public_base_url: "https://cdn.example.com"
+  upload_dir_prefix: "buttons"
+  expire_seconds: 300
 ```
 
 ## 限流规则
@@ -172,6 +209,13 @@ admin:
 - `admin.username`
 - `admin.password`
 - `admin.session_secret`
+- `oss.access_key_id`
+- `oss.access_key_secret`
+- `oss.bucket`
+- `oss.region`
+- `oss.public_base_url`
+- `oss.upload_dir_prefix`
+- `oss.expire_seconds`
 
 ## 昵称敏感词校验
 
@@ -179,14 +223,14 @@ admin:
 - 当前词表来自 `konsheng/Sensitive-lexicon`，仓库内置在 `backend/internal/nickname/lexicon/upstream/`。
 - 当前实现会加载该目录下所有 vendored `.txt` 词表并自动去重，不再只限于政治类词表。
 - 上游许可证文本随仓库一并保存在 `backend/internal/nickname/lexicon/LICENSE.konsheng.txt`。
+- 公共留言内容复用同一套词表与匹配逻辑，命中敏感词会被后端拒绝。
 
 ## 本地启动
 
-先安装项目和前端依赖：
+先安装前端依赖：
 
 ```bash
-npm install
-npm --prefix frontend install
+make deps
 ```
 
 然后准备 Consul 环境变量：
@@ -199,7 +243,7 @@ export CONSUL_CONFIG_KEY=vote-wall/dev
 启动开发环境：
 
 ```bash
-npm run dev
+make dev
 ```
 
 默认地址：
@@ -213,7 +257,7 @@ npm run dev
 运行：
 
 ```bash
-npm run build
+make build
 ```
 
 前端产物会输出到 `backend/public/`，由后端统一静态托管。
@@ -224,13 +268,23 @@ npm run build
 运行 Go 后端测试：
 
 ```bash
-npm test
+make test
 ```
 
 如果你只想单独启动后端，也可以直接跑：
 
 ```bash
-go -C backend run ./cmd/server
+make backend-run
+```
+
+其他常用目标：
+
+```bash
+make frontend-dev
+make frontend-build
+make backend-test
+make backend-vet
+make check
 ```
 
 ## Docker 构建与运行

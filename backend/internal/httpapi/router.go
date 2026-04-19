@@ -13,6 +13,7 @@ import (
 	"time"
 
 	adminauth "long/internal/admin"
+	ossupload "long/internal/oss"
 	"long/internal/ratelimit"
 	"long/internal/vote"
 )
@@ -25,6 +26,7 @@ type ButtonStore interface {
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
+	SynthesizeItem(context.Context, string, string) (vote.State, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	SaveButton(context.Context, vote.ButtonUpsert) error
 	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
@@ -33,6 +35,18 @@ type ButtonStore interface {
 	DeactivateBoss(context.Context) error
 	SetBossLoot(context.Context, string, []vote.BossLootEntry) error
 	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
+	GetLatestAnnouncement(context.Context) (*vote.Announcement, error)
+	ListAnnouncements(context.Context, bool) ([]vote.Announcement, error)
+	SaveAnnouncement(context.Context, vote.AnnouncementUpsert) (*vote.Announcement, error)
+	DeleteAnnouncement(context.Context, string) error
+	CreateMessage(context.Context, string, string) (*vote.Message, error)
+	ListMessages(context.Context, string, int64) (vote.MessagePage, error)
+	DeleteMessage(context.Context, string) error
+}
+
+// OSSSigner 负责生成 OSS 直传短时凭证。
+type OSSSigner interface {
+	CreatePolicy(context.Context) (ossupload.Policy, error)
 }
 
 // Broadcaster 广播接口，点击成功后推送更新快照
@@ -53,6 +67,7 @@ type Options struct {
 	Events             http.Handler
 	PublicDir          string
 	AdminAuthenticator *adminauth.Authenticator
+	OSSSigner          OSSSigner
 }
 
 const adminSessionCookieName = "long_admin_session"
@@ -86,6 +101,55 @@ func NewHandler(options Options) http.Handler {
 		}
 
 		writeJSON(w, http.StatusOK, history)
+	})
+
+	apiMux.HandleFunc("GET /api/announcements/latest", func(w http.ResponseWriter, r *http.Request) {
+		item, err := options.Store.GetLatestAnnouncement(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_FETCH_FAILED"})
+			return
+		}
+		writeJSON(w, http.StatusOK, item)
+	})
+
+	apiMux.HandleFunc("GET /api/announcements", func(w http.ResponseWriter, r *http.Request) {
+		items, err := options.Store.ListAnnouncements(r.Context(), false)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_LIST_FAILED"})
+			return
+		}
+		writeJSON(w, http.StatusOK, items)
+	})
+
+	apiMux.HandleFunc("GET /api/messages", func(w http.ResponseWriter, r *http.Request) {
+		page, err := options.Store.ListMessages(r.Context(), r.URL.Query().Get("cursor"), 50)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "MESSAGE_LIST_FAILED"})
+			return
+		}
+		writeJSON(w, http.StatusOK, page)
+	})
+
+	apiMux.HandleFunc("POST /api/messages", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Nickname string `json:"nickname"`
+			Content  string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+			return
+		}
+
+		message, err := options.Store.CreateMessage(r.Context(), body.Nickname, body.Content)
+		if err != nil {
+			if writeNicknameError(w, err) || writeContentError(w, err) {
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "MESSAGE_CREATE_FAILED"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, message)
 	})
 
 	apiMux.HandleFunc("POST /api/nickname/validate", func(w http.ResponseWriter, r *http.Request) {
@@ -169,27 +233,29 @@ func NewHandler(options Options) http.Handler {
 		}
 
 		_ = options.Broadcaster.BroadcastSnapshot(vote.Snapshot{
-			Buttons:         state.Buttons,
-			Leaderboard:     state.Leaderboard,
-			Boss:            state.Boss,
-			BossLeaderboard: state.BossLeaderboard,
-			BossLoot:        state.BossLoot,
+			Buttons:            state.Buttons,
+			Leaderboard:        state.Leaderboard,
+			Boss:               state.Boss,
+			BossLeaderboard:    state.BossLeaderboard,
+			BossLoot:           state.BossLoot,
+			LatestAnnouncement: state.LatestAnnouncement,
 		})
 		writeJSON(w, http.StatusOK, map[string]any{
-			"button":          result.Button,
-			"buttons":         state.Buttons,
-			"leaderboard":     state.Leaderboard,
-			"userStats":       result.UserStats,
-			"delta":           result.Delta,
-			"critical":        result.Critical,
-			"boss":            state.Boss,
-			"bossLeaderboard": state.BossLeaderboard,
-			"bossLoot":        state.BossLoot,
-			"myBossStats":     state.MyBossStats,
-			"inventory":       state.Inventory,
-			"loadout":         state.Loadout,
-			"combatStats":     state.CombatStats,
-			"lastReward":      state.LastReward,
+			"button":             result.Button,
+			"buttons":            state.Buttons,
+			"leaderboard":        state.Leaderboard,
+			"userStats":          result.UserStats,
+			"delta":              result.Delta,
+			"critical":           result.Critical,
+			"boss":               state.Boss,
+			"bossLeaderboard":    state.BossLeaderboard,
+			"bossLoot":           state.BossLoot,
+			"latestAnnouncement": state.LatestAnnouncement,
+			"myBossStats":        state.MyBossStats,
+			"inventory":          state.Inventory,
+			"loadout":            state.Loadout,
+			"combatStats":        state.CombatStats,
+			"lastReward":         state.LastReward,
 		})
 	})
 
@@ -252,6 +318,46 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "UNEQUIP_FAILED"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/equipment/{itemId}/synthesize", func(w http.ResponseWriter, r *http.Request) {
+		itemID := r.PathValue("itemId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再升星。",
+			})
+			return
+		}
+
+		state, err := options.Store.SynthesizeItem(r.Context(), body.Nickname, itemID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrEquipmentNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+			case errors.Is(err, vote.ErrEquipmentNotOwned), errors.Is(err, vote.ErrEquipmentNotEnough):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_ENOUGH",
+					"message": "至少要有 3 件同名装备才能升星。",
+				})
+			case errors.Is(err, vote.ErrEquipmentMaxStar):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_MAX_STAR",
+					"message": "这件装备已经满星了。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "SYNTHESIZE_FAILED"})
+			}
 			return
 		}
 
@@ -395,6 +501,104 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			writeJSON(w, http.StatusOK, history)
+		})
+
+		apiMux.HandleFunc("GET /api/admin/announcements", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			items, err := options.Store.ListAnnouncements(r.Context(), true)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_LIST_FAILED"})
+				return
+			}
+			writeJSON(w, http.StatusOK, items)
+		})
+
+		apiMux.HandleFunc("POST /api/admin/announcements", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.AnnouncementUpsert
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			item, err := options.Store.SaveAnnouncement(r.Context(), body)
+			if err != nil {
+				if writeContentError(w, err) {
+					return
+				}
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_SAVE_FAILED"})
+				return
+			}
+			writeJSON(w, http.StatusOK, item)
+		})
+
+		apiMux.HandleFunc("DELETE /api/admin/announcements/{id}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			if err := options.Store.DeleteAnnouncement(r.Context(), r.PathValue("id")); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_DELETE_FAILED"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("GET /api/admin/messages", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			page, err := options.Store.ListMessages(r.Context(), r.URL.Query().Get("cursor"), 50)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "MESSAGE_LIST_FAILED"})
+				return
+			}
+			writeJSON(w, http.StatusOK, page)
+		})
+
+		apiMux.HandleFunc("DELETE /api/admin/messages/{id}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			if err := options.Store.DeleteMessage(r.Context(), r.PathValue("id")); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "MESSAGE_DELETE_FAILED"})
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("POST /api/admin/oss/sts", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+			if options.OSSSigner == nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+					"error":   "OSS_NOT_CONFIGURED",
+					"message": "OSS 直传还没配置，先手动填图片 URL。",
+				})
+				return
+			}
+
+			policy, err := options.OSSSigner.CreatePolicy(r.Context())
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "OSS_POLICY_FAILED"})
+				return
+			}
+			writeJSON(w, http.StatusOK, policy)
 		})
 
 		apiMux.HandleFunc("POST /api/admin/buttons", func(w http.ResponseWriter, r *http.Request) {
@@ -552,6 +756,31 @@ func writeNicknameError(w http.ResponseWriter, err error) bool {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "SENSITIVE_NICKNAME",
 			"message": "昵称包含敏感词，请换一个试试。",
+		})
+		return true
+	}
+
+	return false
+}
+
+func writeContentError(w http.ResponseWriter, err error) bool {
+	switch {
+	case errors.Is(err, vote.ErrSensitiveContent):
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "SENSITIVE_CONTENT",
+			"message": "内容包含敏感词，请改一下再发。",
+		})
+		return true
+	case errors.Is(err, vote.ErrMessageEmpty):
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "EMPTY_CONTENT",
+			"message": "内容不能为空。",
+		})
+		return true
+	case errors.Is(err, vote.ErrMessageTooLong):
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "CONTENT_TOO_LONG",
+			"message": "内容最多 200 个字。",
 		})
 		return true
 	}

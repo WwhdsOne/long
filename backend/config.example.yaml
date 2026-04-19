@@ -1,0 +1,29 @@
+port: 2333
+redis:
+  host: 127.0.0.1
+  port: 6379
+  username: ""
+  password: "123456"
+  db: 0
+  tls_enabled: false
+redis_prefix: "vote:button:"
+button_poll_interval_ms: 3000
+rate_limit:
+  limit: 30
+  window_ms: 2000
+  blacklist_ms: 600000
+critical_hit:
+  chance_percent: 5
+  count: 5
+admin:
+  username: "root"
+  password: "123456"
+  session_secret: "session-secret"
+oss:
+  access_key_id: "*****"
+  access_key_secret: "*****"
+  bucket: "*********"
+  region: "cn-beijing"
+  public_base_url: "https://******.oss-cn-beijing.aliyuncs.com"
+  upload_dir_prefix: "buttons"
+  expire_seconds: 300

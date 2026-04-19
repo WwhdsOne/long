@@ -87,6 +87,7 @@ rtk discover
 
 ## 项目结构
 
+- `Makefile` 是项目顶层命令入口，统一提供开发、构建、测试命令
 - `frontend/` 是 Vue 前端
 - `frontend/src/App.vue` 只负责根据路径切换公共页和后台页
 - `frontend/src/pages/PublicPage.vue` 是投票墙主页面，同时承载世界 Boss、背包、装备栏和排行榜展示
@@ -112,12 +113,16 @@ rtk discover
 
 ## 常用命令
 
-- 开发：`npm run dev`
-- 前端构建：`npm run build`
-- 后端测试：`npm test`
-- 后端单独运行：`go -C backend run ./cmd/server`
-- 前端单独构建：`npm --prefix frontend run build`
-- 后端单独测试：`go -C backend test ./...`
+- 安装依赖：`make deps`
+- 开发：`make dev`
+- 前端构建：`make build`
+- 后端测试：`make test`
+- 后端单独运行：`make backend-run`
+- 前端单独运行：`make frontend-dev`
+- 前端单独构建：`make frontend-build`
+- 后端单独测试：`make backend-test`
+- Go 静态检查：`make backend-vet`
+- CI 校验：`make check`
 
 ## 修改约定
 

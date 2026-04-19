@@ -39,6 +39,13 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               username: "admin"
               password: "secret"
               session_secret: "session-secret"
+            oss:
+              access_key_id: "test-ak"
+              access_key_secret: "test-secret"
+              bucket: "vote-wall"
+              region: "cn-beijing"
+              public_base_url: "https://cdn.example.com"
+              upload_dir_prefix: "buttons"
         `))
 
 		w.Header().Set("X-Consul-Index", "7")
@@ -76,6 +83,15 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.Admin.SessionSecret != "session-secret" {
 		t.Fatalf("expected admin session secret session-secret, got %q", cfg.Admin.SessionSecret)
+	}
+	if cfg.OSS.AccessKeyID != "test-ak" {
+		t.Fatalf("expected oss access key id test-ak, got %q", cfg.OSS.AccessKeyID)
+	}
+	if cfg.OSS.Bucket != "vote-wall" {
+		t.Fatalf("expected oss bucket vote-wall, got %q", cfg.OSS.Bucket)
+	}
+	if cfg.OSS.PublicBaseURL != "https://cdn.example.com" {
+		t.Fatalf("expected oss public base url, got %q", cfg.OSS.PublicBaseURL)
 	}
 }
 

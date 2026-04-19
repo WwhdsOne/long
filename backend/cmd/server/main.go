@@ -22,6 +22,7 @@ import (
 	"long/internal/events"
 	"long/internal/httpapi"
 	"long/internal/nickname"
+	ossupload "long/internal/oss"
 	"long/internal/ratelimit"
 	"long/internal/vote"
 )
@@ -120,12 +121,25 @@ func run() error {
 		Window:            cfg.RateLimit.Window,
 		BlacklistDuration: cfg.RateLimit.BlacklistDuration,
 	})
+	var ossSigner *ossupload.Signer
+	if cfg.OSS.Enabled() {
+		ossSigner = ossupload.NewSigner(ossupload.Config{
+			AccessKeyID:     cfg.OSS.AccessKeyID,
+			AccessKeySecret: cfg.OSS.AccessKeySecret,
+			Bucket:          cfg.OSS.Bucket,
+			Region:          cfg.OSS.Region,
+			PublicBaseURL:   cfg.OSS.PublicBaseURL,
+			UploadDirPrefix: cfg.OSS.UploadDirPrefix,
+			ExpireSeconds:   cfg.OSS.ExpireSeconds,
+		})
+	}
 	handler := httpapi.NewHandler(httpapi.Options{
 		Store:       store,
 		Broadcaster: publisher,
 		ClickGuard:  clickLimiter,
 		Events:      eventHandler,
 		PublicDir:   cfg.PublicDir,
+		OSSSigner:   ossSigner,
 		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
 			Username:      cfg.Admin.Username,
 			Password:      cfg.Admin.Password,

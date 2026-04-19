@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"long/internal/admin"
+	ossupload "long/internal/oss"
 	"long/internal/vote"
 )
 
@@ -17,6 +18,9 @@ type mockStore struct {
 	equipState  vote.State
 	adminState  vote.AdminState
 	bossHistory []vote.BossHistoryEntry
+	announcements []vote.Announcement
+	latestAnnouncement *vote.Announcement
+	messagePage vote.MessagePage
 	result      vote.ClickResult
 	lastButton  vote.ButtonUpsert
 	lastBoss    vote.BossUpsert
@@ -24,6 +28,8 @@ type mockStore struct {
 	clickErr    error
 	equipErr    error
 	validateErr error
+	messageErr  error
+	synthesizeErr error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -137,6 +143,67 @@ func (m *mockStore) SetBossLoot(_ context.Context, _ string, _ []vote.BossLootEn
 
 func (m *mockStore) ListBossHistory(_ context.Context) ([]vote.BossHistoryEntry, error) {
 	return m.bossHistory, nil
+}
+
+func (m *mockStore) GetLatestAnnouncement(_ context.Context) (*vote.Announcement, error) {
+	return m.latestAnnouncement, nil
+}
+
+func (m *mockStore) ListAnnouncements(_ context.Context, includeInactive bool) ([]vote.Announcement, error) {
+	return m.announcements, nil
+}
+
+func (m *mockStore) SaveAnnouncement(_ context.Context, announcement vote.AnnouncementUpsert) (*vote.Announcement, error) {
+	return &vote.Announcement{
+		ID:          "1",
+		Title:       announcement.Title,
+		Content:     announcement.Content,
+		PublishedAt: 1710000000,
+		Active:      announcement.Active,
+	}, nil
+}
+
+func (m *mockStore) DeleteAnnouncement(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockStore) CreateMessage(_ context.Context, nickname string, content string) (*vote.Message, error) {
+	if m.messageErr != nil {
+		return nil, m.messageErr
+	}
+	return &vote.Message{
+		ID:        "1",
+		Nickname:  nickname,
+		Content:   content,
+		CreatedAt: 1710000000,
+	}, nil
+}
+
+func (m *mockStore) ListMessages(_ context.Context, _ string, _ int64) (vote.MessagePage, error) {
+	return m.messagePage, m.messageErr
+}
+
+func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockStore) SynthesizeItem(_ context.Context, _ string, _ string) (vote.State, error) {
+	if m.synthesizeErr != nil {
+		return vote.State{}, m.synthesizeErr
+	}
+	if len(m.equipState.Buttons) == 0 && len(m.equipState.Inventory) == 0 && m.equipState.Loadout.Weapon == nil && m.equipState.Loadout.Armor == nil && m.equipState.Loadout.Accessory == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+type mockOSSSigner struct {
+	policy ossupload.Policy
+	err    error
+}
+
+func (m *mockOSSSigner) CreatePolicy(_ context.Context) (ossupload.Policy, error) {
+	return m.policy, m.err
 }
 
 type mockBroadcaster struct {
@@ -268,6 +335,39 @@ func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 	}
 	if len(payload[0].Damage) != 1 || payload[0].Damage[0].Nickname != "阿明" {
 		t.Fatalf("unexpected history damage payload: %+v", payload[0].Damage)
+	}
+}
+
+func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
+	store := &mockStore{
+		latestAnnouncement: &vote.Announcement{
+			ID:          "7",
+			Title:       "更新公告",
+			Content:     "留言墙已上线。",
+			PublishedAt: 1710000000,
+			Active:      true,
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/announcements/latest", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload vote.Announcement
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.ID != "7" || payload.Title != "更新公告" {
+		t.Fatalf("unexpected latest announcement payload: %+v", payload)
 	}
 }
 
@@ -466,6 +566,82 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 	}
 }
 
+func TestSynthesizeItemReturnsUpdatedState(t *testing.T) {
+	store := &mockStore{
+		equipState: vote.State{
+			Inventory: []vote.InventoryItem{
+				{
+					ItemID:      "wood-sword",
+					Name:        "木剑 +1",
+					Quantity:    1,
+					StarLevel:   1,
+					BonusClicks: 3,
+				},
+			},
+			Loadout: vote.Loadout{
+				Weapon: &vote.InventoryItem{
+					ItemID:      "wood-sword",
+					Name:        "木剑 +1",
+					Quantity:    1,
+					StarLevel:   1,
+					BonusClicks: 3,
+					Equipped:    true,
+				},
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/synthesize", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload struct {
+		Loadout struct {
+			Weapon *vote.InventoryItem `json:"weapon"`
+		} `json:"loadout"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Loadout.Weapon == nil || payload.Loadout.Weapon.Name != "木剑 +1" || payload.Loadout.Weapon.StarLevel != 1 {
+		t.Fatalf("unexpected synthesize payload: %+v", payload.Loadout.Weapon)
+	}
+}
+
+func TestPostMessageRejectsSensitiveContent(t *testing.T) {
+	store := &mockStore{
+		messageErr: vote.ErrSensitiveContent,
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/messages", strings.NewReader(`{"nickname":"阿明","content":"XJP后援会"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.Code)
+	}
+	if body := response.Body.String(); !strings.Contains(body, "敏感词") {
+		t.Fatalf("expected sensitive message content error, got %q", body)
+	}
+}
+
 func TestAdminLoginCreatesSessionAndStateRequiresAuth(t *testing.T) {
 	store := &mockStore{
 		adminState: vote.AdminState{
@@ -589,6 +765,64 @@ func TestAdminActivateBossAndSaveButton(t *testing.T) {
 	}
 	if store.lastButton.Slug != "new-one" || store.lastButton.Label != "新按钮" {
 		t.Fatalf("expected button payload to be forwarded, got %+v", store.lastButton)
+	}
+}
+
+func TestAdminOSSPolicyRequiresAuthAndReturnsPayload(t *testing.T) {
+	store := &mockStore{}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+		OSSSigner: &mockOSSSigner{
+			policy: ossupload.Policy{
+				AccessKeyID:   "test-ak",
+				Policy:        "policy",
+				Signature:     "signature",
+				Host:          "https://vote-wall.oss-cn-beijing.aliyuncs.com",
+				Dir:           "buttons/20260419/",
+				PublicBaseURL: "https://cdn.example.com",
+			},
+		},
+	})
+
+	unauthorizedRequest := httptest.NewRequest(http.MethodPost, "/api/admin/oss/sts", nil)
+	unauthorizedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedResponse, unauthorizedRequest)
+
+	if unauthorizedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without session, got %d", unauthorizedResponse.Code)
+	}
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie from login")
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/oss/sts", nil)
+	request.AddCookie(cookies[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload["host"] != "https://vote-wall.oss-cn-beijing.aliyuncs.com" {
+		t.Fatalf("unexpected oss payload: %+v", payload)
 	}
 }
 

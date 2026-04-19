@@ -1,13 +1,5 @@
 {
   "name": "redis-vote-wall",
   "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "dev": "concurrently \"go -C backend run ./cmd/server\" \"npm --prefix frontend run dev\"",
-    "build": "npm --prefix frontend run build",
-    "test": "go -C backend test ./..."
-  },
-  "devDependencies": {
-    "concurrently": "^9.2.1"
-  }
+  "private": true
 }

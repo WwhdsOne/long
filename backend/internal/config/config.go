@@ -55,6 +55,17 @@ type AdminConfig struct {
 	SessionSecret string
 }
 
+// OSSConfig 阿里云 OSS 直传配置
+type OSSConfig struct {
+	AccessKeyID     string
+	AccessKeySecret string
+	Bucket          string
+	Region          string
+	PublicBaseURL   string
+	UploadDirPrefix string
+	ExpireSeconds   int
+}
+
 // Config 运行时配置集合
 type Config struct {
 	Port               int
@@ -62,6 +73,7 @@ type Config struct {
 	RateLimit          RateLimitConfig
 	CriticalHit        CriticalHitConfig
 	Admin              AdminConfig
+	OSS                OSSConfig
 	RedisPrefix        string
 	ButtonPollInterval time.Duration
 	PublicDir          string
@@ -93,6 +105,15 @@ type fileConfig struct {
 		Password      string `yaml:"password"`
 		SessionSecret string `yaml:"session_secret"`
 	} `yaml:"admin"`
+	OSS struct {
+		AccessKeyID     string `yaml:"access_key_id"`
+		AccessKeySecret string `yaml:"access_key_secret"`
+		Bucket          string `yaml:"bucket"`
+		Region          string `yaml:"region"`
+		PublicBaseURL   string `yaml:"public_base_url"`
+		UploadDirPrefix string `yaml:"upload_dir_prefix"`
+		ExpireSeconds   int    `yaml:"expire_seconds"`
+	} `yaml:"oss"`
 }
 
 type consulKV struct {
@@ -178,6 +199,15 @@ func loadFromConsul() (Config, consulSource, error) {
 			Password:      parsed.Admin.Password,
 			SessionSecret: parsed.Admin.SessionSecret,
 		},
+		OSS: OSSConfig{
+			AccessKeyID:     parsed.OSS.AccessKeyID,
+			AccessKeySecret: parsed.OSS.AccessKeySecret,
+			Bucket:          parsed.OSS.Bucket,
+			Region:          parsed.OSS.Region,
+			PublicBaseURL:   parsed.OSS.PublicBaseURL,
+			UploadDirPrefix: parsed.OSS.UploadDirPrefix,
+			ExpireSeconds:   parsed.OSS.ExpireSeconds,
+		},
 		RedisPrefix:        parsed.RedisPrefix,
 		ButtonPollInterval: time.Duration(parsed.ButtonPollIntervalMS) * time.Millisecond,
 		PublicDir:          resolvePublicDir(),
@@ -222,9 +252,26 @@ func validate(config Config) error {
 		return errors.New("admin.password is required")
 	case strings.TrimSpace(config.Admin.SessionSecret) == "":
 		return errors.New("admin.session_secret is required")
+	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeyID) == "":
+		return errors.New("oss.access_key_id is required when oss is configured")
+	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeySecret) == "":
+		return errors.New("oss.access_key_secret is required when oss is configured")
+	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.Bucket) == "":
+		return errors.New("oss.bucket is required when oss is configured")
+	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.Region) == "":
+		return errors.New("oss.region is required when oss is configured")
 	}
 
 	return nil
+}
+
+// Enabled reports whether OSS direct-upload has been configured.
+func (c OSSConfig) Enabled() bool {
+	return strings.TrimSpace(c.AccessKeyID) != "" ||
+		strings.TrimSpace(c.AccessKeySecret) != "" ||
+		strings.TrimSpace(c.Bucket) != "" ||
+		strings.TrimSpace(c.Region) != "" ||
+		strings.TrimSpace(c.PublicBaseURL) != ""
 }
 
 func consulSourceFromEnv() (consulSource, error) {

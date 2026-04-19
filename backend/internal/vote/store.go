@@ -20,8 +20,13 @@ import (
 var ErrButtonNotFound = errors.New("button not found")
 var ErrInvalidNickname = errors.New("invalid nickname")
 var ErrSensitiveNickname = errors.New("sensitive nickname")
+var ErrSensitiveContent = errors.New("sensitive content")
 var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
+var ErrEquipmentNotEnough = errors.New("equipment not enough")
+var ErrEquipmentMaxStar = errors.New("equipment max star")
+var ErrMessageEmpty = errors.New("message empty")
+var ErrMessageTooLong = errors.New("message too long")
 
 const (
 	bossStatusActive   = "active"
@@ -89,12 +94,43 @@ type EquipmentDefinition struct {
 	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
 }
 
+// Announcement 更新公告
+type Announcement struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Content     string `json:"content"`
+	PublishedAt int64  `json:"publishedAt"`
+	Active      bool   `json:"active"`
+}
+
+// AnnouncementUpsert 后台公告保存载荷
+type AnnouncementUpsert struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+	Active  bool   `json:"active"`
+}
+
+// Message 公共留言
+type Message struct {
+	ID        string `json:"id"`
+	Nickname  string `json:"nickname"`
+	Content   string `json:"content"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
+// MessagePage 留言分页结果
+type MessagePage struct {
+	Items      []Message `json:"items"`
+	NextCursor string    `json:"nextCursor,omitempty"`
+}
+
 // InventoryItem 背包道具
 type InventoryItem struct {
 	ItemID                     string `json:"itemId"`
 	Name                       string `json:"name"`
 	Slot                       string `json:"slot"`
 	Quantity                   int64  `json:"quantity"`
+	StarLevel                  int    `json:"starLevel"`
 	BonusClicks                int64  `json:"bonusClicks"`
 	BonusCriticalChancePercent int    `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
@@ -146,6 +182,7 @@ type Snapshot struct {
 	Boss            *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
 	BossLoot        []BossLootEntry        `json:"bossLoot"`
+	LatestAnnouncement *Announcement       `json:"latestAnnouncement,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -156,6 +193,7 @@ type State struct {
 	Boss            *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
 	BossLoot        []BossLootEntry        `json:"bossLoot"`
+	LatestAnnouncement *Announcement       `json:"latestAnnouncement,omitempty"`
 	MyBossStats     *BossUserStats         `json:"myBossStats,omitempty"`
 	Inventory       []InventoryItem        `json:"inventory"`
 	Loadout         Loadout                `json:"loadout"`
@@ -198,10 +236,17 @@ type Store struct {
 	bossCurrentKey     string
 	bossHistoryKey     string
 	bossHistoryPrefix  string
+	announcementSeqKey string
+	announcementKey    string
+	announcementPrefix string
+	messageSeqKey      string
+	messageKey         string
+	messagePrefix      string
 	equipmentDefPrefix string
 	inventoryPrefix    string
 	loadoutPrefix      string
 	lastRewardPrefix   string
+	upgradePrefix      string
 	fallbacks          map[string]buttonFallback
 	critical           StoreOptions
 	roll               func(int) int
@@ -231,10 +276,17 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		bossCurrentKey:     namespace + "boss:current",
 		bossHistoryKey:     namespace + "boss:history",
 		bossHistoryPrefix:  namespace + "boss:history:",
+		announcementSeqKey: namespace + "announcement:seq",
+		announcementKey:    namespace + "announcements",
+		announcementPrefix: namespace + "announcement:",
+		messageSeqKey:      namespace + "message:seq",
+		messageKey:         namespace + "messages",
+		messagePrefix:      namespace + "message:",
 		equipmentDefPrefix: namespace + "equip:def:",
 		inventoryPrefix:    namespace + "user-inventory:",
 		loadoutPrefix:      namespace + "user-loadout:",
 		lastRewardPrefix:   namespace + "user-last-reward:",
+		upgradePrefix:      namespace + "user-equip-upgrade:",
 		fallbacks: map[string]buttonFallback{
 			"wechat-pity": {
 				ImagePath: "/images/emojipedia-wechat-whimper.png",
@@ -285,12 +337,18 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 		}
 	}
 
+	latestAnnouncement, err := s.GetLatestAnnouncement(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
+
 	return Snapshot{
-		Buttons:         buttons,
-		Leaderboard:     leaderboard,
-		Boss:            boss,
-		BossLeaderboard: bossLeaderboard,
-		BossLoot:        bossLoot,
+		Buttons:            buttons,
+		Leaderboard:        leaderboard,
+		Boss:               boss,
+		BossLeaderboard:    bossLeaderboard,
+		BossLoot:           bossLoot,
+		LatestAnnouncement: latestAnnouncement,
 	}, nil
 }
 
@@ -302,14 +360,15 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 	}
 
 	state := State{
-		Buttons:         snapshot.Buttons,
-		Leaderboard:     snapshot.Leaderboard,
-		Boss:            snapshot.Boss,
-		BossLeaderboard: snapshot.BossLeaderboard,
-		BossLoot:        snapshot.BossLoot,
-		Inventory:       []InventoryItem{},
-		Loadout:         Loadout{},
-		CombatStats:     s.baseCombatStats(),
+		Buttons:            snapshot.Buttons,
+		Leaderboard:        snapshot.Leaderboard,
+		Boss:               snapshot.Boss,
+		BossLeaderboard:    snapshot.BossLeaderboard,
+		BossLoot:           snapshot.BossLoot,
+		LatestAnnouncement: snapshot.LatestAnnouncement,
+		Inventory:          []InventoryItem{},
+		Loadout:            Loadout{},
+		CombatStats:        s.baseCombatStats(),
 	}
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
@@ -339,7 +398,7 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 	}
 	state.Loadout = loadout
 
-	inventory, err := s.inventoryForNickname(ctx, quantities, equipped)
+	inventory, err := s.inventoryForNickname(ctx, normalizedNickname, quantities, equipped)
 	if err != nil {
 		return State{}, err
 	}
@@ -1047,60 +1106,45 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantit
 		if defErr != nil {
 			continue
 		}
-
-		item := &InventoryItem{
-			ItemID:                     definition.ItemID,
-			Name:                       definition.Name,
-			Slot:                       definition.Slot,
-			Quantity:                   quantities[itemID],
-			BonusClicks:                definition.BonusClicks,
-			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
-			BonusCriticalCount:         definition.BonusCriticalCount,
-			Equipped:                   true,
+		upgrade, upgradeErr := s.getEquipmentUpgrade(ctx, nickname, itemID)
+		if upgradeErr != nil {
+			return Loadout{}, nil, upgradeErr
 		}
+
+		item := s.buildInventoryItem(definition, upgrade, quantities[itemID], true)
 
 		equipped[itemID] = slot
 		switch slot {
 		case "weapon":
-			loadout.Weapon = item
+			loadout.Weapon = &item
 		case "armor":
-			loadout.Armor = item
+			loadout.Armor = &item
 		case "accessory":
-			loadout.Accessory = item
+			loadout.Accessory = &item
 		}
 	}
 
 	return loadout, equipped, nil
 }
 
-func (s *Store) inventoryForNickname(ctx context.Context, quantities map[string]int64, equipped map[string]string) ([]InventoryItem, error) {
+func (s *Store) inventoryForNickname(ctx context.Context, nickname string, quantities map[string]int64, equipped map[string]string) ([]InventoryItem, error) {
 	if len(quantities) == 0 {
 		return []InventoryItem{}, nil
 	}
 
 	items := make([]InventoryItem, 0, len(quantities))
 	for itemID, quantity := range quantities {
+		upgrade, upgradeErr := s.getEquipmentUpgrade(ctx, nickname, itemID)
+		if upgradeErr != nil {
+			return nil, upgradeErr
+		}
 		definition, err := s.getEquipmentDefinition(ctx, itemID)
 		if err != nil {
-			items = append(items, InventoryItem{
-				ItemID:   itemID,
-				Name:     itemID,
-				Quantity: quantity,
-				Equipped: equipped[itemID] != "",
-			})
+			items = append(items, unknownInventoryItem(itemID, upgrade, quantity, equipped[itemID] != ""))
 			continue
 		}
 
-		items = append(items, InventoryItem{
-			ItemID:                     definition.ItemID,
-			Name:                       definition.Name,
-			Slot:                       definition.Slot,
-			Quantity:                   quantity,
-			BonusClicks:                definition.BonusClicks,
-			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
-			BonusCriticalCount:         definition.BonusCriticalCount,
-			Equipped:                   equipped[itemID] != "",
-		})
+		items = append(items, s.buildInventoryItem(definition, upgrade, quantity, equipped[itemID] != ""))
 	}
 
 	slices.SortFunc(items, func(left, right InventoryItem) int {
@@ -1258,6 +1302,18 @@ func (s *Store) loadoutKey(nickname string) string {
 
 func (s *Store) lastRewardKey(nickname string) string {
 	return s.lastRewardPrefix + nickname
+}
+
+func (s *Store) announcementItemKey(id string) string {
+	return s.announcementPrefix + strings.TrimSpace(id)
+}
+
+func (s *Store) messageItemKey(id string) string {
+	return s.messagePrefix + strings.TrimSpace(id)
+}
+
+func (s *Store) upgradeKey(nickname string, itemID string) string {
+	return s.upgradePrefix + nickname + ":" + itemID
 }
 
 func (s *Store) equipmentKey(itemID string) string {
