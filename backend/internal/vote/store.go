@@ -27,6 +27,8 @@ var ErrEquipmentNotEnough = errors.New("equipment not enough")
 var ErrEquipmentMaxStar = errors.New("equipment max star")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
+var ErrBossTemplateNotFound = errors.New("boss template not found")
+var ErrBossPoolEmpty = errors.New("boss pool empty")
 
 const (
 	bossStatusActive   = "active"
@@ -63,6 +65,7 @@ type LeaderboardEntry struct {
 // Boss 世界 Boss 状态
 type Boss struct {
 	ID         string `json:"id"`
+	TemplateID string `json:"templateId,omitempty"`
 	Name       string `json:"name"`
 	Status     string `json:"status"`
 	MaxHP      int64  `json:"maxHp"`
@@ -213,14 +216,15 @@ type State struct {
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
 type ClickResult struct {
-	Button          Button                 `json:"button"`
-	Delta           int64                  `json:"delta"`
-	Critical        bool                   `json:"critical"`
-	UserStats       UserStats              `json:"userStats"`
-	Boss            *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
-	MyBossStats     *BossUserStats         `json:"myBossStats,omitempty"`
-	LastReward      *Reward                `json:"lastReward,omitempty"`
+	Button           Button                 `json:"button"`
+	Delta            int64                  `json:"delta"`
+	Critical         bool                   `json:"critical"`
+	UserStats        UserStats              `json:"userStats"`
+	Boss             *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard  []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
+	MyBossStats      *BossUserStats         `json:"myBossStats,omitempty"`
+	LastReward       *Reward                `json:"lastReward,omitempty"`
+	BroadcastUserAll bool                   `json:"-"`
 }
 
 // StateChangeType 实时状态变更类型
@@ -260,34 +264,38 @@ type buttonFallback struct {
 
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
 type Store struct {
-	client             redis.UniversalClient
-	prefix             string
-	namespace          string
-	buttonIndexKey     string
-	equipmentIndexKey  string
-	playerIndexKey     string
-	userPrefix         string
-	leaderboardKey     string
-	bossCurrentKey     string
-	bossHistoryKey     string
-	bossHistoryPrefix  string
-	announcementSeqKey string
-	announcementKey    string
-	announcementPrefix string
-	messageSeqKey      string
-	messageKey         string
-	messagePrefix      string
-	equipmentDefPrefix string
-	inventoryPrefix    string
-	loadoutPrefix      string
-	lastRewardPrefix   string
-	upgradePrefix      string
-	fallbacks          map[string]buttonFallback
-	critical           StoreOptions
-	luaRunner          luaScriptRunner
-	bossClickScript    *cachedLuaScript
-	roll               func(int) int
-	validator          interface{ Validate(string) error }
+	client               redis.UniversalClient
+	prefix               string
+	namespace            string
+	buttonIndexKey       string
+	equipmentIndexKey    string
+	playerIndexKey       string
+	userPrefix           string
+	leaderboardKey       string
+	bossCurrentKey       string
+	bossHistoryKey       string
+	bossHistoryPrefix    string
+	bossTemplateIndexKey string
+	bossTemplatePrefix   string
+	bossCycleKey         string
+	bossInstanceSeqKey   string
+	announcementSeqKey   string
+	announcementKey      string
+	announcementPrefix   string
+	messageSeqKey        string
+	messageKey           string
+	messagePrefix        string
+	equipmentDefPrefix   string
+	inventoryPrefix      string
+	loadoutPrefix        string
+	lastRewardPrefix     string
+	upgradePrefix        string
+	fallbacks            map[string]buttonFallback
+	critical             StoreOptions
+	luaRunner            luaScriptRunner
+	bossClickScript      *cachedLuaScript
+	roll                 func(int) int
+	validator            interface{ Validate(string) error }
 }
 
 // hashFields Redis Hash 中存储的字段列表
@@ -306,28 +314,32 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 	luaCache := newLuaScriptCache()
 
 	return &Store{
-		client:             client,
-		prefix:             prefix,
-		namespace:          namespace,
-		buttonIndexKey:     namespace + "buttons:index",
-		equipmentIndexKey:  namespace + "equipment:index",
-		playerIndexKey:     namespace + "players:index",
-		userPrefix:         namespace + "user:",
-		leaderboardKey:     namespace + "leaderboard",
-		bossCurrentKey:     namespace + "boss:current",
-		bossHistoryKey:     namespace + "boss:history",
-		bossHistoryPrefix:  namespace + "boss:history:",
-		announcementSeqKey: namespace + "announcement:seq",
-		announcementKey:    namespace + "announcements",
-		announcementPrefix: namespace + "announcement:",
-		messageSeqKey:      namespace + "message:seq",
-		messageKey:         namespace + "messages",
-		messagePrefix:      namespace + "message:",
-		equipmentDefPrefix: namespace + "equip:def:",
-		inventoryPrefix:    namespace + "user-inventory:",
-		loadoutPrefix:      namespace + "user-loadout:",
-		lastRewardPrefix:   namespace + "user-last-reward:",
-		upgradePrefix:      namespace + "user-equip-upgrade:",
+		client:               client,
+		prefix:               prefix,
+		namespace:            namespace,
+		buttonIndexKey:       namespace + "buttons:index",
+		equipmentIndexKey:    namespace + "equipment:index",
+		playerIndexKey:       namespace + "players:index",
+		userPrefix:           namespace + "user:",
+		leaderboardKey:       namespace + "leaderboard",
+		bossCurrentKey:       namespace + "boss:current",
+		bossHistoryKey:       namespace + "boss:history",
+		bossHistoryPrefix:    namespace + "boss:history:",
+		bossTemplateIndexKey: namespace + "boss:pool:index",
+		bossTemplatePrefix:   namespace + "boss:pool:",
+		bossCycleKey:         namespace + "boss:cycle",
+		bossInstanceSeqKey:   namespace + "boss:instance:seq",
+		announcementSeqKey:   namespace + "announcement:seq",
+		announcementKey:      namespace + "announcements",
+		announcementPrefix:   namespace + "announcement:",
+		messageSeqKey:        namespace + "message:seq",
+		messageKey:           namespace + "messages",
+		messagePrefix:        namespace + "message:",
+		equipmentDefPrefix:   namespace + "equip:def:",
+		inventoryPrefix:      namespace + "user-inventory:",
+		loadoutPrefix:        namespace + "user-loadout:",
+		lastRewardPrefix:     namespace + "user-last-reward:",
+		upgradePrefix:        namespace + "user-equip-upgrade:",
 		fallbacks: map[string]buttonFallback{
 			"wechat-pity": {
 				ImagePath: "/images/emojipedia-wechat-whimper.png",
@@ -880,76 +892,102 @@ func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, 
 
 	result.Boss = &Boss{
 		ID:         stringValue(values, 3),
-		Name:       stringValue(values, 4),
-		Status:     stringValue(values, 5),
-		MaxHP:      int64Value(values, 6),
-		CurrentHP:  int64Value(values, 7),
-		StartedAt:  int64FromString(stringValue(values, 8)),
-		DefeatedAt: int64FromString(stringValue(values, 9)),
+		TemplateID: stringValue(values, 4),
+		Name:       stringValue(values, 5),
+		Status:     stringValue(values, 6),
+		MaxHP:      int64Value(values, 7),
+		CurrentHP:  int64Value(values, 8),
+		StartedAt:  int64FromString(stringValue(values, 9)),
+		DefeatedAt: int64FromString(stringValue(values, 10)),
 	}
 
 	if result.Boss.Status == bossStatusDefeated {
-		if finalizeErr := s.finalizeBossKill(ctx, result.Boss); finalizeErr != nil {
+		result.BroadcastUserAll = true
+		nextBoss, finalizeErr := s.finalizeBossKill(ctx, result.Boss)
+		if finalizeErr != nil {
 			return ClickResult{}, finalizeErr
+		}
+		if nextBoss != nil {
+			result.Boss = nextBoss
 		}
 	}
 
 	return result, nil
 }
 
-func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) error {
+func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error) {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
-		return nil
+		return nil, nil
 	}
 	bossID := strings.TrimSpace(boss.ID)
 	bossName := strings.TrimSpace(boss.Name)
 
 	acquired, err := s.client.SetNX(ctx, s.bossRewardLockKey(bossID), "1", 0).Result()
-	if err != nil || !acquired {
-		return err
+	if err != nil {
+		return nil, err
+	}
+	if !acquired {
+		return s.currentBoss(ctx)
 	}
 
 	lootEntries, err := s.loadBossLoot(ctx, bossID)
 	if err != nil {
-		return err
-	}
-	if len(lootEntries) == 0 {
-		return nil
+		return nil, err
 	}
 
-	participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
+	if len(lootEntries) > 0 {
+		participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		pipe := s.client.Pipeline()
+		now := time.Now().Unix()
+		for _, participant := range participants {
+			nickname, ok := participant.Member.(string)
+			if !ok || nickname == "" || participant.Score <= 0 {
+				continue
+			}
+
+			reward := s.chooseLoot(lootEntries)
+			if reward == nil {
+				continue
+			}
+
+			pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
+			pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
+				"boss_id":    bossID,
+				"boss_name":  bossName,
+				"item_id":    reward.ItemID,
+				"item_name":  reward.ItemName,
+				"granted_at": strconv.FormatInt(now, 10),
+			})
+		}
+
+		if _, err = pipe.Exec(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := s.SaveBossToHistory(ctx, boss); err != nil {
+		return nil, err
+	}
+
+	enabled, err := s.bossCycleEnabled(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if len(participants) == 0 {
-		return nil
-	}
-
-	pipe := s.client.Pipeline()
-	now := time.Now().Unix()
-	for _, participant := range participants {
-		nickname, ok := participant.Member.(string)
-		if !ok || nickname == "" || participant.Score <= 0 {
-			continue
+	if enabled {
+		nextBoss, err := s.activateRandomBossFromPool(ctx)
+		if err != nil && !errors.Is(err, ErrBossPoolEmpty) {
+			return nil, err
 		}
-
-		reward := s.chooseLoot(lootEntries)
-		if reward == nil {
-			continue
+		if nextBoss != nil {
+			return nextBoss, nil
 		}
-
-		pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
-		pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
-			"boss_id":    bossID,
-			"boss_name":  bossName,
-			"item_id":    reward.ItemID,
-			"item_name":  reward.ItemName,
-			"granted_at": strconv.FormatInt(now, 10),
-		})
 	}
 
-	_, err = pipe.Exec(ctx)
-	return err
+	return s.currentBoss(ctx)
 }
 
 func (s *Store) chooseLoot(entries []BossLootEntry) *BossLootEntry {
@@ -1095,6 +1133,7 @@ func normalizeBoss(values map[string]string) *Boss {
 
 	return &Boss{
 		ID:         id,
+		TemplateID: strings.TrimSpace(values["template_id"]),
 		Name:       name,
 		Status:     strings.TrimSpace(values["status"]),
 		MaxHP:      int64FromString(values["max_hp"]),
@@ -1595,6 +1634,14 @@ func (s *Store) bossDamageKey(bossID string) string {
 
 func (s *Store) bossLootKey(bossID string) string {
 	return s.namespace + "boss:" + bossID + ":loot"
+}
+
+func (s *Store) bossTemplateKey(templateID string) string {
+	return s.bossTemplatePrefix + strings.TrimSpace(templateID)
+}
+
+func (s *Store) bossTemplateLootKey(templateID string) string {
+	return s.bossTemplateKey(templateID) + ":loot"
 }
 
 func (s *Store) bossRewardLockKey(bossID string) string {

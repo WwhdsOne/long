@@ -27,6 +27,7 @@ if not bossID or bossID ~= expectedBossID or bossStatus ~= "active" then
   return {0, buttonCount, userCount}
 end
 
+local bossTemplateID = redis.call("HGET", KEYS[5], "template_id") or ""
 local bossName = redis.call("HGET", KEYS[5], "name") or expectedBossID
 local maxHP = tonumber(redis.call("HGET", KEYS[5], "max_hp") or "0")
 local currentHP = tonumber(redis.call("HGET", KEYS[5], "current_hp") or "0")
@@ -42,7 +43,11 @@ end
 
 redis.call("ZINCRBY", KEYS[6], delta, nickname)
 
-local updateArgs = {"id", bossID, "name", bossName, "status", bossStatus, "max_hp", tostring(maxHP), "current_hp", tostring(currentHP)}
+ local updateArgs = {"id", bossID, "name", bossName, "status", bossStatus, "max_hp", tostring(maxHP), "current_hp", tostring(currentHP)}
+ if bossTemplateID ~= "" then
+  table.insert(updateArgs, "template_id")
+  table.insert(updateArgs, bossTemplateID)
+ end
 if startedAt ~= "" then
   table.insert(updateArgs, "started_at")
   table.insert(updateArgs, startedAt)
@@ -53,7 +58,7 @@ if bossStatus == "defeated" then
 end
 
 redis.call("HSET", KEYS[5], unpack(updateArgs))
-return {1, buttonCount, userCount, bossID, bossName, bossStatus, maxHP, currentHP, startedAt, bossStatus == "defeated" and defeatedAt or ""}
+return {1, buttonCount, userCount, bossID, bossTemplateID, bossName, bossStatus, maxHP, currentHP, startedAt, bossStatus == "defeated" and defeatedAt or ""}
 `
 
 type luaScriptRunner interface {

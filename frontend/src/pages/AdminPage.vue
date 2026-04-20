@@ -24,6 +24,7 @@ const equipmentForm = ref(emptyEquipmentForm())
 const buttonForm = reactive(emptyButtonForm())
 const announcementForm = ref(emptyAnnouncementForm())
 const lootRows = ref([{ itemId: '', weight: '' }])
+const selectedBossTemplateId = ref('')
 
 const adminState = ref(emptyAdminState())
 const playerPage = ref(emptyPlayerPage())
@@ -38,6 +39,11 @@ const uploadingImage = ref(false)
 
 const hasBoss = computed(() => Boolean(adminState.value.boss))
 const currentBossId = computed(() => adminState.value.boss?.id || '')
+const bossTemplates = computed(() => adminState.value.bossPool ?? [])
+const bossCycleEnabled = computed(() => Boolean(adminState.value.bossCycleEnabled))
+const selectedBossTemplate = computed(() =>
+  bossTemplates.value.find((entry) => entry.id === selectedBossTemplateId.value) ?? null,
+)
 const equipmentOptions = computed(() => adminState.value.equipment ?? [])
 const hasEquipmentTemplates = computed(() => equipmentOptions.value.length > 0)
 
@@ -48,6 +54,8 @@ function emptyAdminState() {
     bossLeaderboard: [],
     equipment: [],
     loot: [],
+    bossCycleEnabled: false,
+    bossPool: [],
     playerCount: 0,
     recentPlayerCount: 0,
   }
@@ -73,6 +81,15 @@ function normalizeLootEntry(entry) {
   }
 }
 
+function normalizeBossTemplate(entry) {
+  return {
+    id: entry?.id || '',
+    name: entry?.name || '',
+    maxHp: Number(entry?.maxHp ?? 0),
+    loot: Array.isArray(entry?.loot) ? entry.loot.map(normalizeLootEntry) : [],
+  }
+}
+
 function normalizeAdminState(payload) {
   return {
     buttons: Array.isArray(payload?.buttons) ? payload.buttons : [],
@@ -80,6 +97,8 @@ function normalizeAdminState(payload) {
     bossLeaderboard: Array.isArray(payload?.bossLeaderboard) ? payload.bossLeaderboard : [],
     equipment: Array.isArray(payload?.equipment) ? payload.equipment : [],
     loot: Array.isArray(payload?.loot) ? payload.loot.map(normalizeLootEntry) : [],
+    bossCycleEnabled: Boolean(payload?.bossCycleEnabled),
+    bossPool: Array.isArray(payload?.bossPool) ? payload.bossPool.map(normalizeBossTemplate) : [],
     playerCount: Number(payload?.playerCount ?? 0),
     recentPlayerCount: Number(payload?.recentPlayerCount ?? 0),
   }
@@ -140,6 +159,10 @@ function emptyPlayerPage() {
     nextCursor: '',
     total: 0,
   }
+}
+
+function emptyLootRows() {
+  return [{ itemId: '', weight: '' }]
 }
 
 function formatItemStats(item) {
@@ -208,6 +231,35 @@ function findEquipmentTemplate(itemId) {
   return adminState.value.equipment.find((entry) => entry.itemId === itemId) ?? null
 }
 
+function findBossTemplate(templateId) {
+  if (!templateId) {
+    return null
+  }
+
+  return bossTemplates.value.find((entry) => entry.id === templateId) ?? null
+}
+
+function applyLootRows(loot) {
+  lootRows.value = Array.isArray(loot) && loot.length > 0
+    ? loot.map((entry) => ({
+        itemId: entry.itemId,
+        weight: entry.weight,
+      }))
+    : emptyLootRows()
+}
+
+function syncBossTemplateEditor(preferredTemplateId = '') {
+  const nextTemplateId = [
+    preferredTemplateId,
+    selectedBossTemplateId.value,
+    adminState.value.boss?.templateId,
+    bossTemplates.value[0]?.id,
+  ].find((templateId) => findBossTemplate(templateId)) || ''
+
+  selectedBossTemplateId.value = nextTemplateId
+  applyLootRows(findBossTemplate(nextTemplateId)?.loot ?? [])
+}
+
 async function readErrorMessage(response, fallback) {
   try {
     const payload = await response.json()
@@ -236,12 +288,7 @@ async function fetchAdminState() {
     }
 
     adminState.value = normalizeAdminState(await response.json())
-    lootRows.value = adminState.value.loot.length > 0
-      ? adminState.value.loot.map((entry) => ({
-          itemId: entry.itemId,
-          weight: entry.weight,
-        }))
-      : [{ itemId: '', weight: '' }]
+    syncBossTemplateEditor()
   } catch (error) {
     errorMessage.value = error.message || '后台状态加载失败'
   } finally {
@@ -386,11 +433,19 @@ async function logout() {
   successMessage.value = ''
 }
 
-async function activateBoss() {
+async function saveBossTemplate() {
   saving.value = true
   try {
-    const response = await fetch('/api/admin/boss/activate', {
-      method: 'POST',
+    const method = bossTemplates.value.some((entry) => entry.id === bossForm.value.id)
+      ? 'PUT'
+      : 'POST'
+    const targetId = encodeURIComponent(bossForm.value.id)
+    const url = method === 'PUT'
+      ? `/api/admin/boss/pool/${targetId}`
+      : '/api/admin/boss/pool'
+
+    const response = await fetch(url, {
+      method,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -402,13 +457,14 @@ async function activateBoss() {
     })
 
     if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '开启 Boss 失败'))
+      throw new Error(await readErrorMessage(response, '保存 Boss 模板失败'))
     }
 
-    setSuccess('Boss 已开启。')
+    selectedBossTemplateId.value = bossForm.value.id
+    setSuccess('Boss 模板已保存。')
     await fetchAdminState()
   } catch (error) {
-    errorMessage.value = error.message || '开启 Boss 失败'
+    errorMessage.value = error.message || '保存 Boss 模板失败'
   } finally {
     saving.value = false
   }
@@ -425,10 +481,50 @@ async function deactivateBoss() {
       throw new Error(await readErrorMessage(response, '关闭 Boss 失败'))
     }
 
-    setSuccess('当前 Boss 已关闭。')
+    setSuccess(bossCycleEnabled.value ? '当前 Boss 已跳过，循环会继续补位。' : '当前 Boss 已关闭。')
     await fetchAdminState()
   } catch (error) {
     errorMessage.value = error.message || '关闭 Boss 失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function enableBossCycle() {
+  saving.value = true
+  try {
+    const response = await fetch('/api/admin/boss/cycle/enable', {
+      method: 'POST',
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '开启 Boss 循环失败'))
+    }
+
+    setSuccess('Boss 循环已开启。')
+    await fetchAdminState()
+  } catch (error) {
+    errorMessage.value = error.message || '开启 Boss 循环失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function disableBossCycle() {
+  saving.value = true
+  try {
+    const response = await fetch('/api/admin/boss/cycle/disable', {
+      method: 'POST',
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '停止 Boss 循环失败'))
+    }
+
+    setSuccess('Boss 循环已停止，当前 Boss 不会自动续上。')
+    await fetchAdminState()
+  } catch (error) {
+    errorMessage.value = error.message || '停止 Boss 循环失败'
   } finally {
     saving.value = false
   }
@@ -682,20 +778,19 @@ async function uploadButtonImage(event) {
 }
 
 async function saveLoot() {
-  if (!currentBossId.value) {
-    errorMessage.value = '先开启一只 Boss，再配置掉落池。'
+  if (!selectedBossTemplateId.value) {
+    errorMessage.value = '先选一只 Boss 模板，再配置掉落池。'
     return
   }
 
   saving.value = true
   try {
-    const response = await fetch('/api/admin/boss/loot', {
+    const response = await fetch(`/api/admin/boss/pool/${encodeURIComponent(selectedBossTemplateId.value)}/loot`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        bossId: currentBossId.value,
         loot: lootRows.value
           .filter((entry) => entry.itemId)
           .map((entry) => ({
@@ -706,13 +801,43 @@ async function saveLoot() {
     })
 
     if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '保存掉落池失败'))
+      throw new Error(await readErrorMessage(response, '保存模板掉落池失败'))
     }
 
-    setSuccess('掉落池已保存。')
+    setSuccess('模板掉落池已保存。')
     await fetchAdminState()
   } catch (error) {
-    errorMessage.value = error.message || '保存掉落池失败'
+    errorMessage.value = error.message || '保存模板掉落池失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteBossTemplate(templateId) {
+  saving.value = true
+  try {
+    const response = await fetch(`/api/admin/boss/pool/${encodeURIComponent(templateId)}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '删除 Boss 模板失败'))
+    }
+
+    if (selectedBossTemplateId.value === templateId) {
+      selectedBossTemplateId.value = ''
+    }
+    if (bossForm.value.id === templateId) {
+      bossForm.value = {
+        id: '',
+        name: '',
+        maxHp: '',
+      }
+    }
+    setSuccess('Boss 模板已删除。')
+    await fetchAdminState()
+  } catch (error) {
+    errorMessage.value = error.message || '删除 Boss 模板失败'
   } finally {
     saving.value = false
   }
@@ -733,6 +858,22 @@ function editButton(entry) {
     imageAlt: entry.imageAlt || '',
   })
   activeTab.value = 'buttons'
+}
+
+function editBossTemplate(entry) {
+  bossForm.value = {
+    id: entry.id,
+    name: entry.name,
+    maxHp: entry.maxHp,
+  }
+  selectedBossTemplateId.value = entry.id
+  applyLootRows(entry.loot)
+  activeTab.value = 'boss'
+}
+
+function selectBossTemplate(templateId) {
+  selectedBossTemplateId.value = templateId
+  applyLootRows(findBossTemplate(templateId)?.loot ?? [])
 }
 
 function addLootRow() {
@@ -839,87 +980,155 @@ onMounted(() => {
           <div class="admin-grid">
             <section class="social-card">
               <div class="social-card__head">
-                <p class="vote-stage__eyebrow">开启 / 切换 Boss</p>
-                <strong>{{ hasBoss ? adminState.boss.status : '无活动 Boss' }}</strong>
+                <p class="vote-stage__eyebrow">循环状态</p>
+                <strong>{{ bossCycleEnabled ? '循环已开启' : '循环未开启' }}</strong>
               </div>
 
-              <form class="admin-form" @submit.prevent="activateBoss">
-                <input v-model="bossForm.id" class="nickname-form__input" type="text" placeholder="Boss ID（留空自动生成）" />
-                <input v-model="bossForm.name" class="nickname-form__input" type="text" placeholder="Boss 显示名称" />
-                <input v-model="bossForm.maxHp" class="nickname-form__input" type="number" min="1" placeholder="总血量，玩家点击消耗" />
-                <button class="nickname-form__submit" type="submit" :disabled="saving">
-                  开启 Boss
-                </button>
-              </form>
+              <p class="social-card__copy">
+                当前 Boss：{{ adminState.boss?.name || '暂无活动 Boss' }}
+              </p>
+              <div class="admin-cycle-pills">
+                <span class="boss-stage__pill">
+                  {{ bossCycleEnabled ? '击败后会立即补下一只' : '击败后不会自动补位' }}
+                </span>
+                <span class="boss-stage__pill">
+                  {{ adminState.boss?.templateId ? `来源模板 ${adminState.boss.templateId}` : '当前没有绑定模板' }}
+                </span>
+              </div>
 
-              <button v-if="hasBoss" class="nickname-form__ghost" type="button" :disabled="saving" @click="deactivateBoss">
-                关闭当前 Boss
-              </button>
+              <div v-if="hasBoss" class="admin-boss-summary">
+                <p>实例 ID：{{ adminState.boss.id }}</p>
+                <p>状态：{{ adminState.boss.status }} · 血量 {{ adminState.boss.currentHp }}/{{ adminState.boss.maxHp }}</p>
+              </div>
+              <p v-else class="feedback" style="margin-top: 0.75rem;">
+                开启循环后，如果当前没有 Boss，会立刻从 Boss 池里随机刷出一只。
+              </p>
+
+              <div class="admin-inline-actions" style="margin-top: 1rem;">
+                <button
+                  class="nickname-form__submit"
+                  type="button"
+                  :disabled="saving || bossCycleEnabled"
+                  @click="enableBossCycle"
+                >
+                  开启循环
+                </button>
+                <button
+                  class="nickname-form__ghost"
+                  type="button"
+                  :disabled="saving || !bossCycleEnabled"
+                  @click="disableBossCycle"
+                >
+                  停止循环
+                </button>
+                <button
+                  v-if="hasBoss"
+                  class="nickname-form__ghost"
+                  type="button"
+                  :disabled="saving"
+                  @click="deactivateBoss"
+                >
+                  {{ bossCycleEnabled ? '跳过当前 Boss' : '关闭当前 Boss' }}
+                </button>
+              </div>
+
+              <div v-if="hasBoss && adminState.loot.length > 0" style="margin-top: 1rem;">
+                <p class="vote-stage__eyebrow">当前实例掉落快照</p>
+                <ul class="inventory-list">
+                  <li v-for="item in adminState.loot" :key="item.itemId" class="inventory-item">
+                    <div>
+                      <strong>{{ item.itemName || item.itemId }}</strong>
+                      <p>{{ item.itemId }} · {{ item.slot }} · 权重 {{ item.weight }}</p>
+                      <p>{{ formatItemStats(item) }}</p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
             </section>
 
             <section class="social-card">
               <div class="social-card__head">
-                <p class="vote-stage__eyebrow">掉落池</p>
-                <strong>{{ currentBossId || '未绑定 Boss' }}</strong>
+                <p class="vote-stage__eyebrow">Boss 池模板</p>
+                <strong>{{ bossTemplates.length }} 只</strong>
               </div>
 
-              <ul v-if="hasBoss && adminState.loot.length > 0" class="inventory-list" style="margin-bottom: 0.75rem;">
-                <li v-for="item in adminState.loot" :key="item.itemId" class="inventory-item">
+              <form class="admin-form" @submit.prevent="saveBossTemplate">
+                <input v-model="bossForm.id" class="nickname-form__input" type="text" placeholder="模板 ID，如 dragon" />
+                <input v-model="bossForm.name" class="nickname-form__input" type="text" placeholder="Boss 显示名称" />
+                <input v-model="bossForm.maxHp" class="nickname-form__input" type="number" min="1" placeholder="总血量，玩家点击消耗" />
+                <button class="nickname-form__submit" type="submit" :disabled="saving">
+                  保存 Boss 模板
+                </button>
+              </form>
+
+              <ul class="inventory-list">
+                <li v-for="entry in bossTemplates" :key="entry.id" class="inventory-item inventory-item--stacked">
                   <div>
-                    <strong>{{ item.itemName || item.itemId }}</strong>
-                    <p>{{ item.itemId }} · {{ item.slot }} · 权重 {{ item.weight }}</p>
-                    <p>{{ formatItemStats(item) }}</p>
+                    <strong>{{ entry.name }}</strong>
+                    <p>{{ entry.id }} · 血量 {{ entry.maxHp }} · 掉落 {{ entry.loot.length }} 件</p>
+                  </div>
+                  <div class="admin-inline-actions admin-inline-actions--stacked">
+                    <button class="inventory-item__action" type="button" @click="selectBossTemplate(entry.id)">编辑掉落</button>
+                    <button class="inventory-item__action" type="button" @click="editBossTemplate(entry)">编辑模板</button>
+                    <button class="nickname-form__ghost" type="button" @click="deleteBossTemplate(entry.id)">删除</button>
                   </div>
                 </li>
               </ul>
-
-              <p class="feedback" style="margin-bottom: 0.75rem;">
-                当前流程是先开启 Boss，再给这只 Boss 保存掉落池。掉落只会从已有装备模板里选；Boss 被击败后再补配不会补发。
-              </p>
-
-              <p v-if="!hasEquipmentTemplates" class="feedback" style="margin-bottom: 0.75rem;">
-                当前还没有装备模板，先去“装备”页创建装备，再回来配置掉落池。
-              </p>
-
-              <div class="admin-form admin-form--tight">
-                <div v-for="(entry, index) in lootRows" :key="`${index}-${entry.itemId}`" class="admin-inline-row">
-                  <div class="admin-loot-select">
-                    <select
-                      v-model="entry.itemId"
-                      class="nickname-form__input"
-                      :disabled="!hasEquipmentTemplates && !entry.itemId"
-                    >
-                      <option value="">选择已有装备</option>
-                      <option
-                        v-if="entry.itemId && !findEquipmentTemplate(entry.itemId)"
-                        :value="entry.itemId"
-                      >
-                        {{ entry.itemId }}（已删除的装备）
-                      </option>
-                      <option
-                        v-for="item in equipmentOptions"
-                        :key="item.itemId"
-                        :value="item.itemId"
-                      >
-                        {{ item.name }} · {{ item.itemId }} · {{ item.slot }}
-                      </option>
-                    </select>
-                    <p v-if="findEquipmentTemplate(entry.itemId)" class="admin-loot-select__meta">
-                      {{ formatItemStats(findEquipmentTemplate(entry.itemId)) }}
-                    </p>
-                  </div>
-                  <input v-model="entry.weight" class="nickname-form__input" type="number" min="1" placeholder="掉率权重，越大越容易掉落" />
-                  <button class="nickname-form__ghost" type="button" @click="removeLootRow(index)">删</button>
-                </div>
-                <div class="admin-inline-actions">
-                  <button class="nickname-form__ghost" type="button" @click="addLootRow">加一行</button>
-                  <button class="nickname-form__submit" type="button" :disabled="saving" @click="saveLoot">
-                    保存掉落池
-                  </button>
-                </div>
-              </div>
             </section>
           </div>
+
+          <section class="social-card admin-section-card">
+            <div class="social-card__head">
+              <p class="vote-stage__eyebrow">模板掉落池</p>
+              <strong>{{ selectedBossTemplate?.name || selectedBossTemplateId || '未选择模板' }}</strong>
+            </div>
+
+            <p class="feedback" style="margin-bottom: 0.75rem;">
+              掉落池保存到模板上。Boss 刷出来时会复制一份到当前实例，所以你后面再改模板，不会改到场上的那只。
+            </p>
+
+            <p v-if="!hasEquipmentTemplates" class="feedback" style="margin-bottom: 0.75rem;">
+              当前还没有装备模板，先去“装备”页创建装备，再回来配置掉落池。
+            </p>
+
+            <div class="admin-form admin-form--tight">
+              <div v-for="(entry, index) in lootRows" :key="`${selectedBossTemplateId}-${index}-${entry.itemId}`" class="admin-inline-row">
+                <div class="admin-loot-select">
+                  <select
+                    v-model="entry.itemId"
+                    class="nickname-form__input"
+                    :disabled="!hasEquipmentTemplates && !entry.itemId"
+                  >
+                    <option value="">选择已有装备</option>
+                    <option
+                      v-if="entry.itemId && !findEquipmentTemplate(entry.itemId)"
+                      :value="entry.itemId"
+                    >
+                      {{ entry.itemId }}（已删除的装备）
+                    </option>
+                    <option
+                      v-for="item in equipmentOptions"
+                      :key="item.itemId"
+                      :value="item.itemId"
+                    >
+                      {{ item.name }} · {{ item.itemId }} · {{ item.slot }}
+                    </option>
+                  </select>
+                  <p v-if="findEquipmentTemplate(entry.itemId)" class="admin-loot-select__meta">
+                    {{ formatItemStats(findEquipmentTemplate(entry.itemId)) }}
+                  </p>
+                </div>
+                <input v-model="entry.weight" class="nickname-form__input" type="number" min="1" placeholder="掉率权重，越大越容易掉落" />
+                <button class="nickname-form__ghost" type="button" @click="removeLootRow(index)">删</button>
+              </div>
+              <div class="admin-inline-actions">
+                <button class="nickname-form__ghost" type="button" @click="addLootRow">加一行</button>
+                <button class="nickname-form__submit" type="button" :disabled="saving" @click="saveLoot">
+                  保存模板掉落池
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div v-else-if="activeTab === 'equipment'" class="admin-section">

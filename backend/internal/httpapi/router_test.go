@@ -14,24 +14,28 @@ import (
 )
 
 type mockStore struct {
-	state       vote.State
-	equipState  vote.State
-	adminState  vote.AdminState
-	adminPlayerPage vote.AdminPlayerPage
-	adminPlayer *vote.AdminPlayerOverview
-	bossHistory []vote.BossHistoryEntry
-	announcements []vote.Announcement
+	state              vote.State
+	equipState         vote.State
+	adminState         vote.AdminState
+	adminPlayerPage    vote.AdminPlayerPage
+	adminPlayer        *vote.AdminPlayerOverview
+	bossHistory        []vote.BossHistoryEntry
+	announcements      []vote.Announcement
 	latestAnnouncement *vote.Announcement
-	messagePage vote.MessagePage
-	result      vote.ClickResult
-	lastButton  vote.ButtonUpsert
-	lastBoss    vote.BossUpsert
-	getStateErr error
-	clickErr    error
-	equipErr    error
-	validateErr error
-	messageErr  error
-	synthesizeErr error
+	messagePage        vote.MessagePage
+	result             vote.ClickResult
+	lastButton         vote.ButtonUpsert
+	lastBoss           vote.BossUpsert
+	lastBossTemplate   vote.BossTemplateUpsert
+	lastTemplateLootID string
+	lastTemplateLoot   []vote.BossLootEntry
+	lastCycleEnabled   bool
+	getStateErr        error
+	clickErr           error
+	equipErr           error
+	validateErr        error
+	messageErr         error
+	synthesizeErr      error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -171,6 +175,36 @@ func (m *mockStore) DeactivateBoss(_ context.Context) error {
 
 func (m *mockStore) SetBossLoot(_ context.Context, _ string, _ []vote.BossLootEntry) error {
 	return nil
+}
+
+func (m *mockStore) SaveBossTemplate(_ context.Context, template vote.BossTemplateUpsert) error {
+	m.lastBossTemplate = template
+	return nil
+}
+
+func (m *mockStore) DeleteBossTemplate(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, loot []vote.BossLootEntry) error {
+	m.lastTemplateLootID = templateID
+	m.lastTemplateLoot = loot
+	return nil
+}
+
+func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.Boss, error) {
+	m.lastCycleEnabled = enabled
+	if !enabled {
+		return nil, nil
+	}
+	return &vote.Boss{
+		ID:         "dragon-1",
+		TemplateID: "dragon",
+		Name:       "火龙",
+		Status:     "active",
+		MaxHP:      80,
+		CurrentHP:  80,
+	}, nil
 }
 
 func (m *mockStore) ListBossHistory(_ context.Context) ([]vote.BossHistoryEntry, error) {
@@ -869,6 +903,68 @@ func TestAdminActivateBossAndSaveButton(t *testing.T) {
 	}
 	if store.lastButton.Slug != "new-one" || store.lastButton.Label != "新按钮" {
 		t.Fatalf("expected button payload to be forwarded, got %+v", store.lastButton)
+	}
+}
+
+func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
+	store := &mockStore{}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie from login")
+	}
+
+	saveTemplateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":80}`))
+	saveTemplateRequest.Header.Set("Content-Type", "application/json")
+	saveTemplateRequest.AddCookie(cookies[0])
+	saveTemplateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveTemplateResponse, saveTemplateRequest)
+
+	if saveTemplateResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from boss template save, got %d", saveTemplateResponse.Code)
+	}
+	if store.lastBossTemplate.ID != "dragon" || store.lastBossTemplate.MaxHP != 80 {
+		t.Fatalf("expected template payload to be forwarded, got %+v", store.lastBossTemplate)
+	}
+
+	saveLootRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/pool/dragon/loot", strings.NewReader(`{"loot":[{"itemId":"fire-ring","weight":3}]}`))
+	saveLootRequest.Header.Set("Content-Type", "application/json")
+	saveLootRequest.AddCookie(cookies[0])
+	saveLootResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveLootResponse, saveLootRequest)
+
+	if saveLootResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from boss template loot save, got %d", saveLootResponse.Code)
+	}
+	if store.lastTemplateLootID != "dragon" || len(store.lastTemplateLoot) != 1 || store.lastTemplateLoot[0].ItemID != "fire-ring" {
+		t.Fatalf("expected template loot payload to be forwarded, got id=%s loot=%+v", store.lastTemplateLootID, store.lastTemplateLoot)
+	}
+
+	enableCycleRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/cycle/enable", nil)
+	enableCycleRequest.AddCookie(cookies[0])
+	enableCycleResponse := httptest.NewRecorder()
+	handler.ServeHTTP(enableCycleResponse, enableCycleRequest)
+
+	if enableCycleResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from cycle enable, got %d", enableCycleResponse.Code)
+	}
+	if !store.lastCycleEnabled {
+		t.Fatal("expected cycle enable to be forwarded to store")
 	}
 }
 

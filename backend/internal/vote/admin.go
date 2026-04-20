@@ -13,14 +13,16 @@ import (
 
 // AdminState 管理后台聚合状态
 type AdminState struct {
-	Buttons         []Button               `json:"buttons"`
-	Boss            *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
-	Equipment       []EquipmentDefinition  `json:"equipment"`
-	Loot            []BossLootEntry        `json:"loot"`
-	PlayerCount     int64                  `json:"playerCount"`
-	RecentPlayerCount int64                `json:"recentPlayerCount"`
-	Players         []AdminPlayerOverview  `json:"players,omitempty"`
+	Buttons           []Button               `json:"buttons"`
+	Boss              *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard"`
+	Equipment         []EquipmentDefinition  `json:"equipment"`
+	Loot              []BossLootEntry        `json:"loot"`
+	BossCycleEnabled  bool                   `json:"bossCycleEnabled"`
+	BossPool          []BossTemplate         `json:"bossPool"`
+	PlayerCount       int64                  `json:"playerCount"`
+	RecentPlayerCount int64                  `json:"recentPlayerCount"`
+	Players           []AdminPlayerOverview  `json:"players,omitempty"`
 }
 
 // AdminPlayerOverview 管理后台的玩家概览
@@ -55,6 +57,21 @@ type BossUpsert struct {
 	MaxHP int64  `json:"maxHp"`
 }
 
+// BossTemplate Boss 池模板。
+type BossTemplate struct {
+	ID    string          `json:"id"`
+	Name  string          `json:"name"`
+	MaxHP int64           `json:"maxHp"`
+	Loot  []BossLootEntry `json:"loot"`
+}
+
+// BossTemplateUpsert 后台 Boss 模板保存载荷。
+type BossTemplateUpsert struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	MaxHP int64  `json:"maxHp"`
+}
+
 // GetAdminState 返回后台页面所需的聚合数据。
 func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	buttons, err := s.ListButtons(ctx)
@@ -68,6 +85,14 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	}
 
 	equipment, err := s.ListEquipmentDefinitions(ctx)
+	if err != nil {
+		return AdminState{}, err
+	}
+	bossCycleEnabled, err := s.bossCycleEnabled(ctx)
+	if err != nil {
+		return AdminState{}, err
+	}
+	bossPool, err := s.ListBossTemplates(ctx)
 	if err != nil {
 		return AdminState{}, err
 	}
@@ -92,14 +117,16 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	}
 
 	return AdminState{
-		Buttons:         buttons,
-		Boss:            boss,
-		BossLeaderboard: bossLeaderboard,
-		Equipment:       equipment,
-		Loot:            loot,
-		PlayerCount:     playerCount,
+		Buttons:           buttons,
+		Boss:              boss,
+		BossLeaderboard:   bossLeaderboard,
+		Equipment:         equipment,
+		Loot:              loot,
+		BossCycleEnabled:  bossCycleEnabled,
+		BossPool:          bossPool,
+		PlayerCount:       playerCount,
 		RecentPlayerCount: recentPlayerCount,
-		Players:         []AdminPlayerOverview{},
+		Players:           []AdminPlayerOverview{},
 	}, nil
 }
 
@@ -228,17 +255,7 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 		StartedAt: time.Now().Unix(),
 	}
 
-	if err := s.client.Del(ctx, s.bossCurrentKey).Err(); err != nil {
-		return nil, err
-	}
-	if err := s.client.HSet(ctx, s.bossCurrentKey, map[string]any{
-		"id":         current.ID,
-		"name":       current.Name,
-		"status":     current.Status,
-		"max_hp":     strconv.FormatInt(current.MaxHP, 10),
-		"current_hp": strconv.FormatInt(current.CurrentHP, 10),
-		"started_at": strconv.FormatInt(current.StartedAt, 10),
-	}).Err(); err != nil {
+	if err := s.setCurrentBoss(ctx, current, nil); err != nil {
 		return nil, err
 	}
 
@@ -247,8 +264,22 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 
 // DeactivateBoss 清空当前 Boss。
 func (s *Store) DeactivateBoss(ctx context.Context) error {
-	if old, err := s.currentBoss(ctx); err == nil && old != nil {
+	old, err := s.currentBoss(ctx)
+	if err == nil && old != nil {
 		_ = s.SaveBossToHistory(ctx, old)
+	}
+	enabled, cycleErr := s.bossCycleEnabled(ctx)
+	if cycleErr != nil {
+		return cycleErr
+	}
+	if enabled {
+		if _, err := s.activateRandomBossFromPool(ctx); err != nil {
+			if !errors.Is(err, ErrBossPoolEmpty) {
+				return err
+			}
+			return s.client.Del(ctx, s.bossCurrentKey).Err()
+		}
+		return nil
 	}
 	return s.client.Del(ctx, s.bossCurrentKey).Err()
 }
@@ -260,30 +291,7 @@ func (s *Store) SetBossLoot(ctx context.Context, bossID string, loot []BossLootE
 		return nil
 	}
 
-	key := s.bossLootKey(bossID)
-	if err := s.client.Del(ctx, key).Err(); err != nil {
-		return err
-	}
-	if len(loot) == 0 {
-		return nil
-	}
-
-	entries := make([]redis.Z, 0, len(loot))
-	for _, item := range loot {
-		if strings.TrimSpace(item.ItemID) == "" || item.Weight <= 0 {
-			continue
-		}
-		entries = append(entries, redis.Z{
-			Score:  float64(item.Weight),
-			Member: strings.TrimSpace(item.ItemID),
-		})
-	}
-
-	if len(entries) == 0 {
-		return nil
-	}
-
-	return s.client.ZAdd(ctx, key, entries...).Err()
+	return s.setLootEntries(ctx, s.bossLootKey(bossID), loot)
 }
 
 // ListPlayerOverviews 列出后台玩家背包与穿戴概览。
@@ -509,6 +517,9 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 		"max_hp":     strconv.FormatInt(boss.MaxHP, 10),
 		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
 		"started_at": strconv.FormatInt(boss.StartedAt, 10),
+	}
+	if strings.TrimSpace(boss.TemplateID) != "" {
+		values["template_id"] = boss.TemplateID
 	}
 	if boss.DefeatedAt != 0 {
 		values["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)

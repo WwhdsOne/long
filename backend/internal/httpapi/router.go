@@ -37,6 +37,10 @@ type ButtonStore interface {
 	ActivateBoss(context.Context, vote.BossUpsert) (*vote.Boss, error)
 	DeactivateBoss(context.Context) error
 	SetBossLoot(context.Context, string, []vote.BossLootEntry) error
+	SaveBossTemplate(context.Context, vote.BossTemplateUpsert) error
+	DeleteBossTemplate(context.Context, string) error
+	SetBossTemplateLoot(context.Context, string, []vote.BossLootEntry) error
+	SetBossCycleEnabled(context.Context, bool) (*vote.Boss, error)
 	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
 	GetLatestAnnouncement(context.Context) (*vote.Announcement, error)
 	ListAnnouncements(context.Context, bool) ([]vote.Announcement, error)
@@ -258,7 +262,7 @@ func NewHandler(options Options) http.Handler {
 			Nickname:  strings.TrimSpace(body.Nickname),
 			Timestamp: time.Now().Unix(),
 		}
-		if result.Boss != nil && result.Boss.Status == "defeated" {
+		if result.BroadcastUserAll {
 			change.BroadcastUserAll = true
 		}
 		publishChange(r.Context(), options.ChangePublisher, change)
@@ -575,6 +579,132 @@ func NewHandler(options Options) http.Handler {
 				Timestamp:        time.Now().Unix(),
 			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("POST /api/admin/boss/pool", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.BossTemplateUpsert
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			if err := options.Store.SaveBossTemplate(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_SAVE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("PUT /api/admin/boss/pool/{templateId}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.BossTemplateUpsert
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+			if templateID := strings.TrimSpace(r.PathValue("templateId")); templateID != "" {
+				body.ID = templateID
+			}
+
+			if err := options.Store.SaveBossTemplate(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_SAVE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("DELETE /api/admin/boss/pool/{templateId}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			if err := options.Store.DeleteBossTemplate(r.Context(), r.PathValue("templateId")); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_DELETE_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("PUT /api/admin/boss/pool/{templateId}/loot", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body struct {
+				Loot []vote.BossLootEntry `json:"loot"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			if err := options.Store.SetBossTemplateLoot(r.Context(), r.PathValue("templateId"), body.Loot); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_LOOT_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("POST /api/admin/boss/cycle/enable", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			boss, err := options.Store.SetBossCycleEnabled(r.Context(), true)
+			if err != nil {
+				if errors.Is(err, vote.ErrBossPoolEmpty) {
+					writeJSON(w, http.StatusBadRequest, map[string]string{
+						"error":   "BOSS_POOL_EMPTY",
+						"message": "Boss 池还是空的，先加模板再开启循环。",
+					})
+					return
+				}
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_CYCLE_ENABLE_FAILED"})
+				return
+			}
+
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeBossChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
+			writeJSON(w, http.StatusOK, boss)
+		})
+
+		apiMux.HandleFunc("POST /api/admin/boss/cycle/disable", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			boss, err := options.Store.SetBossCycleEnabled(r.Context(), false)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_CYCLE_DISABLE_FAILED"})
+				return
+			}
+
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeBossChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
+			writeJSON(w, http.StatusOK, boss)
 		})
 
 		apiMux.HandleFunc("GET /api/admin/boss/history", func(w http.ResponseWriter, r *http.Request) {

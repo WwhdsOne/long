@@ -668,6 +668,239 @@ func TestClickButtonDefeatsActiveBossAndAwardsLootOnce(t *testing.T) {
 	}
 }
 
+func TestSetBossCycleEnabledSpawnsBossFromPoolImmediately(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "slime-king",
+		Name:  "史莱姆王",
+		MaxHP: 30,
+	}); err != nil {
+		t.Fatalf("save slime template: %v", err)
+	}
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "dragon",
+		Name:  "火龙",
+		MaxHP: 80,
+	}); err != nil {
+		t.Fatalf("save dragon template: %v", err)
+	}
+	if err := store.SetBossTemplateLoot(ctx, "dragon", []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 1},
+	}); err != nil {
+		t.Fatalf("set dragon loot: %v", err)
+	}
+
+	store.roll = func(limit int) int {
+		if limit <= 1 {
+			return 0
+		}
+		return 1
+	}
+
+	boss, err := store.SetBossCycleEnabled(ctx, true)
+	if err != nil {
+		t.Fatalf("enable boss cycle: %v", err)
+	}
+
+	if boss == nil || boss.Status != bossStatusActive {
+		t.Fatalf("expected active boss after enabling cycle, got %+v", boss)
+	}
+	if boss.TemplateID != "dragon" || boss.Name != "火龙" {
+		t.Fatalf("expected dragon template to be activated, got %+v", boss)
+	}
+	if boss.ID == boss.TemplateID {
+		t.Fatalf("expected unique boss instance id, got %+v", boss)
+	}
+
+	adminState, err := store.GetAdminState(ctx)
+	if err != nil {
+		t.Fatalf("get admin state: %v", err)
+	}
+
+	if !adminState.BossCycleEnabled {
+		t.Fatal("expected admin state to report enabled cycle")
+	}
+	if len(adminState.BossPool) != 2 {
+		t.Fatalf("expected 2 boss templates, got %+v", adminState.BossPool)
+	}
+	if len(adminState.Loot) != 1 || adminState.Loot[0].ItemID != "cloth-armor" {
+		t.Fatalf("expected current boss loot copied from template, got %+v", adminState.Loot)
+	}
+}
+
+func TestClickButtonDefeatAutoSpawnsNextBossWhenCycleEnabled(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed cloth-armor definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:fire-ring", map[string]any{
+		"name":                          "火戒",
+		"slot":                          "accessory",
+		"bonus_critical_chance_percent": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed fire-ring definition: %v", err)
+	}
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "slime-king",
+		Name:  "史莱姆王",
+		MaxHP: 1,
+	}); err != nil {
+		t.Fatalf("save slime template: %v", err)
+	}
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "dragon",
+		Name:  "火龙",
+		MaxHP: 5,
+	}); err != nil {
+		t.Fatalf("save dragon template: %v", err)
+	}
+	if err := store.SetBossTemplateLoot(ctx, "slime-king", []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 1},
+	}); err != nil {
+		t.Fatalf("set slime loot: %v", err)
+	}
+	if err := store.SetBossTemplateLoot(ctx, "dragon", []BossLootEntry{
+		{ItemID: "fire-ring", Weight: 1},
+	}); err != nil {
+		t.Fatalf("set dragon loot: %v", err)
+	}
+
+	rolls := []int{0, 0, 1}
+	store.roll = func(limit int) int {
+		if limit <= 1 {
+			return 0
+		}
+		if len(rolls) == 0 {
+			return 0
+		}
+		next := rolls[0]
+		rolls = rolls[1:]
+		if next >= limit {
+			return limit - 1
+		}
+		return next
+	}
+
+	firstBoss, err := store.SetBossCycleEnabled(ctx, true)
+	if err != nil {
+		t.Fatalf("enable boss cycle: %v", err)
+	}
+	if firstBoss == nil || firstBoss.TemplateID != "slime-king" {
+		t.Fatalf("expected slime boss first, got %+v", firstBoss)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click feel: %v", err)
+	}
+
+	if !result.BroadcastUserAll {
+		t.Fatal("expected boss kill to trigger user refresh for all participants")
+	}
+	if result.Boss == nil || result.Boss.Status != bossStatusActive {
+		t.Fatalf("expected next active boss after kill, got %+v", result.Boss)
+	}
+	if result.Boss.TemplateID != "dragon" || result.Boss.Name != "火龙" {
+		t.Fatalf("expected dragon to replace defeated boss, got %+v", result.Boss)
+	}
+	if result.LastReward == nil || result.LastReward.BossName != "史莱姆王" {
+		t.Fatalf("expected reward from defeated slime boss, got %+v", result.LastReward)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state after auto rotate: %v", err)
+	}
+	if state.Boss == nil || state.Boss.Status != bossStatusActive || state.Boss.TemplateID != "dragon" {
+		t.Fatalf("expected current boss to be dragon, got %+v", state.Boss)
+	}
+	if len(state.BossLoot) != 1 || state.BossLoot[0].ItemID != "fire-ring" {
+		t.Fatalf("expected current boss loot to switch to dragon loot, got %+v", state.BossLoot)
+	}
+
+	history, err := store.ListBossHistory(ctx)
+	if err != nil {
+		t.Fatalf("list boss history: %v", err)
+	}
+	if len(history) != 1 || history[0].TemplateID != "slime-king" || history[0].Status != bossStatusDefeated {
+		t.Fatalf("expected defeated slime boss in history, got %+v", history)
+	}
+}
+
+func TestUpdatingBossTemplateLootDoesNotRewriteCurrentBossLoot(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed cloth-armor definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:fire-ring", map[string]any{
+		"name":                          "火戒",
+		"slot":                          "accessory",
+		"bonus_critical_chance_percent": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed fire-ring definition: %v", err)
+	}
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "slime-king",
+		Name:  "史莱姆王",
+		MaxHP: 10,
+	}); err != nil {
+		t.Fatalf("save slime template: %v", err)
+	}
+	if err := store.SetBossTemplateLoot(ctx, "slime-king", []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 1},
+	}); err != nil {
+		t.Fatalf("set initial template loot: %v", err)
+	}
+
+	store.roll = func(int) int { return 0 }
+	if _, err := store.SetBossCycleEnabled(ctx, true); err != nil {
+		t.Fatalf("enable boss cycle: %v", err)
+	}
+
+	if err := store.SetBossTemplateLoot(ctx, "slime-king", []BossLootEntry{
+		{ItemID: "fire-ring", Weight: 1},
+	}); err != nil {
+		t.Fatalf("update template loot: %v", err)
+	}
+
+	adminState, err := store.GetAdminState(ctx)
+	if err != nil {
+		t.Fatalf("get admin state: %v", err)
+	}
+
+	if len(adminState.Loot) != 1 || adminState.Loot[0].ItemID != "cloth-armor" {
+		t.Fatalf("expected current boss loot snapshot to remain cloth-armor, got %+v", adminState.Loot)
+	}
+	if len(adminState.BossPool) != 1 || len(adminState.BossPool[0].Loot) != 1 || adminState.BossPool[0].Loot[0].ItemID != "fire-ring" {
+		t.Fatalf("expected template loot to update independently, got %+v", adminState.BossPool)
+	}
+}
+
 func TestGetAdminStateReturnsEmptyCollectionsWithoutBoss(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

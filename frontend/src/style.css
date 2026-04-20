@@ -1171,6 +1171,10 @@ select {
   justify-content: start;
 }
 
+.admin-inline-actions--stacked {
+  grid-template-columns: repeat(3, auto);
+}
+
 .admin-loot-select {
   display: grid;
   gap: 6px;
@@ -1222,6 +1226,35 @@ select {
   border-radius: 18px;
   border: 1px solid rgba(183, 53, 97, 0.12);
   background: rgba(255, 255, 255, 0.74);
+}
+
+.admin-cycle-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 0.9rem;
+}
+
+.admin-boss-summary {
+  margin-top: 1rem;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(183, 53, 97, 0.1);
+}
+
+.admin-boss-summary p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.admin-boss-summary p + p {
+  margin-top: 6px;
+}
+
+.admin-section-card {
+  margin-top: 18px;
 }
 
 .announcement-modal {
@@ -1299,7 +1332,8 @@ select {
   .me-card__stats,
   .button-grid,
   .admin-grid,
-  .admin-inline-row {
+  .admin-inline-row,
+  .admin-inline-actions--stacked {
     grid-template-columns: 1fr;
   }
 

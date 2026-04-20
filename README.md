@@ -15,7 +15,7 @@
 - Boss 击杀后会按掉落池给参与玩家发装备，装备进入各自背包。
 - 前台会展示当前 Boss 的掉落池，以及每件装备的属性。
 - 前台支持更新公告提醒、公告历史和全站公共留言墙。
-- 提供 `/admin` 管理后台，可登录后配置 Boss、装备、掉落池和前台按钮；玩家概览改为分页拉取，避免后台首屏聚合全量玩家。
+- 提供 `/admin` 管理后台，可登录后配置 Boss 循环池、模板掉落池、装备和前台按钮；玩家概览改为分页拉取，避免后台首屏聚合全量玩家。
 - 后台支持为按钮图片申请阿里云 OSS 直传凭证，前端可直传 OSS 后回填公共图片 URL。
 - 左侧玩家 HUD 支持手动开启挂机，开启后会跟随最近一次手动点击的按钮持续自动点击；关闭页面后自动停止。
 - 你后面只要往 Redis 新增一个新键，前端就会自动展示新按钮。
@@ -82,6 +82,10 @@ vote:leaderboard
 
 ```text
 vote:boss:current
+vote:boss:pool:index
+vote:boss:pool:<templateId>
+vote:boss:pool:<templateId>:loot
+vote:boss:cycle
 vote:boss:<bossId>:damage
 vote:boss:<bossId>:loot
 vote:buttons:index
@@ -100,12 +104,23 @@ vote:message:<id>
 
 - `vote:boss:current` 是 `Hash`
   - `id`
+  - `template_id`
   - `name`
   - `status`
   - `max_hp`
   - `current_hp`
   - `started_at`
   - `defeated_at`
+- `vote:boss:pool:index` 是 `Set`
+  - member = Boss 模板 `templateId`
+- `vote:boss:pool:<templateId>` 是 `Hash`
+  - `name`
+  - `max_hp`
+- `vote:boss:pool:<templateId>:loot` 是 `Sorted Set`
+  - member = 装备 `itemId`
+  - score = 掉落权重
+- `vote:boss:cycle` 是 `Hash`
+  - `enabled`
 - `vote:boss:<bossId>:damage` 是 `Sorted Set`
   - member = 昵称
   - score = 对该 Boss 的累计伤害
@@ -208,7 +223,7 @@ oss:
 ## 限流规则
 
 - 默认按客户端 IP 统计点击频率
-- `2` 秒内超过 `12` 次点击会被判定为异常爆发
+- `2` 秒内超过 `42` 次点击会被判定为异常爆发
 - 命中后会进入 `10` 分钟黑名单
 - 这些值都可以通过 Consul 里的 YAML 配置调整
 
