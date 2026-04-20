@@ -1,8 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
+import { AUTO_CLICK_INTERVAL_MS, createAutoClickLoop } from '../utils/autoClicker'
+
 const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
+const AUTO_CLICK_RATE_LABEL = `每秒约 ${Math.round(1000 / AUTO_CLICK_INTERVAL_MS)} 次`
 
 const buttons = ref([])
 const leaderboard = ref([])
@@ -43,8 +46,11 @@ const loadingMessages = ref(false)
 const postingMessage = ref(false)
 const messageDraft = ref('')
 const messageError = ref('')
+const autoClickEnabled = ref(false)
+const autoClickTargetKey = ref('')
 
 let eventSource
+let autoClickLoop
 const burstTimers = new Map()
 
 const buttonCount = computed(() => buttons.value.length)
@@ -72,6 +78,27 @@ const myBossDamage = computed(() => myBossStats.value?.damage ?? 0)
 const effectiveIncrement = computed(() => combatStats.value?.effectiveIncrement ?? 1)
 const normalDamage = computed(() => combatStats.value?.normalDamage ?? effectiveIncrement.value)
 const criticalDamage = computed(() => combatStats.value?.criticalDamage ?? normalDamage.value)
+const autoClickTargetButton = computed(() =>
+  buttons.value.find((button) => button.key === autoClickTargetKey.value) ?? null,
+)
+const autoClickTargetLabel = computed(() => autoClickTargetButton.value?.label ?? '未选择')
+const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetButton.value))
+const autoClickStatus = computed(() => {
+  if (!isLoggedIn.value) {
+    return '先报个名，再手动点一次按钮，挂机就会跟随你最近一次手动点击。'
+  }
+  if (!autoClickTargetKey.value) {
+    return '先手动点一次按钮选择目标，开启后会持续帮你点击。'
+  }
+  if (!autoClickTargetButton.value) {
+    return '刚才选中的按钮已经下线了，重新手动点一个按钮再开。'
+  }
+  if (autoClickEnabled.value) {
+    return `正在帮你持续点 ${autoClickTargetButton.value.label}；你手动点别的按钮后，挂机目标会立刻切过去。`
+  }
+
+  return `已锁定 ${autoClickTargetButton.value.label}，开启后会按 ${AUTO_CLICK_RATE_LABEL} 持续点击。`
+})
 const bossStatusLabel = computed(() => {
   if (!boss.value) {
     return '休战中'
@@ -354,22 +381,100 @@ function selectHudTab(tab) {
 }
 
 function applyState(payload) {
-  buttons.value = payload?.buttons ?? []
-  leaderboard.value = payload?.leaderboard ?? []
-  userStats.value = payload?.userStats ?? null
-  boss.value = payload?.boss ?? null
-  bossLeaderboard.value = payload?.bossLeaderboard ?? []
-  bossLoot.value = payload?.bossLoot ?? []
-  latestAnnouncement.value = payload?.latestAnnouncement ?? null
-  myBossStats.value = payload?.myBossStats ?? null
-  inventory.value = payload?.inventory ?? []
-  loadout.value = payload?.loadout ?? emptyLoadout()
-  combatStats.value = payload?.combatStats ?? defaultCombatStats()
-  lastReward.value = payload?.lastReward ?? null
+  applyPublicState(payload)
+  applyUserState(payload)
   pendingKeys.value = new Set()
   syncing.value = false
   markUpdated()
   maybePromptAnnouncement()
+}
+
+function applyPublicState(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return
+  }
+
+  if ('buttons' in payload) {
+    buttons.value = Array.isArray(payload.buttons) ? payload.buttons : []
+    syncAutoClickTarget()
+  }
+  if ('leaderboard' in payload) {
+    leaderboard.value = Array.isArray(payload.leaderboard) ? payload.leaderboard : []
+  }
+  if ('boss' in payload) {
+    boss.value = payload.boss ?? null
+  }
+  if ('bossLeaderboard' in payload) {
+    bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
+  }
+  if ('bossLoot' in payload) {
+    bossLoot.value = Array.isArray(payload.bossLoot) ? payload.bossLoot : []
+  }
+  if ('latestAnnouncement' in payload) {
+    latestAnnouncement.value = payload.latestAnnouncement ?? null
+    maybePromptAnnouncement()
+  }
+  syncing.value = false
+  markUpdated()
+}
+
+function applyUserState(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return
+  }
+
+  if ('userStats' in payload) {
+    userStats.value = payload.userStats ?? null
+  }
+  if ('myBossStats' in payload) {
+    myBossStats.value = payload.myBossStats ?? null
+  }
+  if ('inventory' in payload) {
+    inventory.value = Array.isArray(payload.inventory) ? payload.inventory : []
+  }
+  if ('loadout' in payload) {
+    loadout.value = payload.loadout ?? emptyLoadout()
+  }
+  if ('combatStats' in payload) {
+    combatStats.value = payload.combatStats ?? defaultCombatStats()
+  }
+  if ('lastReward' in payload) {
+    lastReward.value = payload.lastReward ?? null
+  }
+  syncing.value = false
+  markUpdated()
+}
+
+function applyClickResult(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return
+  }
+
+  if (payload.button?.key) {
+    buttons.value = buttons.value.map((button) =>
+      button.key === payload.button.key
+        ? { ...button, ...payload.button }
+        : button,
+    )
+    syncAutoClickTarget()
+  }
+  if ('userStats' in payload) {
+    userStats.value = payload.userStats ?? null
+  }
+  if ('boss' in payload) {
+    boss.value = payload.boss ?? null
+  }
+  if ('bossLeaderboard' in payload) {
+    bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : bossLeaderboard.value
+  }
+  if ('myBossStats' in payload) {
+    myBossStats.value = payload.myBossStats ?? null
+  }
+  if ('lastReward' in payload) {
+    lastReward.value = payload.lastReward ?? null
+  }
+  syncing.value = false
+  markUpdated()
 }
 
 function clearCriticalBurst(key) {
@@ -411,6 +516,50 @@ function currentNicknameQuery() {
   return nickname.value ? `?nickname=${encodeURIComponent(nickname.value)}` : ''
 }
 
+function stopAutoClick() {
+  autoClickEnabled.value = false
+  autoClickLoop?.stop()
+}
+
+function syncAutoClickTarget() {
+  if (autoClickTargetKey.value && !autoClickTargetButton.value) {
+    stopAutoClick()
+  }
+}
+
+function startAutoClick() {
+  if (!canStartAutoClick.value) {
+    return
+  }
+
+  if (!autoClickLoop) {
+    autoClickLoop = createAutoClickLoop({
+      onTick: () => {
+        const target = autoClickTargetButton.value
+        if (!nickname.value || !target) {
+          stopAutoClick()
+          return
+        }
+
+        void clickButton(target.key, { source: 'auto' })
+      },
+    })
+  }
+
+  autoClickEnabled.value = true
+  errorMessage.value = ''
+  autoClickLoop.start()
+}
+
+function toggleAutoClick() {
+  if (autoClickEnabled.value) {
+    stopAutoClick()
+    return
+  }
+
+  startAutoClick()
+}
+
 async function loadState() {
   loading.value = true
   syncing.value = true
@@ -431,7 +580,11 @@ async function loadState() {
   }
 }
 
-async function clickButton(key) {
+async function clickButton(key, options = {}) {
+  if (options.source !== 'auto') {
+    autoClickTargetKey.value = key
+  }
+
   if (!nickname.value || pendingKeys.value.has(key)) {
     return
   }
@@ -460,7 +613,10 @@ async function clickButton(key) {
     if (data.critical) {
       triggerCriticalBurst(key, data.delta)
     }
-    applyState(data)
+    const restored = new Set(pendingKeys.value)
+    restored.delete(key)
+    pendingKeys.value = restored
+    applyClickResult(data)
     liveConnected.value = true
     errorMessage.value = ''
   } catch (error) {
@@ -544,18 +700,19 @@ function connectEventStream() {
     errorMessage.value = ''
   }
 
-  eventSource.onmessage = (event) => {
+  const handleNamedEvent = (applier) => (event) => {
     try {
       const payload = JSON.parse(event.data)
-      if (payload?.buttons) {
-        applyState(payload)
-        liveConnected.value = true
-        errorMessage.value = ''
-      }
+      applier(payload)
+      liveConnected.value = true
+      errorMessage.value = ''
     } catch {
       errorMessage.value = '实时消息解析失败，请稍后刷新页面。'
     }
   }
+
+  eventSource.addEventListener('public_state', handleNamedEvent(applyPublicState))
+  eventSource.addEventListener('user_state', handleNamedEvent(applyUserState))
 
   eventSource.onerror = () => {
     liveConnected.value = false
@@ -575,6 +732,7 @@ async function submitNickname() {
   try {
     await validateNicknameWithServer(nextNickname)
 
+    stopAutoClick()
     nickname.value = nextNickname
     nicknameDraft.value = nextNickname
     window.localStorage.setItem(NICKNAME_STORAGE_KEY, nextNickname)
@@ -586,6 +744,7 @@ async function submitNickname() {
 }
 
 async function resetNickname() {
+  stopAutoClick()
   nickname.value = ''
   nicknameDraft.value = ''
   userStats.value = null
@@ -594,6 +753,7 @@ async function resetNickname() {
   combatStats.value = defaultCombatStats()
   myBossStats.value = null
   bossLoot.value = []
+  autoClickTargetKey.value = ''
   window.localStorage.removeItem(NICKNAME_STORAGE_KEY)
   await loadState()
   connectEventStream()
@@ -617,6 +777,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopAutoClick()
   eventSource?.close()
   burstTimers.forEach((timer) => window.clearTimeout(timer))
   burstTimers.clear()
@@ -781,6 +942,34 @@ onBeforeUnmount(() => {
           >
             清空昵称
           </button>
+
+          <section class="player-hud__auto">
+            <div class="player-hud__section-head">
+              <div>
+                <p class="vote-stage__eyebrow">挂机</p>
+                <strong>{{ autoClickEnabled ? '进行中' : '未开启' }}</strong>
+              </div>
+              <span class="player-hud__pill" :class="{ 'player-hud__pill--active': autoClickEnabled }">
+                {{ AUTO_CLICK_RATE_LABEL }}
+              </span>
+            </div>
+
+            <p class="player-hud__note">{{ autoClickStatus }}</p>
+
+            <div class="player-hud__auto-meta">
+              <span class="player-hud__auto-chip">目标：{{ autoClickTargetLabel }}</span>
+              <span class="player-hud__auto-chip">关闭页面自动停止</span>
+            </div>
+
+            <button
+              class="nickname-form__submit player-hud__auto-button"
+              type="button"
+              :disabled="!autoClickEnabled && !canStartAutoClick"
+              @click="toggleAutoClick"
+            >
+              {{ autoClickEnabled ? '关闭挂机' : '开启挂机' }}
+            </button>
+          </section>
 
           <div class="player-hud__tabs">
             <button

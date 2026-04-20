@@ -9,7 +9,7 @@ redis:
 redis_prefix: "vote:button:"
 button_poll_interval_ms: 3000
 rate_limit:
-  limit: 30
+  limit: 42
   window_ms: 2000
   blacklist_ms: 600000
 critical_hit:

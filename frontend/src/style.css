@@ -373,6 +373,47 @@ select {
   margin-top: 0;
 }
 
+.player-hud__auto {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 232, 239, 0.94));
+  border: 1px solid rgba(183, 53, 97, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84);
+}
+
+.player-hud__pill--active {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.22);
+  color: #166534;
+}
+
+.player-hud__auto-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-hud__auto-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(183, 53, 97, 0.12);
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.player-hud__auto-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  box-shadow: none;
+}
+
 .player-hud__tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

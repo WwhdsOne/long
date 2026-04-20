@@ -63,3 +63,20 @@ func TestLimiterKeepsDifferentIPsIndependent(t *testing.T) {
 		t.Fatalf("expected second ip to stay independent, got %v", err)
 	}
 }
+
+func TestLimiterUsesFortyTwoAsDefaultBurstLimit(t *testing.T) {
+	limiter := NewLimiter(Config{
+		Window:            2 * time.Second,
+		BlacklistDuration: 10 * time.Minute,
+	})
+
+	for i := 0; i < 42; i++ {
+		if _, err := limiter.Allow("203.0.113.20"); err != nil {
+			t.Fatalf("expected request %d to pass before default threshold, got %v", i+1, err)
+		}
+	}
+
+	if _, err := limiter.Allow("203.0.113.20"); err == nil {
+		t.Fatal("expected request 43 to be rate limited")
+	}
+}

@@ -35,7 +35,7 @@ type Limiter struct {
 func NewLimiter(config Config) *Limiter {
 	limit := config.Limit
 	if limit <= 0 {
-		limit = 12
+		limit = 42
 	}
 
 	window := config.Window
