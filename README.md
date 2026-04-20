@@ -9,14 +9,15 @@
 - 任意访问者点击按钮后，总数会按当前装备与暴击结算出的实际增量上涨。
 - 玩家可以穿戴装备，装备会让平时点击直接获得额外次数增量。
 - 玩家可以对同装备类型做 `3 合 1` 升星，最高 `+5`；升星不会生成新装备，而是强化该账号下这个装备类型的属性。
-- 所有在线用户都会通过 SSE 实时看到最新计数。
+- 所有在线用户都会通过 SSE 实时收到公共态更新；已登录用户还会收到仅属于自己的个人状态更新。
 - 页面会实时展示个人累计点击和排行榜。
 - 支持单个全服世界 Boss：Boss 活动期间，同一次点击会同时记票并造成 Boss 伤害。
 - Boss 击杀后会按掉落池给参与玩家发装备，装备进入各自背包。
 - 前台会展示当前 Boss 的掉落池，以及每件装备的属性。
 - 前台支持更新公告提醒、公告历史和全站公共留言墙。
-- 提供 `/admin` 管理后台，可登录后配置 Boss、装备、掉落池和前台按钮。
+- 提供 `/admin` 管理后台，可登录后配置 Boss、装备、掉落池和前台按钮；玩家概览改为分页拉取，避免后台首屏聚合全量玩家。
 - 后台支持为按钮图片申请阿里云 OSS 直传凭证，前端可直传 OSS 后回填公共图片 URL。
+- 左侧玩家 HUD 支持手动开启挂机，开启后会跟随最近一次手动点击的按钮持续自动点击；关闭页面后自动停止。
 - 你后面只要往 Redis 新增一个新键，前端就会自动展示新按钮。
 - 前端静态页和后端 API/SSE 统一由一个 Go 服务承载，并可打成单一 Docker 镜像。
 - 后端会在内存里做爆发点击限流，超出人类能力的频率会被拉黑 10 分钟。
@@ -28,7 +29,6 @@
 - `Makefile`: 项目顶层命令入口，统一开发、构建、测试流程
 - `frontend/`: Vue 页面、样式和 Vite 配置
 - `backend/`: Go 服务、Redis 读写、SSE、限流和测试
-- `scripts/`: Docker 重建和镜像导出脚本
 
 ## Redis 数据结构
 
@@ -61,7 +61,7 @@ redis-cli HSET vote:button:wechat-pity label "微信[可怜]表情" count 0 sort
 redis-cli HSET vote:button:new-one label "新按钮" count 0 sort 40 enabled 1
 ```
 
-后端会周期性扫描 `vote:button:*`，所以新增后几秒内就会自动出现在页面上。
+后端会维护按钮显式索引；如果你直接往 Redis 手工新增 `vote:button:*`，服务会在低频兜底扫描后补进索引并出现在页面上。
 
 个人统计和排行榜使用：
 
@@ -84,6 +84,9 @@ vote:leaderboard
 vote:boss:current
 vote:boss:<bossId>:damage
 vote:boss:<bossId>:loot
+vote:buttons:index
+vote:equipment:index
+vote:players:index
 vote:equip:def:<itemId>
 vote:user-inventory:<nickname>
 vote:user-loadout:<nickname>
@@ -109,6 +112,14 @@ vote:message:<id>
 - `vote:boss:<bossId>:loot` 是 `Sorted Set`
   - member = 装备 `itemId`
   - score = 掉落权重
+- `vote:buttons:index` 是 `Sorted Set`
+  - member = 按钮 `slug`
+  - score = 按钮排序值 `sort`
+- `vote:equipment:index` 是 `Set`
+  - member = 装备 `itemId`
+- `vote:players:index` 是 `Sorted Set`
+  - member = 昵称
+  - score = 最近活跃时间戳
 - `vote:equip:def:<itemId>` 是 `Hash`
   - `name`
   - `slot` (`weapon` / `armor` / `accessory`)
@@ -172,7 +183,7 @@ redis:
 redis_prefix: "vote:button:"
 button_poll_interval_ms: 3000
 rate_limit:
-  limit: 12
+  limit: 42
   window_ms: 2000
   blacklist_ms: 600000
 critical_hit:
@@ -191,6 +202,8 @@ oss:
   upload_dir_prefix: "buttons"
   expire_seconds: 300
 ```
+
+`button_poll_interval_ms` 现在表示“按钮索引低频兜底同步间隔”，不是公共状态轮询广播间隔。推荐生产环境调大到 `60000` 左右；只有你直接手工写 Redis 新按钮、没有走后台保存接口时，它才会影响这个按钮多久能被前台看到。
 
 ## 限流规则
 
@@ -250,6 +263,7 @@ make dev
 
 - 前端开发页：`http://localhost:5173`
 - Go 后端接口：`http://localhost:2333`
+- Go `pprof` 调试入口：`http://localhost:2333/debug/pprof/`
 - 管理后台：`http://localhost:5173/admin`（构建后由 Go 服务统一托管）
 
 ## 构建
@@ -304,41 +318,6 @@ docker run -d \
   -e CONSUL_ADDR=http://your-consul:8500 \
   -e CONSUL_CONFIG_KEY=vote-wall/prod \
   long
-```
-
-一键删除旧容器和旧镜像并重新启动名为 `long` 的镜像：
-
-```bash
-bash ./scripts/rebuild-run.sh
-```
-
-这个脚本会：
-
-- 删除旧的 `long` 容器
-- 删除旧的 `long` 镜像
-- 重新构建 `long`
-- 使用 `--network host` 启动
-
-## 导出并上传镜像
-
-如果你想在本地构建好，再把镜像包传到服务器：
-
-```bash
-bash ./scripts/build-save-upload.sh user@your-server:/path/
-```
-
-这个脚本会：
-
-- 删除本地旧的 `long` 镜像
-- 删除旧的 `long.tar.gz`
-- 使用 `buildx` 按 `linux/amd64` 重新构建 `long`
-- 导出为 `long.tar.gz`
-- 自动 `scp` 上传到你指定的服务器路径
-
-也支持自定义镜像名和压缩包名：
-
-```bash
-bash ./scripts/build-save-upload.sh user@your-server:/path/ my-image my-image.tar.gz
 ```
 
 ## 可选 Nginx 反代

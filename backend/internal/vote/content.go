@@ -144,18 +144,22 @@ func (s *Store) CreateMessage(ctx context.Context, nickname string, content stri
 		CreatedAt: now,
 	}
 
-	if err := s.client.HSet(ctx, s.messageItemKey(item.ID), map[string]any{
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.messageItemKey(item.ID), map[string]any{
 		"id":         item.ID,
 		"nickname":   item.Nickname,
 		"content":    item.Content,
 		"created_at": strconv.FormatInt(item.CreatedAt, 10),
-	}).Err(); err != nil {
-		return nil, err
-	}
-	if err := s.client.ZAdd(ctx, s.messageKey, redis.Z{
+	})
+	pipe.ZAdd(ctx, s.messageKey, redis.Z{
 		Score:  float64(id),
 		Member: item.ID,
-	}).Err(); err != nil {
+	})
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: item.Nickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
 		return nil, err
 	}
 
@@ -272,6 +276,10 @@ func (s *Store) SynthesizeItem(ctx context.Context, nickname string, itemID stri
 		"bonus_clicks":                  strconv.FormatInt(upgrade.BonusClicks, 10),
 		"bonus_critical_chance_percent": strconv.Itoa(upgrade.BonusCriticalChancePercent),
 		"bonus_critical_count":          strconv.FormatInt(upgrade.BonusCriticalCount, 10),
+	})
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(time.Now().Unix()),
+		Member: normalizedNickname,
 	})
 	if _, err := pipe.Exec(ctx); err != nil {
 		return State{}, err

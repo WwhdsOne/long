@@ -22,12 +22,15 @@ import (
 type ButtonStore interface {
 	GetState(context.Context, string) (vote.State, error)
 	GetSnapshot(context.Context) (vote.Snapshot, error)
+	GetUserState(context.Context, string) (vote.UserState, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
 	SynthesizeItem(context.Context, string, string) (vote.State, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
+	ListAdminPlayers(context.Context, string, int64) (vote.AdminPlayerPage, error)
+	GetAdminPlayer(context.Context, string) (*vote.AdminPlayerOverview, error)
 	SaveButton(context.Context, vote.ButtonUpsert) error
 	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
 	DeleteEquipmentDefinition(context.Context, string) error
@@ -44,14 +47,26 @@ type ButtonStore interface {
 	DeleteMessage(context.Context, string) error
 }
 
+// StateView 为只读聚合提供公共态、个人态和完整态读取能力。
+type StateView interface {
+	GetState(context.Context, string) (vote.State, error)
+	GetSnapshot(context.Context) (vote.Snapshot, error)
+	GetUserState(context.Context, string) (vote.UserState, error)
+}
+
 // OSSSigner 负责生成 OSS 直传短时凭证。
 type OSSSigner interface {
 	CreatePolicy(context.Context) (ossupload.Policy, error)
 }
 
-// Broadcaster 广播接口，点击成功后推送更新快照
+// Broadcaster 保留旧接口，避免现有调用点和测试同时变更。
 type Broadcaster interface {
 	BroadcastSnapshot(vote.Snapshot) error
+}
+
+// ChangePublisher 负责将业务变更发布到实时层。
+type ChangePublisher interface {
+	PublishChange(context.Context, vote.StateChange) error
 }
 
 // ClickGuard 点击频率限制接口
@@ -62,7 +77,9 @@ type ClickGuard interface {
 // Options 路由配置，注入业务逻辑、实时更新和静态资源
 type Options struct {
 	Store              ButtonStore
+	StateView          StateView
 	Broadcaster        Broadcaster
+	ChangePublisher    ChangePublisher
 	ClickGuard         ClickGuard
 	Events             http.Handler
 	PublicDir          string
@@ -74,6 +91,11 @@ const adminSessionCookieName = "long_admin_session"
 
 // NewHandler 构建 API 路由和 SPA 静态文件回退处理器
 func NewHandler(options Options) http.Handler {
+	stateView := options.StateView
+	if stateView == nil {
+		stateView = options.Store
+	}
+
 	apiMux := http.NewServeMux()
 
 	apiMux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -81,7 +103,7 @@ func NewHandler(options Options) http.Handler {
 	})
 
 	apiMux.HandleFunc("GET /api/buttons", func(w http.ResponseWriter, r *http.Request) {
-		state, err := options.Store.GetState(r.Context(), r.URL.Query().Get("nickname"))
+		state, err := stateView.GetState(r.Context(), r.URL.Query().Get("nickname"))
 		if err != nil {
 			if writeNicknameError(w, err) {
 				return
@@ -149,6 +171,11 @@ func NewHandler(options Options) http.Handler {
 			return
 		}
 
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeMessageCreated,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
 		writeJSON(w, http.StatusOK, message)
 	})
 
@@ -226,36 +253,24 @@ func NewHandler(options Options) http.Handler {
 			return
 		}
 
-		state, err := options.Store.GetState(r.Context(), body.Nickname)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
-			return
+		change := vote.StateChange{
+			Type:      vote.StateChangeButtonClicked,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
 		}
-
-		_ = options.Broadcaster.BroadcastSnapshot(vote.Snapshot{
-			Buttons:            state.Buttons,
-			Leaderboard:        state.Leaderboard,
-			Boss:               state.Boss,
-			BossLeaderboard:    state.BossLeaderboard,
-			BossLoot:           state.BossLoot,
-			LatestAnnouncement: state.LatestAnnouncement,
-		})
+		if result.Boss != nil && result.Boss.Status == "defeated" {
+			change.BroadcastUserAll = true
+		}
+		publishChange(r.Context(), options.ChangePublisher, change)
 		writeJSON(w, http.StatusOK, map[string]any{
-			"button":             result.Button,
-			"buttons":            state.Buttons,
-			"leaderboard":        state.Leaderboard,
-			"userStats":          result.UserStats,
-			"delta":              result.Delta,
-			"critical":           result.Critical,
-			"boss":               state.Boss,
-			"bossLeaderboard":    state.BossLeaderboard,
-			"bossLoot":           state.BossLoot,
-			"latestAnnouncement": state.LatestAnnouncement,
-			"myBossStats":        state.MyBossStats,
-			"inventory":          state.Inventory,
-			"loadout":            state.Loadout,
-			"combatStats":        state.CombatStats,
-			"lastReward":         state.LastReward,
+			"button":          result.Button,
+			"userStats":       result.UserStats,
+			"delta":           result.Delta,
+			"critical":        result.Critical,
+			"boss":            result.Boss,
+			"bossLeaderboard": result.BossLeaderboard,
+			"myBossStats":     result.MyBossStats,
+			"lastReward":      result.LastReward,
 		})
 	})
 
@@ -292,6 +307,11 @@ func NewHandler(options Options) http.Handler {
 			return
 		}
 
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
 		writeJSON(w, http.StatusOK, state)
 	})
 
@@ -321,6 +341,11 @@ func NewHandler(options Options) http.Handler {
 			return
 		}
 
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
 		writeJSON(w, http.StatusOK, state)
 	})
 
@@ -361,6 +386,11 @@ func NewHandler(options Options) http.Handler {
 			return
 		}
 
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
 		writeJSON(w, http.StatusOK, state)
 	})
 
@@ -430,6 +460,50 @@ func NewHandler(options Options) http.Handler {
 			writeJSON(w, http.StatusOK, state)
 		})
 
+		apiMux.HandleFunc("GET /api/admin/players", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			limit := int64(50)
+			if rawLimit := strings.TrimSpace(r.URL.Query().Get("limit")); rawLimit != "" {
+				parsedLimit, err := strconv.ParseInt(rawLimit, 10, 64)
+				if err != nil {
+					writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_LIMIT"})
+					return
+				}
+				limit = parsedLimit
+			}
+
+			page, err := options.Store.ListAdminPlayers(r.Context(), r.URL.Query().Get("cursor"), limit)
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ADMIN_PLAYERS_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, page)
+		})
+
+		apiMux.HandleFunc("GET /api/admin/players/{nickname}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			player, err := options.Store.GetAdminPlayer(r.Context(), r.PathValue("nickname"))
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ADMIN_PLAYER_FAILED"})
+				return
+			}
+			if player == nil {
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "PLAYER_NOT_FOUND"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, player)
+		})
+
 		apiMux.HandleFunc("POST /api/admin/boss/activate", func(w http.ResponseWriter, r *http.Request) {
 			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
@@ -448,6 +522,11 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeBossChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, boss)
 		})
 
@@ -462,6 +541,11 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeBossChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -485,6 +569,11 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeBossChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -537,6 +626,10 @@ func NewHandler(options Options) http.Handler {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_SAVE_FAILED"})
 				return
 			}
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:      vote.StateChangeAnnouncementChanged,
+				Timestamp: time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, item)
 		})
 
@@ -550,6 +643,10 @@ func NewHandler(options Options) http.Handler {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_DELETE_FAILED"})
 				return
 			}
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:      vote.StateChangeAnnouncementChanged,
+				Timestamp: time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -577,6 +674,10 @@ func NewHandler(options Options) http.Handler {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "MESSAGE_DELETE_FAILED"})
 				return
 			}
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:      vote.StateChangeMessageDeleted,
+				Timestamp: time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -618,6 +719,10 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:      vote.StateChangeButtonMetaChanged,
+				Timestamp: time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -639,6 +744,10 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:      vote.StateChangeButtonMetaChanged,
+				Timestamp: time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -659,6 +768,11 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeEquipmentMetaChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -680,6 +794,11 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeEquipmentMetaChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
@@ -694,6 +813,11 @@ func NewHandler(options Options) http.Handler {
 				return
 			}
 
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeEquipmentMetaChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 	}
@@ -819,4 +943,11 @@ func isAdminAuthenticated(request *http.Request, authenticator *adminauth.Authen
 	}
 
 	return authenticator.Verify(cookie.Value)
+}
+
+func publishChange(ctx context.Context, publisher ChangePublisher, change vote.StateChange) {
+	if publisher == nil {
+		return
+	}
+	_ = publisher.PublishChange(ctx, change)
 }

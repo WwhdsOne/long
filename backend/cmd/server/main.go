@@ -3,15 +3,14 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -26,50 +25,6 @@ import (
 	"long/internal/ratelimit"
 	"long/internal/vote"
 )
-
-// snapshotPublisher 快照发布器，避免 Redis 轮询时重复广播相同状态
-type snapshotPublisher struct {
-	hub  *events.Hub
-	mu   sync.Mutex
-	last string
-}
-
-func newSnapshotPublisher(hub *events.Hub) *snapshotPublisher {
-	return &snapshotPublisher{hub: hub}
-}
-
-func (p *snapshotPublisher) BroadcastSnapshot(snapshot vote.Snapshot) error {
-	_, err := p.broadcast(snapshot, false)
-	return err
-}
-
-func (p *snapshotPublisher) BroadcastSnapshotIfChanged(snapshot vote.Snapshot) (bool, error) {
-	return p.broadcast(snapshot, false)
-}
-
-func (p *snapshotPublisher) ForceSnapshot(snapshot vote.Snapshot) error {
-	_, err := p.broadcast(snapshot, true)
-	return err
-}
-
-func (p *snapshotPublisher) broadcast(snapshot vote.Snapshot, force bool) (bool, error) {
-	signatureBytes, err := json.Marshal(snapshot)
-	if err != nil {
-		return false, err
-	}
-
-	signature := string(signatureBytes)
-
-	p.mu.Lock()
-	if !force && signature == p.last {
-		p.mu.Unlock()
-		return false, nil
-	}
-	p.last = signature
-	p.mu.Unlock()
-
-	return true, p.hub.BroadcastSnapshot()
-}
 
 func main() {
 	if err := run(); err != nil {
@@ -114,8 +69,10 @@ func run() error {
 	}
 
 	hub := events.NewHub()
-	publisher := newSnapshotPublisher(hub)
-	eventHandler := events.NewHandler(hub, store.GetState)
+	stateCache := events.NewCache(store)
+	dispatcher := events.NewDispatcher(stateCache, hub)
+	changeBus := events.NewRedisChangeBus(redisClient, vote.RealtimeEventChannel(cfg.RedisPrefix))
+	eventHandler := events.NewHandler(hub, stateCache)
 	clickLimiter := ratelimit.NewLimiter(ratelimit.Config{
 		Limit:             cfg.RateLimit.Limit,
 		Window:            cfg.RateLimit.Window,
@@ -134,12 +91,13 @@ func run() error {
 		})
 	}
 	handler := httpapi.NewHandler(httpapi.Options{
-		Store:       store,
-		Broadcaster: publisher,
-		ClickGuard:  clickLimiter,
-		Events:      eventHandler,
-		PublicDir:   cfg.PublicDir,
-		OSSSigner:   ossSigner,
+		Store:           store,
+		StateView:       stateCache,
+		ChangePublisher: changeBus,
+		ClickGuard:      clickLimiter,
+		Events:          eventHandler,
+		PublicDir:       cfg.PublicDir,
+		OSSSigner:       ossSigner,
 		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
 			Username:      cfg.Admin.Username,
 			Password:      cfg.Admin.Password,
@@ -149,7 +107,7 @@ func run() error {
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           handler,
+		Handler:           buildRootHandler(handler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -165,7 +123,16 @@ func run() error {
 	defer pollCancel()
 
 	go func() {
-		// 定期轮询 Redis，确保动态添加的按钮即使没有点击也能显示
+		if err := changeBus.Listen(pollCtx, dispatcher.HandleChange); err != nil && !errors.Is(err, context.Canceled) {
+			select {
+			case errCh <- fmt.Errorf("listen realtime changes: %w", err):
+			default:
+			}
+		}
+	}()
+
+	go func() {
+		// 低频扫描 Redis，兜底同步手工新增但未走支持写路径的按钮。
 		ticker := time.NewTicker(cfg.ButtonPollInterval)
 		defer ticker.Stop()
 
@@ -174,24 +141,26 @@ func run() error {
 			case <-pollCtx.Done():
 				return
 			case <-ticker.C:
-				snapshot, err := store.GetSnapshot(pollCtx)
+				changed, err := store.SyncButtonIndex(pollCtx)
 				if err != nil {
-					log.Printf("Failed to sync state from Redis: %v", err)
+					log.Printf("Failed to sync button index from Redis: %v", err)
 					continue
 				}
-				if _, err := publisher.BroadcastSnapshotIfChanged(snapshot); err != nil {
-					log.Printf("Failed to publish state: %v", err)
+				if !changed {
+					continue
+				}
+				if err := changeBus.PublishChange(pollCtx, vote.StateChange{
+					Type:      vote.StateChangeButtonMetaChanged,
+					Timestamp: time.Now().Unix(),
+				}); err != nil {
+					log.Printf("Failed to publish button metadata change: %v", err)
 				}
 			}
 		}
 	}()
 
-	initialSnapshot, err := store.GetSnapshot(startupCtx)
-	if err != nil {
-		return fmt.Errorf("load initial state: %w", err)
-	}
-	if err := publisher.ForceSnapshot(initialSnapshot); err != nil {
-		return fmt.Errorf("broadcast initial state: %w", err)
+	if _, err := stateCache.RefreshSnapshot(startupCtx); err != nil {
+		return fmt.Errorf("warm snapshot cache: %w", err)
 	}
 
 	sigCh := make(chan os.Signal, 1)
@@ -220,4 +189,21 @@ func run() error {
 	}
 
 	return nil
+}
+
+func buildRootHandler(appHandler http.Handler) http.Handler {
+	rootMux := http.NewServeMux()
+	rootMux.HandleFunc("/debug/pprof/", pprof.Index)
+	rootMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	rootMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	rootMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	rootMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	rootMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	rootMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	rootMux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+	rootMux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	rootMux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
+	rootMux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
+	rootMux.Handle("/", appHandler)
+	return rootMux
 }

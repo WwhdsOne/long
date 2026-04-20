@@ -18,7 +18,9 @@ type AdminState struct {
 	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
 	Equipment       []EquipmentDefinition  `json:"equipment"`
 	Loot            []BossLootEntry        `json:"loot"`
-	Players         []AdminPlayerOverview  `json:"players"`
+	PlayerCount     int64                  `json:"playerCount"`
+	RecentPlayerCount int64                `json:"recentPlayerCount"`
+	Players         []AdminPlayerOverview  `json:"players,omitempty"`
 }
 
 // AdminPlayerOverview 管理后台的玩家概览
@@ -27,6 +29,13 @@ type AdminPlayerOverview struct {
 	ClickCount int64           `json:"clickCount"`
 	Inventory  []InventoryItem `json:"inventory"`
 	Loadout    Loadout         `json:"loadout"`
+}
+
+// AdminPlayerPage 后台玩家分页结果
+type AdminPlayerPage struct {
+	Items      []AdminPlayerOverview `json:"items"`
+	NextCursor string                `json:"nextCursor,omitempty"`
+	Total      int64                 `json:"total"`
 }
 
 // ButtonUpsert 管理后台按钮保存载荷
@@ -77,7 +86,7 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		}
 	}
 
-	players, err := s.ListPlayerOverviews(ctx)
+	playerCount, recentPlayerCount, err := s.playerCounts(ctx)
 	if err != nil {
 		return AdminState{}, err
 	}
@@ -88,23 +97,24 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		BossLeaderboard: bossLeaderboard,
 		Equipment:       equipment,
 		Loot:            loot,
-		Players:         players,
+		PlayerCount:     playerCount,
+		RecentPlayerCount: recentPlayerCount,
+		Players:         []AdminPlayerOverview{},
 	}, nil
 }
 
 // ListEquipmentDefinitions 列出全部装备模板。
 func (s *Store) ListEquipmentDefinitions(ctx context.Context) ([]EquipmentDefinition, error) {
-	keys, err := s.scanByPrefix(ctx, s.equipmentDefPrefix)
+	itemIDs, err := s.listEquipmentIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(keys) == 0 {
+	if len(itemIDs) == 0 {
 		return []EquipmentDefinition{}, nil
 	}
 
-	equipment := make([]EquipmentDefinition, 0, len(keys))
-	for _, key := range keys {
-		itemID := strings.TrimPrefix(key, s.equipmentDefPrefix)
+	equipment := make([]EquipmentDefinition, 0, len(itemIDs))
+	for _, itemID := range itemIDs {
 		definition, err := s.getEquipmentDefinition(ctx, itemID)
 		if err != nil {
 			continue
@@ -137,12 +147,25 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 		"bonus_critical_count":          strconv.FormatInt(definition.BonusCriticalCount, 10),
 	}
 
-	return s.client.HSet(ctx, s.equipmentKey(itemID), values).Err()
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.equipmentKey(itemID), values)
+	pipe.SAdd(ctx, s.equipmentIndexKey, itemID)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // DeleteEquipmentDefinition 删除装备模板。
 func (s *Store) DeleteEquipmentDefinition(ctx context.Context, itemID string) error {
-	return s.client.Del(ctx, s.equipmentKey(strings.TrimSpace(itemID))).Err()
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return nil
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.Del(ctx, s.equipmentKey(itemID))
+	pipe.SRem(ctx, s.equipmentIndexKey, itemID)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // SaveButton 保存按钮配置。
@@ -174,7 +197,14 @@ func (s *Store) SaveButton(ctx context.Context, button ButtonUpsert) error {
 		values["image_alt"] = strings.TrimSpace(button.ImageAlt)
 	}
 
-	return s.client.HSet(ctx, s.prefix+slug, values).Err()
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.prefix+slug, values)
+	pipe.ZAdd(ctx, s.buttonIndexKey, redis.Z{
+		Score:  float64(button.Sort),
+		Member: slug,
+	})
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 // ActivateBoss 覆盖当前活动 Boss。
@@ -258,17 +288,16 @@ func (s *Store) SetBossLoot(ctx context.Context, bossID string, loot []BossLootE
 
 // ListPlayerOverviews 列出后台玩家背包与穿戴概览。
 func (s *Store) ListPlayerOverviews(ctx context.Context) ([]AdminPlayerOverview, error) {
-	keys, err := s.scanByPrefix(ctx, s.userPrefix)
+	nicknames, err := s.listPlayerNicknames(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(keys) == 0 {
+	if len(nicknames) == 0 {
 		return []AdminPlayerOverview{}, nil
 	}
 
-	players := make([]AdminPlayerOverview, 0, len(keys))
-	for _, key := range keys {
-		nickname := strings.TrimPrefix(key, s.userPrefix)
+	players := make([]AdminPlayerOverview, 0, len(nicknames))
+	for _, nickname := range nicknames {
 		if nickname == "" {
 			continue
 		}
@@ -315,6 +344,67 @@ func (s *Store) ListPlayerOverviews(ctx context.Context) ([]AdminPlayerOverview,
 	return players, nil
 }
 
+// ListAdminPlayers 返回后台玩家分页概览。
+func (s *Store) ListAdminPlayers(ctx context.Context, cursor string, limit int64) (AdminPlayerPage, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	total, _, err := s.playerCounts(ctx)
+	if err != nil {
+		return AdminPlayerPage{}, err
+	}
+
+	offset := int64(0)
+	if trimmed := strings.TrimSpace(cursor); trimmed != "" {
+		parsed, err := strconv.ParseInt(trimmed, 10, 64)
+		if err != nil {
+			return AdminPlayerPage{}, err
+		}
+		if parsed > 0 {
+			offset = parsed
+		}
+	}
+
+	nicknames, err := s.client.ZRevRange(ctx, s.playerIndexKey, offset, offset+limit-1).Result()
+	if err != nil {
+		return AdminPlayerPage{}, err
+	}
+	if len(nicknames) == 0 {
+		return AdminPlayerPage{
+			Items: []AdminPlayerOverview{},
+			Total: total,
+		}, nil
+	}
+
+	items := make([]AdminPlayerOverview, 0, len(nicknames))
+	for _, nickname := range nicknames {
+		player, err := s.adminPlayerOverview(ctx, nickname)
+		if err != nil {
+			return AdminPlayerPage{}, err
+		}
+		if player == nil {
+			continue
+		}
+		items = append(items, *player)
+	}
+
+	page := AdminPlayerPage{
+		Items: items,
+		Total: total,
+	}
+	if offset+int64(len(nicknames)) < total {
+		page.NextCursor = strconv.FormatInt(offset+int64(len(nicknames)), 10)
+	}
+
+	return page, nil
+}
+
+// GetAdminPlayer 返回单个玩家的后台详情。
+func (s *Store) GetAdminPlayer(ctx context.Context, nickname string) (*AdminPlayerOverview, error) {
+	return s.adminPlayerOverview(ctx, strings.TrimSpace(nickname))
+}
+
 func (s *Store) scanByPrefix(ctx context.Context, prefix string) ([]string, error) {
 	var (
 		cursor uint64
@@ -334,6 +424,55 @@ func (s *Store) scanByPrefix(ctx context.Context, prefix string) ([]string, erro
 	}
 
 	return keys, nil
+}
+
+func (s *Store) adminPlayerOverview(ctx context.Context, nickname string) (*AdminPlayerOverview, error) {
+	if strings.TrimSpace(nickname) == "" {
+		return nil, nil
+	}
+
+	userStats, err := s.GetUserStats(ctx, nickname)
+	if err != nil {
+		if errors.Is(err, ErrInvalidNickname) || errors.Is(err, ErrSensitiveNickname) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	quantities, err := s.inventoryQuantities(ctx, nickname)
+	if err != nil {
+		return nil, err
+	}
+	loadout, equipped, err := s.loadoutForNickname(ctx, nickname, quantities)
+	if err != nil {
+		return nil, err
+	}
+	inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AdminPlayerOverview{
+		Nickname:   nickname,
+		ClickCount: userStats.ClickCount,
+		Inventory:  inventory,
+		Loadout:    loadout,
+	}, nil
+}
+
+func (s *Store) playerCounts(ctx context.Context) (int64, int64, error) {
+	total, err := s.client.ZCard(ctx, s.playerIndexKey).Result()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	now := time.Now().Unix()
+	recent, err := s.client.ZCount(ctx, s.playerIndexKey, strconv.FormatInt(now-24*60*60, 10), "+inf").Result()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return total, recent, nil
 }
 
 func boolToRedis(value bool) string {

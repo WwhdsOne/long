@@ -177,28 +177,38 @@ type BossLootEntry struct {
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
 type Snapshot struct {
-	Buttons         []Button               `json:"buttons"`
-	Leaderboard     []LeaderboardEntry     `json:"leaderboard"`
-	Boss            *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
-	BossLoot        []BossLootEntry        `json:"bossLoot"`
-	LatestAnnouncement *Announcement       `json:"latestAnnouncement,omitempty"`
+	Buttons            []Button               `json:"buttons"`
+	Leaderboard        []LeaderboardEntry     `json:"leaderboard"`
+	Boss               *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard    []BossLeaderboardEntry `json:"bossLeaderboard"`
+	BossLoot           []BossLootEntry        `json:"bossLoot"`
+	LatestAnnouncement *Announcement          `json:"latestAnnouncement,omitempty"`
+}
+
+// UserState 个人实时状态，只推送给对应昵称的连接
+type UserState struct {
+	UserStats   *UserStats      `json:"userStats,omitempty"`
+	MyBossStats *BossUserStats  `json:"myBossStats,omitempty"`
+	Inventory   []InventoryItem `json:"inventory"`
+	Loadout     Loadout         `json:"loadout"`
+	CombatStats CombatStats     `json:"combatStats"`
+	LastReward  *Reward         `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
 type State struct {
-	Buttons         []Button               `json:"buttons"`
-	Leaderboard     []LeaderboardEntry     `json:"leaderboard"`
-	UserStats       *UserStats             `json:"userStats,omitempty"`
-	Boss            *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard"`
-	BossLoot        []BossLootEntry        `json:"bossLoot"`
-	LatestAnnouncement *Announcement       `json:"latestAnnouncement,omitempty"`
-	MyBossStats     *BossUserStats         `json:"myBossStats,omitempty"`
-	Inventory       []InventoryItem        `json:"inventory"`
-	Loadout         Loadout                `json:"loadout"`
-	CombatStats     CombatStats            `json:"combatStats"`
-	LastReward      *Reward                `json:"lastReward,omitempty"`
+	Buttons            []Button               `json:"buttons"`
+	Leaderboard        []LeaderboardEntry     `json:"leaderboard"`
+	UserStats          *UserStats             `json:"userStats,omitempty"`
+	Boss               *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard    []BossLeaderboardEntry `json:"bossLeaderboard"`
+	BossLoot           []BossLootEntry        `json:"bossLoot"`
+	LatestAnnouncement *Announcement          `json:"latestAnnouncement,omitempty"`
+	MyBossStats        *BossUserStats         `json:"myBossStats,omitempty"`
+	Inventory          []InventoryItem        `json:"inventory"`
+	Loadout            Loadout                `json:"loadout"`
+	CombatStats        CombatStats            `json:"combatStats"`
+	LastReward         *Reward                `json:"lastReward,omitempty"`
 }
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
@@ -211,6 +221,28 @@ type ClickResult struct {
 	BossLeaderboard []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
 	MyBossStats     *BossUserStats         `json:"myBossStats,omitempty"`
 	LastReward      *Reward                `json:"lastReward,omitempty"`
+}
+
+// StateChangeType 实时状态变更类型
+type StateChangeType string
+
+const (
+	StateChangeButtonClicked        StateChangeType = "button_clicked"
+	StateChangeEquipmentChanged     StateChangeType = "equipment_changed"
+	StateChangeBossChanged          StateChangeType = "boss_changed"
+	StateChangeAnnouncementChanged  StateChangeType = "announcement_changed"
+	StateChangeMessageCreated       StateChangeType = "message_created"
+	StateChangeMessageDeleted       StateChangeType = "message_deleted"
+	StateChangeButtonMetaChanged    StateChangeType = "button_meta_changed"
+	StateChangeEquipmentMetaChanged StateChangeType = "equipment_meta_changed"
+)
+
+// StateChange 描述一次需要推送到实时层的状态变化
+type StateChange struct {
+	Type             StateChangeType `json:"type"`
+	Nickname         string          `json:"nickname,omitempty"`
+	BroadcastUserAll bool            `json:"broadcastUserAll,omitempty"`
+	Timestamp        int64           `json:"timestamp"`
 }
 
 // StoreOptions 暴击机制配置
@@ -231,6 +263,9 @@ type Store struct {
 	client             redis.UniversalClient
 	prefix             string
 	namespace          string
+	buttonIndexKey     string
+	equipmentIndexKey  string
+	playerIndexKey     string
 	userPrefix         string
 	leaderboardKey     string
 	bossCurrentKey     string
@@ -249,6 +284,8 @@ type Store struct {
 	upgradePrefix      string
 	fallbacks          map[string]buttonFallback
 	critical           StoreOptions
+	luaRunner          luaScriptRunner
+	bossClickScript    *cachedLuaScript
 	roll               func(int) int
 	validator          interface{ Validate(string) error }
 }
@@ -266,11 +303,15 @@ var hashFields = []string{
 // NewStore 创建 Redis 投票存储实例
 func NewStore(client redis.UniversalClient, prefix string, options StoreOptions, validator interface{ Validate(string) error }) *Store {
 	namespace := deriveNamespace(prefix)
+	luaCache := newLuaScriptCache()
 
 	return &Store{
 		client:             client,
 		prefix:             prefix,
 		namespace:          namespace,
+		buttonIndexKey:     namespace + "buttons:index",
+		equipmentIndexKey:  namespace + "equipment:index",
+		playerIndexKey:     namespace + "players:index",
 		userPrefix:         namespace + "user:",
 		leaderboardKey:     namespace + "leaderboard",
 		bossCurrentKey:     namespace + "boss:current",
@@ -294,6 +335,10 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 			},
 		},
 		critical: options,
+		luaRunner: redisLuaRunner{
+			client: client,
+		},
+		bossClickScript: newCachedLuaScript("boss-click", bossClickLuaSource, luaCache),
 		roll: func(limit int) int {
 			return rand.IntN(limit)
 		},
@@ -359,77 +404,85 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 		return State{}, err
 	}
 
-	state := State{
-		Buttons:            snapshot.Buttons,
-		Leaderboard:        snapshot.Leaderboard,
-		Boss:               snapshot.Boss,
-		BossLeaderboard:    snapshot.BossLeaderboard,
-		BossLoot:           snapshot.BossLoot,
-		LatestAnnouncement: snapshot.LatestAnnouncement,
-		Inventory:          []InventoryItem{},
-		Loadout:            Loadout{},
-		CombatStats:        s.baseCombatStats(),
+	userState, err := s.GetUserState(ctx, nickname)
+	if err != nil {
+		return State{}, err
+	}
+
+	return ComposeState(snapshot, userState), nil
+}
+
+// GetUserState 获取仅与指定用户相关的状态。
+func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, error) {
+	userState := UserState{
+		Inventory:   []InventoryItem{},
+		Loadout:     Loadout{},
+		CombatStats: s.baseCombatStats(),
 	}
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
 	if !hasNickname {
-		return state, nil
+		return userState, nil
 	}
 
 	normalizedNickname, err := s.validatedNickname(trimmedNickname)
 	if err != nil {
-		return State{}, err
+		return UserState{}, err
 	}
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
 	if err != nil {
-		return State{}, err
+		return UserState{}, err
 	}
-	state.UserStats = &userStats
+	userState.UserStats = &userStats
 
 	quantities, err := s.inventoryQuantities(ctx, normalizedNickname)
 	if err != nil {
-		return State{}, err
+		return UserState{}, err
 	}
 
 	loadout, equipped, err := s.loadoutForNickname(ctx, normalizedNickname, quantities)
 	if err != nil {
-		return State{}, err
+		return UserState{}, err
 	}
-	state.Loadout = loadout
+	userState.Loadout = loadout
 
 	inventory, err := s.inventoryForNickname(ctx, normalizedNickname, quantities, equipped)
 	if err != nil {
-		return State{}, err
+		return UserState{}, err
 	}
-	state.Inventory = inventory
+	userState.Inventory = inventory
 
 	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
 	if err != nil {
-		return State{}, err
+		return UserState{}, err
 	}
-	state.CombatStats = combatStats
+	userState.CombatStats = combatStats
 
 	lastReward, err := s.lastRewardForNickname(ctx, normalizedNickname)
 	if err != nil {
-		return State{}, err
+		return UserState{}, err
 	}
-	state.LastReward = lastReward
+	userState.LastReward = lastReward
 
-	if state.Boss != nil {
-		myBossStats, err := s.bossStatsForNickname(ctx, state.Boss.ID, normalizedNickname)
+	boss, err := s.currentBoss(ctx)
+	if err != nil {
+		return UserState{}, err
+	}
+	if boss != nil {
+		myBossStats, err := s.bossStatsForNickname(ctx, boss.ID, normalizedNickname)
 		if err != nil {
-			return State{}, err
+			return UserState{}, err
 		}
-		state.MyBossStats = myBossStats
+		userState.MyBossStats = myBossStats
 	}
 
-	return state, nil
+	return userState, nil
 }
 
 // ListButtons 扫描 Redis，过滤禁用按钮，按排序权重返回
 func (s *Store) ListButtons(ctx context.Context) ([]Button, error) {
-	keys, err := s.scanKeys(ctx)
+	keys, err := s.listButtonKeys(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -513,21 +566,31 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 			return ClickResult{}, err
 		}
 	} else {
-		result, err = s.applyBossClick(ctx, redisKey, normalizedNickname, delta, critical)
+		result, err = s.applyBossClick(ctx, current, boss, normalizedNickname, delta, critical)
 		if err != nil {
 			return ClickResult{}, err
 		}
 	}
 
-	state, err := s.GetState(ctx, normalizedNickname)
+	if result.Boss != nil {
+		leaderboard, err := s.ListBossLeaderboard(ctx, result.Boss.ID, 10)
+		if err != nil {
+			return ClickResult{}, err
+		}
+		result.BossLeaderboard = leaderboard
+
+		myBossStats, err := s.bossStatsForNickname(ctx, result.Boss.ID, normalizedNickname)
+		if err != nil {
+			return ClickResult{}, err
+		}
+		result.MyBossStats = myBossStats
+	}
+
+	lastReward, err := s.lastRewardForNickname(ctx, normalizedNickname)
 	if err != nil {
 		return ClickResult{}, err
 	}
-
-	result.Boss = state.Boss
-	result.BossLeaderboard = state.BossLeaderboard
-	result.MyBossStats = state.MyBossStats
-	result.LastReward = state.LastReward
+	result.LastReward = lastReward
 
 	return result, nil
 }
@@ -560,7 +623,14 @@ func (s *Store) EquipItem(ctx context.Context, nickname string, itemID string) (
 		return State{}, ErrEquipmentNotOwned
 	}
 
-	if err := s.client.HSet(ctx, s.loadoutKey(normalizedNickname), definition.Slot, itemID).Err(); err != nil {
+	now := time.Now().Unix()
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.loadoutKey(normalizedNickname), definition.Slot, itemID)
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: normalizedNickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
 		return State{}, err
 	}
 
@@ -584,7 +654,14 @@ func (s *Store) UnequipItem(ctx context.Context, nickname string, itemID string)
 		return State{}, err
 	}
 
-	if err := s.client.HDel(ctx, s.loadoutKey(normalizedNickname), definition.Slot).Err(); err != nil {
+	now := time.Now().Unix()
+	pipe := s.client.TxPipeline()
+	pipe.HDel(ctx, s.loadoutKey(normalizedNickname), definition.Slot)
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: normalizedNickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
 		return State{}, err
 	}
 
@@ -629,7 +706,7 @@ func (s *Store) ListBossLeaderboard(ctx context.Context, bossID string, limit in
 
 // EnsureDefaults 在 Redis 为空时初始化默认按钮
 func (s *Store) EnsureDefaults(ctx context.Context, buttons []config.ButtonSeed) error {
-	keys, err := s.scanKeys(ctx)
+	keys, err := s.listButtonKeys(ctx)
 	if err != nil {
 		return err
 	}
@@ -652,6 +729,10 @@ func (s *Store) EnsureDefaults(ctx context.Context, buttons []config.ButtonSeed)
 			values["image_alt"] = button.ImageAlt
 		}
 		pipe.HSet(ctx, s.prefix+button.Slug, values)
+		pipe.ZAdd(ctx, s.buttonIndexKey, redis.Z{
+			Score:  float64(button.Sort),
+			Member: button.Slug,
+		})
 	}
 
 	_, err = pipe.Exec(ctx)
@@ -704,15 +785,38 @@ func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, e
 	}, nil
 }
 
+// ComposeState 将公共快照与个人态组合成完整状态。
+func ComposeState(snapshot Snapshot, userState UserState) State {
+	return State{
+		Buttons:            snapshot.Buttons,
+		Leaderboard:        snapshot.Leaderboard,
+		UserStats:          userState.UserStats,
+		Boss:               snapshot.Boss,
+		BossLeaderboard:    snapshot.BossLeaderboard,
+		BossLoot:           snapshot.BossLoot,
+		LatestAnnouncement: snapshot.LatestAnnouncement,
+		MyBossStats:        userState.MyBossStats,
+		Inventory:          userState.Inventory,
+		Loadout:            userState.Loadout,
+		CombatStats:        userState.CombatStats,
+		LastReward:         userState.LastReward,
+	}
+}
+
 func (s *Store) applyVoteOnlyClick(ctx context.Context, redisKey string, nickname string, delta int64, critical bool) (ClickResult, error) {
+	now := time.Now().Unix()
 	pipe := s.client.TxPipeline()
 	pipe.HIncrBy(ctx, redisKey, "count", delta)
 	userCountCmd := pipe.HIncrBy(ctx, s.userPrefix+nickname, "click_count", delta)
 	pipe.HSet(ctx, s.userPrefix+nickname, map[string]any{
 		"nickname":   nickname,
-		"updated_at": strconv.FormatInt(time.Now().Unix(), 10),
+		"updated_at": strconv.FormatInt(now, 10),
 	})
 	pipe.ZIncrBy(ctx, s.leaderboardKey, float64(delta), nickname)
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: nickname,
+	})
 
 	if _, err := pipe.Exec(ctx); err != nil {
 		return ClickResult{}, err
@@ -734,95 +838,63 @@ func (s *Store) applyVoteOnlyClick(ctx context.Context, redisKey string, nicknam
 	}, nil
 }
 
-func (s *Store) applyBossClick(ctx context.Context, redisKey string, nickname string, delta int64, critical bool) (ClickResult, error) {
-	for range 6 {
-		var result ClickResult
-		err := s.client.Watch(ctx, func(tx *redis.Tx) error {
-			boss, err := s.currentBossFromCmdable(ctx, tx)
-			if err != nil {
-				return err
-			}
-			if boss == nil || boss.Status != bossStatusActive {
-				baseResult, baseErr := s.applyVoteOnlyClick(ctx, redisKey, nickname, delta, critical)
-				if baseErr != nil {
-					return baseErr
-				}
-				result = baseResult
-				return nil
-			}
+func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
+	if boss == nil || boss.Status != bossStatusActive {
+		return s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
+	}
 
-			updatedBoss := *boss
-			updatedBoss.CurrentHP -= delta
-			if updatedBoss.CurrentHP < 0 {
-				updatedBoss.CurrentHP = 0
-			}
-			if updatedBoss.CurrentHP == 0 {
-				updatedBoss.Status = bossStatusDefeated
-				updatedBoss.DefeatedAt = time.Now().Unix()
-			}
-
-			var userCountCmd *redis.IntCmd
-			_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-				pipe.HIncrBy(ctx, redisKey, "count", delta)
-				userCountCmd = pipe.HIncrBy(ctx, s.userPrefix+nickname, "click_count", delta)
-				pipe.HSet(ctx, s.userPrefix+nickname, map[string]any{
-					"nickname":   nickname,
-					"updated_at": strconv.FormatInt(time.Now().Unix(), 10),
-				})
-				pipe.ZIncrBy(ctx, s.leaderboardKey, float64(delta), nickname)
-				pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(delta), nickname)
-				bossFields := map[string]any{
-					"id":         updatedBoss.ID,
-					"name":       updatedBoss.Name,
-					"status":     updatedBoss.Status,
-					"max_hp":     strconv.FormatInt(updatedBoss.MaxHP, 10),
-					"current_hp": strconv.FormatInt(updatedBoss.CurrentHP, 10),
-				}
-				if boss.StartedAt != 0 {
-					bossFields["started_at"] = strconv.FormatInt(boss.StartedAt, 10)
-				}
-				if updatedBoss.DefeatedAt != 0 {
-					bossFields["defeated_at"] = strconv.FormatInt(updatedBoss.DefeatedAt, 10)
-				}
-				pipe.HSet(ctx, s.bossCurrentKey, bossFields)
-				return nil
-			})
-			if err != nil {
-				return err
-			}
-
-			updatedValues, err := s.client.HMGet(ctx, redisKey, hashFields...).Result()
-			if err != nil {
-				return err
-			}
-
-			result = ClickResult{
-				Button:   s.normalizeButton(redisKey, updatedValues),
-				Delta:    delta,
-				Critical: critical,
-				UserStats: UserStats{
-					Nickname:   nickname,
-					ClickCount: userCountCmd.Val(),
-				},
-				Boss: &updatedBoss,
-			}
-			return nil
-		}, s.bossCurrentKey)
-		if err == nil {
-			if result.Boss != nil && result.Boss.Status == bossStatusDefeated {
-				if finalizeErr := s.finalizeBossKill(ctx, result.Boss); finalizeErr != nil {
-					return ClickResult{}, finalizeErr
-				}
-			}
-			return result, nil
-		}
-		if errors.Is(err, redis.TxFailedErr) {
-			continue
-		}
+	now := time.Now().Unix()
+	scriptResult, err := s.bossClickScript.Run(ctx, s.luaRunner, []string{
+		current.RedisKey,
+		s.userPrefix + nickname,
+		s.leaderboardKey,
+		s.playerIndexKey,
+		s.bossCurrentKey,
+		s.bossDamageKey(boss.ID),
+	}, delta, nickname, now, boss.ID, now)
+	if err != nil {
 		return ClickResult{}, err
 	}
 
-	return ClickResult{}, redis.TxFailedErr
+	values, ok := scriptResult.([]any)
+	if !ok || len(values) < 3 {
+		return ClickResult{}, fmt.Errorf("unexpected boss click script result: %T", scriptResult)
+	}
+
+	button := current
+	button.Count = int64Value(values, 1)
+
+	result := ClickResult{
+		Button:   button,
+		Delta:    delta,
+		Critical: critical,
+		UserStats: UserStats{
+			Nickname:   nickname,
+			ClickCount: int64Value(values, 2),
+		},
+	}
+
+	if int64Value(values, 0) == 0 {
+		return result, nil
+	}
+
+	result.Boss = &Boss{
+		ID:         stringValue(values, 3),
+		Name:       stringValue(values, 4),
+		Status:     stringValue(values, 5),
+		MaxHP:      int64Value(values, 6),
+		CurrentHP:  int64Value(values, 7),
+		StartedAt:  int64FromString(stringValue(values, 8)),
+		DefeatedAt: int64FromString(stringValue(values, 9)),
+	}
+
+	if result.Boss.Status == bossStatusDefeated {
+		if finalizeErr := s.finalizeBossKill(ctx, result.Boss); finalizeErr != nil {
+			return ClickResult{}, finalizeErr
+		}
+	}
+
+	return result, nil
 }
 
 func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) error {
@@ -1274,6 +1346,203 @@ func (s *Store) scanKeys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
+func (s *Store) listButtonKeys(ctx context.Context) ([]string, error) {
+	slugs, err := s.client.ZRange(ctx, s.buttonIndexKey, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(slugs) > 0 {
+		keys := make([]string, 0, len(slugs))
+		for _, slug := range slugs {
+			slug = strings.TrimSpace(slug)
+			if slug == "" {
+				continue
+			}
+			keys = append(keys, s.prefix+slug)
+		}
+		return keys, nil
+	}
+
+	keys, err := s.scanKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(keys) == 0 {
+		return []string{}, nil
+	}
+	if err := s.rebuildButtonIndex(ctx, keys); err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
+func (s *Store) rebuildButtonIndex(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	pipe := s.client.Pipeline()
+	cmds := make([]*redis.SliceCmd, len(keys))
+	for index, key := range keys {
+		cmds[index] = pipe.HMGet(ctx, key, "sort")
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return err
+	}
+
+	entries := make([]redis.Z, 0, len(keys))
+	for index, key := range keys {
+		slug := strings.TrimSpace(strings.TrimPrefix(key, s.prefix))
+		if slug == "" {
+			continue
+		}
+		entries = append(entries, redis.Z{
+			Score:  float64(int64Value(cmds[index].Val(), 0)),
+			Member: slug,
+		})
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+
+	return s.client.ZAdd(ctx, s.buttonIndexKey, entries...).Err()
+}
+
+// SyncButtonIndex 将直接写入 Redis 的按钮补进显式索引，供低频兜底扫描使用。
+func (s *Store) SyncButtonIndex(ctx context.Context) (bool, error) {
+	keys, err := s.scanKeys(ctx)
+	if err != nil {
+		return false, err
+	}
+	if len(keys) == 0 {
+		return false, nil
+	}
+
+	indexedSlugs, err := s.client.ZRange(ctx, s.buttonIndexKey, 0, -1).Result()
+	if err != nil {
+		return false, err
+	}
+	indexed := make(map[string]struct{}, len(indexedSlugs))
+	for _, slug := range indexedSlugs {
+		indexed[strings.TrimSpace(slug)] = struct{}{}
+	}
+
+	missingKeys := make([]string, 0)
+	for _, key := range keys {
+		slug := strings.TrimSpace(strings.TrimPrefix(key, s.prefix))
+		if slug == "" {
+			continue
+		}
+		if _, ok := indexed[slug]; ok {
+			continue
+		}
+		missingKeys = append(missingKeys, key)
+	}
+	if len(missingKeys) == 0 {
+		return false, nil
+	}
+
+	if err := s.rebuildButtonIndex(ctx, missingKeys); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (s *Store) listEquipmentIDs(ctx context.Context) ([]string, error) {
+	itemIDs, err := s.client.SMembers(ctx, s.equipmentIndexKey).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(itemIDs) > 0 {
+		return itemIDs, nil
+	}
+
+	keys, err := s.scanByPrefix(ctx, s.equipmentDefPrefix)
+	if err != nil {
+		return nil, err
+	}
+	if len(keys) == 0 {
+		return []string{}, nil
+	}
+
+	itemIDs = make([]string, 0, len(keys))
+	for _, key := range keys {
+		itemID := strings.TrimSpace(strings.TrimPrefix(key, s.equipmentDefPrefix))
+		if itemID == "" {
+			continue
+		}
+		itemIDs = append(itemIDs, itemID)
+	}
+	if len(itemIDs) == 0 {
+		return []string{}, nil
+	}
+	if err := s.client.SAdd(ctx, s.equipmentIndexKey, toAnySlice(itemIDs)...).Err(); err != nil {
+		return nil, err
+	}
+
+	return itemIDs, nil
+}
+
+func (s *Store) listPlayerNicknames(ctx context.Context) ([]string, error) {
+	nicknames, err := s.client.ZRevRange(ctx, s.playerIndexKey, 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(nicknames) > 0 {
+		return nicknames, nil
+	}
+
+	keys, err := s.scanByPrefix(ctx, s.userPrefix)
+	if err != nil {
+		return nil, err
+	}
+	if len(keys) == 0 {
+		return []string{}, nil
+	}
+
+	type playerEntry struct {
+		nickname  string
+		updatedAt int64
+	}
+
+	entries := make([]playerEntry, 0, len(keys))
+	for _, key := range keys {
+		nickname := strings.TrimSpace(strings.TrimPrefix(key, s.userPrefix))
+		if nickname == "" {
+			continue
+		}
+		values, err := s.client.HMGet(ctx, key, "updated_at").Result()
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, playerEntry{
+			nickname:  nickname,
+			updatedAt: int64Value(values, 0),
+		})
+	}
+	if len(entries) == 0 {
+		return []string{}, nil
+	}
+
+	zEntries := make([]redis.Z, 0, len(entries))
+	nicknames = make([]string, 0, len(entries))
+	for _, entry := range entries {
+		nicknames = append(nicknames, entry.nickname)
+		zEntries = append(zEntries, redis.Z{
+			Score:  float64(entry.updatedAt),
+			Member: entry.nickname,
+		})
+	}
+	if len(zEntries) > 0 {
+		if err := s.client.ZAdd(ctx, s.playerIndexKey, zEntries...).Err(); err != nil {
+			return nil, err
+		}
+	}
+
+	return nicknames, nil
+}
+
 func (s *Store) validatedNickname(nickname string) (string, error) {
 	normalizedNickname, ok := normalizeNickname(nickname)
 	if !ok {
@@ -1339,6 +1608,11 @@ func deriveNamespace(prefix string) string {
 	}
 
 	return prefix
+}
+
+// RealtimeEventChannel 返回当前命名空间对应的 Redis 实时事件通道名。
+func RealtimeEventChannel(prefix string) string {
+	return deriveNamespace(prefix) + "events"
 }
 
 // normalizeNickname 规范化昵称（去除首尾空格）
@@ -1410,4 +1684,12 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func toAnySlice(values []string) []any {
+	items := make([]any, 0, len(values))
+	for _, value := range values {
+		items = append(items, value)
+	}
+	return items
 }

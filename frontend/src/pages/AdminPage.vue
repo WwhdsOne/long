@@ -26,12 +26,14 @@ const announcementForm = ref(emptyAnnouncementForm())
 const lootRows = ref([{ itemId: '', weight: '' }])
 
 const adminState = ref(emptyAdminState())
+const playerPage = ref(emptyPlayerPage())
 const bossHistory = ref([])
 const loadingHistory = ref(false)
 const announcements = ref([])
 const loadingAnnouncements = ref(false)
 const messagePage = ref(emptyMessagePage())
 const loadingMessages = ref(false)
+const loadingPlayers = ref(false)
 const uploadingImage = ref(false)
 
 const hasBoss = computed(() => Boolean(adminState.value.boss))
@@ -46,7 +48,8 @@ function emptyAdminState() {
     bossLeaderboard: [],
     equipment: [],
     loot: [],
-    players: [],
+    playerCount: 0,
+    recentPlayerCount: 0,
   }
 }
 
@@ -77,14 +80,8 @@ function normalizeAdminState(payload) {
     bossLeaderboard: Array.isArray(payload?.bossLeaderboard) ? payload.bossLeaderboard : [],
     equipment: Array.isArray(payload?.equipment) ? payload.equipment : [],
     loot: Array.isArray(payload?.loot) ? payload.loot.map(normalizeLootEntry) : [],
-    players: Array.isArray(payload?.players)
-      ? payload.players.map((player) => ({
-          nickname: player?.nickname || '',
-          clickCount: Number(player?.clickCount ?? 0),
-          inventory: Array.isArray(player?.inventory) ? player.inventory : [],
-          loadout: normalizeLoadout(player?.loadout),
-        }))
-      : [],
+    playerCount: Number(payload?.playerCount ?? 0),
+    recentPlayerCount: Number(payload?.recentPlayerCount ?? 0),
   }
 }
 
@@ -137,6 +134,14 @@ function emptyMessagePage() {
   }
 }
 
+function emptyPlayerPage() {
+  return {
+    items: [],
+    nextCursor: '',
+    total: 0,
+  }
+}
+
 function formatItemStats(item) {
   return `点击+${item?.bonusClicks ?? 0} 暴击率+${item?.bonusCriticalChancePercent ?? 0}% 暴击+${item?.bonusCriticalCount ?? 0}`
 }
@@ -164,6 +169,21 @@ function normalizeMessagePage(payload) {
         }))
       : [],
     nextCursor: payload?.nextCursor || '',
+  }
+}
+
+function normalizePlayerPage(payload) {
+  return {
+    items: Array.isArray(payload?.items)
+      ? payload.items.map((player) => ({
+          nickname: player?.nickname || '',
+          clickCount: Number(player?.clickCount ?? 0),
+          inventory: Array.isArray(player?.inventory) ? player.inventory : [],
+          loadout: normalizeLoadout(player?.loadout),
+        }))
+      : [],
+    nextCursor: payload?.nextCursor || '',
+    total: Number(payload?.total ?? 0),
   }
 }
 
@@ -230,6 +250,35 @@ async function fetchAdminState() {
   }
 }
 
+async function fetchPlayerPage(cursor = '', append = false) {
+  loadingPlayers.value = true
+  try {
+    const query = new URLSearchParams()
+    if (cursor) {
+      query.set('cursor', cursor)
+    }
+    query.set('limit', '50')
+
+    const response = await fetch(`/api/admin/players?${query.toString()}`)
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '玩家列表加载失败'))
+    }
+
+    const nextPage = normalizePlayerPage(await response.json())
+    playerPage.value = append
+      ? {
+          items: [...playerPage.value.items, ...nextPage.items],
+          nextCursor: nextPage.nextCursor,
+          total: nextPage.total,
+        }
+      : nextPage
+  } catch (error) {
+    errorMessage.value = error.message || '玩家列表加载失败'
+  } finally {
+    loadingPlayers.value = false
+  }
+}
+
 async function fetchBossHistory() {
   loadingHistory.value = true
   try {
@@ -288,7 +337,7 @@ async function checkSession() {
     authenticated.value = response.ok
     if (response.ok) {
       await fetchAdminState()
-      await Promise.all([fetchAnnouncements(), fetchMessages()])
+      await Promise.all([fetchAnnouncements(), fetchMessages(), fetchPlayerPage()])
     } else {
       checkingSession.value = false
     }
@@ -317,6 +366,7 @@ async function login() {
     authenticated.value = true
     setSuccess('后台已解锁。')
     await fetchAdminState()
+    await fetchPlayerPage()
   } catch (error) {
     errorMessage.value = error.message || '登录失败'
   } finally {
@@ -328,6 +378,7 @@ async function logout() {
   await fetch('/api/admin/logout', { method: 'POST' })
   authenticated.value = false
   adminState.value = emptyAdminState()
+  playerPage.value = emptyPlayerPage()
   bossHistory.value = []
   announcements.value = []
   messagePage.value = emptyMessagePage()
@@ -758,7 +809,7 @@ onMounted(() => {
         </div>
 
         <div class="admin-toolbar__actions">
-          <button class="nickname-form__ghost" type="button" @click="fetchAdminState">
+          <button class="nickname-form__ghost" type="button" @click="Promise.all([fetchAdminState(), fetchPlayerPage()])">
             刷新数据
           </button>
           <button class="nickname-form__ghost" type="button" @click="logout">
@@ -1100,11 +1151,18 @@ onMounted(() => {
             <section class="social-card">
               <div class="social-card__head">
                 <p class="vote-stage__eyebrow">玩家概览</p>
-                <strong>{{ adminState.players.length }} 人</strong>
+                <strong>{{ adminState.playerCount }} 人</strong>
               </div>
 
-              <ul class="inventory-list">
-                <li v-for="player in adminState.players" :key="player.nickname" class="inventory-item inventory-item--stacked">
+              <p class="social-card__copy">
+                最近 24 小时活跃 {{ adminState.recentPlayerCount }} 人
+              </p>
+
+              <div v-if="loadingPlayers" class="feedback-panel">
+                <p>玩家列表加载中...</p>
+              </div>
+              <ul v-else class="inventory-list">
+                <li v-for="player in playerPage.items" :key="player.nickname" class="inventory-item inventory-item--stacked">
                   <div>
                     <strong>{{ player.nickname }}</strong>
                     <p>累计点击 {{ player.clickCount }} · 背包 {{ player.inventory.length }} 件</p>
@@ -1117,6 +1175,16 @@ onMounted(() => {
                   </div>
                 </li>
               </ul>
+
+              <button
+                v-if="playerPage.nextCursor"
+                class="nickname-form__ghost"
+                type="button"
+                :disabled="loadingPlayers"
+                @click="fetchPlayerPage(playerPage.nextCursor, true)"
+              >
+                加载更多玩家
+              </button>
             </section>
           </div>
         </div>

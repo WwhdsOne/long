@@ -76,6 +76,78 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 	}
 }
 
+func TestListButtonsPrefersExplicitIndexWhenPresent(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "3",
+		"sort":    "20",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed feel: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:button:orphan", map[string]any{
+		"label":   "孤儿按钮",
+		"count":   "9",
+		"sort":    "1",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed orphan: %v", err)
+	}
+	if err := store.client.ZAdd(ctx, "vote:buttons:index", redis.Z{
+		Score:  20,
+		Member: "feel",
+	}).Err(); err != nil {
+		t.Fatalf("seed button index: %v", err)
+	}
+
+	buttons, err := store.ListButtons(ctx)
+	if err != nil {
+		t.Fatalf("list buttons: %v", err)
+	}
+
+	if len(buttons) != 1 || buttons[0].Key != "feel" {
+		t.Fatalf("expected only indexed button, got %+v", buttons)
+	}
+}
+
+func TestSyncButtonIndexFindsButtonsAddedOutsideSupportedWritePath(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.EnsureDefaults(ctx, config.DefaultButtons); err != nil {
+		t.Fatalf("seed defaults: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:button:custom", map[string]any{
+		"label":   "自定义",
+		"count":   "0",
+		"sort":    "40",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed custom button directly: %v", err)
+	}
+
+	changed, err := store.SyncButtonIndex(ctx)
+	if err != nil {
+		t.Fatalf("sync button index: %v", err)
+	}
+	if !changed {
+		t.Fatal("expected sync to detect new custom button")
+	}
+
+	buttons, err := store.ListButtons(ctx)
+	if err != nil {
+		t.Fatalf("list buttons after sync: %v", err)
+	}
+	if len(buttons) != 4 || buttons[3].Key != "custom" {
+		t.Fatalf("expected custom button to appear after sync, got %+v", buttons)
+	}
+}
+
 func TestClickButtonUsesNormalCountAndAppliesFallbackImage(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -340,6 +412,35 @@ func TestClickButtonRejectsSensitiveNickname(t *testing.T) {
 	}
 }
 
+func TestClickButtonAddsPlayerToExplicitIndex(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 99 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+
+	if _, err := store.ClickButton(ctx, "feel", "阿明"); err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	members, err := store.client.ZRange(ctx, "vote:players:index", 0, -1).Result()
+	if err != nil {
+		t.Fatalf("load players index: %v", err)
+	}
+	if len(members) != 1 || members[0] != "阿明" {
+		t.Fatalf("expected 阿明 in players index, got %+v", members)
+	}
+}
+
 func TestGetStateRejectsSensitiveNickname(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -376,13 +477,13 @@ func TestEnsureDefaultsSeedsOnlyWhenNoButtonsExist(t *testing.T) {
 		t.Fatalf("expected 3 buttons, got %d", len(buttons))
 	}
 
-	if err := store.client.HSet(ctx, "vote:button:custom", map[string]any{
-		"label":   "自定义",
-		"count":   "0",
-		"sort":    "40",
-		"enabled": "1",
-	}).Err(); err != nil {
-		t.Fatalf("seed custom button: %v", err)
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:    "custom",
+		Label:   "自定义",
+		Sort:    40,
+		Enabled: true,
+	}); err != nil {
+		t.Fatalf("save custom button: %v", err)
 	}
 
 	if err := store.EnsureDefaults(ctx, []config.ButtonSeed{
@@ -591,5 +692,72 @@ func TestGetAdminStateReturnsEmptyCollectionsWithoutBoss(t *testing.T) {
 	}
 	if state.Loot == nil {
 		t.Fatalf("expected empty loot slice, got nil")
+	}
+}
+
+func TestListEquipmentDefinitionsPrefersExplicitIndexWhenPresent(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
+		"name":         "木剑",
+		"slot":         "weapon",
+		"bonus_clicks": "2",
+	}).Err(); err != nil {
+		t.Fatalf("seed indexed equipment: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:orphan", map[string]any{
+		"name":         "孤儿装备",
+		"slot":         "weapon",
+		"bonus_clicks": "9",
+	}).Err(); err != nil {
+		t.Fatalf("seed orphan equipment: %v", err)
+	}
+	if err := store.client.SAdd(ctx, "vote:equipment:index", "wood-sword").Err(); err != nil {
+		t.Fatalf("seed equipment index: %v", err)
+	}
+
+	items, err := store.ListEquipmentDefinitions(ctx)
+	if err != nil {
+		t.Fatalf("list equipment definitions: %v", err)
+	}
+
+	if len(items) != 1 || items[0].ItemID != "wood-sword" {
+		t.Fatalf("expected only indexed equipment, got %+v", items)
+	}
+}
+
+func TestListPlayerOverviewsPrefersExplicitIndexWhenPresent(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:user:阿明", map[string]any{
+		"nickname":    "阿明",
+		"click_count": "5",
+	}).Err(); err != nil {
+		t.Fatalf("seed indexed player: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:user:小红", map[string]any{
+		"nickname":    "小红",
+		"click_count": "9",
+	}).Err(); err != nil {
+		t.Fatalf("seed orphan player: %v", err)
+	}
+	if err := store.client.ZAdd(ctx, "vote:players:index", redis.Z{
+		Score:  1710000000,
+		Member: "阿明",
+	}).Err(); err != nil {
+		t.Fatalf("seed players index: %v", err)
+	}
+
+	players, err := store.ListPlayerOverviews(ctx)
+	if err != nil {
+		t.Fatalf("list player overviews: %v", err)
+	}
+
+	if len(players) != 1 || players[0].Nickname != "阿明" {
+		t.Fatalf("expected only indexed player, got %+v", players)
 	}
 }

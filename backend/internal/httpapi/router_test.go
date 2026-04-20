@@ -17,6 +17,8 @@ type mockStore struct {
 	state       vote.State
 	equipState  vote.State
 	adminState  vote.AdminState
+	adminPlayerPage vote.AdminPlayerPage
+	adminPlayer *vote.AdminPlayerOverview
 	bossHistory []vote.BossHistoryEntry
 	announcements []vote.Announcement
 	latestAnnouncement *vote.Announcement
@@ -48,6 +50,28 @@ func (m *mockStore) GetSnapshot(_ context.Context) (vote.Snapshot, error) {
 		Buttons:     m.state.Buttons,
 		Leaderboard: m.state.Leaderboard,
 	}, nil
+}
+
+func (m *mockStore) GetUserState(_ context.Context, nickname string) (vote.UserState, error) {
+	if m.getStateErr != nil {
+		return vote.UserState{}, m.getStateErr
+	}
+	userState := vote.UserState{
+		Inventory:   []vote.InventoryItem{},
+		Loadout:     vote.Loadout{},
+		CombatStats: vote.CombatStats{},
+	}
+	if nickname == "" {
+		return userState, nil
+	}
+
+	userState.UserStats = m.state.UserStats
+	userState.MyBossStats = m.state.MyBossStats
+	userState.Inventory = m.state.Inventory
+	userState.Loadout = m.state.Loadout
+	userState.CombatStats = m.state.CombatStats
+	userState.LastReward = m.state.LastReward
+	return userState, nil
 }
 
 func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
@@ -107,6 +131,14 @@ func (m *mockStore) UnequipItem(_ context.Context, _ string, _ string) (vote.Sta
 
 func (m *mockStore) GetAdminState(_ context.Context) (vote.AdminState, error) {
 	return m.adminState, nil
+}
+
+func (m *mockStore) ListAdminPlayers(_ context.Context, _ string, _ int64) (vote.AdminPlayerPage, error) {
+	return m.adminPlayerPage, nil
+}
+
+func (m *mockStore) GetAdminPlayer(_ context.Context, _ string) (*vote.AdminPlayerOverview, error) {
+	return m.adminPlayer, nil
 }
 
 func (m *mockStore) SaveButton(_ context.Context, button vote.ButtonUpsert) error {
@@ -212,6 +244,15 @@ type mockBroadcaster struct {
 
 func (m *mockBroadcaster) BroadcastSnapshot(snapshot vote.Snapshot) error {
 	m.snapshots = append(m.snapshots, snapshot)
+	return nil
+}
+
+type mockChangePublisher struct {
+	changes []vote.StateChange
+}
+
+func (m *mockChangePublisher) PublishChange(_ context.Context, change vote.StateChange) error {
+	m.changes = append(m.changes, change)
 	return nil
 }
 
@@ -371,7 +412,7 @@ func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 	}
 }
 
-func TestClickButtonBroadcastsLatestSnapshot(t *testing.T) {
+func TestClickButtonDoesNotUseLegacySnapshotBroadcast(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
 			Buttons: []vote.Button{
@@ -428,8 +469,8 @@ func TestClickButtonBroadcastsLatestSnapshot(t *testing.T) {
 		t.Fatalf("expected user stats for 阿明, got %+v", payload.UserStats)
 	}
 
-	if len(broadcaster.snapshots) != 1 || broadcaster.snapshots[0].Buttons[0].Count != 3 {
-		t.Fatalf("unexpected broadcast payload: %+v", broadcaster.snapshots)
+	if len(broadcaster.snapshots) != 0 {
+		t.Fatalf("expected no legacy snapshot broadcast, got %+v", broadcaster.snapshots)
 	}
 }
 
@@ -494,6 +535,69 @@ func TestClickButtonReturnsCriticalMetadata(t *testing.T) {
 
 	if payload.Delta != 5 || !payload.Critical {
 		t.Fatalf("expected critical payload, got delta=%d critical=%v", payload.Delta, payload.Critical)
+	}
+}
+
+func TestClickButtonPublishesStateChangeWithoutRefetchingState(t *testing.T) {
+	store := &mockStore{
+		getStateErr: context.DeadlineExceeded,
+		result: vote.ClickResult{
+			Button: vote.Button{
+				Key:      "feel",
+				RedisKey: "vote:button:feel",
+				Label:    "有感觉吗",
+				Count:    5,
+				Sort:     10,
+				Enabled:  true,
+			},
+			Delta:    1,
+			Critical: false,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 5,
+			},
+		},
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 4, Sort: 10, Enabled: true},
+			},
+		},
+	}
+	changePublisher := &mockChangePublisher{}
+
+	handler := NewHandler(Options{
+		Store:           store,
+		Broadcaster:     &mockBroadcaster{},
+		ChangePublisher: changePublisher,
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload struct {
+		Button    vote.Button    `json:"button"`
+		Delta     int64          `json:"delta"`
+		Critical  bool           `json:"critical"`
+		UserStats vote.UserStats `json:"userStats"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Button.Count != 5 || payload.UserStats.ClickCount != 5 {
+		t.Fatalf("unexpected click payload: %+v", payload)
+	}
+	if len(changePublisher.changes) != 1 {
+		t.Fatalf("expected one published change, got %+v", changePublisher.changes)
+	}
+	if changePublisher.changes[0].Type != vote.StateChangeButtonClicked || changePublisher.changes[0].Nickname != "阿明" {
+		t.Fatalf("unexpected published change: %+v", changePublisher.changes[0])
 	}
 }
 
@@ -765,6 +869,62 @@ func TestAdminActivateBossAndSaveButton(t *testing.T) {
 	}
 	if store.lastButton.Slug != "new-one" || store.lastButton.Label != "新按钮" {
 		t.Fatalf("expected button payload to be forwarded, got %+v", store.lastButton)
+	}
+}
+
+func TestAdminPlayersPageRequiresAuthAndReturnsPayload(t *testing.T) {
+	store := &mockStore{
+		adminPlayerPage: vote.AdminPlayerPage{
+			Items: []vote.AdminPlayerOverview{
+				{Nickname: "阿明", ClickCount: 12},
+			},
+			NextCursor: "1",
+			Total:      3,
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	unauthorizedRequest := httptest.NewRequest(http.MethodGet, "/api/admin/players", nil)
+	unauthorizedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedResponse, unauthorizedRequest)
+	if unauthorizedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without session, got %d", unauthorizedResponse.Code)
+	}
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie from login")
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/players?cursor=0&limit=1", nil)
+	request.AddCookie(cookies[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload vote.AdminPlayerPage
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Total != 3 || payload.NextCursor != "1" || len(payload.Items) != 1 || payload.Items[0].Nickname != "阿明" {
+		t.Fatalf("unexpected admin player page payload: %+v", payload)
 	}
 }
 

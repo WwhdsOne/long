@@ -75,7 +75,7 @@ type Config struct {
 	Admin              AdminConfig
 	OSS                OSSConfig
 	RedisPrefix        string
-	ButtonPollInterval time.Duration
+	ButtonPollInterval time.Duration // 低频兜底按钮索引同步间隔
 	PublicDir          string
 }
 
