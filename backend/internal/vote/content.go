@@ -22,6 +22,7 @@ type equipmentUpgrade struct {
 	BonusClicks                int64
 	BonusCriticalChancePercent int
 	BonusCriticalCount         int64
+	ReforgePityCounter         int
 }
 
 // GetLatestAnnouncement 返回最新生效公告。
@@ -355,6 +356,7 @@ func (s *Store) getEquipmentUpgrade(ctx context.Context, nickname string, itemID
 		BonusClicks:                int64FromString(values["bonus_clicks"]),
 		BonusCriticalChancePercent: int(int64FromString(values["bonus_critical_chance_percent"])),
 		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
+		ReforgePityCounter:         int(int64FromString(values["reforge_pity_counter"])),
 	}, nil
 }
 
@@ -365,6 +367,7 @@ func (s *Store) buildInventoryItem(definition EquipmentDefinition, upgrade equip
 		Slot:                       definition.Slot,
 		Quantity:                   quantity,
 		StarLevel:                  upgrade.StarLevel,
+		ReforgePityCounter:         upgrade.ReforgePityCounter,
 		BonusClicks:                definition.BonusClicks + upgrade.BonusClicks,
 		BonusCriticalChancePercent: definition.BonusCriticalChancePercent + upgrade.BonusCriticalChancePercent,
 		BonusCriticalCount:         definition.BonusCriticalCount + upgrade.BonusCriticalCount,
@@ -378,6 +381,7 @@ func unknownInventoryItem(itemID string, upgrade equipmentUpgrade, quantity int6
 		Name:                       displayItemName(itemID, upgrade.StarLevel),
 		Quantity:                   quantity,
 		StarLevel:                  upgrade.StarLevel,
+		ReforgePityCounter:         upgrade.ReforgePityCounter,
 		BonusClicks:                upgrade.BonusClicks,
 		BonusCriticalChancePercent: upgrade.BonusCriticalChancePercent,
 		BonusCriticalCount:         upgrade.BonusCriticalCount,

@@ -2,8 +2,8 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -16,6 +16,8 @@ import (
 	ossupload "long/internal/oss"
 	"long/internal/ratelimit"
 	"long/internal/vote"
+
+	"github.com/bytedance/sonic"
 )
 
 // ButtonStore 投票存储接口，HTTP 层所需的最小契约
@@ -28,8 +30,14 @@ type ButtonStore interface {
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
 	SynthesizeItem(context.Context, string, string) (vote.State, error)
+	SalvageEquipment(context.Context, string, string, int64) (vote.State, error)
+	ReforgeEquipment(context.Context, string, string) (vote.State, error)
 	EquipHero(context.Context, string, string) (vote.State, error)
 	UnequipHero(context.Context, string, string) (vote.State, error)
+	SalvageHero(context.Context, string, string, int64) (vote.State, error)
+	AwakenHero(context.Context, string, string) (vote.State, error)
+	PurchaseCosmetic(context.Context, string, string) (vote.State, error)
+	EquipCosmetics(context.Context, string, string, string) (vote.State, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	ListAdminPlayers(context.Context, string, int64) (vote.AdminPlayerPage, error)
 	GetAdminPlayer(context.Context, string) (*vote.AdminPlayerOverview, error)
@@ -124,6 +132,24 @@ func NewHandler(options Options) http.Handler {
 		writeJSON(w, http.StatusOK, state)
 	})
 
+	apiMux.HandleFunc("GET /api/shop", func(w http.ResponseWriter, r *http.Request) {
+		state, err := stateView.GetState(r.Context(), r.URL.Query().Get("nickname"))
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "SHOP_FETCH_FAILED"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"gems":              state.Gems,
+			"ownedCosmetics":    state.OwnedCosmetics,
+			"equippedCosmetics": state.EquippedCosmetics,
+			"shopCatalog":       state.ShopCatalog,
+		})
+	})
+
 	apiMux.HandleFunc("GET /api/boss/history", func(w http.ResponseWriter, r *http.Request) {
 		history, err := options.Store.ListBossHistory(r.Context())
 		if err != nil {
@@ -166,7 +192,8 @@ func NewHandler(options Options) http.Handler {
 			Nickname string `json:"nickname"`
 			Content  string `json:"content"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 			return
 		}
@@ -192,7 +219,8 @@ func NewHandler(options Options) http.Handler {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error":   "INVALID_REQUEST",
 				"message": "昵称没有带上，先报个名再试试。",
@@ -216,7 +244,8 @@ func NewHandler(options Options) http.Handler {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error":   "INVALID_REQUEST",
 				"message": "昵称没有带上，先报个名再开点。",
@@ -289,7 +318,8 @@ func NewHandler(options Options) http.Handler {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error":   "INVALID_REQUEST",
 				"message": "昵称没有带上，先报个名再穿装备。",
@@ -330,7 +360,8 @@ func NewHandler(options Options) http.Handler {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error":   "INVALID_REQUEST",
 				"message": "昵称没有带上，先报个名再卸装备。",
@@ -364,7 +395,8 @@ func NewHandler(options Options) http.Handler {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error":   "INVALID_REQUEST",
 				"message": "昵称没有带上，先报个名再升星。",
@@ -404,12 +436,106 @@ func NewHandler(options Options) http.Handler {
 		writeJSON(w, http.StatusOK, state)
 	})
 
+	apiMux.HandleFunc("POST /api/equipment/{itemId}/salvage", func(w http.ResponseWriter, r *http.Request) {
+		itemID := r.PathValue("itemId")
+		var body struct {
+			Nickname string `json:"nickname"`
+			Quantity int64  `json:"quantity"`
+		}
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称和分解数量都得带上。",
+			})
+			return
+		}
+
+		state, err := options.Store.SalvageEquipment(r.Context(), body.Nickname, itemID, body.Quantity)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrEquipmentNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+			case errors.Is(err, vote.ErrInvalidQuantity):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "INVALID_QUANTITY",
+					"message": "分解数量至少要填 1。",
+				})
+			case errors.Is(err, vote.ErrEquipmentNotOwned), errors.Is(err, vote.ErrEquipmentNotEnough):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_ENOUGH",
+					"message": "当前只能分解多出来的装备，穿戴中的那一件必须留着。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SALVAGE_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/equipment/{itemId}/reforge", func(w http.ResponseWriter, r *http.Request) {
+		itemID := r.PathValue("itemId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再强化。",
+			})
+			return
+		}
+
+		state, err := options.Store.ReforgeEquipment(r.Context(), body.Nickname, itemID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrEquipmentNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+			case errors.Is(err, vote.ErrEquipmentNotOwned):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_OWNED",
+					"message": "这件装备还不在你的背包里。",
+				})
+			case errors.Is(err, vote.ErrGemsNotEnough):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "GEMS_NOT_ENOUGH",
+					"message": "原石不够，先去分解点重复装备吧。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_REFORGE_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
 	apiMux.HandleFunc("POST /api/heroes/{heroId}/equip", func(w http.ResponseWriter, r *http.Request) {
 		heroID := r.PathValue("heroId")
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error":   "INVALID_REQUEST",
 				"message": "昵称没有带上，先报个名再派出英雄。",
@@ -449,7 +575,8 @@ func NewHandler(options Options) http.Handler {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{
 				"error":   "INVALID_REQUEST",
 				"message": "昵称没有带上，先报个名再收回英雄。",
@@ -479,13 +606,195 @@ func NewHandler(options Options) http.Handler {
 		writeJSON(w, http.StatusOK, state)
 	})
 
+	apiMux.HandleFunc("POST /api/heroes/{heroId}/salvage", func(w http.ResponseWriter, r *http.Request) {
+		heroID := r.PathValue("heroId")
+		var body struct {
+			Nickname string `json:"nickname"`
+			Quantity int64  `json:"quantity"`
+		}
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称和分解数量都得带上。",
+			})
+			return
+		}
+
+		state, err := options.Store.SalvageHero(r.Context(), body.Nickname, heroID, body.Quantity)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrHeroNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "HERO_NOT_FOUND"})
+			case errors.Is(err, vote.ErrInvalidQuantity):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "INVALID_QUANTITY",
+					"message": "分解数量至少要填 1。",
+				})
+			case errors.Is(err, vote.ErrHeroNotOwned), errors.Is(err, vote.ErrHeroNotEnough):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "HERO_NOT_ENOUGH",
+					"message": "当前只能分解重复英雄，出战中的最后一位必须保留。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "HERO_SALVAGE_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/heroes/{heroId}/awaken", func(w http.ResponseWriter, r *http.Request) {
+		heroID := r.PathValue("heroId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再觉醒。",
+			})
+			return
+		}
+
+		state, err := options.Store.AwakenHero(r.Context(), body.Nickname, heroID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrHeroNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "HERO_NOT_FOUND"})
+			case errors.Is(err, vote.ErrHeroNotOwned):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "HERO_NOT_OWNED",
+					"message": "这位小小英雄还没加入你的队伍。",
+				})
+			case errors.Is(err, vote.ErrGemsNotEnough):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "GEMS_NOT_ENOUGH",
+					"message": "原石不够，先去分解点重复英雄吧。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "HERO_AWAKEN_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/shop/cosmetics/{cosmeticId}/purchase", func(w http.ResponseWriter, r *http.Request) {
+		cosmeticID := r.PathValue("cosmeticId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再买外观。",
+			})
+			return
+		}
+
+		state, err := options.Store.PurchaseCosmetic(r.Context(), body.Nickname, cosmeticID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrCosmeticNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "COSMETIC_NOT_FOUND"})
+			case errors.Is(err, vote.ErrCosmeticAlreadyOwned):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "COSMETIC_ALREADY_OWNED",
+					"message": "这件外观已经在你的衣柜里了。",
+				})
+			case errors.Is(err, vote.ErrGemsNotEnough):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "GEMS_NOT_ENOUGH",
+					"message": "原石不够，先去分解重复资源吧。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "COSMETIC_PURCHASE_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/shop/cosmetics/equip", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Nickname string `json:"nickname"`
+			TrailID  string `json:"trailId"`
+			ImpactID string `json:"impactId"`
+		}
+		data, _ := io.ReadAll(r.Body)
+		if err := sonic.Unmarshal(data, &body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称和外观槽位都得带上。",
+			})
+			return
+		}
+
+		state, err := options.Store.EquipCosmetics(r.Context(), body.Nickname, body.TrailID, body.ImpactID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrCosmeticNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "COSMETIC_NOT_FOUND"})
+			case errors.Is(err, vote.ErrCosmeticNotOwned), errors.Is(err, vote.ErrInvalidCosmeticLoadout):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "COSMETIC_EQUIP_FAILED",
+					"message": "只能装备已经拥有、且槽位匹配的外观。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "COSMETIC_EQUIP_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
 	if options.AdminAuthenticator != nil {
 		apiMux.HandleFunc("POST /api/admin/login", func(w http.ResponseWriter, r *http.Request) {
 			var body struct {
 				Username string `json:"username"`
 				Password string `json:"password"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -596,7 +905,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.BossUpsert
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -644,7 +954,8 @@ func NewHandler(options Options) http.Handler {
 				BossID string               `json:"bossId"`
 				Loot   []vote.BossLootEntry `json:"loot"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -669,7 +980,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.BossTemplateUpsert
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -689,7 +1001,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.BossTemplateUpsert
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -728,7 +1041,8 @@ func NewHandler(options Options) http.Handler {
 			var body struct {
 				Loot []vote.BossLootEntry `json:"loot"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -750,7 +1064,8 @@ func NewHandler(options Options) http.Handler {
 			var body struct {
 				Loot []vote.BossHeroLootEntry `json:"loot"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -846,7 +1161,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.AnnouncementUpsert
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -942,7 +1258,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.ButtonUpsert
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -966,7 +1283,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.ButtonUpsert
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -991,7 +1309,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.EquipmentDefinition
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -1016,7 +1335,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.HeroDefinition
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -1041,7 +1361,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.HeroDefinition
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -1086,7 +1407,8 @@ func NewHandler(options Options) http.Handler {
 			}
 
 			var body vote.EquipmentDefinition
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			data, _ := io.ReadAll(r.Body)
+			if err := sonic.Unmarshal(data, &body); err != nil {
 				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
 				return
 			}
@@ -1165,9 +1487,10 @@ func NewHandler(options Options) http.Handler {
 
 // writeJSON keeps API responses consistent across handlers.
 func writeJSON(w http.ResponseWriter, status int, payload any) {
+	data, _ := sonic.Marshal(payload)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	_, _ = w.Write(data)
 }
 
 func writeNicknameError(w http.ResponseWriter, err error) bool {

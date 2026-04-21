@@ -217,12 +217,16 @@ func (s *Store) activeHeroForNickname(ctx context.Context, nickname string, quan
 		}
 		return nil, err
 	}
+	upgrade, err := s.getHeroUpgrade(ctx, nickname, heroID)
+	if err != nil {
+		return nil, err
+	}
 
-	item := buildHeroInventoryItem(definition, quantities[heroID], true)
+	item := buildHeroInventoryItem(definition, upgrade, quantities[heroID], true)
 	return &item, nil
 }
 
-func (s *Store) heroInventoryForNickname(ctx context.Context, _ string, quantities map[string]int64, activeHero *HeroInventoryItem) ([]HeroInventoryItem, error) {
+func (s *Store) heroInventoryForNickname(ctx context.Context, nickname string, quantities map[string]int64, activeHero *HeroInventoryItem) ([]HeroInventoryItem, error) {
 	if len(quantities) == 0 {
 		return []HeroInventoryItem{}, nil
 	}
@@ -236,7 +240,11 @@ func (s *Store) heroInventoryForNickname(ctx context.Context, _ string, quantiti
 			}
 			return nil, err
 		}
-		items = append(items, buildHeroInventoryItem(definition, quantity, activeHero != nil && activeHero.HeroID == heroID))
+		upgrade, err := s.getHeroUpgrade(ctx, nickname, heroID)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, buildHeroInventoryItem(definition, upgrade, quantity, activeHero != nil && activeHero.HeroID == heroID))
 	}
 
 	slices.SortFunc(items, func(left, right HeroInventoryItem) int {
@@ -249,7 +257,7 @@ func (s *Store) heroInventoryForNickname(ctx context.Context, _ string, quantiti
 	return items, nil
 }
 
-func buildHeroInventoryItem(definition HeroDefinition, quantity int64, active bool) HeroInventoryItem {
+func buildHeroInventoryItem(definition HeroDefinition, upgrade heroUpgrade, quantity int64, active bool) HeroInventoryItem {
 	return HeroInventoryItem{
 		HeroID:                     definition.HeroID,
 		Name:                       definition.Name,
@@ -257,11 +265,13 @@ func buildHeroInventoryItem(definition HeroDefinition, quantity int64, active bo
 		ImageAlt:                   definition.ImageAlt,
 		Quantity:                   quantity,
 		Active:                     active,
-		BonusClicks:                definition.BonusClicks,
-		BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
-		BonusCriticalCount:         definition.BonusCriticalCount,
+		AwakenLevel:                upgrade.AwakenLevel,
+		PityCounter:                upgrade.PityCounter,
+		BonusClicks:                definition.BonusClicks + upgrade.BonusClicks,
+		BonusCriticalChancePercent: definition.BonusCriticalChancePercent + upgrade.BonusCriticalChancePercent,
+		BonusCriticalCount:         definition.BonusCriticalCount + upgrade.BonusCriticalCount,
 		TraitType:                  definition.TraitType,
-		TraitValue:                 definition.TraitValue,
+		TraitValue:                 definition.TraitValue + upgrade.TraitValue,
 	}
 }
 

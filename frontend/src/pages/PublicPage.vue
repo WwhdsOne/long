@@ -4,10 +4,23 @@ import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 import {AUTO_CLICK_INTERVAL_MS, createAutoClickLoop} from '../utils/autoClicker'
 import {mergeBossState} from '../utils/bossState'
 import {collectButtonTags, filterAndSortButtons, formatDropRate} from '../utils/buttonBoard'
+import {
+  buildCosmeticCollections,
+  canEquipCosmeticSelection,
+  cosmeticStatusText,
+  createEmptyCosmeticLoadout,
+  normalizeCosmeticLoadout,
+  resolveCosmeticEffectConfig,
+  salvageableCount,
+  summarizeEquippedCosmetics,
+} from '../utils/cosmetics'
+import {buildPityProgress} from '../utils/progressionView'
 
 const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const AUTO_CLICK_RATE_LABEL = `每秒约 ${Math.round(1000 / AUTO_CLICK_INTERVAL_MS)} 次`
+const EQUIPMENT_REFORGE_COST = 20
+const HERO_AWAKEN_COST = 25
 
 const buttons = ref([])
 const leaderboard = ref([])
@@ -57,11 +70,19 @@ const messageDraft = ref('')
 const messageError = ref('')
 const autoClickEnabled = ref(false)
 const autoClickTargetKey = ref('')
+const gems = ref(0)
+const ownedCosmetics = ref([])
+const equippedCosmetics = ref(createEmptyCosmeticLoadout())
+const cosmeticDraft = ref(createEmptyCosmeticLoadout())
+const shopCatalog = ref([])
+const lastForgeResult = ref(null)
+const cosmeticBursts = ref({})
 
 let eventSource
 let autoClickLoop
 let starlightTimer = 0
 const burstTimers = new Map()
+const cosmeticTimers = new Map()
 
 const buttonCount = computed(() => buttons.value.length)
 const totalVotes = computed(() =>
@@ -139,6 +160,24 @@ const bossProgress = computed(() => {
 })
 const equippedItems = computed(() => [loadout.value.weapon, loadout.value.armor, loadout.value.accessory].filter(Boolean))
 const heroCount = computed(() => heroes.value.length)
+const cosmeticCollections = computed(() => buildCosmeticCollections(shopCatalog.value))
+const selectedCosmeticLoadout = computed(() => normalizeCosmeticLoadout(cosmeticDraft.value))
+const selectedCosmeticSummary = computed(() =>
+  summarizeEquippedCosmetics(shopCatalog.value, selectedCosmeticLoadout.value),
+)
+const equippedCosmeticSummary = computed(() =>
+  summarizeEquippedCosmetics(shopCatalog.value, equippedCosmetics.value),
+)
+const canApplyCosmeticSelection = computed(() =>
+  isLoggedIn.value && canEquipCosmeticSelection(shopCatalog.value, selectedCosmeticLoadout.value),
+)
+const previewEffectConfig = computed(() =>
+  resolveCosmeticEffectConfig(shopCatalog.value, selectedCosmeticLoadout.value, {
+    mode: 'normal',
+    starlight: false,
+  }),
+)
+const previewDots = computed(() => dotIndexes(previewEffectConfig.value.particleCount || 6))
 const displayedRecentRewards = computed(() => {
   if (Array.isArray(recentRewards.value) && recentRewards.value.length > 0) {
     return recentRewards.value
@@ -299,6 +338,34 @@ function formatTime(timestamp) {
 
 function canSynthesize(item) {
   return Boolean(isLoggedIn.value && item && item.quantity >= 3)
+}
+
+function pityProgress(counter) {
+  return buildPityProgress(counter, 30)
+}
+
+function salvageableEquipmentCount(item) {
+  return salvageableCount(item)
+}
+
+function salvageableHeroCount(hero) {
+  return salvageableCount(hero, hero?.active)
+}
+
+function dotIndexes(count) {
+  const normalized = Math.max(0, Math.min(Number(count) || 0, 6))
+  return Array.from({length: normalized}, (_, index) => index)
+}
+
+function cosmeticModeClasses(effect) {
+  return {
+    'cosmetic-mode--auto': effect?.mode === 'auto',
+    'cosmetic-mode--suppressed': Boolean(effect?.suppressed),
+  }
+}
+
+function syncCosmeticDraft(loadout) {
+  cosmeticDraft.value = normalizeCosmeticLoadout(loadout)
 }
 
 async function readErrorMessage(response, fallback) {
@@ -555,6 +622,22 @@ function applyUserState(payload) {
   if ('combatStats' in payload) {
     combatStats.value = payload.combatStats ?? defaultCombatStats()
   }
+  if ('gems' in payload) {
+    gems.value = Number(payload.gems ?? 0)
+  }
+  if ('ownedCosmetics' in payload) {
+    ownedCosmetics.value = Array.isArray(payload.ownedCosmetics) ? payload.ownedCosmetics : []
+  }
+  if ('equippedCosmetics' in payload) {
+    equippedCosmetics.value = normalizeCosmeticLoadout(payload.equippedCosmetics)
+    syncCosmeticDraft(payload.equippedCosmetics)
+  }
+  if ('lastForgeResult' in payload) {
+    lastForgeResult.value = payload.lastForgeResult ?? null
+  }
+  if ('shopCatalog' in payload) {
+    shopCatalog.value = Array.isArray(payload.shopCatalog) ? payload.shopCatalog : []
+  }
   if ('recentRewards' in payload) {
     recentRewards.value = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
   }
@@ -628,10 +711,53 @@ function triggerCriticalBurst(key, delta) {
   }
 
   burstTimers.set(
-      key,
-      window.setTimeout(() => {
-        clearCriticalBurst(key)
-      }, 1600),
+    key,
+    window.setTimeout(() => {
+      clearCriticalBurst(key)
+    }, 1600),
+  )
+}
+
+function clearCosmeticBurst(key) {
+  const timer = cosmeticTimers.get(key)
+  if (timer) {
+    window.clearTimeout(timer)
+    cosmeticTimers.delete(key)
+  }
+
+  if (!cosmeticBursts.value[key]) {
+    return
+  }
+
+  const nextBursts = {...cosmeticBursts.value}
+  delete nextBursts[key]
+  cosmeticBursts.value = nextBursts
+}
+
+function triggerCosmeticBurst(key, options = {}) {
+  const effect = resolveCosmeticEffectConfig(shopCatalog.value, equippedCosmetics.value, {
+    mode: options.mode === 'auto' ? 'auto' : 'normal',
+    starlight: isStarlightButton(key),
+  })
+  if (!effect.trailTheme && !effect.impactTheme) {
+    return
+  }
+
+  clearCosmeticBurst(key)
+  cosmeticBursts.value = {
+    ...cosmeticBursts.value,
+    [key]: {
+      ...effect,
+      nonce: `${key}-${Date.now()}`,
+      dots: dotIndexes(effect.particleCount),
+    },
+  }
+
+  cosmeticTimers.set(
+    key,
+    window.setTimeout(() => {
+      clearCosmeticBurst(key)
+    }, Number(effect.durationMs || 900) + 240),
   )
 }
 
@@ -736,6 +862,7 @@ async function clickButton(key, options = {}) {
     if (data.critical) {
       triggerCriticalBurst(key, data.delta)
     }
+    triggerCosmeticBurst(key, {mode: options.source})
     const restored = new Set(pendingKeys.value)
     restored.delete(key)
     pendingKeys.value = restored
@@ -750,7 +877,7 @@ async function clickButton(key, options = {}) {
   }
 }
 
-async function postEquipmentAction(itemId, action) {
+async function postEquipmentAction(itemId, action, extraBody = {}) {
   if (!nickname.value || !itemId) {
     return
   }
@@ -766,6 +893,7 @@ async function postEquipmentAction(itemId, action) {
       },
       body: JSON.stringify({
         nickname: nickname.value,
+        ...extraBody,
       }),
     })
 
@@ -782,7 +910,7 @@ async function postEquipmentAction(itemId, action) {
   }
 }
 
-async function postHeroAction(heroId, action) {
+async function postHeroAction(heroId, action, extraBody = {}) {
   if (!nickname.value || !heroId) {
     return
   }
@@ -798,6 +926,7 @@ async function postHeroAction(heroId, action) {
       },
       body: JSON.stringify({
         nickname: nickname.value,
+        ...extraBody,
       }),
     })
 
@@ -809,6 +938,119 @@ async function postHeroAction(heroId, action) {
     applyState(data)
   } catch (error) {
     errorMessage.value = error.message || '英雄操作失败，请稍后重试。'
+  } finally {
+    actioningItemId.value = ''
+  }
+}
+
+async function salvageEquipment(item) {
+  const quantity = salvageableEquipmentCount(item)
+  if (!quantity) {
+    return
+  }
+
+  await postEquipmentAction(item.itemId, 'salvage', {quantity})
+}
+
+async function reforgeEquipment(item) {
+  await postEquipmentAction(item.itemId, 'reforge')
+}
+
+async function salvageHero(hero) {
+  const quantity = salvageableHeroCount(hero)
+  if (!quantity) {
+    return
+  }
+
+  await postHeroAction(hero.heroId, 'salvage', {quantity})
+}
+
+async function awakenHero(hero) {
+  await postHeroAction(hero.heroId, 'awaken')
+}
+
+async function purchaseCosmetic(item) {
+  if (!nickname.value || !item?.cosmeticId) {
+    return
+  }
+
+  actioningItemId.value = item.cosmeticId
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`/api/shop/cosmetics/${encodeURIComponent(item.cosmeticId)}/purchase`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nickname: nickname.value,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '外观购买失败，请稍后重试。'))
+    }
+
+    const data = await response.json()
+    applyState(data)
+  } catch (error) {
+    errorMessage.value = error.message || '外观购买失败，请稍后重试。'
+  } finally {
+    actioningItemId.value = ''
+  }
+}
+
+function selectCosmeticItem(item) {
+  if (!item?.owned) {
+    return
+  }
+
+  if (item.type === 'trail') {
+    cosmeticDraft.value = {
+      ...selectedCosmeticLoadout.value,
+      trailId: item.cosmeticId,
+    }
+    return
+  }
+
+  if (item.type === 'impact') {
+    cosmeticDraft.value = {
+      ...selectedCosmeticLoadout.value,
+      impactId: item.cosmeticId,
+    }
+  }
+}
+
+async function equipSelectedCosmetics() {
+  if (!nickname.value || !canApplyCosmeticSelection.value) {
+    return
+  }
+
+  actioningItemId.value = 'cosmetic-loadout'
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch('/api/shop/cosmetics/equip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nickname: nickname.value,
+        trailId: selectedCosmeticLoadout.value.trailId,
+        impactId: selectedCosmeticLoadout.value.impactId,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '外观装备失败，请稍后重试。'))
+    }
+
+    const data = await response.json()
+    applyState(data)
+  } catch (error) {
+    errorMessage.value = error.message || '外观装备失败，请稍后重试。'
   } finally {
     actioningItemId.value = ''
   }
@@ -908,6 +1150,12 @@ async function resetNickname() {
   activeHero.value = null
   loadout.value = emptyLoadout()
   combatStats.value = defaultCombatStats()
+  gems.value = 0
+  ownedCosmetics.value = []
+  equippedCosmetics.value = createEmptyCosmeticLoadout()
+  syncCosmeticDraft(createEmptyCosmeticLoadout())
+  shopCatalog.value = []
+  lastForgeResult.value = null
   myBossStats.value = null
   bossLoot.value = []
   bossHeroLoot.value = []
@@ -942,6 +1190,8 @@ onBeforeUnmount(() => {
   clearStarlightTimer()
   burstTimers.forEach((timer) => window.clearTimeout(timer))
   burstTimers.clear()
+  cosmeticTimers.forEach((timer) => window.clearTimeout(timer))
+  cosmeticTimers.clear()
 })
 </script>
 
@@ -1201,6 +1451,22 @@ onBeforeUnmount(() => {
             </button>
             <button
                 class="player-hud__tab"
+                :class="{ 'player-hud__tab--active': activeHudTab === 'forge' }"
+                type="button"
+                @click="selectHudTab('forge')"
+            >
+              强化
+            </button>
+            <button
+                class="player-hud__tab"
+                :class="{ 'player-hud__tab--active': activeHudTab === 'shop' }"
+                type="button"
+                @click="selectHudTab('shop')"
+            >
+              商店
+            </button>
+            <button
+                class="player-hud__tab"
                 :class="{ 'player-hud__tab--active': activeHudTab === 'info' }"
                 type="button"
                 @click="selectHudTab('info')"
@@ -1239,6 +1505,7 @@ onBeforeUnmount(() => {
                         <span class="inventory-item__chip">星级:{{
                             item.starLevel ? `+${item.starLevel}` : '未升星'
                           }}</span>
+                        <span class="inventory-item__chip">可分解:{{ salvageableEquipmentCount(item) }}</span>
                       </div>
                     </div>
                   </div>
@@ -1405,6 +1672,8 @@ onBeforeUnmount(() => {
                       <div class="inventory-item__meta">
                         <span class="inventory-item__chip">库存:{{ hero.quantity }}</span>
                         <span class="inventory-item__chip">{{ hero.active ? '出战中' : '待命中' }}</span>
+                        <span class="inventory-item__chip">觉醒:{{ hero.awakenLevel || 0 }}</span>
+                        <span class="inventory-item__chip">可分解:{{ salvageableHeroCount(hero) }}</span>
                       </div>
                     </div>
                   </div>
@@ -1435,6 +1704,301 @@ onBeforeUnmount(() => {
                   </div>
                 </li>
               </ul>
+            </section>
+
+            <section v-else-if="activeHudTab === 'forge'" class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">原石强化</p>
+                <strong>{{ gems }} 原石</strong>
+              </div>
+
+              <div class="forge-grid">
+                <article class="forge-summary">
+                  <span>当前余额</span>
+                  <strong>{{ gems }} 原石</strong>
+                  <p>重复装备和重复英雄都可以分解成原石，再投入强化和觉醒。</p>
+                </article>
+                <article class="forge-summary">
+                  <span>本期价格</span>
+                  <strong>强化 {{ EQUIPMENT_REFORGE_COST }} · 觉醒 {{ HERO_AWAKEN_COST }}</strong>
+                  <p>装备走强化，英雄走觉醒；两边都共用 31 次大奖保底。</p>
+                </article>
+              </div>
+
+              <article
+                  v-if="lastForgeResult"
+                  class="forge-result"
+                  :class="{ 'forge-result--jackpot': lastForgeResult.jackpot }"
+              >
+                <span>{{ lastForgeResult.kind }}</span>
+                <strong>{{ lastForgeResult.targetName || lastForgeResult.targetId }}</strong>
+                <p class="player-hud__note">
+                  {{ lastForgeResult.rewardSummary }} · 原石 {{ lastForgeResult.gemsDelta > 0 ? '+' : '' }}{{ lastForgeResult.gemsDelta }} · 余额 {{ lastForgeResult.remainingGems }}
+                </p>
+              </article>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>装备强化</span>
+                  <strong>{{ inventory.length }} 件</strong>
+                </div>
+                <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
+                  <p>背包里还没有装备，先去打 Boss 再回来强化。</p>
+                </div>
+                <ul v-else class="forge-action-list">
+                  <li v-for="item in inventory" :key="`forge-${item.itemId}`">
+                    <div class="forge-action-list__copy">
+                      <strong>{{ item.name }}</strong>
+                      <div class="forge-action-list__meta">
+                        <span>可分解 {{ salvageableEquipmentCount(item) }} 件</span>
+                        <span>强化保底 {{ pityProgress(item.reforgePityCounter).label }}</span>
+                        <span>每次 {{ EQUIPMENT_REFORGE_COST }} 原石</span>
+                      </div>
+                      <div class="boss-stage__bar boss-stage__bar--compact">
+                        <span
+                            class="boss-stage__bar-fill"
+                            :style="{ width: `${pityProgress(item.reforgePityCounter).percent}%` }"
+                        ></span>
+                      </div>
+                    </div>
+                    <div class="inventory-item__actions">
+                      <button
+                          class="nickname-form__ghost"
+                          type="button"
+                          :disabled="!isLoggedIn || !salvageableEquipmentCount(item) || actioningItemId === item.itemId"
+                          @click="salvageEquipment(item)"
+                      >
+                        分解 x{{ salvageableEquipmentCount(item) }}
+                      </button>
+                      <button
+                          class="inventory-item__action"
+                          type="button"
+                          :disabled="!isLoggedIn || gems < EQUIPMENT_REFORGE_COST || actioningItemId === item.itemId"
+                          @click="reforgeEquipment(item)"
+                      >
+                        强化
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>英雄觉醒</span>
+                  <strong>{{ heroCount }} 位</strong>
+                </div>
+                <div v-if="heroes.length === 0" class="leaderboard-list leaderboard-list--empty">
+                  <p>你还没有招募到英雄，先去 Boss 池碰碰运气。</p>
+                </div>
+                <ul v-else class="forge-action-list">
+                  <li v-for="hero in heroes" :key="`awaken-${hero.heroId}`">
+                    <div class="forge-action-list__copy">
+                      <strong>{{ hero.name }}</strong>
+                      <div class="forge-action-list__meta">
+                        <span>可分解 {{ salvageableHeroCount(hero) }} 个</span>
+                        <span>觉醒 {{ hero.awakenLevel || 0 }} 层</span>
+                        <span>保底 {{ pityProgress(hero.pityCounter).label }}</span>
+                        <span>每次 {{ HERO_AWAKEN_COST }} 原石</span>
+                      </div>
+                      <div class="boss-stage__bar boss-stage__bar--compact">
+                        <span
+                            class="boss-stage__bar-fill"
+                            :style="{ width: `${pityProgress(hero.pityCounter).percent}%` }"
+                        ></span>
+                      </div>
+                    </div>
+                    <div class="inventory-item__actions">
+                      <button
+                          class="nickname-form__ghost"
+                          type="button"
+                          :disabled="!isLoggedIn || !salvageableHeroCount(hero) || actioningItemId === hero.heroId"
+                          @click="salvageHero(hero)"
+                      >
+                        分解 x{{ salvageableHeroCount(hero) }}
+                      </button>
+                      <button
+                          class="inventory-item__action"
+                          type="button"
+                          :disabled="!isLoggedIn || gems < HERO_AWAKEN_COST || actioningItemId === hero.heroId"
+                          @click="awakenHero(hero)"
+                      >
+                        觉醒
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+            </section>
+
+            <section v-else-if="activeHudTab === 'shop'" class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">外观商店</p>
+                <strong>{{ gems }} 原石</strong>
+              </div>
+
+              <div class="forge-grid">
+                <article class="forge-summary">
+                  <span>已拥有外观</span>
+                  <strong>{{ ownedCosmetics.length }} 件</strong>
+                  <p>一期只卖轨迹和点击特效，全部拆件售卖，不碰任何数值。</p>
+                </article>
+                <article class="forge-summary">
+                  <span>当前装备</span>
+                  <strong>{{ equippedCosmeticSummary.trailName }} / {{ equippedCosmeticSummary.impactName }}</strong>
+                  <p>轨迹和点击特效可以自由混搭，星光按钮上会自动降透明度。</p>
+                </article>
+              </div>
+
+              <section class="cosmetic-preview">
+                <div class="player-hud__mini-head">
+                  <span>试衣预览</span>
+                  <strong>{{ selectedCosmeticSummary.trailName }} / {{ selectedCosmeticSummary.impactName }}</strong>
+                </div>
+                <div class="cosmetic-preview__stage">
+                  <div class="cosmetic-preview__copy">
+                    <span>仅自己可见</span>
+                    <strong>普通点击、挂机点击和星光按钮都会自动切换到对应表现。</strong>
+                    <p>星光态会压制外观亮度，避免和系统提示抢焦点。</p>
+                  </div>
+                  <span
+                      v-if="previewEffectConfig.trailTheme"
+                      class="cosmetic-preview__trail"
+                      :class="[previewEffectConfig.trailClass, cosmeticModeClasses(previewEffectConfig)]"
+                  ></span>
+                  <span
+                      v-if="previewEffectConfig.impactTheme"
+                      class="cosmetic-preview__impact"
+                      :class="[previewEffectConfig.impactClass, cosmeticModeClasses(previewEffectConfig)]"
+                  >
+                    <span
+                        v-for="dot in previewDots"
+                        :key="`preview-${dot}`"
+                        class="cosmetic-preview__dot"
+                    ></span>
+                  </span>
+                </div>
+                <div class="cosmetic-preview__actions">
+                  <button
+                      class="inventory-item__action"
+                      type="button"
+                      :disabled="!canApplyCosmeticSelection || actioningItemId === 'cosmetic-loadout'"
+                      @click="equipSelectedCosmetics"
+                  >
+                    应用当前搭配
+                  </button>
+                  <button
+                      class="nickname-form__ghost"
+                      type="button"
+                      :disabled="actioningItemId === 'cosmetic-loadout'"
+                      @click="syncCosmeticDraft(equippedCosmetics)"
+                  >
+                    恢复已装备
+                  </button>
+                  <button
+                      class="nickname-form__ghost"
+                      type="button"
+                      :disabled="actioningItemId === 'cosmetic-loadout'"
+                      @click="syncCosmeticDraft(createEmptyCosmeticLoadout())"
+                  >
+                    清空搭配
+                  </button>
+                </div>
+              </section>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>轨迹</span>
+                  <strong>{{ cosmeticCollections.trails.length }} 件</strong>
+                </div>
+                <ul class="shop-grid">
+                  <li
+                      v-for="item in cosmeticCollections.trails"
+                      :key="item.cosmeticId"
+                      class="shop-card"
+                      :class="{
+                        'shop-card--owned': item.owned,
+                        'shop-card--equipped': item.equipped,
+                        'shop-card--selected': selectedCosmeticLoadout.trailId === item.cosmeticId,
+                      }"
+                  >
+                    <div class="shop-card__preview" :class="`cosmetic-theme--${item.preview?.theme || 'ribbon'}`">
+                      <span class="shop-card__preview-mark"></span>
+                    </div>
+                    <div>
+                      <strong>{{ item.name }}</strong>
+                      <p>{{ item.rarity }} · 轨迹 · {{ cosmeticStatusText(item) }}</p>
+                    </div>
+                    <div class="inventory-item__actions">
+                      <button
+                          v-if="!item.owned"
+                          class="inventory-item__action"
+                          type="button"
+                          :disabled="!isLoggedIn || gems < item.price || actioningItemId === item.cosmeticId"
+                          @click="purchaseCosmetic(item)"
+                      >
+                        购买
+                      </button>
+                      <button
+                          v-else
+                          class="nickname-form__ghost"
+                          type="button"
+                          :disabled="!isLoggedIn"
+                          @click="selectCosmeticItem(item)"
+                      >
+                        {{ selectedCosmeticLoadout.trailId === item.cosmeticId ? '已选中' : '选这条轨迹' }}
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>点击特效</span>
+                  <strong>{{ cosmeticCollections.impacts.length }} 件</strong>
+                </div>
+                <ul class="shop-grid">
+                  <li
+                      v-for="item in cosmeticCollections.impacts"
+                      :key="item.cosmeticId"
+                      class="shop-card"
+                      :class="{
+                        'shop-card--owned': item.owned,
+                        'shop-card--equipped': item.equipped,
+                        'shop-card--selected': selectedCosmeticLoadout.impactId === item.cosmeticId,
+                      }"
+                  >
+                    <div class="shop-card__preview" :class="`cosmetic-theme--${item.preview?.theme || 'ribbon'}`">
+                      <span class="shop-card__preview-mark"></span>
+                    </div>
+                    <div>
+                      <strong>{{ item.name }}</strong>
+                      <p>{{ item.rarity }} · 点击特效 · {{ cosmeticStatusText(item) }}</p>
+                    </div>
+                    <div class="inventory-item__actions">
+                      <button
+                          v-if="!item.owned"
+                          class="inventory-item__action"
+                          type="button"
+                          :disabled="!isLoggedIn || gems < item.price || actioningItemId === item.cosmeticId"
+                          @click="purchaseCosmetic(item)"
+                      >
+                        购买
+                      </button>
+                      <button
+                          v-else
+                          class="nickname-form__ghost"
+                          type="button"
+                          :disabled="!isLoggedIn"
+                          @click="selectCosmeticItem(item)"
+                      >
+                        {{ selectedCosmeticLoadout.impactId === item.cosmeticId ? '已选中' : '选这个特效' }}
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              </section>
             </section>
 
             <section v-else-if="activeHudTab === 'info'" class="player-hud__panel player-hud__panel--info">
@@ -1729,6 +2293,26 @@ onBeforeUnmount(() => {
                 @click="clickButton(button.key)"
             >
               <span class="vote-card__shine"></span>
+              <span
+                  v-if="cosmeticBursts[button.key]?.trailTheme"
+                  :key="`${cosmeticBursts[button.key].nonce}-trail`"
+                  class="vote-card__cosmetic vote-card__cosmetic--trail"
+                  :class="[cosmeticBursts[button.key].trailClass, cosmeticModeClasses(cosmeticBursts[button.key])]"
+                  :style="{ animationDuration: `${cosmeticBursts[button.key].durationMs}ms` }"
+              ></span>
+              <span
+                  v-if="cosmeticBursts[button.key]?.impactTheme"
+                  :key="`${cosmeticBursts[button.key].nonce}-impact`"
+                  class="vote-card__cosmetic vote-card__cosmetic--impact"
+                  :class="[cosmeticBursts[button.key].impactClass, cosmeticModeClasses(cosmeticBursts[button.key])]"
+                  :style="{ animationDuration: `${cosmeticBursts[button.key].durationMs}ms` }"
+              >
+                <span
+                    v-for="dot in cosmeticBursts[button.key].dots"
+                    :key="`${cosmeticBursts[button.key].nonce}-dot-${dot}`"
+                    class="vote-card__cosmetic-dot"
+                ></span>
+              </span>
               <span
                   v-if="criticalBursts[button.key]"
                   :key="criticalBursts[button.key].nonce"

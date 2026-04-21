@@ -2,7 +2,6 @@ package vote
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/config"
@@ -27,8 +27,15 @@ var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
 var ErrEquipmentNotEnough = errors.New("equipment not enough")
 var ErrEquipmentMaxStar = errors.New("equipment max star")
+var ErrHeroNotEnough = errors.New("hero not enough")
 var ErrHeroNotFound = errors.New("hero not found")
 var ErrHeroNotOwned = errors.New("hero not owned")
+var ErrGemsNotEnough = errors.New("gems not enough")
+var ErrCosmeticNotFound = errors.New("cosmetic not found")
+var ErrCosmeticAlreadyOwned = errors.New("cosmetic already owned")
+var ErrCosmeticNotOwned = errors.New("cosmetic not owned")
+var ErrInvalidCosmeticLoadout = errors.New("invalid cosmetic loadout")
+var ErrInvalidQuantity = errors.New("invalid quantity")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
@@ -133,6 +140,8 @@ type HeroInventoryItem struct {
 	ImageAlt                   string        `json:"imageAlt,omitempty"`
 	Quantity                   int64         `json:"quantity"`
 	Active                     bool          `json:"active"`
+	AwakenLevel                int           `json:"awakenLevel"`
+	PityCounter                int           `json:"pityCounter"`
 	BonusClicks                int64         `json:"bonusClicks"`
 	BonusCriticalChancePercent int           `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
@@ -177,6 +186,7 @@ type InventoryItem struct {
 	Slot                       string `json:"slot"`
 	Quantity                   int64  `json:"quantity"`
 	StarLevel                  int    `json:"starLevel"`
+	ReforgePityCounter         int    `json:"reforgePityCounter"`
 	BonusClicks                int64  `json:"bonusClicks"`
 	BonusCriticalChancePercent int    `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
@@ -258,15 +268,20 @@ type Snapshot struct {
 
 // UserState 个人实时状态，只推送给对应昵称的连接
 type UserState struct {
-	UserStats     *UserStats          `json:"userStats,omitempty"`
-	MyBossStats   *BossUserStats      `json:"myBossStats,omitempty"`
-	Inventory     []InventoryItem     `json:"inventory"`
-	Heroes        []HeroInventoryItem `json:"heroes"`
-	ActiveHero    *HeroInventoryItem  `json:"activeHero,omitempty"`
-	Loadout       Loadout             `json:"loadout"`
-	CombatStats   CombatStats         `json:"combatStats"`
-	RecentRewards []Reward            `json:"recentRewards,omitempty"`
-	LastReward    *Reward             `json:"lastReward,omitempty"`
+	UserStats         *UserStats            `json:"userStats,omitempty"`
+	MyBossStats       *BossUserStats        `json:"myBossStats,omitempty"`
+	Inventory         []InventoryItem       `json:"inventory"`
+	Heroes            []HeroInventoryItem   `json:"heroes"`
+	ActiveHero        *HeroInventoryItem    `json:"activeHero,omitempty"`
+	Loadout           Loadout               `json:"loadout"`
+	CombatStats       CombatStats           `json:"combatStats"`
+	Gems              int64                 `json:"gems"`
+	OwnedCosmetics    []string              `json:"ownedCosmetics"`
+	EquippedCosmetics CosmeticLoadout       `json:"equippedCosmetics"`
+	LastForgeResult   *ForgeResult          `json:"lastForgeResult,omitempty"`
+	ShopCatalog       []CosmeticCatalogItem `json:"shopCatalog"`
+	RecentRewards     []Reward              `json:"recentRewards,omitempty"`
+	LastReward        *Reward               `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -286,6 +301,11 @@ type State struct {
 	ActiveHero         *HeroInventoryItem     `json:"activeHero,omitempty"`
 	Loadout            Loadout                `json:"loadout"`
 	CombatStats        CombatStats            `json:"combatStats"`
+	Gems               int64                  `json:"gems"`
+	OwnedCosmetics     []string               `json:"ownedCosmetics"`
+	EquippedCosmetics  CosmeticLoadout        `json:"equippedCosmetics"`
+	LastForgeResult    *ForgeResult           `json:"lastForgeResult,omitempty"`
+	ShopCatalog        []CosmeticCatalogItem  `json:"shopCatalog"`
 	RecentRewards      []Reward               `json:"recentRewards,omitempty"`
 	LastReward         *Reward                `json:"lastReward,omitempty"`
 }
@@ -530,11 +550,14 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 // GetUserState 获取仅与指定用户相关的状态。
 func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, error) {
 	userState := UserState{
-		Inventory:     []InventoryItem{},
-		Heroes:        []HeroInventoryItem{},
-		Loadout:       Loadout{},
-		CombatStats:   s.baseCombatStats(),
-		RecentRewards: []Reward{},
+		Inventory:         []InventoryItem{},
+		Heroes:            []HeroInventoryItem{},
+		Loadout:           Loadout{},
+		CombatStats:       s.baseCombatStats(),
+		OwnedCosmetics:    []string{},
+		EquippedCosmetics: CosmeticLoadout{},
+		ShopCatalog:       buildShopCatalog(nil, CosmeticLoadout{}),
+		RecentRewards:     []Reward{},
 	}
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
@@ -546,6 +569,31 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	if err != nil {
 		return UserState{}, err
 	}
+
+	gems, err := s.gemsForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.Gems = gems
+
+	ownedCosmetics, ownedCosmeticsSet, err := s.ownedCosmeticsForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.OwnedCosmetics = ownedCosmetics
+
+	equippedCosmetics, err := s.cosmeticLoadoutForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.EquippedCosmetics = equippedCosmetics
+	userState.ShopCatalog = buildShopCatalog(ownedCosmeticsSet, equippedCosmetics)
+
+	lastForgeResult, err := s.lastForgeResultForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.LastForgeResult = lastForgeResult
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
 	if err != nil {
@@ -950,6 +998,11 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		ActiveHero:         userState.ActiveHero,
 		Loadout:            userState.Loadout,
 		CombatStats:        userState.CombatStats,
+		Gems:               userState.Gems,
+		OwnedCosmetics:     userState.OwnedCosmetics,
+		EquippedCosmetics:  userState.EquippedCosmetics,
+		LastForgeResult:    userState.LastForgeResult,
+		ShopCatalog:        userState.ShopCatalog,
 		RecentRewards:      userState.RecentRewards,
 		LastReward:         userState.LastReward,
 	}
@@ -1461,7 +1514,7 @@ func (s *Store) recentRewardsForNickname(ctx context.Context, nickname string) (
 
 	if raw := strings.TrimSpace(values["recent_rewards"]); raw != "" {
 		var rewards []Reward
-		if err := json.Unmarshal([]byte(raw), &rewards); err == nil {
+		if err := sonic.Unmarshal([]byte(raw), &rewards); err == nil {
 			normalized := make([]Reward, 0, len(rewards))
 			for _, reward := range rewards {
 				if strings.TrimSpace(reward.ItemID) == "" {
@@ -1501,7 +1554,7 @@ func rewardRecordValues(rewards []Reward) map[string]any {
 	}
 
 	lastReward := rewards[len(rewards)-1]
-	encoded, err := json.Marshal(rewards)
+	encoded, err := sonic.Marshal(rewards)
 	if err != nil {
 		encoded = []byte("[]")
 	}
@@ -1611,7 +1664,7 @@ func decodeStringList(raw string) []string {
 	}
 
 	var items []string
-	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+	if err := sonic.Unmarshal([]byte(raw), &items); err != nil {
 		return nil
 	}
 
@@ -1651,7 +1704,7 @@ func encodeStringList(items []string) string {
 		return "[]"
 	}
 
-	encoded, err := json.Marshal(normalized)
+	encoded, err := sonic.Marshal(normalized)
 	if err != nil {
 		return "[]"
 	}

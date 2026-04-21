@@ -11,6 +11,11 @@
 - 玩家可以穿戴装备，装备会让平时点击直接获得额外次数增量。
 - 玩家可以对同装备类型做 `3 合 1` 升星；升星不会生成新装备，而是强化该账号下这个装备类型的属性。
 - 玩家可以通过 Boss 掉落招募小小英雄；每次只允许 1 位英雄出战，英雄属性和被动会同时影响平时点击与 Boss 战。
+- 玩家可以把多余装备和重复英雄分解成 `原石`；穿戴中的最后 1 件装备、出战中的最后 1 位英雄不会被分解掉。
+- 玩家可以消耗 `20` 原石对已有装备做强化，按 `52% / 22% / 12% / 13% / 1%` 提升点击、暴击、暴击率、随机两项或大奖全加；连续 `30` 次未出大奖后第 `31` 次保底。
+- 玩家可以消耗 `25` 原石对已有英雄做觉醒，按 `36% / 22% / 15% / 14% / 12% / 1%` 提升点击、暴击、暴击率、被动、随机两项或大奖全加；同样采用 `30` 次未中后第 `31` 次保底。
+- 前台新增外观商店，一期上架 `流星彩带 / 纸片庆典 / 印章敲击 / 流萤追光` 四套外观的轨迹与点击特效拆件，全部按单件 `30` 原石售卖。
+- 外观只影响当前玩家自己的前台视觉表现，不改变按钮可点击性、Boss 伤害、掉率或任何数值结算。
 - 所有在线用户都会通过 SSE 实时收到公共态更新；已登录用户还会收到仅属于自己的个人状态更新。
 - 页面会实时展示个人累计点击和排行榜。
 - 支持单个全服世界 Boss：Boss 活动期间，同一次点击会同时记票并造成 Boss 伤害。
@@ -108,7 +113,12 @@ vote:user-hero-inventory:<nickname>
 vote:user-loadout:<nickname>
 vote:user-active-hero:<nickname>
 vote:user-last-reward:<nickname>
+vote:user-last-forge-result:<nickname>
+vote:user-gems:<nickname>
 vote:user-equip-upgrade:<nickname>:<itemId>
+vote:user-hero-upgrade:<nickname>:<heroId>
+vote:user-cosmetics:<nickname>
+vote:user-cosmetic-loadout:<nickname>
 vote:announcements
 vote:announcement:<id>
 vote:messages
@@ -192,11 +202,28 @@ vote:message:<id>
   - `item_name`
   - `granted_at`
   - `recent_rewards`：最近一次 Boss 结算奖励数组的 JSON 字符串，兼容同时掉装备和英雄
+- `vote:user-last-forge-result:<nickname>` 是 `String`
+  - value = 最近一次分解/强化/觉醒结果的 JSON 字符串
+- `vote:user-gems:<nickname>` 是 `String`
+  - value = 当前原石数量
 - `vote:user-equip-upgrade:<nickname>:<itemId>` 是 `Hash`
   - `star_level`
   - `bonus_clicks`
   - `bonus_critical_chance_percent`
   - `bonus_critical_count`
+  - `reforge_pity_counter`
+- `vote:user-hero-upgrade:<nickname>:<heroId>` 是 `Hash`
+  - `awaken_level`
+  - `bonus_clicks`
+  - `bonus_critical_chance_percent`
+  - `bonus_critical_count`
+  - `trait_value`
+  - `pity_counter`
+- `vote:user-cosmetics:<nickname>` 是 `Set`
+  - member = 已拥有外观 `cosmeticId`
+- `vote:user-cosmetic-loadout:<nickname>` 是 `Hash`
+  - `trail`
+  - `impact`
 - `vote:announcements` 是 `Sorted Set`
   - member = 公告 `id`
   - score = 公告顺序 ID（越大越新）
@@ -257,6 +284,23 @@ oss:
 ```
 
 `button_poll_interval_ms` 现在表示“按钮索引低频兜底同步间隔”，不是公共状态轮询广播间隔。推荐生产环境调大到 `60000` 左右；只有你直接手工写 Redis 新按钮、没有走后台保存接口时，它才会影响这个按钮多久能被前台看到。
+
+## 前台接口补充
+
+- `POST /api/equipment/{itemId}/salvage`
+  - 请求体：`{ "nickname": "阿明", "quantity": 2 }`
+- `POST /api/equipment/{itemId}/reforge`
+  - 请求体：`{ "nickname": "阿明" }`
+- `POST /api/heroes/{heroId}/salvage`
+  - 请求体：`{ "nickname": "阿明", "quantity": 1 }`
+- `POST /api/heroes/{heroId}/awaken`
+  - 请求体：`{ "nickname": "阿明" }`
+- `GET /api/shop`
+  - 支持可选查询参数 `nickname`
+- `POST /api/shop/cosmetics/{cosmeticId}/purchase`
+  - 请求体：`{ "nickname": "阿明" }`
+- `POST /api/shop/cosmetics/equip`
+  - 请求体：`{ "nickname": "阿明", "trailId": "trail-ribbon", "impactId": "impact-firefly" }`
 
 ## 限流规则
 
@@ -336,6 +380,12 @@ make build
 
 ```bash
 make test
+```
+
+运行前端 Vitest：
+
+```bash
+npm --prefix frontend run test
 ```
 
 如果你只想单独启动后端，也可以直接跑：

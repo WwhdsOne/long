@@ -2,11 +2,12 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/bytedance/sonic"
 
 	"long/internal/admin"
 	ossupload "long/internal/oss"
@@ -33,12 +34,23 @@ type mockStore struct {
 	lastTemplateHeroLootID string
 	lastTemplateHeroLoot   []vote.BossHeroLootEntry
 	lastCycleEnabled       bool
+	lastSalvageItemID      string
+	lastSalvageQuantity    int64
+	lastReforgeItemID      string
+	lastAwakenHeroID       string
+	lastPurchasedCosmetic  string
+	lastCosmeticLoadout    vote.CosmeticLoadout
 	getStateErr            error
 	clickErr               error
 	equipErr               error
 	validateErr            error
 	messageErr             error
 	synthesizeErr          error
+	salvageErr             error
+	reforgeErr             error
+	awakenErr              error
+	purchaseErr            error
+	cosmeticEquipErr       error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -281,8 +293,79 @@ func (m *mockStore) SynthesizeItem(_ context.Context, _ string, _ string) (vote.
 	return m.equipState, nil
 }
 
+func (m *mockStore) SalvageEquipment(_ context.Context, _ string, itemID string, quantity int64) (vote.State, error) {
+	if m.salvageErr != nil {
+		return vote.State{}, m.salvageErr
+	}
+	m.lastSalvageItemID = itemID
+	m.lastSalvageQuantity = quantity
+	if len(m.equipState.Inventory) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) ReforgeEquipment(_ context.Context, _ string, itemID string) (vote.State, error) {
+	if m.reforgeErr != nil {
+		return vote.State{}, m.reforgeErr
+	}
+	m.lastReforgeItemID = itemID
+	if len(m.equipState.Inventory) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
 func (m *mockStore) EquipHero(_ context.Context, _ string, _ string) (vote.State, error) {
 	if len(m.equipState.Buttons) == 0 && len(m.equipState.Heroes) == 0 && m.equipState.ActiveHero == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) AwakenHero(_ context.Context, _ string, heroID string) (vote.State, error) {
+	if m.awakenErr != nil {
+		return vote.State{}, m.awakenErr
+	}
+	m.lastAwakenHeroID = heroID
+	if len(m.equipState.Heroes) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) SalvageHero(_ context.Context, _ string, heroID string, quantity int64) (vote.State, error) {
+	if m.salvageErr != nil {
+		return vote.State{}, m.salvageErr
+	}
+	m.lastAwakenHeroID = heroID
+	m.lastSalvageQuantity = quantity
+	if len(m.equipState.Heroes) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) PurchaseCosmetic(_ context.Context, _ string, cosmeticID string) (vote.State, error) {
+	if m.purchaseErr != nil {
+		return vote.State{}, m.purchaseErr
+	}
+	m.lastPurchasedCosmetic = cosmeticID
+	if len(m.equipState.ShopCatalog) == 0 && m.equipState.Gems == 0 {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) EquipCosmetics(_ context.Context, _ string, trailID string, impactID string) (vote.State, error) {
+	if m.cosmeticEquipErr != nil {
+		return vote.State{}, m.cosmeticEquipErr
+	}
+	m.lastCosmeticLoadout = vote.CosmeticLoadout{
+		TrailID:  trailID,
+		ImpactID: impactID,
+	}
+	if len(m.equipState.ShopCatalog) == 0 && m.equipState.EquippedCosmetics == (vote.CosmeticLoadout{}) {
 		return m.state, nil
 	}
 	return m.equipState, nil
@@ -377,7 +460,7 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 		Leaderboard []vote.LeaderboardEntry `json:"leaderboard"`
 		BossLoot    []vote.BossLootEntry    `json:"bossLoot"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
@@ -433,7 +516,7 @@ func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 	}
 
 	var payload []vote.BossHistoryEntry
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
@@ -470,7 +553,7 @@ func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 	}
 
 	var payload vote.Announcement
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if payload.ID != "7" || payload.Title != "更新公告" {
@@ -521,7 +604,7 @@ func TestClickButtonDoesNotUseLegacySnapshotBroadcast(t *testing.T) {
 		UserStats   vote.UserStats          `json:"userStats"`
 		Leaderboard []vote.LeaderboardEntry `json:"leaderboard"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
@@ -595,7 +678,7 @@ func TestClickButtonReturnsCriticalMetadata(t *testing.T) {
 		Delta    int64 `json:"delta"`
 		Critical bool  `json:"critical"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
@@ -653,7 +736,7 @@ func TestClickButtonPublishesStateChangeWithoutRefetchingState(t *testing.T) {
 		Critical  bool           `json:"critical"`
 		UserStats vote.UserStats `json:"userStats"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if payload.Button.Count != 5 || payload.UserStats.ClickCount != 5 {
@@ -721,7 +804,7 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 		} `json:"loadout"`
 		CombatStats vote.CombatStats `json:"combatStats"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
@@ -781,11 +864,99 @@ func TestSynthesizeItemReturnsUpdatedState(t *testing.T) {
 			Weapon *vote.InventoryItem `json:"weapon"`
 		} `json:"loadout"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if payload.Loadout.Weapon == nil || payload.Loadout.Weapon.Name != "木剑 +1" || payload.Loadout.Weapon.StarLevel != 1 {
 		t.Fatalf("unexpected synthesize payload: %+v", payload.Loadout.Weapon)
+	}
+}
+
+func TestSalvageEquipmentReturnsUpdatedState(t *testing.T) {
+	store := &mockStore{
+		equipState: vote.State{
+			Gems: 2,
+			Inventory: []vote.InventoryItem{
+				{
+					ItemID:   "wood-sword",
+					Name:     "木剑",
+					Quantity: 1,
+				},
+			},
+			LastForgeResult: &vote.ForgeResult{
+				Kind:          "equipment_salvage",
+				TargetID:      "wood-sword",
+				RemainingGems: 2,
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/salvage", strings.NewReader(`{"nickname":"阿明","quantity":2}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastSalvageItemID != "wood-sword" || store.lastSalvageQuantity != 2 {
+		t.Fatalf("expected salvage payload to be forwarded, got id=%s quantity=%d", store.lastSalvageItemID, store.lastSalvageQuantity)
+	}
+
+	var payload struct {
+		Gems            int64             `json:"gems"`
+		LastForgeResult *vote.ForgeResult `json:"lastForgeResult"`
+	}
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Gems != 2 || payload.LastForgeResult == nil || payload.LastForgeResult.Kind != "equipment_salvage" {
+		t.Fatalf("unexpected salvage payload: %+v", payload)
+	}
+}
+
+func TestReforgeEquipmentReturnsUpdatedState(t *testing.T) {
+	store := &mockStore{
+		equipState: vote.State{
+			Gems: 0,
+			Inventory: []vote.InventoryItem{
+				{
+					ItemID:      "wood-sword",
+					Name:        "木剑",
+					Quantity:    1,
+					BonusClicks: 3,
+				},
+			},
+			LastForgeResult: &vote.ForgeResult{
+				Kind:          "equipment_reforge",
+				TargetID:      "wood-sword",
+				RemainingGems: 0,
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/reforge", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastReforgeItemID != "wood-sword" {
+		t.Fatalf("expected reforge payload to be forwarded, got %+v", store.lastReforgeItemID)
 	}
 }
 
@@ -836,11 +1007,139 @@ func TestEquipHeroReturnsUpdatedState(t *testing.T) {
 	var payload struct {
 		ActiveHero *vote.HeroInventoryItem `json:"activeHero"`
 	}
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if payload.ActiveHero == nil || payload.ActiveHero.HeroID != "spark-cat" {
 		t.Fatalf("unexpected hero equip payload: %+v", payload.ActiveHero)
+	}
+}
+
+func TestAwakenHeroReturnsUpdatedState(t *testing.T) {
+	store := &mockStore{
+		equipState: vote.State{
+			Gems: 0,
+			Heroes: []vote.HeroInventoryItem{
+				{
+					HeroID:      "spark-cat",
+					Name:        "星火猫",
+					AwakenLevel: 1,
+					BonusClicks: 3,
+				},
+			},
+			LastForgeResult: &vote.ForgeResult{
+				Kind:       "hero_awaken",
+				TargetID:   "spark-cat",
+				TargetName: "星火猫",
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/heroes/spark-cat/awaken", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastAwakenHeroID != "spark-cat" {
+		t.Fatalf("expected awaken payload to be forwarded, got %+v", store.lastAwakenHeroID)
+	}
+}
+
+func TestShopRoutesReturnCatalogAndLoadout(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			Gems: 30,
+			ShopCatalog: []vote.CosmeticCatalogItem{
+				{
+					CosmeticID: "trail-ribbon",
+					Name:       "流星彩带轨迹",
+					Type:       vote.CosmeticTypeTrail,
+					Price:      30,
+					Owned:      true,
+					Equipped:   true,
+				},
+				{
+					CosmeticID: "impact-firefly",
+					Name:       "流萤追光点击特效",
+					Type:       vote.CosmeticTypeImpact,
+					Price:      30,
+				},
+			},
+			EquippedCosmetics: vote.CosmeticLoadout{
+				TrailID: "trail-ribbon",
+			},
+		},
+		equipState: vote.State{
+			Gems: 0,
+			ShopCatalog: []vote.CosmeticCatalogItem{
+				{
+					CosmeticID: "trail-ribbon",
+					Name:       "流星彩带轨迹",
+					Type:       vote.CosmeticTypeTrail,
+					Price:      30,
+					Owned:      true,
+					Equipped:   true,
+				},
+				{
+					CosmeticID: "impact-firefly",
+					Name:       "流萤追光点击特效",
+					Type:       vote.CosmeticTypeImpact,
+					Price:      30,
+					Owned:      true,
+					Equipped:   true,
+				},
+			},
+			EquippedCosmetics: vote.CosmeticLoadout{
+				TrailID:  "trail-ribbon",
+				ImpactID: "impact-firefly",
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	getRequest := httptest.NewRequest(http.MethodGet, "/api/shop?nickname=%E9%98%BF%E6%98%8E", nil)
+	getResponse := httptest.NewRecorder()
+	handler.ServeHTTP(getResponse, getRequest)
+
+	if getResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from shop list, got %d", getResponse.Code)
+	}
+
+	purchaseRequest := httptest.NewRequest(http.MethodPost, "/api/shop/cosmetics/impact-firefly/purchase", strings.NewReader(`{"nickname":"阿明"}`))
+	purchaseRequest.Header.Set("Content-Type", "application/json")
+	purchaseResponse := httptest.NewRecorder()
+	handler.ServeHTTP(purchaseResponse, purchaseRequest)
+
+	if purchaseResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from cosmetic purchase, got %d", purchaseResponse.Code)
+	}
+	if store.lastPurchasedCosmetic != "impact-firefly" {
+		t.Fatalf("expected purchase payload to be forwarded, got %+v", store.lastPurchasedCosmetic)
+	}
+
+	equipRequest := httptest.NewRequest(http.MethodPost, "/api/shop/cosmetics/equip", strings.NewReader(`{"nickname":"阿明","trailId":"trail-ribbon","impactId":"impact-firefly"}`))
+	equipRequest.Header.Set("Content-Type", "application/json")
+	equipResponse := httptest.NewRecorder()
+	handler.ServeHTTP(equipResponse, equipRequest)
+
+	if equipResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from cosmetic equip, got %d", equipResponse.Code)
+	}
+	if store.lastCosmeticLoadout.TrailID != "trail-ribbon" || store.lastCosmeticLoadout.ImpactID != "impact-firefly" {
+		t.Fatalf("expected cosmetic loadout to be forwarded, got %+v", store.lastCosmeticLoadout)
 	}
 }
 
@@ -931,7 +1230,7 @@ func TestAdminLoginCreatesSessionAndStateRequiresAuth(t *testing.T) {
 		Buttons   []vote.Button              `json:"buttons"`
 		Equipment []vote.EquipmentDefinition `json:"equipment"`
 	}
-	if err := json.Unmarshal(adminResponse.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(adminResponse.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
@@ -1153,7 +1452,7 @@ func TestAdminPlayersPageRequiresAuthAndReturnsPayload(t *testing.T) {
 	}
 
 	var payload vote.AdminPlayerPage
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if payload.Total != 3 || payload.NextCursor != "1" || len(payload.Items) != 1 || payload.Items[0].Nickname != "阿明" {
@@ -1211,7 +1510,7 @@ func TestAdminOSSPolicyRequiresAuthAndReturnsPayload(t *testing.T) {
 	}
 
 	var payload map[string]any
-	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if payload["host"] != "https://vote-wall.oss-cn-beijing.aliyuncs.com" {
