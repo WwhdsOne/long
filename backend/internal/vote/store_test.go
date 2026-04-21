@@ -184,6 +184,46 @@ func TestClickButtonUsesNormalCountAndAppliesFallbackImage(t *testing.T) {
 	}
 }
 
+func TestClickButtonDoesNotReturnHistoricalRewardsOnNormalClick(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 99 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "2",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.lastRewardKey("阿明"), rewardRecordValues([]Reward{
+		{
+			BossID:    "slime-king",
+			BossName:  "史莱姆王",
+			ItemID:    "cloth-armor",
+			ItemName:  "布甲",
+			GrantedAt: 1713744300,
+		},
+	})).Err(); err != nil {
+		t.Fatalf("seed last reward: %v", err)
+	}
+
+	updated, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if updated.LastReward != nil {
+		t.Fatalf("expected normal click to omit historical last reward, got %+v", updated.LastReward)
+	}
+	if len(updated.RecentRewards) != 0 {
+		t.Fatalf("expected normal click to omit historical recent rewards, got %+v", updated.RecentRewards)
+	}
+}
+
 func TestClickButtonAppliesCriticalHitWhenRollMatches(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

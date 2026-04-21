@@ -727,14 +727,16 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 		result.MyBossStats = myBossStats
 	}
 
-	recentRewards, err := s.recentRewardsForNickname(ctx, normalizedNickname)
-	if err != nil {
-		return ClickResult{}, err
-	}
-	result.RecentRewards = recentRewards
-	if len(recentRewards) > 0 {
-		lastReward := recentRewards[len(recentRewards)-1]
-		result.LastReward = &lastReward
+	if result.BroadcastUserAll {
+		recentRewards, err := s.recentRewardsForNickname(ctx, normalizedNickname)
+		if err != nil {
+			return ClickResult{}, err
+		}
+		result.RecentRewards = recentRewards
+		if len(recentRewards) > 0 {
+			lastReward := recentRewards[len(recentRewards)-1]
+			result.LastReward = &lastReward
+		}
 	}
 
 	return result, nil

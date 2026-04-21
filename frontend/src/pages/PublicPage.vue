@@ -590,11 +590,11 @@ function applyClickResult(payload) {
   if ('myBossStats' in payload) {
     myBossStats.value = payload.myBossStats ?? null
   }
-  if ('recentRewards' in payload) {
-    recentRewards.value = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
+  if (Array.isArray(payload.recentRewards) && payload.recentRewards.length > 0) {
+    recentRewards.value = payload.recentRewards
   }
-  if ('lastReward' in payload) {
-    lastReward.value = payload.lastReward ?? null
+  if (payload.lastReward) {
+    lastReward.value = payload.lastReward
   }
   syncing.value = false
   markUpdated()
@@ -740,9 +740,6 @@ async function clickButton(key, options = {}) {
     restored.delete(key)
     pendingKeys.value = restored
     applyClickResult(data)
-    if (Array.isArray(data.recentRewards) && data.recentRewards.length > 0) {
-      await loadState()
-    }
     liveConnected.value = true
     errorMessage.value = ''
   } catch (error) {
