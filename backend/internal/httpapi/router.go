@@ -28,18 +28,23 @@ type ButtonStore interface {
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
 	SynthesizeItem(context.Context, string, string) (vote.State, error)
+	EquipHero(context.Context, string, string) (vote.State, error)
+	UnequipHero(context.Context, string, string) (vote.State, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	ListAdminPlayers(context.Context, string, int64) (vote.AdminPlayerPage, error)
 	GetAdminPlayer(context.Context, string) (*vote.AdminPlayerOverview, error)
 	SaveButton(context.Context, vote.ButtonUpsert) error
 	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
+	SaveHeroDefinition(context.Context, vote.HeroDefinition) error
 	DeleteEquipmentDefinition(context.Context, string) error
+	DeleteHeroDefinition(context.Context, string) error
 	ActivateBoss(context.Context, vote.BossUpsert) (*vote.Boss, error)
 	DeactivateBoss(context.Context) error
 	SetBossLoot(context.Context, string, []vote.BossLootEntry) error
 	SaveBossTemplate(context.Context, vote.BossTemplateUpsert) error
 	DeleteBossTemplate(context.Context, string) error
 	SetBossTemplateLoot(context.Context, string, []vote.BossLootEntry) error
+	SetBossTemplateHeroLoot(context.Context, string, []vote.BossHeroLootEntry) error
 	SetBossCycleEnabled(context.Context, bool) (*vote.Boss, error)
 	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
 	GetLatestAnnouncement(context.Context) (*vote.Announcement, error)
@@ -398,6 +403,81 @@ func NewHandler(options Options) http.Handler {
 		writeJSON(w, http.StatusOK, state)
 	})
 
+	apiMux.HandleFunc("POST /api/heroes/{heroId}/equip", func(w http.ResponseWriter, r *http.Request) {
+		heroID := r.PathValue("heroId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再派出英雄。",
+			})
+			return
+		}
+
+		state, err := options.Store.EquipHero(r.Context(), body.Nickname, heroID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrHeroNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "HERO_NOT_FOUND"})
+			case errors.Is(err, vote.ErrHeroNotOwned):
+				writeJSON(w, http.StatusBadRequest, map[string]string{
+					"error":   "HERO_NOT_OWNED",
+					"message": "这位小小英雄还没加入你的队伍。",
+				})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "HERO_EQUIP_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
+	apiMux.HandleFunc("POST /api/heroes/{heroId}/unequip", func(w http.ResponseWriter, r *http.Request) {
+		heroID := r.PathValue("heroId")
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{
+				"error":   "INVALID_REQUEST",
+				"message": "昵称没有带上，先报个名再收回英雄。",
+			})
+			return
+		}
+
+		state, err := options.Store.UnequipHero(r.Context(), body.Nickname, heroID)
+		if err != nil {
+			if writeNicknameError(w, err) {
+				return
+			}
+			switch {
+			case errors.Is(err, vote.ErrHeroNotFound):
+				writeJSON(w, http.StatusNotFound, map[string]string{"error": "HERO_NOT_FOUND"})
+			default:
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "HERO_UNEQUIP_FAILED"})
+			}
+			return
+		}
+
+		publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+			Type:      vote.StateChangeEquipmentChanged,
+			Nickname:  strings.TrimSpace(body.Nickname),
+			Timestamp: time.Now().Unix(),
+		})
+		writeJSON(w, http.StatusOK, state)
+	})
+
 	if options.AdminAuthenticator != nil {
 		apiMux.HandleFunc("POST /api/admin/login", func(w http.ResponseWriter, r *http.Request) {
 			var body struct {
@@ -660,6 +740,28 @@ func NewHandler(options Options) http.Handler {
 			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		})
 
+		apiMux.HandleFunc("PUT /api/admin/boss/pool/{templateId}/hero-loot", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body struct {
+				Loot []vote.BossHeroLootEntry `json:"loot"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			if err := options.Store.SetBossTemplateHeroLoot(r.Context(), r.PathValue("templateId"), body.Loot); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_HERO_LOOT_FAILED"})
+				return
+			}
+
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
 		apiMux.HandleFunc("POST /api/admin/boss/cycle/enable", func(w http.ResponseWriter, r *http.Request) {
 			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
 				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
@@ -895,6 +997,76 @@ func NewHandler(options Options) http.Handler {
 
 			if err := options.Store.SaveEquipmentDefinition(r.Context(), body); err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SAVE_FAILED"})
+				return
+			}
+
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeEquipmentMetaChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("POST /api/admin/heroes", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.HeroDefinition
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+
+			if err := options.Store.SaveHeroDefinition(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "HERO_SAVE_FAILED"})
+				return
+			}
+
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeEquipmentMetaChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("PUT /api/admin/heroes/{heroId}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			var body vote.HeroDefinition
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]string{"error": "INVALID_REQUEST"})
+				return
+			}
+			body.HeroID = r.PathValue("heroId")
+
+			if err := options.Store.SaveHeroDefinition(r.Context(), body); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "HERO_SAVE_FAILED"})
+				return
+			}
+
+			publishChange(r.Context(), options.ChangePublisher, vote.StateChange{
+				Type:             vote.StateChangeEquipmentMetaChanged,
+				BroadcastUserAll: true,
+				Timestamp:        time.Now().Unix(),
+			})
+			writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		apiMux.HandleFunc("DELETE /api/admin/heroes/{heroId}", func(w http.ResponseWriter, r *http.Request) {
+			if !isAdminAuthenticated(r, options.AdminAuthenticator) {
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+				return
+			}
+
+			if err := options.Store.DeleteHeroDefinition(r.Context(), r.PathValue("heroId")); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "HERO_DELETE_FAILED"})
 				return
 			}
 

@@ -7,13 +7,16 @@
 - 页面会展示所有符合规则的 Redis 按钮键。
 - 访问者先输入昵称，之后点击都会记到这个昵称名下。
 - 任意访问者点击按钮后，总数会按当前装备与暴击结算出的实际增量上涨。
+- 按钮支持标签分组；前台可按标签和关键字搜索，后台可配置哪些按钮参与星光轮换。
 - 玩家可以穿戴装备，装备会让平时点击直接获得额外次数增量。
-- 玩家可以对同装备类型做 `3 合 1` 升星，最高 `+5`；升星不会生成新装备，而是强化该账号下这个装备类型的属性。
+- 玩家可以对同装备类型做 `3 合 1` 升星；升星不会生成新装备，而是强化该账号下这个装备类型的属性。
+- 玩家可以通过 Boss 掉落招募小小英雄；每次只允许 1 位英雄出战，英雄属性和被动会同时影响平时点击与 Boss 战。
 - 所有在线用户都会通过 SSE 实时收到公共态更新；已登录用户还会收到仅属于自己的个人状态更新。
 - 页面会实时展示个人累计点击和排行榜。
 - 支持单个全服世界 Boss：Boss 活动期间，同一次点击会同时记票并造成 Boss 伤害。
-- Boss 击杀后会按掉落池给参与玩家发装备，装备进入各自背包。
-- 前台会展示当前 Boss 的掉落池，以及每件装备的属性。
+- 星光卡片每 5 分钟轮换一次；每轮随机挑 6 个可参与按钮排到前面，点击按双倍增量结算。
+- Boss 击杀后只有伤害达到该 Boss 最大生命值 `1%` 的玩家才有掉落资格；装备和英雄掉落各自独立抽取。
+- 前台会展示当前 Boss 的装备/英雄掉落池，以及后端计算好的实际掉落概率。
 - 前台支持更新公告提醒、公告历史和全站公共留言墙。
 - 提供 `/admin` 管理后台，可登录后配置 Boss 循环池、模板掉落池、装备和前台按钮；玩家概览改为分页拉取，避免后台首屏聚合全量玩家。
 - 后台支持为按钮图片申请阿里云 OSS 直传凭证，前端可直传 OSS 后回填公共图片 URL。
@@ -44,6 +47,8 @@ vote:button:<slug>
 - `count`: 当前总数
 - `sort`: 排序值，越小越靠前
 - `enabled`: `1` 为展示，`0` 为隐藏
+- `tags`: JSON 数组字符串，按钮标签
+- `starlight_eligible`: `1` 表示可以参与星光轮换
 - `image_path`: 可选，任意可访问图片地址，推荐填 OSS/CDN 公共 URL
 - `image_alt`: 可选，图片说明文本
 
@@ -85,15 +90,22 @@ vote:boss:current
 vote:boss:pool:index
 vote:boss:pool:<templateId>
 vote:boss:pool:<templateId>:loot
+vote:boss:pool:<templateId>:hero-loot
 vote:boss:cycle
 vote:boss:<bossId>:damage
 vote:boss:<bossId>:loot
+vote:boss:<bossId>:hero-loot
 vote:buttons:index
+vote:buttons:starlight
 vote:equipment:index
+vote:heroes:index
 vote:players:index
 vote:equip:def:<itemId>
+vote:hero:def:<heroId>
 vote:user-inventory:<nickname>
+vote:user-hero-inventory:<nickname>
 vote:user-loadout:<nickname>
+vote:user-active-hero:<nickname>
 vote:user-last-reward:<nickname>
 vote:user-equip-upgrade:<nickname>:<itemId>
 vote:announcements
@@ -119,6 +131,9 @@ vote:message:<id>
 - `vote:boss:pool:<templateId>:loot` 是 `Sorted Set`
   - member = 装备 `itemId`
   - score = 掉落权重
+- `vote:boss:pool:<templateId>:hero-loot` 是 `Sorted Set`
+  - member = 英雄 `heroId`
+  - score = 掉落权重
 - `vote:boss:cycle` 是 `Hash`
   - `enabled`
 - `vote:boss:<bossId>:damage` 是 `Sorted Set`
@@ -127,11 +142,18 @@ vote:message:<id>
 - `vote:boss:<bossId>:loot` 是 `Sorted Set`
   - member = 装备 `itemId`
   - score = 掉落权重
+- `vote:boss:<bossId>:hero-loot` 是 `Sorted Set`
+  - member = 英雄 `heroId`
+  - score = 掉落权重
 - `vote:buttons:index` 是 `Sorted Set`
   - member = 按钮 `slug`
   - score = 按钮排序值 `sort`
+- `vote:buttons:starlight` 是 `Set`
+  - member = 可参与星光轮换的按钮 `slug`
 - `vote:equipment:index` 是 `Set`
   - member = 装备 `itemId`
+- `vote:heroes:index` 是 `Set`
+  - member = 英雄 `heroId`
 - `vote:players:index` 是 `Sorted Set`
   - member = 昵称
   - score = 最近活跃时间戳
@@ -141,13 +163,27 @@ vote:message:<id>
   - `bonus_clicks`
   - `bonus_critical_chance_percent`
   - `bonus_critical_count`
+- `vote:hero:def:<heroId>` 是 `Hash`
+  - `name`
+  - `image_path`
+  - `image_alt`
+  - `bonus_clicks`
+  - `bonus_critical_chance_percent`
+  - `bonus_critical_count`
+  - `trait_type`
+  - `trait_value`
 - `vote:user-inventory:<nickname>` 是 `Hash`
   - field = `itemId`
+  - value = 库存数量
+- `vote:user-hero-inventory:<nickname>` 是 `Hash`
+  - field = `heroId`
   - value = 库存数量
 - `vote:user-loadout:<nickname>` 是 `Hash`
   - `weapon`
   - `armor`
   - `accessory`
+- `vote:user-active-hero:<nickname>` 是 `String`
+  - value = 当前出战英雄 `heroId`
 - `vote:user-last-reward:<nickname>` 是 `Hash`
   - `boss_id`
   - `boss_name`

@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { AUTO_CLICK_INTERVAL_MS, createAutoClickLoop } from '../utils/autoClicker'
+import { mergeBossState } from '../utils/bossState'
+import { collectButtonTags, filterAndSortButtons, formatDropRate } from '../utils/buttonBoard'
 
 const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
@@ -12,10 +14,14 @@ const leaderboard = ref([])
 const boss = ref(null)
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
+const bossHeroLoot = ref([])
+const starlight = ref({ activeKeys: [], startedAt: 0, endsAt: 0 })
 const latestAnnouncement = ref(null)
 const announcements = ref([])
 const myBossStats = ref(null)
 const inventory = ref([])
+const heroes = ref([])
+const activeHero = ref(null)
 const loadout = ref(emptyLoadout())
 const combatStats = ref(defaultCombatStats())
 const lastReward = ref(null)
@@ -36,6 +42,8 @@ const bossHistoryQuery = ref('')
 const loadingBossHistory = ref(false)
 const bossHistoryLoaded = ref(false)
 const bossHistoryError = ref('')
+const selectedButtonTag = ref('全部')
+const buttonSearch = ref('')
 const loadingAnnouncements = ref(false)
 const announcementsLoaded = ref(false)
 const announcementError = ref('')
@@ -51,11 +59,21 @@ const autoClickTargetKey = ref('')
 
 let eventSource
 let autoClickLoop
+let starlightTimer = 0
 const burstTimers = new Map()
 
 const buttonCount = computed(() => buttons.value.length)
 const totalVotes = computed(() =>
   buttons.value.reduce((total, button) => total + button.count, 0),
+)
+const buttonTags = computed(() => ['全部', ...collectButtonTags(buttons.value)])
+const activeStarlightKeys = computed(() => starlight.value?.activeKeys ?? [])
+const displayedButtons = computed(() =>
+  filterAndSortButtons(buttons.value, {
+    selectedTag: selectedButtonTag.value,
+    query: buttonSearch.value,
+    activeStarlightKeys: activeStarlightKeys.value,
+  }),
 )
 const syncLabel = computed(() => {
   if (syncing.value) {
@@ -119,6 +137,7 @@ const bossProgress = computed(() => {
   return Math.max(0, Math.min(100, (boss.value.currentHp / boss.value.maxHp) * 100))
 })
 const equippedItems = computed(() => [loadout.value.weapon, loadout.value.armor, loadout.value.accessory].filter(Boolean))
+const heroCount = computed(() => heroes.value.length)
 const filteredBossHistory = computed(() => {
   const query = normalizeNickname(bossHistoryQuery.value).toLowerCase()
   if (!query) {
@@ -162,8 +181,56 @@ function formatItemStatLines(item) {
   ]
 }
 
+function formatHeroTrait(hero) {
+  switch (hero?.traitType) {
+    case 'bonus_clicks':
+      return `被动：额外点击 +${hero?.traitValue ?? 0}`
+    case 'critical_chance_percent':
+      return `被动：暴击率 +${hero?.traitValue ?? 0}%`
+    case 'critical_count_bonus':
+      return `被动：暴击额外 +${hero?.traitValue ?? 0}`
+    case 'final_damage_percent':
+      return `被动：最终伤害 +${hero?.traitValue ?? 0}%`
+    default:
+      return '被动：暂无'
+  }
+}
+
+function heroImageAlt(hero) {
+  return hero?.imageAlt || hero?.heroName || hero?.name || hero?.heroId || '英雄头像'
+}
+
 function normalizeNickname(value) {
   return value.trim()
+}
+
+function isStarlightButton(key) {
+  return activeStarlightKeys.value.includes(key)
+}
+
+function clearStarlightTimer() {
+  if (starlightTimer) {
+    window.clearTimeout(starlightTimer)
+    starlightTimer = 0
+  }
+}
+
+function scheduleStarlightRefresh() {
+  clearStarlightTimer()
+  const endsAt = Number(starlight.value?.endsAt ?? 0)
+  if (!endsAt) {
+    return
+  }
+
+  const delay = endsAt * 1000 - Date.now() + 150
+  if (delay <= 0) {
+    void loadState()
+    return
+  }
+
+  starlightTimer = window.setTimeout(() => {
+    void loadState()
+  }, delay)
 }
 
 function formatBossTime(timestamp) {
@@ -197,7 +264,7 @@ function formatTime(timestamp) {
 }
 
 function canSynthesize(item) {
-  return Boolean(isLoggedIn.value && item && item.quantity >= 3 && (item.starLevel ?? 0) < 5)
+  return Boolean(isLoggedIn.value && item && item.quantity >= 3)
 }
 
 async function readErrorMessage(response, fallback) {
@@ -396,19 +463,29 @@ function applyPublicState(payload) {
 
   if ('buttons' in payload) {
     buttons.value = Array.isArray(payload.buttons) ? payload.buttons : []
+    if (!buttonTags.value.includes(selectedButtonTag.value)) {
+      selectedButtonTag.value = '全部'
+    }
     syncAutoClickTarget()
   }
   if ('leaderboard' in payload) {
     leaderboard.value = Array.isArray(payload.leaderboard) ? payload.leaderboard : []
   }
   if ('boss' in payload) {
-    boss.value = payload.boss ?? null
+    boss.value = mergeBossState(boss.value, payload.boss)
   }
   if ('bossLeaderboard' in payload) {
     bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
   }
   if ('bossLoot' in payload) {
     bossLoot.value = Array.isArray(payload.bossLoot) ? payload.bossLoot : []
+  }
+  if ('bossHeroLoot' in payload) {
+    bossHeroLoot.value = Array.isArray(payload.bossHeroLoot) ? payload.bossHeroLoot : []
+  }
+  if ('starlight' in payload) {
+    starlight.value = payload.starlight ?? { activeKeys: [], startedAt: 0, endsAt: 0 }
+    scheduleStarlightRefresh()
   }
   if ('latestAnnouncement' in payload) {
     latestAnnouncement.value = payload.latestAnnouncement ?? null
@@ -431,6 +508,12 @@ function applyUserState(payload) {
   }
   if ('inventory' in payload) {
     inventory.value = Array.isArray(payload.inventory) ? payload.inventory : []
+  }
+  if ('heroes' in payload) {
+    heroes.value = Array.isArray(payload.heroes) ? payload.heroes : []
+  }
+  if ('activeHero' in payload) {
+    activeHero.value = payload.activeHero ?? null
   }
   if ('loadout' in payload) {
     loadout.value = payload.loadout ?? emptyLoadout()
@@ -462,7 +545,7 @@ function applyClickResult(payload) {
     userStats.value = payload.userStats ?? null
   }
   if ('boss' in payload) {
-    boss.value = payload.boss ?? null
+    boss.value = mergeBossState(boss.value, payload.boss)
   }
   if ('bossLeaderboard' in payload) {
     bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : bossLeaderboard.value
@@ -659,6 +742,38 @@ async function postEquipmentAction(itemId, action) {
   }
 }
 
+async function postHeroAction(heroId, action) {
+  if (!nickname.value || !heroId) {
+    return
+  }
+
+  actioningItemId.value = heroId
+  errorMessage.value = ''
+
+  try {
+    const response = await fetch(`/api/heroes/${encodeURIComponent(heroId)}/${action}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nickname: nickname.value,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '英雄操作失败，请稍后重试。'))
+    }
+
+    const data = await response.json()
+    applyState(data)
+  } catch (error) {
+    errorMessage.value = error.message || '英雄操作失败，请稍后重试。'
+  } finally {
+    actioningItemId.value = ''
+  }
+}
+
 async function synthesizeItem(itemId) {
   if (!nickname.value || !itemId) {
     return
@@ -749,10 +864,13 @@ async function resetNickname() {
   nicknameDraft.value = ''
   userStats.value = null
   inventory.value = []
+  heroes.value = []
+  activeHero.value = null
   loadout.value = emptyLoadout()
   combatStats.value = defaultCombatStats()
   myBossStats.value = null
   bossLoot.value = []
+  bossHeroLoot.value = []
   autoClickTargetKey.value = ''
   window.localStorage.removeItem(NICKNAME_STORAGE_KEY)
   await loadState()
@@ -779,6 +897,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   stopAutoClick()
   eventSource?.close()
+  clearStarlightTimer()
   burstTimers.forEach((timer) => window.clearTimeout(timer))
   burstTimers.clear()
 })
@@ -898,8 +1017,40 @@ onBeforeUnmount(() => {
           >
             <div>
               <strong>{{ item.itemName || item.itemId }}</strong>
-              <p>{{ item.slot || '未分类' }} · 权重 {{ item.weight }}</p>
+              <p>{{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
               <p>{{ formatItemStats(item) }}</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div v-if="boss && bossHeroLoot.length > 0" class="boss-stage__drops">
+        <div class="boss-stage__drops-head">
+          <div>
+            <p class="vote-stage__eyebrow">Boss 英雄池</p>
+            <strong>{{ bossHeroLoot.length }} 位</strong>
+          </div>
+        </div>
+
+        <ul class="inventory-list inventory-list--loot">
+          <li
+            v-for="hero in bossHeroLoot"
+            :key="hero.heroId"
+            class="inventory-item inventory-item--stacked inventory-item--loot"
+          >
+            <div class="inventory-item__hero">
+              <img
+                v-if="hero.imagePath"
+                class="inventory-item__avatar"
+                :src="hero.imagePath"
+                :alt="heroImageAlt(hero)"
+              />
+              <div>
+                <strong>{{ hero.heroName || hero.heroId }}</strong>
+                <p>掉落概率 {{ formatDropRate(hero.dropRatePercent) }}</p>
+                <p>{{ formatItemStats(hero) }}</p>
+                <p>{{ formatHeroTrait(hero) }}</p>
+              </div>
             </div>
           </li>
         </ul>
@@ -998,6 +1149,14 @@ onBeforeUnmount(() => {
             </button>
             <button
               class="player-hud__tab"
+              :class="{ 'player-hud__tab--active': activeHudTab === 'heroes' }"
+              type="button"
+              @click="selectHudTab('heroes')"
+            >
+              英雄
+            </button>
+            <button
+              class="player-hud__tab"
               :class="{ 'player-hud__tab--active': activeHudTab === 'info' }"
               type="button"
               @click="selectHudTab('info')"
@@ -1067,7 +1226,7 @@ onBeforeUnmount(() => {
                         :disabled="!canSynthesize(item) || actioningItemId === item.itemId"
                         @click="synthesizeItem(item.itemId)"
                       >
-                        {{ item.starLevel >= 5 ? '已满星' : '3 合 1 升星' }}
+                        3 合 1 升星
                       </button>
                     </div>
                   </div>
@@ -1155,6 +1314,83 @@ onBeforeUnmount(() => {
               </div>
             </section>
 
+            <section v-else-if="activeHudTab === 'heroes'" class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">小小英雄</p>
+                <strong>{{ heroCount }} 位</strong>
+              </div>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>当前出战</span>
+                  <strong>{{ activeHero?.name || '未派出' }}</strong>
+                </div>
+                <div v-if="activeHero?.imagePath" class="player-hud__hero-active">
+                  <img
+                    class="player-hud__hero-portrait"
+                    :src="activeHero.imagePath"
+                    :alt="heroImageAlt(activeHero)"
+                  />
+                </div>
+                <p class="player-hud__note">
+                  {{
+                    activeHero
+                      ? `${formatItemStats(activeHero)}，${formatHeroTrait(activeHero)}`
+                      : '先去打 Boss 拿到一位英雄，再派出去陪你冲榜。'
+                  }}
+                </p>
+              </section>
+
+              <div v-if="heroes.length === 0" class="leaderboard-list leaderboard-list--empty">
+                <p>你还没有招募到任何小小英雄。</p>
+              </div>
+
+              <ul v-else class="inventory-list">
+                <li v-for="hero in heroes" :key="hero.heroId" class="inventory-item inventory-item--panel">
+                  <div class="inventory-item__top">
+                    <img
+                      v-if="hero.imagePath"
+                      class="inventory-item__avatar inventory-item__avatar--hero"
+                      :src="hero.imagePath"
+                      :alt="heroImageAlt(hero)"
+                    />
+                    <div class="inventory-item__main">
+                      <strong>{{ hero.name }}</strong>
+                      <div class="inventory-item__meta">
+                        <span class="inventory-item__chip">库存:{{ hero.quantity }}</span>
+                        <span class="inventory-item__chip">{{ hero.active ? '出战中' : '待命中' }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ul class="inventory-item__stats inventory-item__stats--stacked">
+                    <li>{{ formatItemStats(hero) }}</li>
+                    <li>{{ formatHeroTrait(hero) }}</li>
+                  </ul>
+
+                  <div class="inventory-item__footer">
+                    <span
+                      class="inventory-item__state"
+                      :class="{ 'inventory-item__state--active': hero.active }"
+                    >
+                      {{ hero.active ? '已出战' : '未出战' }}
+                    </span>
+
+                    <div class="inventory-item__actions">
+                      <button
+                        class="inventory-item__action"
+                        type="button"
+                        :disabled="!isLoggedIn || actioningItemId === hero.heroId"
+                        @click="hero.active ? postHeroAction(hero.heroId, 'unequip') : postHeroAction(hero.heroId, 'equip')"
+                      >
+                        {{ hero.active ? '收回' : '出战' }}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </section>
+
             <section v-else-if="activeHudTab === 'info'" class="player-hud__panel player-hud__panel--info">
               <div class="player-hud__section-head">
                 <p class="vote-stage__eyebrow">信息</p>
@@ -1209,8 +1445,40 @@ onBeforeUnmount(() => {
                   >
                     <div>
                       <strong>{{ item.itemName || item.itemId }}</strong>
-                      <p>{{ item.slot || '未分类' }} · 权重 {{ item.weight }}</p>
+                      <p>{{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
                       <p>{{ formatItemStats(item) }}</p>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <section class="player-hud__info-block">
+                <div class="player-hud__mini-head">
+                  <span>英雄招募</span>
+                  <strong>{{ bossHeroLoot.length }} 位</strong>
+                </div>
+                <div v-if="bossHeroLoot.length === 0" class="leaderboard-list leaderboard-list--empty">
+                  <p>当前 Boss 还没配置英雄掉落。</p>
+                </div>
+                <ul v-else class="inventory-list inventory-list--hud-loot">
+                  <li
+                    v-for="hero in bossHeroLoot"
+                    :key="hero.heroId"
+                    class="inventory-item inventory-item--stacked inventory-item--loot"
+                  >
+                    <div class="inventory-item__hero">
+                      <img
+                        v-if="hero.imagePath"
+                        class="inventory-item__avatar"
+                        :src="hero.imagePath"
+                        :alt="heroImageAlt(hero)"
+                      />
+                      <div>
+                        <strong>{{ hero.heroName || hero.heroId }}</strong>
+                        <p>掉落概率 {{ formatDropRate(hero.dropRatePercent) }}</p>
+                        <p>{{ formatItemStats(hero) }}</p>
+                        <p>{{ formatHeroTrait(hero) }}</p>
+                      </div>
                     </div>
                   </li>
                 </ul>
@@ -1377,15 +1645,42 @@ onBeforeUnmount(() => {
           <p>还没有按钮上墙，先加一个再回来看看。</p>
         </div>
 
-        <div v-else class="button-grid">
+        <div v-else>
+          <div class="vote-stage__filters">
+            <input
+              v-model="buttonSearch"
+              class="nickname-form__input vote-stage__search"
+              type="text"
+              placeholder="搜按钮名或标签"
+            />
+            <div class="vote-stage__tags">
+              <button
+                v-for="tag in buttonTags"
+                :key="tag"
+                class="vote-stage__tag"
+                :class="{ 'vote-stage__tag--active': selectedButtonTag === tag }"
+                type="button"
+                @click="selectedButtonTag = tag"
+              >
+                {{ tag }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="displayedButtons.length === 0" class="feedback-panel">
+            <p>当前筛选下没有匹配按钮，换个标签或关键词试试。</p>
+          </div>
+
+          <div v-else class="button-grid">
           <button
-            v-for="button in buttons"
+            v-for="button in displayedButtons"
             :key="button.key"
             class="vote-card"
             :class="{
               'vote-card--image': button.imagePath,
               'vote-card--pending': pendingKeys.has(button.key),
               'vote-card--critical': Boolean(criticalBursts[button.key]),
+              'vote-card--starlight': isStarlightButton(button.key),
               'vote-card--locked': !isLoggedIn,
             }"
             type="button"
@@ -1414,6 +1709,10 @@ onBeforeUnmount(() => {
                   ? '先报个名'
                   : pendingKeys.has(button.key)
                     ? '正在记票'
+                    : isStarlightButton(button.key)
+                      ? boss?.status === 'active'
+                        ? `星光双倍 · 拍一下 +${effectiveIncrement * 2}`
+                        : `星光双倍 · 拍一下 +${effectiveIncrement * 2}`
                     : boss?.status === 'active'
                       ? `拍一下 +${effectiveIncrement} 并打 Boss`
                       : `拍一下 +${effectiveIncrement}`
@@ -1430,6 +1729,7 @@ onBeforeUnmount(() => {
 
             <span class="vote-card__count">{{ button.count }}</span>
           </button>
+        </div>
         </div>
       </section>
 

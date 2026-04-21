@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
@@ -992,5 +993,309 @@ func TestListPlayerOverviewsPrefersExplicitIndexWhenPresent(t *testing.T) {
 
 	if len(players) != 1 || players[0].Nickname != "阿明" {
 		t.Fatalf("expected only indexed player, got %+v", players)
+	}
+}
+
+func TestSaveButtonPersistsTagsAndStarlightEligibility(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:              "feel",
+		Label:             "有感觉吗",
+		Sort:              10,
+		Enabled:           true,
+		Tags:              []string{"日常", "互动"},
+		StarlightEligible: true,
+	}); err != nil {
+		t.Fatalf("save button: %v", err)
+	}
+
+	buttons, err := store.ListButtons(ctx)
+	if err != nil {
+		t.Fatalf("list buttons: %v", err)
+	}
+
+	if len(buttons) != 1 {
+		t.Fatalf("expected 1 button, got %+v", buttons)
+	}
+	if len(buttons[0].Tags) != 2 || buttons[0].Tags[0] != "日常" || buttons[0].Tags[1] != "互动" {
+		t.Fatalf("expected tags to round-trip, got %+v", buttons[0])
+	}
+	if !buttons[0].StarlightEligible {
+		t.Fatalf("expected starlight flag to round-trip, got %+v", buttons[0])
+	}
+}
+
+func TestGetSnapshotIncludesStarlightAndDropRates(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:              "feel",
+		Label:             "有感觉吗",
+		Sort:              20,
+		Enabled:           true,
+		StarlightEligible: true,
+	}); err != nil {
+		t.Fatalf("save feel button: %v", err)
+	}
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:              "understand",
+		Label:             "有没有懂的",
+		Sort:              30,
+		Enabled:           true,
+		StarlightEligible: true,
+	}); err != nil {
+		t.Fatalf("save understand button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed cloth-armor definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:fire-ring", map[string]any{
+		"name":                          "火戒",
+		"slot":                          "accessory",
+		"bonus_critical_chance_percent": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed fire-ring definition: %v", err)
+	}
+
+	boss := &Boss{
+		ID:        "dragon-1",
+		Name:      "火龙",
+		Status:    bossStatusActive,
+		MaxHP:     100,
+		CurrentHP: 100,
+		StartedAt: store.now().Unix(),
+	}
+	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 1},
+		{ItemID: "fire-ring", Weight: 3},
+	}, nil); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+
+	snapshot, err := store.GetSnapshot(ctx)
+	if err != nil {
+		t.Fatalf("get snapshot: %v", err)
+	}
+
+	if len(snapshot.Starlight.ActiveKeys) != 2 {
+		t.Fatalf("expected both eligible buttons to be active when total below limit, got %+v", snapshot.Starlight)
+	}
+	if snapshot.Starlight.EndsAt <= snapshot.Starlight.StartedAt {
+		t.Fatalf("expected starlight window timestamps, got %+v", snapshot.Starlight)
+	}
+	if len(snapshot.BossLoot) != 2 {
+		t.Fatalf("expected boss loot snapshot, got %+v", snapshot.BossLoot)
+	}
+	if snapshot.BossLoot[0].DropRatePercent+snapshot.BossLoot[1].DropRatePercent != 100 {
+		t.Fatalf("expected drop rates to add up to 100, got %+v", snapshot.BossLoot)
+	}
+	if snapshot.BossLoot[0].ItemID != "cloth-armor" || snapshot.BossLoot[0].DropRatePercent != 25 {
+		t.Fatalf("expected cloth-armor probability 25%%, got %+v", snapshot.BossLoot)
+	}
+	if snapshot.BossLoot[1].ItemID != "fire-ring" || snapshot.BossLoot[1].DropRatePercent != 75 {
+		t.Fatalf("expected fire-ring probability 75%%, got %+v", snapshot.BossLoot)
+	}
+}
+
+func TestFinalizeBossKillRewardsOnlyQualifiedParticipants(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 0 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed cloth-armor definition: %v", err)
+	}
+
+	boss := &Boss{
+		ID:         "dragon-1",
+		TemplateID: "dragon",
+		Name:       "火龙",
+		Status:     bossStatusDefeated,
+		MaxHP:      1000,
+		CurrentHP:  0,
+		StartedAt:  1713744000,
+		DefeatedAt: 1713744300,
+	}
+	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 1},
+	}, nil); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+	if err := store.client.ZAdd(ctx, store.bossDamageKey(boss.ID),
+		redis.Z{Score: 9, Member: "小红"},
+		redis.Z{Score: 10, Member: "阿明"},
+	).Err(); err != nil {
+		t.Fatalf("seed boss damage: %v", err)
+	}
+
+	if _, err := store.finalizeBossKill(ctx, boss); err != nil {
+		t.Fatalf("finalize boss kill: %v", err)
+	}
+
+	amingReward, err := store.lastRewardForNickname(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("load 阿明 reward: %v", err)
+	}
+	if amingReward == nil || amingReward.ItemID != "cloth-armor" {
+		t.Fatalf("expected 阿明 to receive reward, got %+v", amingReward)
+	}
+
+	xiaohongReward, err := store.lastRewardForNickname(ctx, "小红")
+	if err != nil {
+		t.Fatalf("load 小红 reward: %v", err)
+	}
+	if xiaohongReward != nil {
+		t.Fatalf("expected 小红 to miss reward below 1%% threshold, got %+v", xiaohongReward)
+	}
+}
+
+func TestGetStateIncludesActiveHeroBonuses(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveHeroDefinition(ctx, HeroDefinition{
+		HeroID:                     "spark-cat",
+		Name:                       "星火猫",
+		BonusClicks:                2,
+		BonusCriticalChancePercent: 3,
+		TraitType:                  HeroTraitFinalDamagePercent,
+		TraitValue:                 50,
+	}); err != nil {
+		t.Fatalf("save hero definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.heroInventoryKey("阿明"), map[string]any{
+		"spark-cat": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed hero inventory: %v", err)
+	}
+	if err := store.client.Set(ctx, store.activeHeroKey("阿明"), "spark-cat", 0).Err(); err != nil {
+		t.Fatalf("seed active hero: %v", err)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state: %v", err)
+	}
+
+	if len(state.Heroes) != 1 {
+		t.Fatalf("expected 1 hero in inventory, got %+v", state.Heroes)
+	}
+	if state.ActiveHero == nil || state.ActiveHero.HeroID != "spark-cat" {
+		t.Fatalf("expected spark-cat to be active, got %+v", state.ActiveHero)
+	}
+	if state.CombatStats.NormalDamage != 5 {
+		t.Fatalf("expected hero bonuses to raise normal damage to 5, got %+v", state.CombatStats)
+	}
+	if state.CombatStats.CriticalChancePercent != 8 {
+		t.Fatalf("expected hero bonuses to raise critical chance to 8, got %+v", state.CombatStats)
+	}
+}
+
+func TestFinalizeBossKillAwardsQualifiedHeroLoot(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 0 }
+
+	ctx := context.Background()
+	if err := store.SaveHeroDefinition(ctx, HeroDefinition{
+		HeroID: "spark-cat",
+		Name:   "星火猫",
+	}); err != nil {
+		t.Fatalf("save hero definition: %v", err)
+	}
+
+	boss := &Boss{
+		ID:         "dragon-2",
+		TemplateID: "dragon",
+		Name:       "火龙",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  1713744000,
+		DefeatedAt: 1713744300,
+	}
+	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{}, []BossHeroLootEntry{
+		{HeroID: "spark-cat", Weight: 1},
+	}); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+	if err := store.client.ZAdd(ctx, store.bossDamageKey(boss.ID),
+		redis.Z{Score: 1, Member: "阿明"},
+		redis.Z{Score: 0.5, Member: "小红"},
+	).Err(); err != nil {
+		t.Fatalf("seed boss damage: %v", err)
+	}
+
+	if _, err := store.finalizeBossKill(ctx, boss); err != nil {
+		t.Fatalf("finalize boss kill: %v", err)
+	}
+
+	quantities, err := store.heroInventoryQuantities(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("load 阿明 hero inventory: %v", err)
+	}
+	if quantities["spark-cat"] != 1 {
+		t.Fatalf("expected 阿明 to receive hero reward, got %+v", quantities)
+	}
+
+	xiaohongQuantities, err := store.heroInventoryQuantities(ctx, "小红")
+	if err != nil {
+		t.Fatalf("load 小红 hero inventory: %v", err)
+	}
+	if len(xiaohongQuantities) != 0 {
+		t.Fatalf("expected 小红 to miss hero reward below threshold, got %+v", xiaohongQuantities)
+	}
+}
+
+func TestClickButtonDoublesDeltaWhenStarlightActive(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:              "feel",
+		Label:             "有感觉吗",
+		Sort:              10,
+		Enabled:           true,
+		StarlightEligible: true,
+	}); err != nil {
+		t.Fatalf("save button: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+
+	if result.Delta != 2 {
+		t.Fatalf("expected starlight button to double delta to 2, got %+v", result)
+	}
+	if result.Button.Count != 2 || result.UserStats.ClickCount != 2 {
+		t.Fatalf("expected doubled delta to apply to counts, got %+v", result)
 	}
 }

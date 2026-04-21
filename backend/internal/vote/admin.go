@@ -17,7 +17,9 @@ type AdminState struct {
 	Boss              *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard"`
 	Equipment         []EquipmentDefinition  `json:"equipment"`
+	Heroes            []HeroDefinition       `json:"heroes"`
 	Loot              []BossLootEntry        `json:"loot"`
+	HeroLoot          []BossHeroLootEntry    `json:"heroLoot"`
 	BossCycleEnabled  bool                   `json:"bossCycleEnabled"`
 	BossPool          []BossTemplate         `json:"bossPool"`
 	PlayerCount       int64                  `json:"playerCount"`
@@ -42,12 +44,14 @@ type AdminPlayerPage struct {
 
 // ButtonUpsert 管理后台按钮保存载荷
 type ButtonUpsert struct {
-	Slug      string `json:"slug"`
-	Label     string `json:"label"`
-	Sort      int    `json:"sort"`
-	Enabled   bool   `json:"enabled"`
-	ImagePath string `json:"imagePath"`
-	ImageAlt  string `json:"imageAlt"`
+	Slug              string   `json:"slug"`
+	Label             string   `json:"label"`
+	Sort              int      `json:"sort"`
+	Enabled           bool     `json:"enabled"`
+	Tags              []string `json:"tags"`
+	StarlightEligible bool     `json:"starlightEligible"`
+	ImagePath         string   `json:"imagePath"`
+	ImageAlt          string   `json:"imageAlt"`
 }
 
 // BossUpsert 管理后台 Boss 启动载荷
@@ -59,10 +63,11 @@ type BossUpsert struct {
 
 // BossTemplate Boss 池模板。
 type BossTemplate struct {
-	ID    string          `json:"id"`
-	Name  string          `json:"name"`
-	MaxHP int64           `json:"maxHp"`
-	Loot  []BossLootEntry `json:"loot"`
+	ID       string              `json:"id"`
+	Name     string              `json:"name"`
+	MaxHP    int64               `json:"maxHp"`
+	Loot     []BossLootEntry     `json:"loot"`
+	HeroLoot []BossHeroLootEntry `json:"heroLoot"`
 }
 
 // BossTemplateUpsert 后台 Boss 模板保存载荷。
@@ -88,6 +93,10 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	if err != nil {
 		return AdminState{}, err
 	}
+	heroes, err := s.ListHeroDefinitions(ctx)
+	if err != nil {
+		return AdminState{}, err
+	}
 	bossCycleEnabled, err := s.bossCycleEnabled(ctx)
 	if err != nil {
 		return AdminState{}, err
@@ -99,6 +108,7 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 
 	bossLeaderboard := []BossLeaderboardEntry{}
 	loot := []BossLootEntry{}
+	heroLoot := []BossHeroLootEntry{}
 	if boss != nil {
 		bossLeaderboard, err = s.ListBossLeaderboard(ctx, boss.ID, 20)
 		if err != nil {
@@ -106,6 +116,10 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		}
 
 		loot, err = s.loadBossLoot(ctx, boss.ID)
+		if err != nil {
+			return AdminState{}, err
+		}
+		heroLoot, err = s.loadBossHeroLoot(ctx, boss.ID)
 		if err != nil {
 			return AdminState{}, err
 		}
@@ -121,7 +135,9 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		Boss:              boss,
 		BossLeaderboard:   bossLeaderboard,
 		Equipment:         equipment,
+		Heroes:            heroes,
 		Loot:              loot,
+		HeroLoot:          heroLoot,
 		BossCycleEnabled:  bossCycleEnabled,
 		BossPool:          bossPool,
 		PlayerCount:       playerCount,
@@ -203,10 +219,12 @@ func (s *Store) SaveButton(ctx context.Context, button ButtonUpsert) error {
 	}
 
 	values := map[string]any{
-		"label":   firstNonEmpty(strings.TrimSpace(button.Label), slug),
-		"count":   "0",
-		"sort":    strconv.Itoa(button.Sort),
-		"enabled": boolToRedis(button.Enabled),
+		"label":              firstNonEmpty(strings.TrimSpace(button.Label), slug),
+		"count":              "0",
+		"sort":               strconv.Itoa(button.Sort),
+		"enabled":            boolToRedis(button.Enabled),
+		"tags":               encodeStringList(button.Tags),
+		"starlight_eligible": boolToRedis(button.StarlightEligible),
 	}
 
 	existing, err := s.client.HGetAll(ctx, s.prefix+slug).Result()
@@ -230,6 +248,11 @@ func (s *Store) SaveButton(ctx context.Context, button ButtonUpsert) error {
 		Score:  float64(button.Sort),
 		Member: slug,
 	})
+	if button.StarlightEligible {
+		pipe.SAdd(ctx, s.buttonStarlightKey, slug)
+	} else {
+		pipe.SRem(ctx, s.buttonStarlightKey, slug)
+	}
 	_, err = pipe.Exec(ctx)
 	return err
 }
@@ -255,7 +278,7 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 		StartedAt: time.Now().Unix(),
 	}
 
-	if err := s.setCurrentBoss(ctx, current, nil); err != nil {
+	if err := s.setCurrentBoss(ctx, current, nil, nil); err != nil {
 		return nil, err
 	}
 

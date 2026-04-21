@@ -123,9 +123,11 @@ func TestSynthesizeItemConsumesThreeCopiesAndImprovesStats(t *testing.T) {
 	}
 }
 
-func TestSynthesizeItemRejectsWhenAtMaxStar(t *testing.T) {
+func TestSynthesizeItemAllowsBeyondFormerMaxStar(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
+
+	store.roll = func(int) int { return 0 }
 
 	ctx := context.Background()
 	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
@@ -146,7 +148,19 @@ func TestSynthesizeItemRejectsWhenAtMaxStar(t *testing.T) {
 		t.Fatalf("seed upgrade: %v", err)
 	}
 
-	if _, err := store.SynthesizeItem(ctx, "阿明", "wood-sword"); !errors.Is(err, ErrEquipmentMaxStar) {
-		t.Fatalf("expected max star error, got %v", err)
+	state, err := store.SynthesizeItem(ctx, "阿明", "wood-sword")
+	if err != nil {
+		t.Fatalf("expected synthesize to continue beyond old max star, got %v", err)
+	}
+
+	item := state.Inventory[0]
+	if item.StarLevel != 6 {
+		t.Fatalf("expected star level 6, got %+v", item)
+	}
+	if item.Quantity != 7 {
+		t.Fatalf("expected quantity 7 after consuming two extra copies, got %+v", item)
+	}
+	if item.BonusClicks != 3 {
+		t.Fatalf("expected bonus clicks to keep growing after old cap, got %+v", item)
 	}
 }

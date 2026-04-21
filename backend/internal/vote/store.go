@@ -2,8 +2,10 @@ package vote
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"math/rand/v2"
 	"slices"
 	"strconv"
@@ -25,6 +27,8 @@ var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
 var ErrEquipmentNotEnough = errors.New("equipment not enough")
 var ErrEquipmentMaxStar = errors.New("equipment max star")
+var ErrHeroNotFound = errors.New("hero not found")
+var ErrHeroNotOwned = errors.New("hero not owned")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
@@ -39,14 +43,16 @@ var loadoutSlots = []string{"weapon", "armor", "accessory"}
 
 // Button 按钮数据结构，返回给前端和 SSE 客户端
 type Button struct {
-	Key       string `json:"key"`
-	RedisKey  string `json:"redisKey"`
-	Label     string `json:"label"`
-	Count     int64  `json:"count"`
-	Sort      int    `json:"sort"`
-	Enabled   bool   `json:"enabled"`
-	ImagePath string `json:"imagePath,omitempty"`
-	ImageAlt  string `json:"imageAlt,omitempty"`
+	Key               string   `json:"key"`
+	RedisKey          string   `json:"redisKey"`
+	Label             string   `json:"label"`
+	Count             int64    `json:"count"`
+	Sort              int      `json:"sort"`
+	Enabled           bool     `json:"enabled"`
+	Tags              []string `json:"tags,omitempty"`
+	StarlightEligible bool     `json:"starlightEligible,omitempty"`
+	ImagePath         string   `json:"imagePath,omitempty"`
+	ImageAlt          string   `json:"imageAlt,omitempty"`
 }
 
 // UserStats 用户统计信息
@@ -95,6 +101,43 @@ type EquipmentDefinition struct {
 	BonusClicks                int64  `json:"bonusClicks"`
 	BonusCriticalChancePercent int    `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
+}
+
+type HeroTraitType string
+
+const (
+	HeroTraitBonusClicks           HeroTraitType = "bonus_clicks"
+	HeroTraitCriticalChancePercent HeroTraitType = "critical_chance_percent"
+	HeroTraitCriticalCountBonus    HeroTraitType = "critical_count_bonus"
+	HeroTraitFinalDamagePercent    HeroTraitType = "final_damage_percent"
+)
+
+// HeroDefinition 小小英雄模板。
+type HeroDefinition struct {
+	HeroID                     string        `json:"heroId"`
+	Name                       string        `json:"name"`
+	ImagePath                  string        `json:"imagePath,omitempty"`
+	ImageAlt                   string        `json:"imageAlt,omitempty"`
+	BonusClicks                int64         `json:"bonusClicks"`
+	BonusCriticalChancePercent int           `json:"bonusCriticalChancePercent"`
+	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
+	TraitType                  HeroTraitType `json:"traitType"`
+	TraitValue                 int64         `json:"traitValue"`
+}
+
+// HeroInventoryItem 玩家持有的小小英雄。
+type HeroInventoryItem struct {
+	HeroID                     string        `json:"heroId"`
+	Name                       string        `json:"name"`
+	ImagePath                  string        `json:"imagePath,omitempty"`
+	ImageAlt                   string        `json:"imageAlt,omitempty"`
+	Quantity                   int64         `json:"quantity"`
+	Active                     bool          `json:"active"`
+	BonusClicks                int64         `json:"bonusClicks"`
+	BonusCriticalChancePercent int           `json:"bonusCriticalChancePercent"`
+	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
+	TraitType                  HeroTraitType `json:"traitType"`
+	TraitValue                 int64         `json:"traitValue"`
 }
 
 // Announcement 更新公告
@@ -169,13 +212,36 @@ type Reward struct {
 
 // BossLootEntry Boss 掉落池条目
 type BossLootEntry struct {
-	ItemID                     string `json:"itemId"`
-	ItemName                   string `json:"itemName"`
-	Slot                       string `json:"slot"`
-	Weight                     int64  `json:"weight"`
-	BonusClicks                int64  `json:"bonusClicks"`
-	BonusCriticalChancePercent int    `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
+	ItemID                     string  `json:"itemId"`
+	ItemName                   string  `json:"itemName"`
+	Slot                       string  `json:"slot"`
+	Weight                     int64   `json:"weight"`
+	DropRatePercent            float64 `json:"dropRatePercent"`
+	BonusClicks                int64   `json:"bonusClicks"`
+	BonusCriticalChancePercent int     `json:"bonusCriticalChancePercent"`
+	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
+}
+
+// BossHeroLootEntry Boss 英雄掉落池条目。
+type BossHeroLootEntry struct {
+	HeroID                     string        `json:"heroId"`
+	HeroName                   string        `json:"heroName"`
+	ImagePath                  string        `json:"imagePath,omitempty"`
+	ImageAlt                   string        `json:"imageAlt,omitempty"`
+	Weight                     int64         `json:"weight"`
+	DropRatePercent            float64       `json:"dropRatePercent"`
+	BonusClicks                int64         `json:"bonusClicks"`
+	BonusCriticalChancePercent int           `json:"bonusCriticalChancePercent"`
+	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
+	TraitType                  HeroTraitType `json:"traitType"`
+	TraitValue                 int64         `json:"traitValue"`
+}
+
+// StarlightState 描述当前生效的星光卡片窗口。
+type StarlightState struct {
+	ActiveKeys []string `json:"activeKeys"`
+	StartedAt  int64    `json:"startedAt"`
+	EndsAt     int64    `json:"endsAt"`
 }
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
@@ -185,17 +251,21 @@ type Snapshot struct {
 	Boss               *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard    []BossLeaderboardEntry `json:"bossLeaderboard"`
 	BossLoot           []BossLootEntry        `json:"bossLoot"`
+	BossHeroLoot       []BossHeroLootEntry    `json:"bossHeroLoot"`
+	Starlight          StarlightState         `json:"starlight"`
 	LatestAnnouncement *Announcement          `json:"latestAnnouncement,omitempty"`
 }
 
 // UserState 个人实时状态，只推送给对应昵称的连接
 type UserState struct {
-	UserStats   *UserStats      `json:"userStats,omitempty"`
-	MyBossStats *BossUserStats  `json:"myBossStats,omitempty"`
-	Inventory   []InventoryItem `json:"inventory"`
-	Loadout     Loadout         `json:"loadout"`
-	CombatStats CombatStats     `json:"combatStats"`
-	LastReward  *Reward         `json:"lastReward,omitempty"`
+	UserStats   *UserStats          `json:"userStats,omitempty"`
+	MyBossStats *BossUserStats      `json:"myBossStats,omitempty"`
+	Inventory   []InventoryItem     `json:"inventory"`
+	Heroes      []HeroInventoryItem `json:"heroes"`
+	ActiveHero  *HeroInventoryItem  `json:"activeHero,omitempty"`
+	Loadout     Loadout             `json:"loadout"`
+	CombatStats CombatStats         `json:"combatStats"`
+	LastReward  *Reward             `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -206,9 +276,13 @@ type State struct {
 	Boss               *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard    []BossLeaderboardEntry `json:"bossLeaderboard"`
 	BossLoot           []BossLootEntry        `json:"bossLoot"`
+	BossHeroLoot       []BossHeroLootEntry    `json:"bossHeroLoot"`
+	Starlight          StarlightState         `json:"starlight"`
 	LatestAnnouncement *Announcement          `json:"latestAnnouncement,omitempty"`
 	MyBossStats        *BossUserStats         `json:"myBossStats,omitempty"`
 	Inventory          []InventoryItem        `json:"inventory"`
+	Heroes             []HeroInventoryItem    `json:"heroes"`
+	ActiveHero         *HeroInventoryItem     `json:"activeHero,omitempty"`
 	Loadout            Loadout                `json:"loadout"`
 	CombatStats        CombatStats            `json:"combatStats"`
 	LastReward         *Reward                `json:"lastReward,omitempty"`
@@ -268,7 +342,9 @@ type Store struct {
 	prefix               string
 	namespace            string
 	buttonIndexKey       string
+	buttonStarlightKey   string
 	equipmentIndexKey    string
+	heroIndexKey         string
 	playerIndexKey       string
 	userPrefix           string
 	leaderboardKey       string
@@ -286,8 +362,11 @@ type Store struct {
 	messageKey           string
 	messagePrefix        string
 	equipmentDefPrefix   string
+	heroDefPrefix        string
 	inventoryPrefix      string
+	heroInventoryPrefix  string
 	loadoutPrefix        string
+	activeHeroPrefix     string
 	lastRewardPrefix     string
 	upgradePrefix        string
 	fallbacks            map[string]buttonFallback
@@ -295,6 +374,7 @@ type Store struct {
 	luaRunner            luaScriptRunner
 	bossClickScript      *cachedLuaScript
 	roll                 func(int) int
+	now                  func() time.Time
 	validator            interface{ Validate(string) error }
 }
 
@@ -304,9 +384,16 @@ var hashFields = []string{
 	"count",
 	"sort",
 	"enabled",
+	"tags",
+	"starlight_eligible",
 	"image_path",
 	"image_alt",
 }
+
+const (
+	starlightWindow = 5 * time.Minute
+	starlightLimit  = 6
+)
 
 // NewStore 创建 Redis 投票存储实例
 func NewStore(client redis.UniversalClient, prefix string, options StoreOptions, validator interface{ Validate(string) error }) *Store {
@@ -318,7 +405,9 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		prefix:               prefix,
 		namespace:            namespace,
 		buttonIndexKey:       namespace + "buttons:index",
+		buttonStarlightKey:   namespace + "buttons:starlight",
 		equipmentIndexKey:    namespace + "equipment:index",
+		heroIndexKey:         namespace + "heroes:index",
 		playerIndexKey:       namespace + "players:index",
 		userPrefix:           namespace + "user:",
 		leaderboardKey:       namespace + "leaderboard",
@@ -336,8 +425,11 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		messageKey:           namespace + "messages",
 		messagePrefix:        namespace + "message:",
 		equipmentDefPrefix:   namespace + "equip:def:",
+		heroDefPrefix:        namespace + "hero:def:",
 		inventoryPrefix:      namespace + "user-inventory:",
+		heroInventoryPrefix:  namespace + "user-hero-inventory:",
 		loadoutPrefix:        namespace + "user-loadout:",
+		activeHeroPrefix:     namespace + "user-active-hero:",
 		lastRewardPrefix:     namespace + "user-last-reward:",
 		upgradePrefix:        namespace + "user-equip-upgrade:",
 		fallbacks: map[string]buttonFallback{
@@ -354,6 +446,7 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		roll: func(limit int) int {
 			return rand.IntN(limit)
 		},
+		now:       time.Now,
 		validator: validator,
 	}
 }
@@ -383,12 +476,17 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 
 	bossLeaderboard := []BossLeaderboardEntry{}
 	bossLoot := []BossLootEntry{}
+	bossHeroLoot := []BossHeroLootEntry{}
 	if boss != nil {
 		bossLeaderboard, err = s.ListBossLeaderboard(ctx, boss.ID, 10)
 		if err != nil {
 			return Snapshot{}, err
 		}
 		bossLoot, err = s.loadBossLoot(ctx, boss.ID)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		bossHeroLoot, err = s.loadBossHeroLoot(ctx, boss.ID)
 		if err != nil {
 			return Snapshot{}, err
 		}
@@ -405,6 +503,8 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 		Boss:               boss,
 		BossLeaderboard:    bossLeaderboard,
 		BossLoot:           bossLoot,
+		BossHeroLoot:       bossHeroLoot,
+		Starlight:          starlightStateForButtons(buttons, s.now()),
 		LatestAnnouncement: latestAnnouncement,
 	}, nil
 }
@@ -428,6 +528,7 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, error) {
 	userState := UserState{
 		Inventory:   []InventoryItem{},
+		Heroes:      []HeroInventoryItem{},
 		Loadout:     Loadout{},
 		CombatStats: s.baseCombatStats(),
 	}
@@ -465,7 +566,22 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	}
 	userState.Inventory = inventory
 
-	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
+	heroQuantities, err := s.heroInventoryQuantities(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	activeHero, err := s.activeHeroForNickname(ctx, normalizedNickname, heroQuantities)
+	if err != nil {
+		return UserState{}, err
+	}
+	heroes, err := s.heroInventoryForNickname(ctx, normalizedNickname, heroQuantities, activeHero)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.Heroes = heroes
+	userState.ActiveHero = activeHero
+
+	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout, activeHero)
 	if err != nil {
 		return UserState{}, err
 	}
@@ -564,6 +680,11 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 	delta, critical, err := s.nextIncrement(ctx, normalizedNickname)
 	if err != nil {
 		return ClickResult{}, err
+	}
+	if active, err := s.buttonStarlightActive(ctx, slug, s.now()); err != nil {
+		return ClickResult{}, err
+	} else if active {
+		delta *= 2
 	}
 
 	boss, err := s.currentBoss(ctx)
@@ -806,9 +927,13 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Boss:               snapshot.Boss,
 		BossLeaderboard:    snapshot.BossLeaderboard,
 		BossLoot:           snapshot.BossLoot,
+		BossHeroLoot:       snapshot.BossHeroLoot,
+		Starlight:          snapshot.Starlight,
 		LatestAnnouncement: snapshot.LatestAnnouncement,
 		MyBossStats:        userState.MyBossStats,
 		Inventory:          userState.Inventory,
+		Heroes:             userState.Heroes,
+		ActiveHero:         userState.ActiveHero,
 		Loadout:            userState.Loadout,
 		CombatStats:        userState.CombatStats,
 		LastReward:         userState.LastReward,
@@ -934,34 +1059,46 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 	if err != nil {
 		return nil, err
 	}
+	heroLootEntries, err := s.loadBossHeroLoot(ctx, bossID)
+	if err != nil {
+		return nil, err
+	}
 
-	if len(lootEntries) > 0 {
+	if len(lootEntries) > 0 || len(heroLootEntries) > 0 {
 		participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
 		if err != nil {
 			return nil, err
 		}
 
 		pipe := s.client.Pipeline()
-		now := time.Now().Unix()
+		now := s.now().Unix()
+		minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
 		for _, participant := range participants {
 			nickname, ok := participant.Member.(string)
-			if !ok || nickname == "" || participant.Score <= 0 {
+			if !ok || nickname == "" || participant.Score < float64(minDamage) {
 				continue
 			}
 
-			reward := s.chooseLoot(lootEntries)
-			if reward == nil {
-				continue
+			if reward := s.chooseLoot(lootEntries); reward != nil {
+				pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
+				pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
+					"boss_id":    bossID,
+					"boss_name":  bossName,
+					"item_id":    reward.ItemID,
+					"item_name":  reward.ItemName,
+					"granted_at": strconv.FormatInt(now, 10),
+				})
 			}
-
-			pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
-			pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
-				"boss_id":    bossID,
-				"boss_name":  bossName,
-				"item_id":    reward.ItemID,
-				"item_name":  reward.ItemName,
-				"granted_at": strconv.FormatInt(now, 10),
-			})
+			if heroReward := s.chooseHeroLoot(heroLootEntries); heroReward != nil {
+				pipe.HIncrBy(ctx, s.heroInventoryKey(nickname), heroReward.HeroID, 1)
+				pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
+					"boss_id":    bossID,
+					"boss_name":  bossName,
+					"item_id":    heroReward.HeroID,
+					"item_name":  heroReward.HeroName,
+					"granted_at": strconv.FormatInt(now, 10),
+				})
+			}
 		}
 
 		if _, err = pipe.Exec(ctx); err != nil {
@@ -1031,7 +1168,15 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 	if err != nil {
 		return 0, false, err
 	}
-	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout)
+	heroQuantities, err := s.heroInventoryQuantities(ctx, nickname)
+	if err != nil {
+		return 0, false, err
+	}
+	activeHero, err := s.activeHeroForNickname(ctx, nickname, heroQuantities)
+	if err != nil {
+		return 0, false, err
+	}
+	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout, activeHero)
 	if err != nil {
 		return 0, false, err
 	}
@@ -1052,7 +1197,7 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 	return delta, false, nil
 }
 
-func (s *Store) combatStatsForNickname(_ context.Context, _ string, loadout Loadout) (CombatStats, error) {
+func (s *Store) combatStatsForNickname(_ context.Context, _ string, loadout Loadout, activeHero *HeroInventoryItem) (CombatStats, error) {
 	stats := s.baseCombatStats()
 
 	bonusClicks, bonusChance, bonusCount := loadoutBonuses(loadout)
@@ -1060,7 +1205,12 @@ func (s *Store) combatStatsForNickname(_ context.Context, _ string, loadout Load
 	stats.CriticalChancePercent = clampInt(stats.CriticalChancePercent+bonusChance, 0, 100)
 	stats.CriticalCount += bonusCount
 
-	return deriveCombatStats(stats), nil
+	heroBonusClicks, heroBonusChance, heroBonusCount, heroFinalDamagePercent := heroBonuses(activeHero)
+	stats.BonusClicks += heroBonusClicks
+	stats.CriticalChancePercent = clampInt(stats.CriticalChancePercent+heroBonusChance, 0, 100)
+	stats.CriticalCount += heroBonusCount
+
+	return applyFinalDamagePercent(deriveCombatStats(stats), heroFinalDamagePercent), nil
 }
 
 func (s *Store) baseCombatStats() CombatStats {
@@ -1297,17 +1447,26 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 	}
 
 	loot := make([]BossLootEntry, 0, len(entries))
+	totalWeight := int64(0)
+	for _, entry := range entries {
+		if entry.Score > 0 {
+			totalWeight += int64(entry.Score)
+		}
+	}
 	for _, entry := range entries {
 		itemID, ok := entry.Member.(string)
 		if !ok || strings.TrimSpace(itemID) == "" {
 			continue
 		}
 
+		dropRatePercent := percentageFromWeight(int64(entry.Score), totalWeight)
+
 		definition, defErr := s.getEquipmentDefinition(ctx, itemID)
 		if defErr != nil {
 			loot = append(loot, BossLootEntry{
-				ItemID: itemID,
-				Weight: int64(entry.Score),
+				ItemID:          itemID,
+				Weight:          int64(entry.Score),
+				DropRatePercent: dropRatePercent,
 			})
 			continue
 		}
@@ -1317,6 +1476,7 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			ItemName:                   definition.Name,
 			Slot:                       definition.Slot,
 			Weight:                     int64(entry.Score),
+			DropRatePercent:            dropRatePercent,
 			BonusClicks:                definition.BonusClicks,
 			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
 			BonusCriticalCount:         definition.BonusCriticalCount,
@@ -1340,26 +1500,176 @@ func (s *Store) normalizeButton(redisKey string, values []any) Button {
 		}
 	}
 
-	imagePath := stringValue(values, 4)
+	imagePath := stringValue(values, 6)
 	if imagePath == "" {
 		imagePath = fallback.ImagePath
 	}
 
-	imageAlt := stringValue(values, 5)
+	imageAlt := stringValue(values, 7)
 	if imageAlt == "" {
 		imageAlt = fallback.ImageAlt
 	}
 
 	return Button{
-		Key:       slug,
-		RedisKey:  redisKey,
-		Label:     label,
-		Count:     int64Value(values, 1),
-		Sort:      int(int64Value(values, 2)),
-		Enabled:   stringValue(values, 3) != "0",
-		ImagePath: imagePath,
-		ImageAlt:  imageAlt,
+		Key:               slug,
+		RedisKey:          redisKey,
+		Label:             label,
+		Count:             int64Value(values, 1),
+		Sort:              int(int64Value(values, 2)),
+		Enabled:           stringValue(values, 3) != "0",
+		Tags:              decodeStringList(stringValue(values, 4)),
+		StarlightEligible: stringValue(values, 5) == "1",
+		ImagePath:         imagePath,
+		ImageAlt:          imageAlt,
 	}
+}
+
+func decodeStringList(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	var items []string
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return nil
+	}
+
+	normalized := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		normalized = append(normalized, item)
+	}
+
+	return normalized
+}
+
+func encodeStringList(items []string) string {
+	normalized := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		normalized = append(normalized, item)
+	}
+
+	if len(normalized) == 0 {
+		return "[]"
+	}
+
+	encoded, err := json.Marshal(normalized)
+	if err != nil {
+		return "[]"
+	}
+	return string(encoded)
+}
+
+func starlightStateForButtons(buttons []Button, now time.Time) StarlightState {
+	startedAt := now.Unix() - (now.Unix() % int64(starlightWindow/time.Second))
+	eligible := make([]string, 0, len(buttons))
+	for _, button := range buttons {
+		if button.StarlightEligible {
+			eligible = append(eligible, button.Key)
+		}
+	}
+
+	return StarlightState{
+		ActiveKeys: activeStarlightKeys(eligible, startedAt),
+		StartedAt:  startedAt,
+		EndsAt:     startedAt + int64(starlightWindow/time.Second),
+	}
+}
+
+func activeStarlightKeys(keys []string, startedAt int64) []string {
+	normalized := make([]string, 0, len(keys))
+	seen := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		normalized = append(normalized, key)
+	}
+
+	if len(normalized) <= starlightLimit {
+		slices.Sort(normalized)
+		return normalized
+	}
+
+	type scoredKey struct {
+		key   string
+		score uint64
+	}
+
+	scored := make([]scoredKey, 0, len(normalized))
+	for _, key := range normalized {
+		hasher := fnv.New64a()
+		_, _ = hasher.Write([]byte(strconv.FormatInt(startedAt, 10)))
+		_, _ = hasher.Write([]byte(":"))
+		_, _ = hasher.Write([]byte(key))
+		scored = append(scored, scoredKey{
+			key:   key,
+			score: hasher.Sum64(),
+		})
+	}
+
+	slices.SortFunc(scored, func(left, right scoredKey) int {
+		if left.score == right.score {
+			return strings.Compare(left.key, right.key)
+		}
+		if left.score < right.score {
+			return -1
+		}
+		return 1
+	})
+
+	active := make([]string, 0, starlightLimit)
+	for _, item := range scored[:starlightLimit] {
+		active = append(active, item.key)
+	}
+	slices.Sort(active)
+	return active
+}
+
+func (s *Store) buttonStarlightActive(ctx context.Context, slug string, now time.Time) (bool, error) {
+	keys, err := s.client.SMembers(ctx, s.buttonStarlightKey).Result()
+	if err != nil {
+		return false, err
+	}
+
+	startedAt := now.Unix() - (now.Unix() % int64(starlightWindow/time.Second))
+	for _, key := range activeStarlightKeys(keys, startedAt) {
+		if key == slug {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func percentageFromWeight(weight int64, totalWeight int64) float64 {
+	if weight <= 0 || totalWeight <= 0 {
+		return 0
+	}
+
+	return float64(weight) * 100 / float64(totalWeight)
 }
 
 // scanKeys 扫描 Redis 中匹配前缀的所有键
@@ -1604,8 +1914,16 @@ func (s *Store) inventoryKey(nickname string) string {
 	return s.inventoryPrefix + nickname
 }
 
+func (s *Store) heroInventoryKey(nickname string) string {
+	return s.heroInventoryPrefix + nickname
+}
+
 func (s *Store) loadoutKey(nickname string) string {
 	return s.loadoutPrefix + nickname
+}
+
+func (s *Store) activeHeroKey(nickname string) string {
+	return s.activeHeroPrefix + nickname
 }
 
 func (s *Store) lastRewardKey(nickname string) string {
@@ -1628,6 +1946,10 @@ func (s *Store) equipmentKey(itemID string) string {
 	return s.equipmentDefPrefix + itemID
 }
 
+func (s *Store) heroKey(heroID string) string {
+	return s.heroDefPrefix + heroID
+}
+
 func (s *Store) bossDamageKey(bossID string) string {
 	return s.namespace + "boss:" + bossID + ":damage"
 }
@@ -1642,6 +1964,14 @@ func (s *Store) bossTemplateKey(templateID string) string {
 
 func (s *Store) bossTemplateLootKey(templateID string) string {
 	return s.bossTemplateKey(templateID) + ":loot"
+}
+
+func (s *Store) bossTemplateHeroLootKey(templateID string) string {
+	return s.bossTemplateKey(templateID) + ":hero-loot"
+}
+
+func (s *Store) bossHeroLootKey(bossID string) string {
+	return s.namespace + "boss:" + bossID + ":hero-loot"
 }
 
 func (s *Store) bossRewardLockKey(bossID string) string {

@@ -14,28 +14,31 @@ import (
 )
 
 type mockStore struct {
-	state              vote.State
-	equipState         vote.State
-	adminState         vote.AdminState
-	adminPlayerPage    vote.AdminPlayerPage
-	adminPlayer        *vote.AdminPlayerOverview
-	bossHistory        []vote.BossHistoryEntry
-	announcements      []vote.Announcement
-	latestAnnouncement *vote.Announcement
-	messagePage        vote.MessagePage
-	result             vote.ClickResult
-	lastButton         vote.ButtonUpsert
-	lastBoss           vote.BossUpsert
-	lastBossTemplate   vote.BossTemplateUpsert
-	lastTemplateLootID string
-	lastTemplateLoot   []vote.BossLootEntry
-	lastCycleEnabled   bool
-	getStateErr        error
-	clickErr           error
-	equipErr           error
-	validateErr        error
-	messageErr         error
-	synthesizeErr      error
+	state                  vote.State
+	equipState             vote.State
+	adminState             vote.AdminState
+	adminPlayerPage        vote.AdminPlayerPage
+	adminPlayer            *vote.AdminPlayerOverview
+	bossHistory            []vote.BossHistoryEntry
+	announcements          []vote.Announcement
+	latestAnnouncement     *vote.Announcement
+	messagePage            vote.MessagePage
+	result                 vote.ClickResult
+	lastButton             vote.ButtonUpsert
+	lastBoss               vote.BossUpsert
+	lastBossTemplate       vote.BossTemplateUpsert
+	lastHero               vote.HeroDefinition
+	lastTemplateLootID     string
+	lastTemplateLoot       []vote.BossLootEntry
+	lastTemplateHeroLootID string
+	lastTemplateHeroLoot   []vote.BossHeroLootEntry
+	lastCycleEnabled       bool
+	getStateErr            error
+	clickErr               error
+	equipErr               error
+	validateErr            error
+	messageErr             error
+	synthesizeErr          error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -154,6 +157,15 @@ func (m *mockStore) SaveEquipmentDefinition(_ context.Context, _ vote.EquipmentD
 	return nil
 }
 
+func (m *mockStore) SaveHeroDefinition(_ context.Context, hero vote.HeroDefinition) error {
+	m.lastHero = hero
+	return nil
+}
+
+func (m *mockStore) DeleteHeroDefinition(_ context.Context, _ string) error {
+	return nil
+}
+
 func (m *mockStore) DeleteEquipmentDefinition(_ context.Context, _ string) error {
 	return nil
 }
@@ -189,6 +201,12 @@ func (m *mockStore) DeleteBossTemplate(_ context.Context, _ string) error {
 func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, loot []vote.BossLootEntry) error {
 	m.lastTemplateLootID = templateID
 	m.lastTemplateLoot = loot
+	return nil
+}
+
+func (m *mockStore) SetBossTemplateHeroLoot(_ context.Context, templateID string, loot []vote.BossHeroLootEntry) error {
+	m.lastTemplateHeroLootID = templateID
+	m.lastTemplateHeroLoot = loot
 	return nil
 }
 
@@ -258,6 +276,20 @@ func (m *mockStore) SynthesizeItem(_ context.Context, _ string, _ string) (vote.
 		return vote.State{}, m.synthesizeErr
 	}
 	if len(m.equipState.Buttons) == 0 && len(m.equipState.Inventory) == 0 && m.equipState.Loadout.Weapon == nil && m.equipState.Loadout.Armor == nil && m.equipState.Loadout.Accessory == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) EquipHero(_ context.Context, _ string, _ string) (vote.State, error) {
+	if len(m.equipState.Buttons) == 0 && len(m.equipState.Heroes) == 0 && m.equipState.ActiveHero == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) UnequipHero(_ context.Context, _ string, _ string) (vote.State, error) {
+	if len(m.equipState.Buttons) == 0 && len(m.equipState.Heroes) == 0 && m.equipState.ActiveHero == nil {
 		return m.state, nil
 	}
 	return m.equipState, nil
@@ -757,6 +789,61 @@ func TestSynthesizeItemReturnsUpdatedState(t *testing.T) {
 	}
 }
 
+func TestEquipHeroReturnsUpdatedState(t *testing.T) {
+	store := &mockStore{
+		equipState: vote.State{
+			Heroes: []vote.HeroInventoryItem{
+				{
+					HeroID:      "spark-cat",
+					Name:        "星火猫",
+					Quantity:    1,
+					Active:      true,
+					BonusClicks: 2,
+				},
+			},
+			ActiveHero: &vote.HeroInventoryItem{
+				HeroID:      "spark-cat",
+				Name:        "星火猫",
+				Quantity:    1,
+				Active:      true,
+				BonusClicks: 2,
+			},
+			CombatStats: vote.CombatStats{
+				BaseIncrement:      1,
+				BonusClicks:        2,
+				EffectiveIncrement: 3,
+				NormalDamage:       3,
+				CriticalDamage:     7,
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/heroes/spark-cat/equip", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload struct {
+		ActiveHero *vote.HeroInventoryItem `json:"activeHero"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.ActiveHero == nil || payload.ActiveHero.HeroID != "spark-cat" {
+		t.Fatalf("unexpected hero equip payload: %+v", payload.ActiveHero)
+	}
+}
+
 func TestPostMessageRejectsSensitiveContent(t *testing.T) {
 	store := &mockStore{
 		messageErr: vote.ErrSensitiveContent,
@@ -965,6 +1052,56 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	}
 	if !store.lastCycleEnabled {
 		t.Fatal("expected cycle enable to be forwarded to store")
+	}
+}
+
+func TestAdminHeroRoutesForwardPayloads(t *testing.T) {
+	store := &mockStore{}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie from login")
+	}
+
+	saveHeroRequest := httptest.NewRequest(http.MethodPost, "/api/admin/heroes", strings.NewReader(`{"heroId":"spark-cat","name":"星火猫","bonusClicks":2,"traitType":"final_damage_percent","traitValue":50}`))
+	saveHeroRequest.Header.Set("Content-Type", "application/json")
+	saveHeroRequest.AddCookie(cookies[0])
+	saveHeroResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveHeroResponse, saveHeroRequest)
+
+	if saveHeroResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from hero save, got %d", saveHeroResponse.Code)
+	}
+	if store.lastHero.HeroID != "spark-cat" || store.lastHero.TraitValue != 50 {
+		t.Fatalf("expected hero payload to be forwarded, got %+v", store.lastHero)
+	}
+
+	saveHeroLootRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/pool/dragon/hero-loot", strings.NewReader(`{"loot":[{"heroId":"spark-cat","weight":2}]}`))
+	saveHeroLootRequest.Header.Set("Content-Type", "application/json")
+	saveHeroLootRequest.AddCookie(cookies[0])
+	saveHeroLootResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveHeroLootResponse, saveHeroLootRequest)
+
+	if saveHeroLootResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from hero loot save, got %d", saveHeroLootResponse.Code)
+	}
+	if store.lastTemplateHeroLootID != "dragon" || len(store.lastTemplateHeroLoot) != 1 || store.lastTemplateHeroLoot[0].HeroID != "spark-cat" {
+		t.Fatalf("expected hero loot payload to be forwarded, got id=%s loot=%+v", store.lastTemplateHeroLootID, store.lastTemplateHeroLoot)
 	}
 }
 

@@ -668,6 +668,39 @@ select {
   margin-top: 24px;
 }
 
+.vote-stage__filters {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.vote-stage__search {
+  max-width: 380px;
+}
+
+.vote-stage__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vote-stage__tag {
+  min-height: 38px;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(183, 53, 97, 0.14);
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink-soft);
+  font-weight: 800;
+  box-shadow: var(--shadow-soft);
+}
+
+.vote-stage__tag--active {
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.92), rgba(251, 113, 133, 0.92));
+  color: #fff7fb;
+  border-color: transparent;
+}
+
 .vote-card {
   position: relative;
   min-height: 260px;
@@ -735,6 +768,26 @@ select {
 
 .vote-card--locked {
   opacity: 0.88;
+}
+
+.vote-card--starlight {
+  background:
+    linear-gradient(180deg, rgba(255, 253, 243, 0.98), rgba(255, 230, 189, 0.98)),
+    var(--surface-strong);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.96),
+    inset 0 -10px 18px rgba(245, 158, 11, 0.14),
+    0 24px 36px rgba(234, 88, 12, 0.18);
+}
+
+.vote-card--starlight .vote-card__badge {
+  background: rgba(255, 247, 204, 0.92);
+  color: #9a3412;
+}
+
+.vote-card--starlight .vote-card__count {
+  color: #c2410c;
+  text-shadow: 0 0 18px rgba(255, 196, 64, 0.22);
 }
 
 .hero__admin-link {
@@ -968,7 +1021,10 @@ select {
 }
 
 .inventory-item__top {
-  display: block;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
 }
 
 .inventory-item__meta {
@@ -990,6 +1046,41 @@ select {
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+.inventory-item__hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.inventory-item__avatar,
+.player-hud__hero-portrait,
+.admin-entity__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 22px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(183, 53, 97, 0.12);
+  box-shadow: 0 12px 22px rgba(183, 53, 97, 0.14);
+}
+
+.inventory-item__avatar--hero {
+  width: 84px;
+  height: 84px;
+}
+
+.player-hud__hero-active {
+  display: flex;
+  justify-content: center;
+}
+
+.player-hud__hero-portrait {
+  width: 112px;
+  height: 112px;
+  border-radius: 28px;
 }
 
 .inventory-item__stats {
@@ -1228,6 +1319,19 @@ select {
   background: rgba(255, 255, 255, 0.74);
 }
 
+.admin-upload__preview--avatar {
+  max-width: 140px;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.admin-entity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
 .admin-cycle-pills {
   display: flex;
   flex-wrap: wrap;
@@ -1344,6 +1448,12 @@ select {
 
   .inventory-item__stats {
     margin-top: 12px;
+  }
+
+  .inventory-item__top,
+  .inventory-item__hero,
+  .admin-entity {
+    grid-template-columns: 1fr;
   }
 
   .inventory-item__footer {

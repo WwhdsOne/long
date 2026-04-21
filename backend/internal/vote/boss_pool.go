@@ -40,12 +40,17 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 		if err != nil {
 			return nil, err
 		}
+		heroLoot, err := s.loadBossTemplateHeroLoot(ctx, templateID)
+		if err != nil {
+			return nil, err
+		}
 
 		templates = append(templates, BossTemplate{
-			ID:    templateID,
-			Name:  firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
-			MaxHP: maxInt64(1, int64FromString(values["max_hp"])),
-			Loot:  loot,
+			ID:       templateID,
+			Name:     firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
+			MaxHP:    maxInt64(1, int64FromString(values["max_hp"])),
+			Loot:     loot,
+			HeroLoot: heroLoot,
 		})
 	}
 
@@ -182,7 +187,7 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 		StartedAt:  time.Now().Unix(),
 	}
 
-	if err := s.setCurrentBoss(ctx, current, template.Loot); err != nil {
+	if err := s.setCurrentBoss(ctx, current, template.Loot, template.HeroLoot); err != nil {
 		return nil, err
 	}
 
@@ -203,7 +208,7 @@ func (s *Store) nextBossInstanceID(ctx context.Context, templateID string) (stri
 	return baseID + "-" + strconv.FormatInt(seq, 10), nil
 }
 
-func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootEntry) error {
+func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootEntry, heroLoot []BossHeroLootEntry) error {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil
 	}
@@ -227,6 +232,7 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	pipe.Del(ctx, s.bossCurrentKey)
 	pipe.HSet(ctx, s.bossCurrentKey, values)
 	pipe.Del(ctx, s.bossLootKey(boss.ID))
+	pipe.Del(ctx, s.bossHeroLootKey(boss.ID))
 
 	entries := make([]redis.Z, 0, len(loot))
 	for _, item := range loot {
@@ -240,6 +246,19 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	}
 	if len(entries) > 0 {
 		pipe.ZAdd(ctx, s.bossLootKey(boss.ID), entries...)
+	}
+	heroEntries := make([]redis.Z, 0, len(heroLoot))
+	for _, item := range heroLoot {
+		if strings.TrimSpace(item.HeroID) == "" || item.Weight <= 0 {
+			continue
+		}
+		heroEntries = append(heroEntries, redis.Z{
+			Score:  float64(item.Weight),
+			Member: strings.TrimSpace(item.HeroID),
+		})
+	}
+	if len(heroEntries) > 0 {
+		pipe.ZAdd(ctx, s.bossHeroLootKey(boss.ID), heroEntries...)
 	}
 
 	_, err := pipe.Exec(ctx)

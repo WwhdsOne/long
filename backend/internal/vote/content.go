@@ -15,7 +15,6 @@ import (
 
 const (
 	maxMessageRunes = 200
-	maxEquipmentStar = 5
 )
 
 type equipmentUpgrade struct {
@@ -255,10 +254,6 @@ func (s *Store) SynthesizeItem(ctx context.Context, nickname string, itemID stri
 	if err != nil {
 		return State{}, err
 	}
-	if upgrade.StarLevel >= maxEquipmentStar {
-		return State{}, ErrEquipmentMaxStar
-	}
-
 	switch s.roll(3) {
 	case 0:
 		upgrade.BonusClicks++

@@ -1,6 +1,8 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 
+import { uploadImageWithPolicy } from '../utils/ossUpload'
+
 const checkingSession = ref(true)
 const authenticated = ref(false)
 const loading = ref(false)
@@ -21,9 +23,11 @@ const bossForm = ref({
 })
 
 const equipmentForm = ref(emptyEquipmentForm())
+const heroForm = ref(emptyHeroForm())
 const buttonForm = reactive(emptyButtonForm())
 const announcementForm = ref(emptyAnnouncementForm())
 const lootRows = ref([{ itemId: '', weight: '' }])
+const heroLootRows = ref([{ heroId: '', weight: '' }])
 const selectedBossTemplateId = ref('')
 
 const adminState = ref(emptyAdminState())
@@ -45,7 +49,9 @@ const selectedBossTemplate = computed(() =>
   bossTemplates.value.find((entry) => entry.id === selectedBossTemplateId.value) ?? null,
 )
 const equipmentOptions = computed(() => adminState.value.equipment ?? [])
+const heroOptions = computed(() => adminState.value.heroes ?? [])
 const hasEquipmentTemplates = computed(() => equipmentOptions.value.length > 0)
+const hasHeroTemplates = computed(() => heroOptions.value.length > 0)
 
 function emptyAdminState() {
   return {
@@ -53,7 +59,9 @@ function emptyAdminState() {
     boss: null,
     bossLeaderboard: [],
     equipment: [],
+    heroes: [],
     loot: [],
+    heroLoot: [],
     bossCycleEnabled: false,
     bossPool: [],
     playerCount: 0,
@@ -81,12 +89,43 @@ function normalizeLootEntry(entry) {
   }
 }
 
+function normalizeHeroLootEntry(entry) {
+  return {
+    heroId: entry?.heroId || '',
+    heroName: entry?.heroName || '',
+    imagePath: entry?.imagePath || '',
+    imageAlt: entry?.imageAlt || '',
+    weight: Number(entry?.weight ?? 0),
+    dropRatePercent: Number(entry?.dropRatePercent ?? 0),
+    bonusClicks: Number(entry?.bonusClicks ?? 0),
+    bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
+    bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
+    traitType: entry?.traitType || '',
+    traitValue: Number(entry?.traitValue ?? 0),
+  }
+}
+
+function normalizeHeroDefinition(entry) {
+  return {
+    heroId: entry?.heroId || '',
+    name: entry?.name || '',
+    imagePath: entry?.imagePath || '',
+    imageAlt: entry?.imageAlt || '',
+    bonusClicks: Number(entry?.bonusClicks ?? 0),
+    bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
+    bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
+    traitType: entry?.traitType || 'bonus_clicks',
+    traitValue: Number(entry?.traitValue ?? 0),
+  }
+}
+
 function normalizeBossTemplate(entry) {
   return {
     id: entry?.id || '',
     name: entry?.name || '',
     maxHp: Number(entry?.maxHp ?? 0),
     loot: Array.isArray(entry?.loot) ? entry.loot.map(normalizeLootEntry) : [],
+    heroLoot: Array.isArray(entry?.heroLoot) ? entry.heroLoot.map(normalizeHeroLootEntry) : [],
   }
 }
 
@@ -96,7 +135,9 @@ function normalizeAdminState(payload) {
     boss: payload?.boss ?? null,
     bossLeaderboard: Array.isArray(payload?.bossLeaderboard) ? payload.bossLeaderboard : [],
     equipment: Array.isArray(payload?.equipment) ? payload.equipment : [],
+    heroes: Array.isArray(payload?.heroes) ? payload.heroes.map(normalizeHeroDefinition) : [],
     loot: Array.isArray(payload?.loot) ? payload.loot.map(normalizeLootEntry) : [],
+    heroLoot: Array.isArray(payload?.heroLoot) ? payload.heroLoot.map(normalizeHeroLootEntry) : [],
     bossCycleEnabled: Boolean(payload?.bossCycleEnabled),
     bossPool: Array.isArray(payload?.bossPool) ? payload.bossPool.map(normalizeBossTemplate) : [],
     playerCount: Number(payload?.playerCount ?? 0),
@@ -133,8 +174,24 @@ function emptyButtonForm() {
     label: '',
     sort: '',
     enabled: true,
+    tagsText: '',
+    starlightEligible: false,
     imagePath: '',
     imageAlt: '',
+  }
+}
+
+function emptyHeroForm() {
+  return {
+    heroId: '',
+    name: '',
+    imagePath: '',
+    imageAlt: '',
+    bonusClicks: '',
+    bonusCriticalChancePercent: '',
+    bonusCriticalCount: '',
+    traitType: 'bonus_clicks',
+    traitValue: '',
   }
 }
 
@@ -165,8 +222,31 @@ function emptyLootRows() {
   return [{ itemId: '', weight: '' }]
 }
 
+function emptyHeroLootRows() {
+  return [{ heroId: '', weight: '' }]
+}
+
 function formatItemStats(item) {
   return `点击+${item?.bonusClicks ?? 0} 暴击率+${item?.bonusCriticalChancePercent ?? 0}% 暴击+${item?.bonusCriticalCount ?? 0}`
+}
+
+function formatHeroTrait(hero) {
+  switch (hero?.traitType) {
+    case 'bonus_clicks':
+      return `被动：额外点击 +${hero?.traitValue ?? 0}`
+    case 'critical_chance_percent':
+      return `被动：暴击率 +${hero?.traitValue ?? 0}%`
+    case 'critical_count_bonus':
+      return `被动：暴击额外 +${hero?.traitValue ?? 0}`
+    case 'final_damage_percent':
+      return `被动：最终伤害 +${hero?.traitValue ?? 0}%`
+    default:
+      return '被动：暂无'
+  }
+}
+
+function heroImageAlt(hero) {
+  return hero?.imageAlt || hero?.name || hero?.heroId || '英雄头像'
 }
 
 function normalizeAnnouncements(payload) {
@@ -239,6 +319,14 @@ function findBossTemplate(templateId) {
   return bossTemplates.value.find((entry) => entry.id === templateId) ?? null
 }
 
+function findHeroTemplate(heroId) {
+  if (!heroId) {
+    return null
+  }
+
+  return heroOptions.value.find((entry) => entry.heroId === heroId) ?? null
+}
+
 function applyLootRows(loot) {
   lootRows.value = Array.isArray(loot) && loot.length > 0
     ? loot.map((entry) => ({
@@ -246,6 +334,15 @@ function applyLootRows(loot) {
         weight: entry.weight,
       }))
     : emptyLootRows()
+}
+
+function applyHeroLootRows(loot) {
+  heroLootRows.value = Array.isArray(loot) && loot.length > 0
+    ? loot.map((entry) => ({
+        heroId: entry.heroId,
+        weight: entry.weight,
+      }))
+    : emptyHeroLootRows()
 }
 
 function syncBossTemplateEditor(preferredTemplateId = '') {
@@ -258,6 +355,7 @@ function syncBossTemplateEditor(preferredTemplateId = '') {
 
   selectedBossTemplateId.value = nextTemplateId
   applyLootRows(findBossTemplate(nextTemplateId)?.loot ?? [])
+  applyHeroLootRows(findBossTemplate(nextTemplateId)?.heroLoot ?? [])
 }
 
 async function readErrorMessage(response, fallback) {
@@ -567,6 +665,64 @@ async function saveEquipment() {
   }
 }
 
+async function saveHero() {
+  saving.value = true
+  try {
+    const method = adminState.value.heroes.some((entry) => entry.heroId === heroForm.value.heroId)
+      ? 'PUT'
+      : 'POST'
+    const url = method === 'PUT'
+      ? `/api/admin/heroes/${encodeURIComponent(heroForm.value.heroId)}`
+      : '/api/admin/heroes'
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...heroForm.value,
+        bonusClicks: Number(heroForm.value.bonusClicks),
+        bonusCriticalChancePercent: Number(heroForm.value.bonusCriticalChancePercent),
+        bonusCriticalCount: Number(heroForm.value.bonusCriticalCount),
+        traitValue: Number(heroForm.value.traitValue),
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '保存英雄失败'))
+    }
+
+    setSuccess('英雄模板已保存。')
+    heroForm.value = emptyHeroForm()
+    await fetchAdminState()
+  } catch (error) {
+    errorMessage.value = error.message || '保存英雄失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteHero(heroId) {
+  saving.value = true
+  try {
+    const response = await fetch(`/api/admin/heroes/${encodeURIComponent(heroId)}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '删除英雄失败'))
+    }
+
+    setSuccess('英雄模板已删除。')
+    await fetchAdminState()
+  } catch (error) {
+    errorMessage.value = error.message || '删除英雄失败'
+  } finally {
+    saving.value = false
+  }
+}
+
 async function deleteEquipment(itemId) {
   saving.value = true
   try {
@@ -606,6 +762,11 @@ async function saveButton() {
         ...buttonForm,
         sort: Number(buttonForm.sort),
         enabled: Boolean(buttonForm.enabled),
+        tags: buttonForm.tagsText
+          .split(/[,，]/)
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        starlightEligible: Boolean(buttonForm.starlightEligible),
       }),
     })
 
@@ -688,40 +849,7 @@ async function deleteMessage(id) {
   }
 }
 
-function sanitizeFileName(name) {
-  return name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-')
-}
-
-function delay(ms) {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms)
-  })
-}
-
-function probeImage(url) {
-  return new Promise((resolve) => {
-    const image = new Image()
-    image.onload = () => resolve(true)
-    image.onerror = () => resolve(false)
-    image.src = `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}`
-  })
-}
-
-async function waitForPublicImage(url, attempts = 6, interval = 800) {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    if (await probeImage(url)) {
-      return true
-    }
-
-    if (attempt < attempts - 1) {
-      await delay(interval)
-    }
-  }
-
-  return false
-}
-
-async function uploadButtonImage(event) {
+async function uploadImageToOSS(event, applyImage, successTip) {
   const file = event.target?.files?.[0]
   if (!file) {
     return
@@ -737,44 +865,44 @@ async function uploadButtonImage(event) {
     }
 
     const policy = await policyResponse.json()
-    const objectKey = `${policy.dir}${Date.now()}-${sanitizeFileName(file.name)}`
-    const formData = new FormData()
-    formData.append('key', objectKey)
-    formData.append('policy', policy.policy)
-    formData.append('OSSAccessKeyId', policy.accessKeyId)
-    formData.append('Signature', policy.signature)
-    formData.append('success_action_status', '200')
-    formData.append('file', file)
+    const finalURL = await uploadImageWithPolicy(file, policy)
 
-    const finalURL = `${String(policy.publicBaseUrl || '').replace(/\/$/, '')}/${objectKey}`
-
-    try {
-      const uploadResponse = await fetch(policy.host, {
-        method: 'POST',
-        body: formData,
-      })
-      if (!uploadResponse.ok) {
-        throw new Error('上传到 OSS 失败，请检查桶权限和上传策略。')
-      }
-    } catch (error) {
-      const reachable = await waitForPublicImage(finalURL)
-      if (!reachable) {
-        throw new Error('图片可能已经传到 OSS，但浏览器无法确认上传结果。请给 OSS 配置 CORS，或检查 public_base_url 是否可公开访问。')
-      }
-    }
-
-    Object.assign(buttonForm, {
-      imagePath: finalURL,
-      imageAlt: buttonForm.imageAlt || file.name.replace(/\.[^.]+$/, ''),
-    })
+    applyImage(finalURL, file)
     await nextTick()
-    setSuccess('按钮图片已上传到 OSS。')
+    setSuccess(successTip)
   } catch (error) {
     errorMessage.value = error.message || 'OSS 上传失败'
   } finally {
     uploadingImage.value = false
     event.target.value = ''
   }
+}
+
+async function uploadButtonImage(event) {
+  await uploadImageToOSS(
+    event,
+    (finalURL, file) => {
+      Object.assign(buttonForm, {
+        imagePath: finalURL,
+        imageAlt: buttonForm.imageAlt || file.name.replace(/\.[^.]+$/, ''),
+      })
+    },
+    '按钮图片已上传到 OSS。',
+  )
+}
+
+async function uploadHeroImage(event) {
+  await uploadImageToOSS(
+    event,
+    (finalURL, file) => {
+      heroForm.value = {
+        ...heroForm.value,
+        imagePath: finalURL,
+        imageAlt: heroForm.value.imageAlt || file.name.replace(/\.[^.]+$/, ''),
+      }
+    },
+    '英雄头像已上传到 OSS。',
+  )
 }
 
 async function saveLoot() {
@@ -808,6 +936,42 @@ async function saveLoot() {
     await fetchAdminState()
   } catch (error) {
     errorMessage.value = error.message || '保存模板掉落池失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveHeroLoot() {
+  if (!selectedBossTemplateId.value) {
+    errorMessage.value = '先选一只 Boss 模板，再配置英雄掉落池。'
+    return
+  }
+
+  saving.value = true
+  try {
+    const response = await fetch(`/api/admin/boss/pool/${encodeURIComponent(selectedBossTemplateId.value)}/hero-loot`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        loot: heroLootRows.value
+          .filter((entry) => entry.heroId)
+          .map((entry) => ({
+            heroId: entry.heroId,
+            weight: Number(entry.weight),
+          })),
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '保存模板英雄池失败'))
+    }
+
+    setSuccess('模板英雄池已保存。')
+    await fetchAdminState()
+  } catch (error) {
+    errorMessage.value = error.message || '保存模板英雄池失败'
   } finally {
     saving.value = false
   }
@@ -854,10 +1018,23 @@ function editButton(entry) {
     label: entry.label,
     sort: entry.sort,
     enabled: entry.enabled,
+    tagsText: Array.isArray(entry.tags) ? entry.tags.join(', ') : '',
+    starlightEligible: Boolean(entry.starlightEligible),
     imagePath: entry.imagePath || '',
     imageAlt: entry.imageAlt || '',
   })
   activeTab.value = 'buttons'
+}
+
+function editHero(entry) {
+  heroForm.value = {
+    ...entry,
+    bonusClicks: entry.bonusClicks,
+    bonusCriticalChancePercent: entry.bonusCriticalChancePercent,
+    bonusCriticalCount: entry.bonusCriticalCount,
+    traitValue: entry.traitValue,
+  }
+  activeTab.value = 'heroes'
 }
 
 function editBossTemplate(entry) {
@@ -868,12 +1045,14 @@ function editBossTemplate(entry) {
   }
   selectedBossTemplateId.value = entry.id
   applyLootRows(entry.loot)
+  applyHeroLootRows(entry.heroLoot)
   activeTab.value = 'boss'
 }
 
 function selectBossTemplate(templateId) {
   selectedBossTemplateId.value = templateId
   applyLootRows(findBossTemplate(templateId)?.loot ?? [])
+  applyHeroLootRows(findBossTemplate(templateId)?.heroLoot ?? [])
 }
 
 function addLootRow() {
@@ -887,6 +1066,20 @@ function removeLootRow(index) {
   lootRows.value.splice(index, 1)
   if (lootRows.value.length === 0) {
     addLootRow()
+  }
+}
+
+function addHeroLootRow() {
+  heroLootRows.value.push({
+    heroId: '',
+    weight: '',
+  })
+}
+
+function removeHeroLootRow(index) {
+  heroLootRows.value.splice(index, 1)
+  if (heroLootRows.value.length === 0) {
+    addHeroLootRow()
   }
 }
 
@@ -966,6 +1159,7 @@ onMounted(() => {
         <div class="admin-tabs">
           <button class="admin-tab" :class="{ 'admin-tab--active': activeTab === 'boss' }" @click="activeTab = 'boss'">Boss</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': activeTab === 'equipment' }" @click="activeTab = 'equipment'">装备</button>
+          <button class="admin-tab" :class="{ 'admin-tab--active': activeTab === 'heroes' }" @click="activeTab = 'heroes'">英雄</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': activeTab === 'buttons' }" @click="activeTab = 'buttons'">按钮</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': activeTab === 'content' }" @click="activeTab = 'content'; fetchAnnouncements(); fetchMessages()">内容</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': activeTab === 'history' }" @click="activeTab = 'history'; fetchBossHistory()">历史</button>
@@ -1044,6 +1238,28 @@ onMounted(() => {
                   </li>
                 </ul>
               </div>
+
+              <div v-if="hasBoss && adminState.heroLoot.length > 0" style="margin-top: 1rem;">
+                <p class="vote-stage__eyebrow">当前实例英雄快照</p>
+                <ul class="inventory-list">
+                  <li v-for="hero in adminState.heroLoot" :key="hero.heroId" class="inventory-item">
+                    <div class="admin-entity">
+                      <img
+                        v-if="hero.imagePath"
+                        class="admin-entity__avatar"
+                        :src="hero.imagePath"
+                        :alt="heroImageAlt(hero)"
+                      />
+                      <div>
+                        <strong>{{ hero.heroName || hero.heroId }}</strong>
+                        <p>{{ hero.heroId }} · 权重 {{ hero.weight }}</p>
+                        <p>{{ formatItemStats(hero) }}</p>
+                        <p>{{ formatHeroTrait(hero) }}</p>
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </div>
             </section>
 
             <section class="social-card">
@@ -1065,7 +1281,7 @@ onMounted(() => {
                 <li v-for="entry in bossTemplates" :key="entry.id" class="inventory-item inventory-item--stacked">
                   <div>
                     <strong>{{ entry.name }}</strong>
-                    <p>{{ entry.id }} · 血量 {{ entry.maxHp }} · 掉落 {{ entry.loot.length }} 件</p>
+                    <p>{{ entry.id }} · 血量 {{ entry.maxHp }} · 装备 {{ entry.loot.length }} 件 · 英雄 {{ entry.heroLoot.length }} 位</p>
                   </div>
                   <div class="admin-inline-actions admin-inline-actions--stacked">
                     <button class="inventory-item__action" type="button" @click="selectBossTemplate(entry.id)">编辑掉落</button>
@@ -1129,6 +1345,59 @@ onMounted(() => {
               </div>
             </div>
           </section>
+
+          <section class="social-card admin-section-card">
+            <div class="social-card__head">
+              <p class="vote-stage__eyebrow">模板英雄池</p>
+              <strong>{{ selectedBossTemplate?.name || selectedBossTemplateId || '未选择模板' }}</strong>
+            </div>
+
+            <p class="feedback" style="margin-bottom: 0.75rem;">
+              英雄池和装备池分开配置，Boss 被击败时会分别独立抽取。
+            </p>
+
+            <p v-if="!hasHeroTemplates" class="feedback" style="margin-bottom: 0.75rem;">
+              当前还没有英雄模板，先去“英雄”页创建模板，再回来配置英雄池。
+            </p>
+
+            <div class="admin-form admin-form--tight">
+              <div v-for="(entry, index) in heroLootRows" :key="`${selectedBossTemplateId}-hero-${index}-${entry.heroId}`" class="admin-inline-row">
+                <div class="admin-loot-select">
+                  <select
+                    v-model="entry.heroId"
+                    class="nickname-form__input"
+                    :disabled="!hasHeroTemplates && !entry.heroId"
+                  >
+                    <option value="">选择已有英雄</option>
+                    <option
+                      v-if="entry.heroId && !findHeroTemplate(entry.heroId)"
+                      :value="entry.heroId"
+                    >
+                      {{ entry.heroId }}（已删除的英雄）
+                    </option>
+                    <option
+                      v-for="hero in heroOptions"
+                      :key="hero.heroId"
+                      :value="hero.heroId"
+                    >
+                      {{ hero.name }} · {{ hero.heroId }}
+                    </option>
+                  </select>
+                  <p v-if="findHeroTemplate(entry.heroId)" class="admin-loot-select__meta">
+                    {{ formatItemStats(findHeroTemplate(entry.heroId)) }} · {{ formatHeroTrait(findHeroTemplate(entry.heroId)) }}
+                  </p>
+                </div>
+                <input v-model="entry.weight" class="nickname-form__input" type="number" min="1" placeholder="掉率权重，越大越容易招募" />
+                <button class="nickname-form__ghost" type="button" @click="removeHeroLootRow(index)">删</button>
+              </div>
+              <div class="admin-inline-actions">
+                <button class="nickname-form__ghost" type="button" @click="addHeroLootRow">加一行</button>
+                <button class="nickname-form__submit" type="button" :disabled="saving" @click="saveHeroLoot">
+                  保存模板英雄池
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div v-else-if="activeTab === 'equipment'" class="admin-section">
@@ -1174,6 +1443,78 @@ onMounted(() => {
           </div>
         </div>
 
+        <div v-else-if="activeTab === 'heroes'" class="admin-section">
+          <div class="admin-grid">
+            <section class="social-card">
+              <div class="social-card__head">
+                <p class="vote-stage__eyebrow">英雄模板</p>
+                <strong>{{ adminState.heroes.length }} 位</strong>
+              </div>
+
+              <form class="admin-form" @submit.prevent="saveHero">
+                <input v-model="heroForm.heroId" class="nickname-form__input" type="text" placeholder="唯一标识，如 spark-cat" />
+                <input v-model="heroForm.name" class="nickname-form__input" type="text" placeholder="前台显示名称" />
+                <input v-model="heroForm.imagePath" class="nickname-form__input" type="text" placeholder="头像 URL（可选）" />
+                <input v-model="heroForm.imageAlt" class="nickname-form__input" type="text" placeholder="头像说明（可选）" />
+                <label class="admin-upload">
+                  <span>或上传到 OSS（支持 webp）</span>
+                  <input type="file" accept="image/*" :disabled="uploadingImage" @change="uploadHeroImage" />
+                </label>
+                <p v-if="heroForm.imagePath" class="admin-upload__result">
+                  当前头像地址：{{ heroForm.imagePath }}
+                </p>
+                <img
+                  v-if="heroForm.imagePath"
+                  class="admin-upload__preview admin-upload__preview--avatar"
+                  :src="heroForm.imagePath"
+                  :alt="heroForm.imageAlt || heroForm.name || heroForm.heroId || '英雄头像预览'"
+                />
+                <p class="feedback">
+                  {{ uploadingImage ? '图片上传中...' : '如果 OSS 还没配置，也可以继续手填图片 URL。' }}
+                </p>
+                <input v-model="heroForm.bonusClicks" class="nickname-form__input" type="number" min="0" placeholder="点击加成" />
+                <input v-model="heroForm.bonusCriticalChancePercent" class="nickname-form__input" type="number" min="0" max="100" placeholder="暴击率加成" />
+                <input v-model="heroForm.bonusCriticalCount" class="nickname-form__input" type="number" min="0" placeholder="暴击额外加成" />
+                <select v-model="heroForm.traitType" class="nickname-form__input">
+                  <option value="bonus_clicks">额外点击</option>
+                  <option value="critical_chance_percent">暴击率</option>
+                  <option value="critical_count_bonus">暴击额外</option>
+                  <option value="final_damage_percent">最终伤害百分比</option>
+                </select>
+                <input v-model="heroForm.traitValue" class="nickname-form__input" type="number" min="0" placeholder="被动数值" />
+                <button class="nickname-form__submit" type="submit" :disabled="saving">
+                  保存英雄
+                </button>
+              </form>
+            </section>
+
+            <section class="social-card">
+              <ul class="inventory-list">
+                <li v-for="hero in adminState.heroes" :key="hero.heroId" class="inventory-item inventory-item--stacked">
+                  <div class="admin-entity">
+                    <img
+                      v-if="hero.imagePath"
+                      class="admin-entity__avatar"
+                      :src="hero.imagePath"
+                      :alt="heroImageAlt(hero)"
+                    />
+                    <div>
+                      <strong>{{ hero.name }}</strong>
+                      <p>{{ hero.heroId }}</p>
+                      <p>{{ formatItemStats(hero) }}</p>
+                      <p>{{ formatHeroTrait(hero) }}</p>
+                    </div>
+                  </div>
+                  <div class="admin-inline-actions">
+                    <button class="inventory-item__action" type="button" @click="editHero(hero)">编辑</button>
+                    <button class="nickname-form__ghost" type="button" @click="deleteHero(hero.heroId)">删除</button>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </div>
+        </div>
+
         <div v-else-if="activeTab === 'buttons'" class="admin-section">
           <div class="admin-grid">
             <section class="social-card">
@@ -1186,6 +1527,7 @@ onMounted(() => {
                 <input v-model="buttonForm.slug" class="nickname-form__input" type="text" placeholder="唯一标识，如 feel" />
                 <input v-model="buttonForm.label" class="nickname-form__input" type="text" placeholder="前台显示的文字" />
                 <input v-model="buttonForm.sort" class="nickname-form__input" type="number" placeholder="排序，数字小的排前面" />
+                <input v-model="buttonForm.tagsText" class="nickname-form__input" type="text" placeholder="标签，逗号分隔，如 日常, 活动" />
                 <input v-model="buttonForm.imagePath" class="nickname-form__input" type="text" placeholder="图片 URL（可选，可直接填 OSS/CDN 地址）" />
                 <input v-model="buttonForm.imageAlt" class="nickname-form__input" type="text" placeholder="图片说明（可选）" />
                 <label class="admin-upload">
@@ -1208,6 +1550,10 @@ onMounted(() => {
                   <input v-model="buttonForm.enabled" type="checkbox" />
                   启用按钮
                 </label>
+                <label class="admin-check">
+                  <input v-model="buttonForm.starlightEligible" type="checkbox" />
+                  参与星光轮换
+                </label>
                 <button class="nickname-form__submit" type="submit" :disabled="saving">
                   保存按钮
                 </button>
@@ -1220,6 +1566,7 @@ onMounted(() => {
                   <div>
                     <strong>{{ button.label }}</strong>
                     <p>{{ button.key }} · sort {{ button.sort }} · {{ button.enabled ? '启用' : '停用' }}</p>
+                    <p>{{ Array.isArray(button.tags) && button.tags.length > 0 ? button.tags.join(' / ') : '未打标签' }} · {{ button.starlightEligible ? '参与星光' : '不参与星光' }}</p>
                   </div>
                   <button class="inventory-item__action" type="button" @click="editButton(button)">编辑</button>
                 </li>
