@@ -279,6 +279,7 @@ func NewHandler(options Options) http.Handler {
 			"boss":            result.Boss,
 			"bossLeaderboard": result.BossLeaderboard,
 			"myBossStats":     result.MyBossStats,
+			"recentRewards":   result.RecentRewards,
 			"lastReward":      result.LastReward,
 		})
 	})

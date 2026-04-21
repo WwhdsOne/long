@@ -258,14 +258,15 @@ type Snapshot struct {
 
 // UserState 个人实时状态，只推送给对应昵称的连接
 type UserState struct {
-	UserStats   *UserStats          `json:"userStats,omitempty"`
-	MyBossStats *BossUserStats      `json:"myBossStats,omitempty"`
-	Inventory   []InventoryItem     `json:"inventory"`
-	Heroes      []HeroInventoryItem `json:"heroes"`
-	ActiveHero  *HeroInventoryItem  `json:"activeHero,omitempty"`
-	Loadout     Loadout             `json:"loadout"`
-	CombatStats CombatStats         `json:"combatStats"`
-	LastReward  *Reward             `json:"lastReward,omitempty"`
+	UserStats     *UserStats          `json:"userStats,omitempty"`
+	MyBossStats   *BossUserStats      `json:"myBossStats,omitempty"`
+	Inventory     []InventoryItem     `json:"inventory"`
+	Heroes        []HeroInventoryItem `json:"heroes"`
+	ActiveHero    *HeroInventoryItem  `json:"activeHero,omitempty"`
+	Loadout       Loadout             `json:"loadout"`
+	CombatStats   CombatStats         `json:"combatStats"`
+	RecentRewards []Reward            `json:"recentRewards,omitempty"`
+	LastReward    *Reward             `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -285,6 +286,7 @@ type State struct {
 	ActiveHero         *HeroInventoryItem     `json:"activeHero,omitempty"`
 	Loadout            Loadout                `json:"loadout"`
 	CombatStats        CombatStats            `json:"combatStats"`
+	RecentRewards      []Reward               `json:"recentRewards,omitempty"`
 	LastReward         *Reward                `json:"lastReward,omitempty"`
 }
 
@@ -297,6 +299,7 @@ type ClickResult struct {
 	Boss             *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard  []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
 	MyBossStats      *BossUserStats         `json:"myBossStats,omitempty"`
+	RecentRewards    []Reward               `json:"recentRewards,omitempty"`
 	LastReward       *Reward                `json:"lastReward,omitempty"`
 	BroadcastUserAll bool                   `json:"-"`
 }
@@ -527,10 +530,11 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 // GetUserState 获取仅与指定用户相关的状态。
 func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, error) {
 	userState := UserState{
-		Inventory:   []InventoryItem{},
-		Heroes:      []HeroInventoryItem{},
-		Loadout:     Loadout{},
-		CombatStats: s.baseCombatStats(),
+		Inventory:     []InventoryItem{},
+		Heroes:        []HeroInventoryItem{},
+		Loadout:       Loadout{},
+		CombatStats:   s.baseCombatStats(),
+		RecentRewards: []Reward{},
 	}
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
@@ -587,11 +591,15 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	}
 	userState.CombatStats = combatStats
 
-	lastReward, err := s.lastRewardForNickname(ctx, normalizedNickname)
+	recentRewards, err := s.recentRewardsForNickname(ctx, normalizedNickname)
 	if err != nil {
 		return UserState{}, err
 	}
-	userState.LastReward = lastReward
+	userState.RecentRewards = recentRewards
+	if len(recentRewards) > 0 {
+		lastReward := recentRewards[len(recentRewards)-1]
+		userState.LastReward = &lastReward
+	}
 
 	boss, err := s.currentBoss(ctx)
 	if err != nil {
@@ -719,11 +727,15 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 		result.MyBossStats = myBossStats
 	}
 
-	lastReward, err := s.lastRewardForNickname(ctx, normalizedNickname)
+	recentRewards, err := s.recentRewardsForNickname(ctx, normalizedNickname)
 	if err != nil {
 		return ClickResult{}, err
 	}
-	result.LastReward = lastReward
+	result.RecentRewards = recentRewards
+	if len(recentRewards) > 0 {
+		lastReward := recentRewards[len(recentRewards)-1]
+		result.LastReward = &lastReward
+	}
 
 	return result, nil
 }
@@ -936,6 +948,7 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		ActiveHero:         userState.ActiveHero,
 		Loadout:            userState.Loadout,
 		CombatStats:        userState.CombatStats,
+		RecentRewards:      userState.RecentRewards,
 		LastReward:         userState.LastReward,
 	}
 }
@@ -1079,25 +1092,29 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 				continue
 			}
 
+			rewards := make([]Reward, 0, 2)
 			if reward := s.chooseLoot(lootEntries); reward != nil {
 				pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
-				pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
-					"boss_id":    bossID,
-					"boss_name":  bossName,
-					"item_id":    reward.ItemID,
-					"item_name":  reward.ItemName,
-					"granted_at": strconv.FormatInt(now, 10),
+				rewards = append(rewards, Reward{
+					BossID:    bossID,
+					BossName:  bossName,
+					ItemID:    reward.ItemID,
+					ItemName:  reward.ItemName,
+					GrantedAt: now,
 				})
 			}
 			if heroReward := s.chooseHeroLoot(heroLootEntries); heroReward != nil {
 				pipe.HIncrBy(ctx, s.heroInventoryKey(nickname), heroReward.HeroID, 1)
-				pipe.HSet(ctx, s.lastRewardKey(nickname), map[string]any{
-					"boss_id":    bossID,
-					"boss_name":  bossName,
-					"item_id":    heroReward.HeroID,
-					"item_name":  heroReward.HeroName,
-					"granted_at": strconv.FormatInt(now, 10),
+				rewards = append(rewards, Reward{
+					BossID:    bossID,
+					BossName:  bossName,
+					ItemID:    heroReward.HeroID,
+					ItemName:  heroReward.HeroName,
+					GrantedAt: now,
 				})
+			}
+			if len(rewards) > 0 {
+				pipe.HSet(ctx, s.lastRewardKey(nickname), rewardRecordValues(rewards))
 			}
 		}
 
@@ -1419,12 +1436,52 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, quant
 }
 
 func (s *Store) lastRewardForNickname(ctx context.Context, nickname string) (*Reward, error) {
+	recentRewards, err := s.recentRewardsForNickname(ctx, nickname)
+	if err != nil {
+		return nil, err
+	}
+	if len(recentRewards) == 0 {
+		return nil, nil
+	}
+
+	lastReward := recentRewards[len(recentRewards)-1]
+	return &lastReward, nil
+}
+
+func (s *Store) recentRewardsForNickname(ctx context.Context, nickname string) ([]Reward, error) {
 	values, err := s.client.HGetAll(ctx, s.lastRewardKey(nickname)).Result()
 	if err != nil {
 		return nil, err
 	}
+	if len(values) == 0 {
+		return []Reward{}, nil
+	}
+
+	if raw := strings.TrimSpace(values["recent_rewards"]); raw != "" {
+		var rewards []Reward
+		if err := json.Unmarshal([]byte(raw), &rewards); err == nil {
+			normalized := make([]Reward, 0, len(rewards))
+			for _, reward := range rewards {
+				if strings.TrimSpace(reward.ItemID) == "" {
+					continue
+				}
+				normalized = append(normalized, reward)
+			}
+			return normalized, nil
+		}
+	}
+
+	legacyReward := rewardFromRecordValues(values)
+	if legacyReward == nil {
+		return []Reward{}, nil
+	}
+
+	return []Reward{*legacyReward}, nil
+}
+
+func rewardFromRecordValues(values map[string]string) *Reward {
 	if len(values) == 0 || strings.TrimSpace(values["item_id"]) == "" {
-		return nil, nil
+		return nil
 	}
 
 	return &Reward{
@@ -1433,7 +1490,28 @@ func (s *Store) lastRewardForNickname(ctx context.Context, nickname string) (*Re
 		ItemID:    strings.TrimSpace(values["item_id"]),
 		ItemName:  strings.TrimSpace(values["item_name"]),
 		GrantedAt: int64FromString(values["granted_at"]),
-	}, nil
+	}
+}
+
+func rewardRecordValues(rewards []Reward) map[string]any {
+	if len(rewards) == 0 {
+		return map[string]any{}
+	}
+
+	lastReward := rewards[len(rewards)-1]
+	encoded, err := json.Marshal(rewards)
+	if err != nil {
+		encoded = []byte("[]")
+	}
+
+	return map[string]any{
+		"boss_id":        lastReward.BossID,
+		"boss_name":      lastReward.BossName,
+		"item_id":        lastReward.ItemID,
+		"item_name":      lastReward.ItemName,
+		"granted_at":     strconv.FormatInt(lastReward.GrantedAt, 10),
+		"recent_rewards": string(encoded),
+	}
 }
 
 func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntry, error) {

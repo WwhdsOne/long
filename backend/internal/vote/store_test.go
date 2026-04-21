@@ -1168,6 +1168,73 @@ func TestFinalizeBossKillRewardsOnlyQualifiedParticipants(t *testing.T) {
 	}
 }
 
+func TestGetUserStateIncludesAllRewardsFromBossSettlement(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.roll = func(int) int { return 0 }
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed cloth-armor definition: %v", err)
+	}
+	if err := store.SaveHeroDefinition(ctx, HeroDefinition{
+		HeroID: "spark-cat",
+		Name:   "星火猫",
+	}); err != nil {
+		t.Fatalf("save hero definition: %v", err)
+	}
+
+	boss := &Boss{
+		ID:         "dragon-2",
+		TemplateID: "dragon",
+		Name:       "火龙",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  1713744000,
+		DefeatedAt: 1713744300,
+	}
+	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 1},
+	}, []BossHeroLootEntry{
+		{HeroID: "spark-cat", Weight: 1},
+	}); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+	if err := store.client.ZAdd(ctx, store.bossDamageKey(boss.ID),
+		redis.Z{Score: 10, Member: "阿明"},
+	).Err(); err != nil {
+		t.Fatalf("seed boss damage: %v", err)
+	}
+
+	if _, err := store.finalizeBossKill(ctx, boss); err != nil {
+		t.Fatalf("finalize boss kill: %v", err)
+	}
+
+	state, err := store.GetUserState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+
+	if len(state.Inventory) != 1 || state.Inventory[0].ItemID != "cloth-armor" {
+		t.Fatalf("expected equipment reward in inventory, got %+v", state.Inventory)
+	}
+	if len(state.Heroes) != 1 || state.Heroes[0].HeroID != "spark-cat" {
+		t.Fatalf("expected hero reward in inventory, got %+v", state.Heroes)
+	}
+	if len(state.RecentRewards) != 2 {
+		t.Fatalf("expected two visible rewards, got %+v", state.RecentRewards)
+	}
+	if state.RecentRewards[0].ItemID != "cloth-armor" || state.RecentRewards[1].ItemID != "spark-cat" {
+		t.Fatalf("expected equipment and hero rewards in order, got %+v", state.RecentRewards)
+	}
+}
+
 func TestGetStateIncludesActiveHeroBonuses(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
