@@ -48,6 +48,20 @@ jobs:
       - name: Build frontend
         run: make build
 
+      - name: Install UPX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y upx-ucl || sudo apt-get install -y upx
+
+          if command -v upx >/dev/null 2>&1; then
+            echo "UPX_BIN=upx" >> "$GITHUB_ENV"
+          elif command -v upx-ucl >/dev/null 2>&1; then
+            echo "UPX_BIN=upx-ucl" >> "$GITHUB_ENV"
+          else
+            echo "UPX 安装失败" >&2
+            exit 1
+          fi
+
       - name: Build Go binary (linux/amd64)
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
@@ -56,6 +70,10 @@ jobs:
               -ldflags "-w -s" \
               -o long \
               ./cmd/server
+
+      - name: Compress Go binary with UPX
+        run: |
+          "$UPX_BIN" --best --lzma backend/long
 
       - name: Prepare deploy artifacts
         run: |

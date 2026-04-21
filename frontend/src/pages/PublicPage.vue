@@ -15,6 +15,7 @@ import {
   summarizeEquippedCosmetics,
 } from '../utils/cosmetics'
 import {buildPityProgress} from '../utils/progressionView'
+import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
@@ -81,6 +82,7 @@ const cosmeticBursts = ref({})
 let eventSource
 let autoClickLoop
 let starlightTimer = 0
+let lastExpiredStarlightEndsAt = 0
 const burstTimers = new Map()
 const cosmeticTimers = new Map()
 
@@ -290,20 +292,18 @@ function clearStarlightTimer() {
 
 function scheduleStarlightRefresh() {
   clearStarlightTimer()
-  const endsAt = Number(starlight.value?.endsAt ?? 0)
-  if (!endsAt) {
-    return
-  }
-
-  const delay = endsAt * 1000 - Date.now() + 150
-  if (delay <= 0) {
-    void loadState()
+  const plan = resolveStarlightRefreshPlan({
+    endsAtSeconds: starlight.value?.endsAt,
+    lastExpiredEndsAtSeconds: lastExpiredStarlightEndsAt,
+  })
+  lastExpiredStarlightEndsAt = plan.expiredRetryEndsAtSeconds
+  if (plan.delayMs === null) {
     return
   }
 
   starlightTimer = window.setTimeout(() => {
     void loadState()
-  }, delay)
+  }, plan.delayMs)
 }
 
 function formatBossTime(timestamp) {
