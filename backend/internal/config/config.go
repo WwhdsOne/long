@@ -3,7 +3,6 @@ package config
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"gopkg.in/yaml.v3"
 )
 
@@ -326,7 +326,7 @@ func fetchConfigPayload(ctx context.Context, consulAddr, configKey, index string
 	}
 
 	var kvs []consulKV
-	if err := json.Unmarshal(body, &kvs); err != nil {
+	if err := sonic.Unmarshal(body, &kvs); err != nil {
 		return nil, "", fmt.Errorf("decode consul response: %w", err)
 	}
 	if len(kvs) == 0 {

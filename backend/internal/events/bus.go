@@ -2,10 +2,10 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/vote"
@@ -34,7 +34,7 @@ func (b *RedisChangeBus) PublishChange(ctx context.Context, change vote.StateCha
 		change.Timestamp = time.Now().Unix()
 	}
 
-	payload, err := json.Marshal(change)
+	payload, err := sonic.Marshal(change)
 	if err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (b *RedisChangeBus) Listen(ctx context.Context, handler func(context.Contex
 			}
 
 			var change vote.StateChange
-			if err := json.Unmarshal([]byte(message.Payload), &change); err != nil {
+			if err := sonic.Unmarshal([]byte(message.Payload), &change); err != nil {
 				continue
 			}
 			if handler == nil {

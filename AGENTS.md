@@ -39,50 +39,11 @@ rtk playwright test
 rtk tsc --noEmit
 ```
 
-### Python
-
-```bash
-rtk pytest
-rtk ruff check / format
-rtk mypy .
-rtk pip install / list
-```
-
-### Rust
-
-```bash
-rtk cargo build / test / clippy / fmt
-```
-
 ### Go
 
 ```bash
 rtk go build / test / vet
 rtk golangci-lint run
-```
-
-### .NET / Ruby
-
-```bash
-rtk dotnet build / test
-rtk rspec / rake / rubocop
-```
-
-### Infrastructure
-
-```bash
-rtk aws <service> <command>
-rtk docker ps / logs / compose
-rtk kubectl get / describe / logs
-rtk psql <query>
-```
-
-### Meta Commands
-
-```bash
-rtk gain
-rtk gain --history
-rtk discover
 ```
 
 ## 项目结构
@@ -135,3 +96,169 @@ rtk discover
 - 第一版只支持单个当前世界 Boss；如果改这个前提，要同步检查 Redis 键设计、后台接口和前端展示
 - 后台能力当前覆盖 Boss、装备、掉落池、按钮和玩家概览；新增后台模块时优先沿用现有 `/api/admin/*` 约定
 - 如果改了接口、配置或部署方式，要同步更新 `README.md`
+
+
+## 🧱 文件拆分与模块化强约束（非常重要）
+
+在生成任何代码时，必须遵循以下规则，禁止输出“单文件巨型实现”。
+
+### 1. 文件大小限制（强制）
+- 单个文件 **不允许超过 500 行**
+- 超过 500 行视为严重违规
+
+如果逻辑复杂，必须主动拆分，而不是继续往一个文件里追加代码
+
+---
+
+### 2. 必须按职责拆分（后端）
+
+禁止将所有逻辑写在一个 handler / controller 文件中
+
+必须按职责拆分：
+
+- `handler`：只负责 HTTP 层（参数解析 + 返回）
+- `service`：业务逻辑
+- `repository`：数据访问
+- `model`：数据结构
+- `router`：路由注册
+- `middleware`：中间件
+
+#### 示例结构：
+```
+internal/
+httpapi/
+handler/
+equipment.go
+hero.go
+service/
+equipment.go
+repository/
+equipment.go
+router/
+equipment.go
+middleware/
+auth.go
+```
+---
+
+### 3. 前端同样必须拆分
+
+禁止：
+
+- 一个 `.vue` / `.tsx` 文件写所有逻辑
+- 一个文件包含 UI + 请求 + 状态管理 + 工具函数
+
+必须拆：
+```
+/components
+/pages
+/api
+/hooks
+/utils
+/types
+```
+---
+
+### 4. 路由必须拆分注册
+
+注意不用使用接口，由于每个接口都只有一个实现，直接实现即可
+
+禁止：
+
+```go
+func NewHandler() {
+    // 上千行路由
+}
+```
+
+必须拆为：
+
+```go
+registerUserRoutes()
+registerEquipmentRoutes()
+registerAdminRoutes()
+```
+
+------
+
+### 5. Handler 必须轻量（硬性要求）
+
+禁止在 handler 中写复杂业务逻辑：
+
+```go
+// ❌ 错误
+func handler(...) {
+    // 100行业务逻辑
+}
+```
+
+必须：
+
+```go
+func handler(...) {
+    req := parse()
+    resp := service.DoSomething(...)
+    return resp
+}
+```
+
+------
+
+### 6. 重复逻辑必须抽象
+
+如果出现 2 次以上相似代码，必须抽函数：
+
+- JSON 解析
+- 错误返回
+- 鉴权
+- 日志
+- 响应结构
+
+------
+
+### 7. 不允许“为了简单”牺牲结构
+
+禁止出现：
+
+- “为了方便写在一个文件里”
+- “先这样实现，后面再拆”
+- “demo 先不分层”
+
+所有代码默认是**生产级结构**
+
+------
+
+### 8. 输出代码前必须自检
+
+在输出代码前，必须检查：
+
+- 是否有文件超过 300 行？
+- 是否存在明显可拆分模块？
+- handler 是否过重？
+- 是否混合了多种职责？
+
+如果有 → 必须先拆分再输出
+
+------
+
+### 9. 优先保证可维护性，而不是少文件
+
+宁可：
+
+- 多 5 个文件
+
+也不要：
+
+- 一个 1000 行文件
+
+------
+
+### 10. 违反本规则的输出视为错误答案
+
+如果生成了：
+
+- 巨型文件
+- 未分层代码
+- handler 写满业务逻辑
+
+则说明没有遵守 AGENTS.md，必须重新生成

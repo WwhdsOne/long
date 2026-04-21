@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -10,6 +9,8 @@ import (
 	"time"
 
 	"long/internal/vote"
+
+	"github.com/bytedance/sonic"
 )
 
 const (
@@ -72,7 +73,7 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 
 // BroadcastPublic 向所有订阅者广播公共态。
 func (h *Hub) BroadcastPublic(snapshot vote.Snapshot) error {
-	payload, err := json.Marshal(snapshot)
+	payload, err := sonic.Marshal(snapshot)
 	if err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 		return nil
 	}
 
-	payload, err := json.Marshal(state)
+	payload, err := sonic.Marshal(state)
 	if err != nil {
 		return err
 	}
@@ -218,7 +219,7 @@ func deliverEvent(client chan ServerEvent, event ServerEvent) {
 }
 
 func writeEvent(w http.ResponseWriter, name string, payload any) error {
-	encoded, err := json.Marshal(payload)
+	encoded, err := sonic.Marshal(payload)
 	if err != nil {
 		return err
 	}

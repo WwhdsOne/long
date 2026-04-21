@@ -5,11 +5,12 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/bytedance/sonic"
 )
 
 // Config 定义 OSS 直传签名所需配置。
@@ -72,7 +73,7 @@ func (s *Signer) CreatePolicy(_ context.Context) (Policy, error) {
 	dir := fmt.Sprintf("%s/%s/", dirPrefix, time.Now().UTC().Format("20060102"))
 	host := fmt.Sprintf("https://%s.oss-%s.aliyuncs.com", s.config.Bucket, s.config.Region)
 
-	rawPolicy, err := json.Marshal(map[string]any{
+	rawPolicy, err := sonic.Marshal(map[string]any{
 		"expiration": expiresAt.Format(time.RFC3339),
 		"conditions": []any{
 			map[string]string{"bucket": s.config.Bucket},
