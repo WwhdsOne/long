@@ -25,3 +25,12 @@ func TestServerAddressUsesLoopback(t *testing.T) {
 		t.Fatalf("expected loopback listen address, got %q", addr)
 	}
 }
+
+func TestServerAddressUsesOverrideEnv(t *testing.T) {
+	t.Setenv("LONG_LISTEN_HOST", "0.0.0.0")
+	t.Setenv("LONG_LISTEN_PORT", "18080")
+
+	if addr := serverAddress(2333); addr != "0.0.0.0:18080" {
+		t.Fatalf("expected overridden listen address, got %q", addr)
+	}
+}

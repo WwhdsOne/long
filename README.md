@@ -443,18 +443,24 @@ make check
 docker buildx build --platform linux/amd64 -t long . --load
 ```
 
+镜像会在构建阶段自动编译前端静态资源和 Go 服务，不依赖宿主机预先生成 `long` 二进制或 `backend/public` 目录。
+
 运行容器：
 
 ```bash
 docker run -d \
   --name long \
-  --network host \
+  --network docker-compose_app-net \
+  -p 2333:2333 \
   -e CONSUL_ADDR=http://your-consul:8500 \
   -e CONSUL_CONFIG_KEY=vote-wall/prod \
   long
 ```
 
-## Nginx 反代
+这个单镜像现在内置了 `nginx + go` 双进程：
 
-线上建议由 Nginx 暴露公网入口，再反代到本机 `127.0.0.1:2333` 的 Go 服务。示例见 `deploy/nginx.vote-wall.conf.example`。
-当前后端默认只监听 `127.0.0.1`，避免被外部直接绕过反代访问。
+- 宿主机访问入口：`http://localhost:2333`
+- 容器内 `nginx`：监听 `2333`
+- 容器内 Go：仅监听 `127.0.0.1:18080`
+
+外部不需要再额外部署一个 Nginx 给它做反代；镜像内置配置位于 `deploy/nginx.container.conf`，参考版见 `deploy/nginx.vote-wall.conf.example`。
