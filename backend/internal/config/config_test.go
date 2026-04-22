@@ -39,6 +39,9 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               username: "admin"
               password: "secret"
               session_secret: "session-secret"
+            player_auth:
+              jwt_secret: "player-secret"
+              jwt_ttl_seconds: 604800
             oss:
               access_key_id: "test-ak"
               access_key_secret: "test-secret"
@@ -83,6 +86,9 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.Admin.SessionSecret != "session-secret" {
 		t.Fatalf("expected admin session secret session-secret, got %q", cfg.Admin.SessionSecret)
+	}
+	if cfg.PlayerAuth.JWTSecret != "player-secret" {
+		t.Fatalf("expected player jwt secret player-secret, got %q", cfg.PlayerAuth.JWTSecret)
 	}
 	if cfg.OSS.AccessKeyID != "test-ak" {
 		t.Fatalf("expected oss access key id test-ak, got %q", cfg.OSS.AccessKeyID)

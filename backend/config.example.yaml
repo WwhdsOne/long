@@ -19,6 +19,9 @@ admin:
   username: "root"
   password: "123456"
   session_secret: "session-secret"
+player_auth:
+  jwt_secret: "player-session-secret"
+  jwt_ttl_seconds: 604800
 oss:
   access_key_id: "*****"
   access_key_secret: "*****"

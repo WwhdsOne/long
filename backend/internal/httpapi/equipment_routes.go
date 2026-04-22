@@ -24,8 +24,12 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.EquipItem(ctx, body.Nickname, c.Param("itemId"))
+		state, err := options.Store.EquipItem(ctx, nickname, c.Param("itemId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -45,7 +49,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -59,8 +63,12 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.UnequipItem(ctx, body.Nickname, c.Param("itemId"))
+		state, err := options.Store.UnequipItem(ctx, nickname, c.Param("itemId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -73,7 +81,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -87,8 +95,12 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.SynthesizeItem(ctx, body.Nickname, c.Param("itemId"))
+		state, err := options.Store.SynthesizeItem(ctx, nickname, c.Param("itemId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -112,7 +124,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -127,8 +139,12 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.SalvageEquipment(ctx, body.Nickname, c.Param("itemId"), body.Quantity)
+		state, err := options.Store.SalvageEquipment(ctx, nickname, c.Param("itemId"), body.Quantity)
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -152,7 +168,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -166,8 +182,12 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.ReforgeEquipment(ctx, body.Nickname, c.Param("itemId"))
+		state, err := options.Store.ReforgeEquipment(ctx, nickname, c.Param("itemId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -191,7 +211,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 }

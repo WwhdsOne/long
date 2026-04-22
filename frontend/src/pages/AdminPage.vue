@@ -193,6 +193,8 @@ const admin = reactive(useAdminPage())
           :loading-players="admin.loadingPlayers"
           :player-page="admin.playerPage"
           :fetch-player-page="admin.fetchPlayerPage"
+          :reset-player-password="admin.resetPlayerPassword"
+          :saving="admin.saving"
         />
       </article>
     </section>

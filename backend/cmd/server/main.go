@@ -9,9 +9,11 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/admin"
@@ -20,6 +22,7 @@ import (
 	"long/internal/httpapi"
 	"long/internal/nickname"
 	ossupload "long/internal/oss"
+	playerauth "long/internal/playerauth"
 	"long/internal/ratelimit"
 	"long/internal/vote"
 )
@@ -70,7 +73,14 @@ func run() error {
 	stateCache := events.NewCache(store)
 	dispatcher := events.NewDispatcher(stateCache, hub)
 	changeBus := events.NewRedisChangeBus(redisClient, vote.RealtimeEventChannel(cfg.RedisPrefix))
-	eventHandler := events.NewHandler(hub, stateCache)
+	playerAuthenticator := playerauth.NewService(redisClient, playerauth.Config{
+		Namespace: namespaceFromPrefix(cfg.RedisPrefix),
+		JWTSecret: cfg.PlayerAuth.JWTSecret,
+		TokenTTL:  cfg.PlayerAuth.JWTTTL,
+	}, nicknameValidator)
+	eventHandler := events.NewHandler(hub, stateCache, func(ctx context.Context, c *app.RequestContext) string {
+		return httpapi.AuthenticatedPlayerNickname(ctx, c, playerAuthenticator)
+	})
 	clickLimiter := ratelimit.NewLimiter(ratelimit.Config{
 		Limit:             cfg.RateLimit.Limit,
 		Window:            cfg.RateLimit.Window,
@@ -89,13 +99,14 @@ func run() error {
 		})
 	}
 	httpServer := httpapi.NewHertzServer(serverAddress(cfg.Port), httpapi.Options{
-		Store:           store,
-		StateView:       stateCache,
-		ChangePublisher: changeBus,
-		ClickGuard:      clickLimiter,
-		Events:          eventHandler,
-		PublicDir:       cfg.PublicDir,
-		OSSSigner:       ossSigner,
+		Store:               store,
+		StateView:           stateCache,
+		ChangePublisher:     changeBus,
+		ClickGuard:          clickLimiter,
+		PlayerAuthenticator: playerAuthenticator,
+		Events:              eventHandler,
+		PublicDir:           cfg.PublicDir,
+		OSSSigner:           ossSigner,
 		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
 			Username:      cfg.Admin.Username,
 			Password:      cfg.Admin.Password,
@@ -185,4 +196,11 @@ func run() error {
 
 func serverAddress(port int) string {
 	return net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
+}
+
+func namespaceFromPrefix(prefix string) string {
+	if before, ok := strings.CutSuffix(prefix, "button:"); ok {
+		return before
+	}
+	return prefix
 }

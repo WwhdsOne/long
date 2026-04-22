@@ -357,6 +357,31 @@ export function useAdminPage() {
     bossForm.value = { id: '', name: '', maxHp: '' }
   }
 
+  async function resetPlayerPassword(nickname) {
+    const nextPassword = window.prompt(`给 ${nickname} 设置一个新密码`, '')
+    if (!nextPassword) {
+      return
+    }
+
+    saving.value = true
+    try {
+      const response = await fetchWithTimeout(`/api/admin/players/${encodeURIComponent(nickname)}/password/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: nextPassword }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '玩家密码重置失败'))
+      }
+
+      setSuccess(`已重置 ${nickname} 的密码。`)
+    } catch (error) {
+      errorMessage.value = error.message || '玩家密码重置失败'
+    } finally {
+      saving.value = false
+    }
+  }
+
   const shared = {
     activeTab,
     addHeroLootRow,
@@ -485,6 +510,7 @@ export function useAdminPage() {
     login,
     logout,
     refreshAll,
+    resetPlayerPassword,
     saving,
     selectedBossTemplate,
     selectedBossTemplateId,

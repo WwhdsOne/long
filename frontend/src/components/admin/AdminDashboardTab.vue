@@ -4,6 +4,8 @@ defineProps({
   loadingPlayers: { type: Boolean, required: true },
   playerPage: { type: Object, required: true },
   fetchPlayerPage: { type: Function, required: true },
+  resetPlayerPassword: { type: Function, required: true },
+  saving: { type: Boolean, required: true },
 })
 </script>
 
@@ -48,6 +50,9 @@ defineProps({
                 {{ player.loadout.accessory?.name || '空饰品' }}
               </p>
             </div>
+            <button class="nickname-form__ghost" type="button" :disabled="saving" @click="resetPlayerPassword(player.nickname)">
+              重置密码
+            </button>
           </li>
         </ul>
 

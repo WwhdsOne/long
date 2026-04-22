@@ -22,8 +22,12 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.EquipHero(ctx, body.Nickname, c.Param("heroId"))
+		state, err := options.Store.EquipHero(ctx, nickname, c.Param("heroId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -42,7 +46,7 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -56,8 +60,12 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.UnequipHero(ctx, body.Nickname, c.Param("heroId"))
+		state, err := options.Store.UnequipHero(ctx, nickname, c.Param("heroId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -71,7 +79,7 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -86,8 +94,12 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.SalvageHero(ctx, body.Nickname, c.Param("heroId"), body.Quantity)
+		state, err := options.Store.SalvageHero(ctx, nickname, c.Param("heroId"), body.Quantity)
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -111,7 +123,7 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -125,8 +137,12 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.AwakenHero(ctx, body.Nickname, c.Param("heroId"))
+		state, err := options.Store.AwakenHero(ctx, nickname, c.Param("heroId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -150,7 +166,7 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 }

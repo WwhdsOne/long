@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -26,20 +25,23 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
-		if strings.TrimSpace(body.Nickname) == "" {
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			if options.PlayerAuthenticator != nil {
+				return
+			}
 			writeJSON(c, consts.StatusBadRequest, map[string]string{
 				"error":   "INVALID_NICKNAME",
 				"message": "昵称还没填好，先起个名字再点。",
 			})
 			return
 		}
-		nickname := strings.TrimSpace(body.Nickname)
 
 		if err := enforceClickRateLimit(c, options.ClickGuard, nickname); err != nil {
 			return
 		}
 
-		result, err := options.Store.ClickButton(ctx, c.Param("slug"), body.Nickname)
+		result, err := options.Store.ClickButton(ctx, c.Param("slug"), nickname)
 		if err != nil {
 			if errors.Is(err, vote.ErrButtonNotFound) {
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "BUTTON_NOT_FOUND"})
@@ -55,7 +57,7 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 
 		change := vote.StateChange{
 			Type:      vote.StateChangeButtonClicked,
-			Nickname:  strings.TrimSpace(body.Nickname),
+			Nickname:  nickname,
 			Timestamp: time.Now().Unix(),
 		}
 		if result.BroadcastUserAll {

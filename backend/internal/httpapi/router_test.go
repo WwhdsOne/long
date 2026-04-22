@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -43,6 +44,8 @@ type mockStore struct {
 	lastAwakenHeroID       string
 	lastPurchasedCosmetic  string
 	lastCosmeticLoadout    vote.CosmeticLoadout
+	lastClickNickname      string
+	lastGetStateNickname   string
 	getStateErr            error
 	clickErr               error
 	equipErr               error
@@ -57,6 +60,7 @@ type mockStore struct {
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
+	m.lastGetStateNickname = nickname
 	if m.getStateErr != nil {
 		return vote.State{}, m.getStateErr
 	}
@@ -97,6 +101,7 @@ func (m *mockStore) GetUserState(_ context.Context, nickname string) (vote.UserS
 }
 
 func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+	m.lastClickNickname = nickname
 	if m.clickErr != nil {
 		return vote.ClickResult{}, m.clickErr
 	}
@@ -1535,11 +1540,13 @@ func TestClickMissingButtonReturnsNotFound(t *testing.T) {
 		},
 	}
 	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
+		Store:               store,
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{verifyNickname: "阿明"},
 	})
 
 	request := httptest.NewRequest(http.MethodPost, "/api/buttons/missing/click", strings.NewReader(`{"nickname":"阿明"}`))
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
 	response := httptest.NewRecorder()
 
 	handler.ServeHTTP(response, request)
@@ -1558,8 +1565,9 @@ func TestClickRequiresNickname(t *testing.T) {
 		},
 	}
 	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
+		Store:               store,
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{verifyErr: errors.New("missing")},
 	})
 
 	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"   "}`))
@@ -1568,8 +1576,8 @@ func TestClickRequiresNickname(t *testing.T) {
 
 	handler.ServeHTTP(response, request)
 
-	if response.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", response.Code)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", response.Code)
 	}
 }
 

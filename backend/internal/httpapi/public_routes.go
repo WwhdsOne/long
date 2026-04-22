@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -18,7 +17,7 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 	})
 
 	router.GET("/api/buttons", func(ctx context.Context, c *app.RequestContext) {
-		state, err := stateView.GetState(ctx, c.Query("nickname"))
+		state, err := stateView.GetState(ctx, resolvedPlayerNicknameForRead(ctx, c, options.PlayerAuthenticator))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -31,7 +30,7 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 	})
 
 	router.GET("/api/shop", func(ctx context.Context, c *app.RequestContext) {
-		state, err := stateView.GetState(ctx, c.Query("nickname"))
+		state, err := stateView.GetState(ctx, resolvedPlayerNicknameForRead(ctx, c, options.PlayerAuthenticator))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -93,8 +92,19 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			if options.PlayerAuthenticator != nil {
+				return
+			}
+			writeJSON(c, consts.StatusBadRequest, map[string]string{
+				"error":   "INVALID_NICKNAME",
+				"message": "昵称还没填好，先起个名字再发。",
+			})
+			return
+		}
 
-		message, err := options.Store.CreateMessage(ctx, body.Nickname, body.Content)
+		message, err := options.Store.CreateMessage(ctx, nickname, body.Content)
 		if err != nil {
 			if writeNicknameError(c, err) || writeContentError(c, err) {
 				return
@@ -105,7 +115,7 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 
 		publishChange(ctx, options.ChangePublisher, vote.StateChange{
 			Type:      vote.StateChangeMessageCreated,
-			Nickname:  strings.TrimSpace(body.Nickname),
+			Nickname:  nickname,
 			Timestamp: time.Now().Unix(),
 		})
 		writeJSON(c, consts.StatusOK, message)

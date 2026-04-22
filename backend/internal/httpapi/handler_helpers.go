@@ -7,9 +7,11 @@ import (
 	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
 	adminauth "long/internal/admin"
+	playerauth "long/internal/playerauth"
 	"long/internal/vote"
 )
 
@@ -72,6 +74,66 @@ func writeContentError(c *app.RequestContext, err error) bool {
 
 func clientIdentifier(c *app.RequestContext) string {
 	return c.ClientIP()
+}
+
+func setPlayerSessionCookie(c *app.RequestContext, token string) {
+	c.SetCookie(playerSessionCookieName, token, 0, "/", "", protocol.CookieSameSiteLaxMode, false, true)
+}
+
+func clearPlayerSessionCookie(c *app.RequestContext) {
+	c.SetCookie(playerSessionCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, false, true)
+}
+
+func authenticatedPlayerNickname(ctx context.Context, c *app.RequestContext, authenticator PlayerAuthenticator) string {
+	if authenticator == nil {
+		return ""
+	}
+
+	token := strings.TrimSpace(string(c.Cookie(playerSessionCookieName)))
+	if token == "" {
+		return ""
+	}
+
+	nickname, err := authenticator.Verify(ctx, token)
+	if err != nil {
+		if errors.Is(err, playerauth.ErrInvalidToken) {
+			clearPlayerSessionCookie(c)
+			return ""
+		}
+		return ""
+	}
+
+	return strings.TrimSpace(nickname)
+}
+
+// AuthenticatedPlayerNickname 暴露给 SSE 等非路由包装层复用玩家 JWT 解析逻辑。
+func AuthenticatedPlayerNickname(ctx context.Context, c *app.RequestContext, authenticator PlayerAuthenticator) string {
+	return authenticatedPlayerNickname(ctx, c, authenticator)
+}
+
+func requireAuthenticatedPlayerNickname(ctx context.Context, c *app.RequestContext, authenticator PlayerAuthenticator) (string, bool) {
+	nickname := authenticatedPlayerNickname(ctx, c, authenticator)
+	if nickname == "" {
+		writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+		return "", false
+	}
+
+	return nickname, true
+}
+
+func resolvedPlayerNickname(ctx context.Context, c *app.RequestContext, authenticator PlayerAuthenticator, legacyNickname string) (string, bool) {
+	if authenticator == nil {
+		nickname := strings.TrimSpace(legacyNickname)
+		return nickname, nickname != ""
+	}
+	return requireAuthenticatedPlayerNickname(ctx, c, authenticator)
+}
+
+func resolvedPlayerNicknameForRead(ctx context.Context, c *app.RequestContext, authenticator PlayerAuthenticator) string {
+	if authenticator == nil {
+		return strings.TrimSpace(c.Query("nickname"))
+	}
+	return authenticatedPlayerNickname(ctx, c, authenticator)
 }
 
 func isAdminAuthenticated(c *app.RequestContext, authenticator *adminauth.Authenticator) bool {

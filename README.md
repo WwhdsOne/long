@@ -273,6 +273,9 @@ admin:
   username: "admin"
   password: "change-me"
   session_secret: "change-this-too"
+player_auth:
+  jwt_secret: "change-player-jwt-secret"
+  jwt_ttl_seconds: 604800
 oss:
   access_key_id: "your-ak"
   access_key_secret: "your-secret"
@@ -286,6 +289,13 @@ oss:
 `button_poll_interval_ms` 现在表示“按钮索引低频兜底同步间隔”，不是公共状态轮询广播间隔。推荐生产环境调大到 `60000` 左右；只有你直接手工写 Redis 新按钮、没有走后台保存接口时，它才会影响这个按钮多久能被前台看到。
 
 ## 前台接口补充
+
+- `POST /api/player/auth/login`
+  - 请求体：`{ "nickname": "阿明", "password": "secret" }`
+  - 首次使用该昵称时会直接为它设置密码；之后必须用同一昵称和密码登录
+- `POST /api/player/auth/logout`
+- `GET /api/player/auth/session`
+  - 返回当前玩家登录态和昵称
 
 - `POST /api/equipment/{itemId}/salvage`
   - 请求体：`{ "nickname": "阿明", "quantity": 2 }`
@@ -302,6 +312,11 @@ oss:
 - `POST /api/shop/cosmetics/equip`
   - 请求体：`{ "nickname": "阿明", "trailId": "trail-ribbon", "impactId": "impact-firefly" }`
 
+说明：
+
+- 前台写接口现在要求玩家先登录，后端优先使用 JWT 会话中的昵称，不再信任客户端随便传来的 `nickname`
+- 现有请求体里的 `nickname` 字段保留是为了兼容前端结构，真实身份以后端登录态为准
+
 ## 后台接口补充
 
 - `GET /api/admin/state`
@@ -312,6 +327,9 @@ oss:
   - 返回装备分页：`items / page / pageSize / total / totalPages`
 - `GET /api/admin/boss/history?page=1&pageSize=20`
   - 返回历史 Boss 分页：`items / page / pageSize / total / totalPages`
+- `POST /api/admin/players/{nickname}/password/reset`
+  - 请求体：`{ "password": "new-secret" }`
+  - 用于后台手动重置某个玩家昵称的密码，并让旧玩家会话失效
 
 ## 限流规则
 
@@ -330,6 +348,8 @@ oss:
 - `admin.username`
 - `admin.password`
 - `admin.session_secret`
+- `player_auth.jwt_secret`
+- `player_auth.jwt_ttl_seconds`
 - `oss.access_key_id`
 - `oss.access_key_secret`
 - `oss.bucket`

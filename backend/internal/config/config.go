@@ -55,6 +55,12 @@ type AdminConfig struct {
 	SessionSecret string
 }
 
+// PlayerAuthConfig 玩家账号 JWT 配置。
+type PlayerAuthConfig struct {
+	JWTSecret string
+	JWTTTL    time.Duration
+}
+
 // OSSConfig 阿里云 OSS 直传配置
 type OSSConfig struct {
 	AccessKeyID     string
@@ -73,6 +79,7 @@ type Config struct {
 	RateLimit          RateLimitConfig
 	CriticalHit        CriticalHitConfig
 	Admin              AdminConfig
+	PlayerAuth         PlayerAuthConfig
 	OSS                OSSConfig
 	RedisPrefix        string
 	ButtonPollInterval time.Duration // 低频兜底按钮索引同步间隔
@@ -105,6 +112,10 @@ type fileConfig struct {
 		Password      string `yaml:"password"`
 		SessionSecret string `yaml:"session_secret"`
 	} `yaml:"admin"`
+	PlayerAuth struct {
+		JWTSecret    string `yaml:"jwt_secret"`
+		JWTTTLSecond int    `yaml:"jwt_ttl_seconds"`
+	} `yaml:"player_auth"`
 	OSS struct {
 		AccessKeyID     string `yaml:"access_key_id"`
 		AccessKeySecret string `yaml:"access_key_secret"`
@@ -199,6 +210,10 @@ func loadFromConsul() (Config, consulSource, error) {
 			Password:      parsed.Admin.Password,
 			SessionSecret: parsed.Admin.SessionSecret,
 		},
+		PlayerAuth: PlayerAuthConfig{
+			JWTSecret: parsed.PlayerAuth.JWTSecret,
+			JWTTTL:    time.Duration(parsed.PlayerAuth.JWTTTLSecond) * time.Second,
+		},
 		OSS: OSSConfig{
 			AccessKeyID:     parsed.OSS.AccessKeyID,
 			AccessKeySecret: parsed.OSS.AccessKeySecret,
@@ -252,6 +267,10 @@ func validate(config Config) error {
 		return errors.New("admin.password is required")
 	case strings.TrimSpace(config.Admin.SessionSecret) == "":
 		return errors.New("admin.session_secret is required")
+	case strings.TrimSpace(config.PlayerAuth.JWTSecret) == "":
+		return errors.New("player_auth.jwt_secret is required")
+	case config.PlayerAuth.JWTTTL <= 0:
+		return errors.New("player_auth.jwt_ttl_seconds must be greater than 0")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeyID) == "":
 		return errors.New("oss.access_key_id is required when oss is configured")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeySecret) == "":

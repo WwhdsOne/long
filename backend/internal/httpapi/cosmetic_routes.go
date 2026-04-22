@@ -22,8 +22,12 @@ func registerCosmeticRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.PurchaseCosmetic(ctx, body.Nickname, c.Param("cosmeticId"))
+		state, err := options.Store.PurchaseCosmetic(ctx, nickname, c.Param("cosmeticId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -47,7 +51,7 @@ func registerCosmeticRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -63,8 +67,12 @@ func registerCosmeticRoutes(router route.IRouter, options Options) {
 		}) {
 			return
 		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
 
-		state, err := options.Store.EquipCosmetics(ctx, body.Nickname, body.TrailID, body.ImpactID)
+		state, err := options.Store.EquipCosmetics(ctx, nickname, body.TrailID, body.ImpactID)
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -83,7 +91,7 @@ func registerCosmeticRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishEquipmentChange(ctx, body.Nickname, options.ChangePublisher)
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, state)
 	})
 }

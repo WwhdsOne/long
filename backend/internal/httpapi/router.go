@@ -86,20 +86,29 @@ type ClickGuard interface {
 	Allow(string) (time.Duration, error)
 }
 
+// PlayerAuthenticator 负责玩家昵称密码登录、JWT 校验和后台密码重置。
+type PlayerAuthenticator interface {
+	Login(context.Context, string, string) (string, string, error)
+	Verify(context.Context, string) (string, error)
+	ResetPassword(context.Context, string, string) error
+}
+
 // Options 路由配置，注入业务逻辑、实时更新和静态资源。
 type Options struct {
-	Store              ButtonStore
-	StateView          StateView
-	Broadcaster        Broadcaster
-	ChangePublisher    ChangePublisher
-	ClickGuard         ClickGuard
-	Events             app.HandlerFunc
-	PublicDir          string
-	AdminAuthenticator *adminauth.Authenticator
-	OSSSigner          OSSSigner
+	Store               ButtonStore
+	StateView           StateView
+	Broadcaster         Broadcaster
+	ChangePublisher     ChangePublisher
+	ClickGuard          ClickGuard
+	PlayerAuthenticator PlayerAuthenticator
+	Events              app.HandlerFunc
+	PublicDir           string
+	AdminAuthenticator  *adminauth.Authenticator
+	OSSSigner           OSSSigner
 }
 
 const adminSessionCookieName = "long_admin_session"
+const playerSessionCookieName = "long_player_session"
 
 func registerRoutes(engine *route.Engine, options Options) {
 	stateView := options.StateView
@@ -108,6 +117,7 @@ func registerRoutes(engine *route.Engine, options Options) {
 	}
 
 	registerPublicRoutes(engine, options, stateView)
+	registerPlayerAuthRoutes(engine, options)
 	registerPlayerActionRoutes(engine, options)
 	registerAdminRoutes(engine, options)
 	registerEventRoutes(engine, options)

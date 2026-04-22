@@ -17,7 +17,6 @@ import {
 import {buildPityProgress} from '../utils/progressionView'
 import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
-const NICKNAME_STORAGE_KEY = 'vote-wall-nickname'
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const AUTO_CLICK_RATE_LABEL = `每秒约 ${Math.round(1000 / AUTO_CLICK_INTERVAL_MS)} 次`
 const EQUIPMENT_REFORGE_COST = 20
@@ -43,6 +42,7 @@ const lastReward = ref(null)
 const userStats = ref(null)
 const nickname = ref('')
 const nicknameDraft = ref('')
+const passwordDraft = ref('')
 const loading = ref(true)
 const syncing = ref(false)
 const errorMessage = ref('')
@@ -127,7 +127,7 @@ const autoClickTargetLabel = computed(() => autoClickTargetButton.value?.label ?
 const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetButton.value))
 const autoClickStatus = computed(() => {
   if (!isLoggedIn.value) {
-    return '先报个名，再手动点一次按钮，挂机就会跟随你最近一次手动点击。'
+    return '先登录账号，再手动点一次按钮，挂机就会跟随你最近一次手动点击。'
   }
   if (!autoClickTargetKey.value) {
     return '先手动点一次按钮选择目标，开启后会持续帮你点击。'
@@ -448,7 +448,7 @@ async function loadMessages(cursor = '', append = false) {
 
 async function submitMessage() {
   if (!nickname.value) {
-    messageError.value = '先报个名再留言。'
+    messageError.value = '先登录账号再留言。'
     return
   }
 
@@ -762,7 +762,7 @@ function triggerCosmeticBurst(key, options = {}) {
 }
 
 function currentNicknameQuery() {
-  return nickname.value ? `?nickname=${encodeURIComponent(nickname.value)}` : ''
+  return ''
 }
 
 function stopAutoClick() {
@@ -1120,30 +1120,64 @@ function connectEventStream() {
 async function submitNickname() {
   const nextNickname = normalizeNickname(nicknameDraft.value)
   if (!nextNickname) {
-    errorMessage.value = '先给自己起个名字，再上墙。'
+    errorMessage.value = '先填一个昵称。'
+    return
+  }
+  if (!passwordDraft.value.trim()) {
+    errorMessage.value = '再设一个密码。'
     return
   }
 
   errorMessage.value = ''
 
   try {
-    await validateNicknameWithServer(nextNickname)
+    const response = await fetch('/api/player/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        nickname: nextNickname,
+        password: passwordDraft.value,
+      }),
+    })
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '登录失败，请稍后重试。'))
+    }
+
+    const payload = await response.json()
+    const resolvedNickname = normalizeNickname(payload?.nickname || nextNickname)
 
     stopAutoClick()
-    nickname.value = nextNickname
-    nicknameDraft.value = nextNickname
-    window.localStorage.setItem(NICKNAME_STORAGE_KEY, nextNickname)
+    nickname.value = resolvedNickname
+    nicknameDraft.value = resolvedNickname
+    passwordDraft.value = ''
     await loadState()
     connectEventStream()
   } catch (error) {
-    errorMessage.value = error.message || '昵称校验失败，请稍后重试。'
+    errorMessage.value = error.message || '登录失败，请稍后重试。'
   }
 }
 
 async function resetNickname() {
+  try {
+    await fetch('/api/player/auth/logout', {
+      method: 'POST',
+    })
+  } catch {
+    // 忽略异常，继续清理本地状态。
+  }
+
   stopAutoClick()
+  clearPlayerSessionState()
+  await loadState()
+  connectEventStream()
+}
+
+function clearPlayerSessionState() {
   nickname.value = ''
   nicknameDraft.value = ''
+  passwordDraft.value = ''
   userStats.value = null
   inventory.value = []
   heroes.value = []
@@ -1162,24 +1196,32 @@ async function resetNickname() {
   recentRewards.value = []
   lastReward.value = null
   autoClickTargetKey.value = ''
-  window.localStorage.removeItem(NICKNAME_STORAGE_KEY)
-  await loadState()
-  connectEventStream()
+}
+
+async function loadPlayerSession() {
+  try {
+    const response = await fetch('/api/player/auth/session')
+    if (!response.ok) {
+      clearPlayerSessionState()
+      return
+    }
+
+    const payload = await response.json()
+    const resolvedNickname = normalizeNickname(payload?.nickname || '')
+    if (!resolvedNickname) {
+      clearPlayerSessionState()
+      return
+    }
+
+    nickname.value = resolvedNickname
+    nicknameDraft.value = resolvedNickname
+  } catch {
+    clearPlayerSessionState()
+  }
 }
 
 onMounted(async () => {
-  const savedNickname = normalizeNickname(window.localStorage.getItem(NICKNAME_STORAGE_KEY) || '')
-  if (savedNickname) {
-    try {
-      await validateNicknameWithServer(savedNickname)
-      nickname.value = savedNickname
-      nicknameDraft.value = savedNickname
-    } catch (error) {
-      window.localStorage.removeItem(NICKNAME_STORAGE_KEY)
-      errorMessage.value = error.message || '已保存昵称不可用，请换一个试试。'
-    }
-  }
-
+  await loadPlayerSession()
   await loadState()
   connectEventStream()
 })
@@ -1204,7 +1246,7 @@ onBeforeUnmount(() => {
     <section class="hero">
       <div class="hero__copy">
         <p class="hero__eyebrow">Long Vote Wall</p>
-        <h1>报个名，再狠狠干一票。</h1>
+        <h1>登录账号，再狠狠干一票。</h1>
         <p class="hero__lede">
           平时点按钮照样冲榜；有活动 Boss 时，同一点击会把装备增量一起结算成伤害。
         </p>
@@ -1362,7 +1404,7 @@ onBeforeUnmount(() => {
 
           <p class="player-hud__copy">
             {{
-              isLoggedIn ? `你现在用的是 ${nickname}。同名会直接并成同一个人。` : '先报个名，HUD 里的背包、属性和装备栏就都会跟你走。'
+              isLoggedIn ? `你现在登录的是 ${nickname}。背包、属性和装备都会跟着这个账号走。` : '先输入昵称和密码登录；第一次使用该昵称时会直接为它设置密码。'
             }}
           </p>
 
@@ -1374,8 +1416,14 @@ onBeforeUnmount(() => {
                 maxlength="20"
                 placeholder="比如：阿明"
             />
+            <input
+                v-model="passwordDraft"
+                class="nickname-form__input"
+                type="password"
+                placeholder="输入密码"
+            />
             <button class="nickname-form__submit" type="submit">
-              {{ isLoggedIn ? '切换昵称' : '进入现场' }}
+              {{ isLoggedIn ? '切换账号' : '登录 / 首次认领' }}
             </button>
           </form>
 
@@ -1385,7 +1433,7 @@ onBeforeUnmount(() => {
               type="button"
               @click="resetNickname"
           >
-            清空昵称
+            退出登录
           </button>
 
           <section class="player-hud__auto">
@@ -2216,7 +2264,7 @@ onBeforeUnmount(() => {
             <h2>看见哪个想按，就直接拍下去。</h2>
           </div>
           <p v-if="!errorMessage" class="vote-stage__hint">
-            {{ isLoggedIn ? `现在上墙的是 ${nickname}` : '先报个名，再开始冲榜。' }}
+            {{ isLoggedIn ? `现在上墙的是 ${nickname}` : '先登录账号，再开始冲榜。' }}
           </p>
         </div>
 
@@ -2330,7 +2378,7 @@ onBeforeUnmount(() => {
               <span class="vote-card__badge">
               {{
                   !isLoggedIn
-                      ? '先报个名'
+                      ? '先登录'
                       : pendingKeys.has(button.key)
                           ? '正在记票'
                           : isStarlightButton(button.key)

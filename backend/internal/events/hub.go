@@ -126,9 +126,12 @@ func (h *Hub) ActiveNicknames() []string {
 }
 
 // NewHandler 暴露浏览器 EventSource 使用的 Hertz 原生 SSE 入口。
-func NewHandler(hub *Hub, reader StateReader) app.HandlerFunc {
+func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Context, *app.RequestContext) string) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		nickname := strings.TrimSpace(c.Query("nickname"))
+		if resolveNickname != nil {
+			nickname = strings.TrimSpace(resolveNickname(ctx, c))
+		}
 
 		snapshot, err := reader.GetSnapshot(ctx)
 		if err != nil {
