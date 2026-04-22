@@ -49,10 +49,18 @@ jobs:
       - name: Build frontend
         run: make build
 
-      - name: Prepare deploy context
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image artifact in GitHub Actions
         run: |
           mkdir -p deploy-artifacts
-          git archive --format=tar HEAD | tar -xf - -C deploy-artifacts
+          docker buildx build \
+            --platform linux/amd64 \
+            -t "${IMAGE_NAME}:latest" \
+            --output "type=docker,dest=deploy-artifacts/${IMAGE_NAME}-image.tar" \
+            .
+          gzip -f "deploy-artifacts/${IMAGE_NAME}-image.tar"
 
       - name: Prepare remote deploy directory and clean old container/image
         uses: appleboy/ssh-action@v1.2.0
@@ -76,17 +84,17 @@ jobs:
               docker rmi -f "$IMAGE_ID" || true
             fi
 
-      - name: Upload deploy context to server
+      - name: Upload image artifact to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SSH_USER }}
           password: ${{ env.SSH_PASSWORD }}
           port: ${{ env.SERVER_PORT }}
-          source: "deploy-artifacts"
+          source: "deploy-artifacts/${{ env.IMAGE_NAME }}-image.tar.gz"
           target: ${{ env.DEPLOY_PATH }}
 
-      - name: Build image and start container
+      - name: Load image and start container
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ env.SERVER_IP }}
@@ -100,7 +108,7 @@ jobs:
             docker network inspect "${{ env.NETWORK_NAME }}" >/dev/null 2>&1 || \
               docker network create "${{ env.NETWORK_NAME }}"
 
-            docker build -t ${{ env.IMAGE_NAME }}:latest .
+            gunzip -c "${{ env.IMAGE_NAME }}-image.tar.gz" | docker load
 
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \

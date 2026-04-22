@@ -16,13 +16,17 @@ WORKDIR /src/backend
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 
+RUN apk add --no-cache upx
+
 COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 COPY backend ./
 COPY --from=frontend-builder /src/backend/public ./public
 
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/long ./cmd/server
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags "-w -s" -o /out/long ./cmd/server && \
+    upx --best --lzma /out/long
 
 FROM alpine:latest
 
