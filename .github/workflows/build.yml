@@ -11,6 +11,7 @@ jobs:
     env:
       IMAGE_NAME: long
       CONTAINER_NAME: long
+      NETWORK_NAME: docker-compose_app-net
       DEPLOY_PATH: /home/docker-images/long
       CONSUL_ADDR: ${{ secrets.CONSUL_ADDR }}
       CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
@@ -48,39 +49,10 @@ jobs:
       - name: Build frontend
         run: make build
 
-      - name: Install UPX
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y upx-ucl || sudo apt-get install -y upx
-
-          if command -v upx >/dev/null 2>&1; then
-            echo "UPX_BIN=upx" >> "$GITHUB_ENV"
-          elif command -v upx-ucl >/dev/null 2>&1; then
-            echo "UPX_BIN=upx-ucl" >> "$GITHUB_ENV"
-          else
-            echo "UPX 安装失败" >&2
-            exit 1
-          fi
-
-      - name: Build Go binary (linux/amd64)
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go -C backend build \
-              -trimpath \
-              -ldflags "-w -s" \
-              -o long \
-              ./cmd/server
-
-      - name: Compress Go binary with UPX
-        run: |
-          "$UPX_BIN" --best --lzma backend/long
-
-      - name: Prepare deploy artifacts
+      - name: Prepare deploy context
         run: |
           mkdir -p deploy-artifacts
-          cp Dockerfile deploy-artifacts/
-          cp backend/long deploy-artifacts/
-          cp -r backend/public deploy-artifacts/
+          git archive --format=tar HEAD | tar -xf - -C deploy-artifacts
 
       - name: Prepare remote deploy directory and clean old container/image
         uses: appleboy/ssh-action@v1.2.0
@@ -104,7 +76,7 @@ jobs:
               docker rmi -f "$IMAGE_ID" || true
             fi
 
-      - name: Upload build artifacts to server
+      - name: Upload deploy context to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.SERVER_IP }}
@@ -125,11 +97,15 @@ jobs:
             set -e
             cd "${{ env.DEPLOY_PATH }}/deploy-artifacts"
 
+            docker network inspect "${{ env.NETWORK_NAME }}" >/dev/null 2>&1 || \
+              docker network create "${{ env.NETWORK_NAME }}"
+
             docker build -t ${{ env.IMAGE_NAME }}:latest .
 
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
-              --network host \
+              --network "${{ env.NETWORK_NAME }}" \
+              -p 2333:2333 \
               --restart unless-stopped \
               -e CONSUL_ADDR="${{ env.CONSUL_ADDR }}" \
               -e CONSUL_CONFIG_KEY="${{ env.CONSUL_CONFIG_KEY }}" \
