@@ -1779,6 +1779,7 @@ onBeforeUnmount(() => {
                   <span>当前余额</span>
                   <strong>{{ gems }} 原石</strong>
                   <p>重复装备和重复英雄都可以分解成原石，再投入强化和觉醒。</p>
+                  <p>每件装备或者小小英雄可以分解为1原石</p>
                 </article>
                 <article class="forge-summary">
                   <span>本期价格</span>
