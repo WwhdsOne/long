@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -115,8 +116,9 @@ func run() error {
 	})
 
 	errCh := make(chan error, 1)
+	listenAddr := serverAddress(cfg.Port)
 	go func() {
-		log.Printf("Vote wall listening on port %d", cfg.Port)
+		log.Printf("Vote wall listening on %s", listenAddr)
 		if err := httpServer.Run(); err != nil {
 			errCh <- err
 		}
@@ -195,7 +197,20 @@ func run() error {
 }
 
 func serverAddress(port int) string {
-	return net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
+	host := strings.TrimSpace(os.Getenv("LONG_LISTEN_HOST"))
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
+	listenPort := port
+	if rawPort := strings.TrimSpace(os.Getenv("LONG_LISTEN_PORT")); rawPort != "" {
+		parsed, err := strconv.Atoi(rawPort)
+		if err == nil && parsed > 0 {
+			listenPort = parsed
+		}
+	}
+
+	return net.JoinHostPort(host, fmt.Sprintf("%d", listenPort))
 }
 
 func namespaceFromPrefix(prefix string) string {
