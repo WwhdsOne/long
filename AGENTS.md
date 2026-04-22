@@ -4,6 +4,23 @@
 
 一次性任务说明写进 `docs/`，不要继续堆进这里。
 
+# Repository Index
+
+这里只维护长期稳定的“目录职责 + 少量关键入口”，作为仓库导航索引。
+
+不维护全量文件枚举，不把它写成一次性任务清单。
+
+发现新模块时，只有当它已经成为长期稳定入口，再补进这里。
+
+- `backend/`：Go + Hertz 服务、API、SSE、业务逻辑
+- `frontend/`：Vue 3 + Vite 页面与前端测试
+- `deploy/`：容器与 Nginx 部署配置
+- `scripts/`：本地脚本
+- `docs/`：一次性任务、设计、计划、记录
+- `Makefile`：顶层开发、构建、校验入口
+- `backend/cmd/server/main.go`：后端启动入口
+- `frontend/src/main.js`：前端启动入口
+
 # Read Policy
 
 先搜索，后读取。
@@ -29,6 +46,58 @@
 默认只用本地 shell、git、仓库文件和本地非破坏性检查。
 
 优先使用本地命令：`rg`、`sed`、`git`、项目测试命令。
+
+# RTK Priority
+
+所有可由 `rtk` 代理、且与本仓库工作流重叠的命令，优先使用 `rtk`，以压缩输出、节省 token。
+
+这条规则仍然服从现有 Tool Policy：只使用本地 shell、git、仓库文件和本地非破坏性检查。
+
+当 `rtk` 与普通 shell 命令功能重叠时，优先使用 `rtk` 版本。
+
+只有在 `rtk` 没有对应能力，或属于写操作、复杂交互操作时，才退回普通命令或内置编辑能力。
+
+如果仓库已经提供统一入口，优先写“`rtk` + 项目入口命令”。
+
+优先级默认是：先 `Makefile`，再语言原生命令。
+
+文件与目录探索优先：
+
+- `rtk find`
+- `rtk tree`
+- `rtk ls`
+- `rtk grep`
+- `rtk read`
+
+Git 检查优先：
+
+- `rtk git status`
+- `rtk git diff`
+- `rtk git log`
+
+项目入口优先：
+
+- `rtk make test`
+- `rtk make check`
+
+Go / 后端检查与运行：
+
+- `rtk go run ./cmd/server`
+- `rtk go test ./...`
+- `rtk go vet ./...`
+
+Frontend 检查与运行：
+
+- `rtk npm --prefix frontend run dev`
+- `rtk npm --prefix frontend run build`
+- `rtk npm --prefix frontend run test`
+- `rtk vitest run`：仅在直接进入 `frontend/` 目录工作时使用
+
+容器相关只在确实处理镜像或容器问题时使用 `rtk docker ...`。
+
+不要在这里扩展与当前仓库无关的 RTK 命令族。
+
+不要写 `rtk gh`、`rtk curl`，也不要补入 Python、Rust、.NET、Ruby、AWS、`kubectl`、`psql` 等与当前仓库无关的能力表。
 
 # Git Workflow
 
