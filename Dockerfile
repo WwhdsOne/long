@@ -42,6 +42,6 @@ COPY deploy/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 2333
+EXPOSE 16002
 
 CMD ["/entrypoint.sh"]
