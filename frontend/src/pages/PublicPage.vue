@@ -4,6 +4,7 @@ import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 import {AUTO_CLICK_INTERVAL_MS, createAutoClickLoop} from '../utils/autoClicker'
 import {mergeBossState} from '../utils/bossState'
 import {collectButtonTags, filterAndSortButtons, formatDropRate} from '../utils/buttonBoard'
+import {buildClickRequestBody, mergeClickFallbackState} from '../utils/clickResponse'
 import {
   buildCosmeticCollections,
   canEquipCosmeticSelection,
@@ -732,24 +733,23 @@ function applyClickResult(payload) {
     )
     syncAutoClickTarget()
   }
-  if ('userStats' in payload) {
-    userStats.value = payload.userStats ?? null
-  }
-  if ('boss' in payload) {
-    boss.value = mergeBossState(boss.value, payload.boss)
-  }
-  if ('bossLeaderboard' in payload) {
-    bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : bossLeaderboard.value
-  }
-  if ('myBossStats' in payload) {
-    myBossStats.value = payload.myBossStats ?? null
-  }
-  if (Array.isArray(payload.recentRewards) && payload.recentRewards.length > 0) {
-    recentRewards.value = payload.recentRewards
-  }
-  if (payload.lastReward) {
-    lastReward.value = payload.lastReward
-  }
+  const nextClickState = mergeClickFallbackState(
+    {
+      userStats: userStats.value,
+      boss: boss.value,
+      bossLeaderboard: bossLeaderboard.value,
+      myBossStats: myBossStats.value,
+      recentRewards: recentRewards.value,
+      lastReward: lastReward.value,
+    },
+    payload,
+  )
+  userStats.value = nextClickState.userStats
+  boss.value = nextClickState.boss
+  bossLeaderboard.value = nextClickState.bossLeaderboard
+  myBossStats.value = nextClickState.myBossStats
+  recentRewards.value = nextClickState.recentRewards
+  lastReward.value = nextClickState.lastReward
   syncing.value = false
   markUpdated()
 }
@@ -920,9 +920,7 @@ async function clickButton(key, options = {}) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        nickname: nickname.value,
-      }),
+      body: JSON.stringify(buildClickRequestBody(nickname.value, liveConnected.value)),
     })
 
     if (!response.ok) {
@@ -938,7 +936,6 @@ async function clickButton(key, options = {}) {
     restored.delete(key)
     pendingKeys.value = restored
     applyClickResult(data)
-    liveConnected.value = true
     errorMessage.value = ''
   } catch (error) {
     const restored = new Set(pendingKeys.value)

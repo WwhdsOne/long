@@ -17,7 +17,8 @@ import (
 func registerButtonClickRoutes(router route.IRouter, options Options) {
 	router.POST("/api/buttons/:slug/click", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
-			Nickname string `json:"nickname"`
+			Nickname          string `json:"nickname"`
+			RealtimeConnected bool   `json:"realtimeConnected"`
 		}
 		if !bindJSON(c, &body, map[string]string{
 			"error":   "INVALID_REQUEST",
@@ -64,17 +65,21 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 			change.BroadcastUserAll = true
 		}
 		publishChange(ctx, options.ChangePublisher, change)
-		writeJSON(c, consts.StatusOK, map[string]any{
-			"button":          result.Button,
-			"userStats":       result.UserStats,
-			"delta":           result.Delta,
-			"critical":        result.Critical,
-			"boss":            result.Boss,
-			"bossLeaderboard": result.BossLeaderboard,
-			"myBossStats":     result.MyBossStats,
-			"recentRewards":   result.RecentRewards,
-			"lastReward":      result.LastReward,
-		})
+		payload := map[string]any{
+			"button":   result.Button,
+			"delta":    result.Delta,
+			"critical": result.Critical,
+		}
+		if !body.RealtimeConnected {
+			payload["userStats"] = result.UserStats
+			payload["boss"] = result.Boss
+			payload["bossLeaderboard"] = result.BossLeaderboard
+			payload["myBossStats"] = result.MyBossStats
+			payload["recentRewards"] = result.RecentRewards
+			payload["lastReward"] = result.LastReward
+		}
+
+		writeJSON(c, consts.StatusOK, payload)
 	})
 }
 
