@@ -1,5 +1,5 @@
 <script setup>
-import { RARITY_OPTIONS } from '../../utils/rarity'
+import { formatRarityLabel, RARITY_OPTIONS } from '../../utils/rarity'
 
 defineProps({
   equipmentPage: { type: Object, required: true },
@@ -52,7 +52,7 @@ defineProps({
           <li v-for="item in equipmentPage.items" :key="item.itemId" class="inventory-item">
             <div>
               <strong>{{ item.name }}</strong>
-              <p>{{ item.itemId }} · {{ item.slot }} · {{ item.rarity || '普通' }}</p>
+              <p>{{ item.itemId }} · {{ item.slot }} · {{ formatRarityLabel(item.rarity) }}</p>
               <p>强化上限 {{ item.enhanceCap || '未设置' }}</p>
               <p>{{ formatItemStats(item) }}</p>
             </div>
