@@ -38,6 +38,48 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.rarity-text--common {
+  color: #6b7280;
+}
+
+.rarity-text--fine {
+  color: #0f766e;
+}
+
+.rarity-text--rare {
+  color: #2563eb;
+}
+
+.rarity-text--epic {
+  color: #c026d3;
+}
+
+.rarity-text--legendary {
+  color: #d97706;
+}
+
+.rarity-text--supreme {
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981, #3b82f6, #ec4899, #ef4444);
+  background-size: 220% auto;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.rarity-text--animated {
+  animation: rarity-supreme-shift 3.2s linear infinite;
+}
+
+@keyframes rarity-supreme-shift {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 220% 50%;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -2160,5 +2202,9 @@ select {
     animation: none !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .rarity-text--supreme {
+    background-position: 50% 50%;
   }
 }

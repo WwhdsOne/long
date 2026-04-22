@@ -110,6 +110,7 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 	values := map[string]any{
 		"name":                          firstNonEmpty(strings.TrimSpace(definition.Name), itemID),
 		"slot":                          strings.TrimSpace(definition.Slot),
+		"rarity":                        normalizeEquipmentRarity(definition.Rarity),
 		"bonus_clicks":                  strconv.FormatInt(definition.BonusClicks, 10),
 		"bonus_critical_chance_percent": formatFloatForRedis(definition.BonusCriticalChancePercent),
 		"bonus_critical_count":          strconv.FormatInt(definition.BonusCriticalCount, 10),

@@ -33,6 +33,7 @@ type mockStore struct {
 	lastBoss               vote.BossUpsert
 	lastBossTemplate       vote.BossTemplateUpsert
 	lastHero               vote.HeroDefinition
+	lastEquipment          vote.EquipmentDefinition
 	lastTemplateLootID     string
 	lastTemplateLoot       []vote.BossLootEntry
 	lastTemplateHeroLootID string
@@ -184,7 +185,8 @@ func (m *mockStore) SaveButton(_ context.Context, button vote.ButtonUpsert) erro
 	return nil
 }
 
-func (m *mockStore) SaveEquipmentDefinition(_ context.Context, _ vote.EquipmentDefinition) error {
+func (m *mockStore) SaveEquipmentDefinition(_ context.Context, definition vote.EquipmentDefinition) error {
+	m.lastEquipment = definition
 	return nil
 }
 

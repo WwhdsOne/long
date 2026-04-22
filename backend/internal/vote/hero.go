@@ -384,6 +384,7 @@ func (s *Store) normalizeHeroLootEntries(ctx context.Context, entries []redis.Z)
 			ImageAlt:                   definition.ImageAlt,
 			Weight:                     int64(entry.Score),
 			DropRatePercent:            dropRatePercent,
+			AwakenCap:                  definition.AwakenCap,
 			BonusClicks:                definition.BonusClicks,
 			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
 			BonusCriticalCount:         definition.BonusCriticalCount,
