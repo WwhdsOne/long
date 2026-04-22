@@ -305,6 +305,9 @@ select {
   display: grid;
   gap: 14px;
   padding: 22px 20px;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  overflow-x: hidden;
   border-radius: 34px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 236, 241, 0.96)),
@@ -449,9 +452,6 @@ select {
 .player-hud__content {
   display: grid;
   gap: 14px;
-  max-height: calc(100vh - 260px);
-  overflow-y: auto;
-  overflow-x: hidden;
   padding-right: 4px;
 }
 
@@ -514,12 +514,31 @@ select {
   position: sticky;
   top: 18px;
   align-self: start;
+  max-height: calc(100vh - 36px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
 }
 
 .social-card {
   margin-top: 0;
   padding: 22px;
   border-radius: 32px;
+}
+
+.leaderboard-card--stacked {
+  display: grid;
+  gap: 20px;
+}
+
+.leaderboard-card__section {
+  display: grid;
+  gap: 2px;
+}
+
+.leaderboard-card__section + .leaderboard-card__section {
+  padding-top: 20px;
+  border-top: 1px solid rgba(183, 53, 97, 0.14);
 }
 
 .social-card__head {
@@ -1646,6 +1665,14 @@ select {
   font-size: 0.88rem;
 }
 
+.forge-summary__tips span {
+  display: block;
+  font-size: 9px;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  letter-spacing: 0.5px; /* 关键：稍微拉开一点间距，9px就不显得挤 */
+}
+
+
 .forge-result {
   margin-top: 14px;
 }
@@ -2066,11 +2093,19 @@ select {
   .player-hud,
   .social-panel--ranking {
     position: static;
-  }
-
-  .player-hud__content {
     max-height: none;
     overflow: visible;
+    padding-right: 0;
+  }
+
+  .player-hud__shell,
+  .player-hud__content {
+    overflow: visible;
+  }
+
+  .player-hud__shell,
+  .player-hud__content {
+    max-height: none;
     padding-right: 0;
   }
 }
