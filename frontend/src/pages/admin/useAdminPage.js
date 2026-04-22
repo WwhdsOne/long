@@ -169,7 +169,6 @@ export function useAdminPage() {
       errorMessage.value = error.message || '后台状态加载失败'
     } finally {
       loading.value = false
-      console.log('loading ', loading.value)
     }
   }
 
@@ -431,6 +430,8 @@ export function useAdminPage() {
   return {
     ...actions,
     activeTab,
+    addHeroLootRow,
+    addLootRow,
     adminState,
     announcementForm,
     announcements,

@@ -2,6 +2,7 @@ server {
     listen 80;
     server_name _;
 
+    # Go 服务默认只监听本机 127.0.0.1:2333，对外统一走 Nginx 入口。
     location / {
         proxy_pass http://127.0.0.1:2333;
         proxy_http_version 1.1;

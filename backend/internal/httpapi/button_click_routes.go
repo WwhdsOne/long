@@ -33,22 +33,10 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 			})
 			return
 		}
+		nickname := strings.TrimSpace(body.Nickname)
 
-		if options.ClickGuard != nil {
-			retryAfter, err := options.ClickGuard.Allow(clientIdentifier(c))
-			if err != nil {
-				if errors.Is(err, ratelimit.ErrTooManyRequests) {
-					c.Header("Retry-After", strconv.FormatInt(int64(retryAfter/time.Second), 10))
-					writeJSON(c, consts.StatusTooManyRequests, map[string]string{
-						"error":   "TOO_MANY_REQUESTS",
-						"message": "点得太快了，先歇 10 分钟再来。",
-					})
-					return
-				}
-
-				writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "RATE_LIMIT_FAILED"})
-				return
-			}
+		if err := enforceClickRateLimit(c, options.ClickGuard, nickname); err != nil {
+			return
 		}
 
 		result, err := options.Store.ClickButton(ctx, c.Param("slug"), body.Nickname)
@@ -86,4 +74,33 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 			"lastReward":      result.LastReward,
 		})
 	})
+}
+
+func enforceClickRateLimit(c *app.RequestContext, guard ClickGuard, nickname string) error {
+	if guard == nil {
+		return nil
+	}
+
+	for _, key := range []string{
+		"ip:" + clientIdentifier(c),
+		"nickname:" + nickname,
+	} {
+		retryAfter, err := guard.Allow(key)
+		if err == nil {
+			continue
+		}
+		if errors.Is(err, ratelimit.ErrTooManyRequests) {
+			c.Header("Retry-After", strconv.FormatInt(int64(retryAfter/time.Second), 10))
+			writeJSON(c, consts.StatusTooManyRequests, map[string]string{
+				"error":   "TOO_MANY_REQUESTS",
+				"message": "点得太快了，先歇 10 分钟再来。",
+			})
+			return err
+		}
+
+		writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "RATE_LIMIT_FAILED"})
+		return err
+	}
+
+	return nil
 }

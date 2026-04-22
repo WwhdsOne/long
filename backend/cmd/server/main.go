@@ -88,7 +88,7 @@ func run() error {
 			ExpireSeconds:   cfg.OSS.ExpireSeconds,
 		})
 	}
-	httpServer := httpapi.NewHertzServer(fmt.Sprintf(":%d", cfg.Port), httpapi.Options{
+	httpServer := httpapi.NewHertzServer(serverAddress(cfg.Port), httpapi.Options{
 		Store:           store,
 		StateView:       stateCache,
 		ChangePublisher: changeBus,
@@ -181,4 +181,8 @@ func run() error {
 	}
 
 	return nil
+}
+
+func serverAddress(port int) string {
+	return net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", port))
 }

@@ -19,3 +19,9 @@ func TestHertzServerRegistersPprofAndAPI(t *testing.T) {
 		t.Fatal("expected pprof body")
 	}
 }
+
+func TestServerAddressUsesLoopback(t *testing.T) {
+	if addr := serverAddress(2333); addr != "127.0.0.1:2333" {
+		t.Fatalf("expected loopback listen address, got %q", addr)
+	}
+}

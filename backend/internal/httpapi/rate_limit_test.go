@@ -20,6 +20,17 @@ func (b blockingLimiter) Allow(string) (time.Duration, error) {
 	return b.retryAfter, b.err
 }
 
+type selectiveLimiter struct {
+	blockedKey string
+}
+
+func (s selectiveLimiter) Allow(key string) (time.Duration, error) {
+	if key == s.blockedKey {
+		return 10 * time.Minute, ratelimit.ErrTooManyRequests
+	}
+	return 0, nil
+}
+
 func TestClickButtonReturnsTooManyRequestsWhenClientIsBlocked(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
@@ -61,5 +72,40 @@ func TestClickButtonReturnsTooManyRequestsWhenClientIsBlocked(t *testing.T) {
 	}
 	if body := response.Body.String(); body == "" {
 		t.Fatal("expected response body for rate limit error")
+	}
+}
+
+func TestClickButtonBlocksSameNicknameAcrossDifferentIPs(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			Buttons: []vote.Button{
+				{
+					Key:      "feel",
+					RedisKey: "vote:button:feel",
+					Label:    "有感觉吗",
+					Count:    2,
+					Sort:     10,
+					Enabled:  true,
+				},
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		ClickGuard: selectiveLimiter{
+			blockedKey: "nickname:阿明",
+		},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected click to be blocked by nickname limit, got %d", response.Code)
 	}
 }
