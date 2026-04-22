@@ -2,15 +2,16 @@ package events
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"long/internal/vote"
-
 	"github.com/bytedance/sonic"
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/hertz/pkg/protocol/sse"
+
+	"long/internal/vote"
 )
 
 const (
@@ -41,14 +42,10 @@ type Hub struct {
 	clients map[*subscriber]struct{}
 }
 
-// NewHub creates an in-memory broadcaster for browser subscribers.
 func NewHub() *Hub {
-	return &Hub{
-		clients: make(map[*subscriber]struct{}),
-	}
+	return &Hub{clients: make(map[*subscriber]struct{})}
 }
 
-// Subscribe 注册一个订阅者；昵称为空表示只接收公共态。
 func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 	client := &subscriber{
 		nickname: strings.TrimSpace(nickname),
@@ -71,7 +68,6 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 	return client.ch, unsubscribe
 }
 
-// BroadcastPublic 向所有订阅者广播公共态。
 func (h *Hub) BroadcastPublic(snapshot vote.Snapshot) error {
 	payload, err := sonic.Marshal(snapshot)
 	if err != nil {
@@ -81,16 +77,12 @@ func (h *Hub) BroadcastPublic(snapshot vote.Snapshot) error {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for client := range h.clients {
-		deliverEvent(client.ch, ServerEvent{
-			Name:    publicStateEventName,
-			Payload: payload,
-		})
+		deliverEvent(client.ch, ServerEvent{Name: publicStateEventName, Payload: payload})
 	}
 
 	return nil
 }
 
-// BroadcastUser 向指定昵称的订阅者广播个人态。
 func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 	normalizedNickname := strings.TrimSpace(nickname)
 	if normalizedNickname == "" {
@@ -108,16 +100,12 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 		if client.nickname != normalizedNickname {
 			continue
 		}
-		deliverEvent(client.ch, ServerEvent{
-			Name:    userStateEventName,
-			Payload: payload,
-		})
+		deliverEvent(client.ch, ServerEvent{Name: userStateEventName, Payload: payload})
 	}
 
 	return nil
 }
 
-// ActiveNicknames 返回当前在线且带昵称的订阅者集合。
 func (h *Hub) ActiveNicknames() []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -137,42 +125,34 @@ func (h *Hub) ActiveNicknames() []string {
 	return nicknames
 }
 
-// NewHandler exposes the SSE endpoint used by the frontend EventSource client.
-func NewHandler(hub *Hub, reader StateReader) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-			return
-		}
+// NewHandler 暴露浏览器 EventSource 使用的 Hertz 原生 SSE 入口。
+func NewHandler(hub *Hub, reader StateReader) app.HandlerFunc {
+	return func(ctx context.Context, c *app.RequestContext) {
+		nickname := strings.TrimSpace(c.Query("nickname"))
 
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("X-Accel-Buffering", "no")
-
-		nickname := strings.TrimSpace(r.URL.Query().Get("nickname"))
-
-		snapshot, err := reader.GetSnapshot(r.Context())
+		snapshot, err := reader.GetSnapshot(ctx)
 		if err != nil {
-			http.Error(w, "STATE_FETCH_FAILED", http.StatusInternalServerError)
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 			return
 		}
-		if err := writeEvent(w, publicStateEventName, snapshot); err != nil {
+
+		writer := sse.NewWriter(c)
+		defer writer.Close()
+
+		if err := writeEvent(writer, publicStateEventName, snapshot); err != nil {
 			return
 		}
 
 		if nickname != "" {
-			userState, err := reader.GetUserState(r.Context(), nickname)
+			userState, err := reader.GetUserState(ctx, nickname)
 			if err != nil {
-				http.Error(w, "STATE_FETCH_FAILED", http.StatusInternalServerError)
+				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 				return
 			}
-			if err := writeEvent(w, userStateEventName, userState); err != nil {
+			if err := writeEvent(writer, userStateEventName, userState); err != nil {
 				return
 			}
 		}
-		flusher.Flush()
 
 		client, unsubscribe := hub.Subscribe(nickname)
 		defer unsubscribe()
@@ -182,21 +162,19 @@ func NewHandler(hub *Hub, reader StateReader) http.HandlerFunc {
 
 		for {
 			select {
-			case <-r.Context().Done():
+			case <-ctx.Done():
 				return
 			case event, ok := <-client:
 				if !ok {
 					return
 				}
-				if err := writeRawEvent(w, event.Name, event.Payload); err != nil {
+				if err := writer.WriteEvent("", event.Name, event.Payload); err != nil {
 					return
 				}
-				flusher.Flush()
 			case <-heartbeat.C:
-				if _, err := fmt.Fprint(w, ": ping\n\n"); err != nil {
+				if err := writer.WriteComment("ping"); err != nil {
 					return
 				}
-				flusher.Flush()
 			}
 		}
 	}
@@ -218,18 +196,10 @@ func deliverEvent(client chan ServerEvent, event ServerEvent) {
 	}
 }
 
-func writeEvent(w http.ResponseWriter, name string, payload any) error {
+func writeEvent(writer *sse.Writer, name string, payload any) error {
 	encoded, err := sonic.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	return writeRawEvent(w, name, encoded)
-}
-
-func writeRawEvent(w http.ResponseWriter, name string, payload []byte) error {
-	if _, err := fmt.Fprintf(w, "event: %s\n", name); err != nil {
-		return err
-	}
-	_, err := fmt.Fprintf(w, "data: %s\n\n", payload)
-	return err
+	return writer.WriteEvent("", name, encoded)
 }

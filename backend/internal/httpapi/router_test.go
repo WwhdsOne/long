@@ -18,6 +18,9 @@ type mockStore struct {
 	state                  vote.State
 	equipState             vote.State
 	adminState             vote.AdminState
+	adminButtonPage        vote.AdminButtonPage
+	adminEquipmentPage     vote.AdminEquipmentPage
+	adminBossHistoryPage   vote.AdminBossHistoryPage
 	adminPlayerPage        vote.AdminPlayerPage
 	adminPlayer            *vote.AdminPlayerOverview
 	bossHistory            []vote.BossHistoryEntry
@@ -150,6 +153,18 @@ func (m *mockStore) UnequipItem(_ context.Context, _ string, _ string) (vote.Sta
 
 func (m *mockStore) GetAdminState(_ context.Context) (vote.AdminState, error) {
 	return m.adminState, nil
+}
+
+func (m *mockStore) ListAdminButtonsPage(_ context.Context, _ int64, _ int64) (vote.AdminButtonPage, error) {
+	return m.adminButtonPage, nil
+}
+
+func (m *mockStore) ListAdminEquipmentPage(_ context.Context, _ int64, _ int64) (vote.AdminEquipmentPage, error) {
+	return m.adminEquipmentPage, nil
+}
+
+func (m *mockStore) ListAdminBossHistoryPage(_ context.Context, _ int64, _ int64) (vote.AdminBossHistoryPage, error) {
+	return m.adminBossHistoryPage, nil
 }
 
 func (m *mockStore) ListAdminPlayers(_ context.Context, _ string, _ int64) (vote.AdminPlayerPage, error) {
@@ -1169,19 +1184,8 @@ func TestPostMessageRejectsSensitiveContent(t *testing.T) {
 func TestAdminLoginCreatesSessionAndStateRequiresAuth(t *testing.T) {
 	store := &mockStore{
 		adminState: vote.AdminState{
-			Buttons: []vote.Button{
-				{
-					Key:      "feel",
-					RedisKey: "vote:button:feel",
-					Label:    "有感觉吗",
-					Count:    3,
-					Sort:     10,
-					Enabled:  true,
-				},
-			},
-			Equipment: []vote.EquipmentDefinition{
-				{ItemID: "wood-sword", Name: "木剑", Slot: "weapon", BonusClicks: 2},
-			},
+			PlayerCount:       8,
+			RecentPlayerCount: 3,
 		},
 	}
 
@@ -1226,19 +1230,19 @@ func TestAdminLoginCreatesSessionAndStateRequiresAuth(t *testing.T) {
 		t.Fatalf("expected 200 with session, got %d", adminResponse.Code)
 	}
 
-	var payload struct {
-		Buttons   []vote.Button              `json:"buttons"`
-		Equipment []vote.EquipmentDefinition `json:"equipment"`
-	}
+	var payload map[string]any
 	if err := sonic.Unmarshal(adminResponse.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if len(payload.Buttons) != 1 || payload.Buttons[0].Key != "feel" {
-		t.Fatalf("unexpected admin buttons payload: %+v", payload.Buttons)
+	if _, ok := payload["buttons"]; ok {
+		t.Fatalf("expected admin state summary to omit buttons, got %+v", payload)
 	}
-	if len(payload.Equipment) != 1 || payload.Equipment[0].ItemID != "wood-sword" {
-		t.Fatalf("unexpected admin equipment payload: %+v", payload.Equipment)
+	if _, ok := payload["equipment"]; ok {
+		t.Fatalf("expected admin state summary to omit equipment, got %+v", payload)
+	}
+	if got := int64(payload["playerCount"].(float64)); got != 8 {
+		t.Fatalf("expected playerCount 8, got %d", got)
 	}
 }
 

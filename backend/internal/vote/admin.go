@@ -11,88 +11,13 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// AdminState 管理后台聚合状态
-type AdminState struct {
-	Buttons           []Button               `json:"buttons"`
-	Boss              *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard"`
-	Equipment         []EquipmentDefinition  `json:"equipment"`
-	Heroes            []HeroDefinition       `json:"heroes"`
-	Loot              []BossLootEntry        `json:"loot"`
-	HeroLoot          []BossHeroLootEntry    `json:"heroLoot"`
-	BossCycleEnabled  bool                   `json:"bossCycleEnabled"`
-	BossPool          []BossTemplate         `json:"bossPool"`
-	PlayerCount       int64                  `json:"playerCount"`
-	RecentPlayerCount int64                  `json:"recentPlayerCount"`
-	Players           []AdminPlayerOverview  `json:"players,omitempty"`
-}
-
-// AdminPlayerOverview 管理后台的玩家概览
-type AdminPlayerOverview struct {
-	Nickname   string          `json:"nickname"`
-	ClickCount int64           `json:"clickCount"`
-	Inventory  []InventoryItem `json:"inventory"`
-	Loadout    Loadout         `json:"loadout"`
-}
-
-// AdminPlayerPage 后台玩家分页结果
-type AdminPlayerPage struct {
-	Items      []AdminPlayerOverview `json:"items"`
-	NextCursor string                `json:"nextCursor,omitempty"`
-	Total      int64                 `json:"total"`
-}
-
-// ButtonUpsert 管理后台按钮保存载荷
-type ButtonUpsert struct {
-	Slug              string   `json:"slug"`
-	Label             string   `json:"label"`
-	Sort              int      `json:"sort"`
-	Enabled           bool     `json:"enabled"`
-	Tags              []string `json:"tags"`
-	StarlightEligible bool     `json:"starlightEligible"`
-	ImagePath         string   `json:"imagePath"`
-	ImageAlt          string   `json:"imageAlt"`
-}
-
-// BossUpsert 管理后台 Boss 启动载荷
-type BossUpsert struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	MaxHP int64  `json:"maxHp"`
-}
-
-// BossTemplate Boss 池模板。
-type BossTemplate struct {
-	ID       string              `json:"id"`
-	Name     string              `json:"name"`
-	MaxHP    int64               `json:"maxHp"`
-	Loot     []BossLootEntry     `json:"loot"`
-	HeroLoot []BossHeroLootEntry `json:"heroLoot"`
-}
-
-// BossTemplateUpsert 后台 Boss 模板保存载荷。
-type BossTemplateUpsert struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	MaxHP int64  `json:"maxHp"`
-}
-
 // GetAdminState 返回后台页面所需的聚合数据。
 func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
-	buttons, err := s.ListButtons(ctx)
-	if err != nil {
-		return AdminState{}, err
-	}
-
 	boss, err := s.currentBoss(ctx)
 	if err != nil {
 		return AdminState{}, err
 	}
 
-	equipment, err := s.ListEquipmentDefinitions(ctx)
-	if err != nil {
-		return AdminState{}, err
-	}
 	heroes, err := s.ListHeroDefinitions(ctx)
 	if err != nil {
 		return AdminState{}, err
@@ -131,10 +56,10 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	}
 
 	return AdminState{
-		Buttons:           buttons,
 		Boss:              boss,
 		BossLeaderboard:   bossLeaderboard,
-		Equipment:         equipment,
+		Buttons:           []Button{},
+		Equipment:         []EquipmentDefinition{},
 		Heroes:            heroes,
 		Loot:              loot,
 		HeroLoot:          heroLoot,
@@ -518,79 +443,4 @@ func maxInt64(left int64, right int64) int64 {
 		return left
 	}
 	return right
-}
-
-// BossHistoryEntry 历史 Boss 概览
-type BossHistoryEntry struct {
-	Boss
-	Loot   []BossLootEntry        `json:"loot"`
-	Damage []BossLeaderboardEntry `json:"damage"`
-}
-
-// SaveBossToHistory 将 Boss 快照存入历史列表。
-func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
-	if boss == nil || strings.TrimSpace(boss.ID) == "" {
-		return nil
-	}
-
-	values := map[string]any{
-		"id":         boss.ID,
-		"name":       boss.Name,
-		"status":     boss.Status,
-		"max_hp":     strconv.FormatInt(boss.MaxHP, 10),
-		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
-		"started_at": strconv.FormatInt(boss.StartedAt, 10),
-	}
-	if strings.TrimSpace(boss.TemplateID) != "" {
-		values["template_id"] = boss.TemplateID
-	}
-	if boss.DefeatedAt != 0 {
-		values["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
-	}
-
-	key := s.bossHistoryPrefix + boss.ID
-	if err := s.client.HSet(ctx, key, values).Err(); err != nil {
-		return err
-	}
-
-	score := float64(boss.StartedAt)
-	if score == 0 {
-		score = float64(time.Now().Unix())
-	}
-	return s.client.ZAdd(ctx, s.bossHistoryKey, redis.Z{
-		Score:  score,
-		Member: boss.ID,
-	}).Err()
-}
-
-// ListBossHistory 返回历史 Boss 列表（按时间倒序）。
-func (s *Store) ListBossHistory(ctx context.Context) ([]BossHistoryEntry, error) {
-	ids, err := s.client.ZRevRange(ctx, s.bossHistoryKey, 0, -1).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	entries := make([]BossHistoryEntry, 0, len(ids))
-	for _, id := range ids {
-		values, err := s.client.HGetAll(ctx, s.bossHistoryPrefix+id).Result()
-		if err != nil || len(values) == 0 {
-			continue
-		}
-
-		boss := normalizeBoss(values)
-		if boss == nil {
-			continue
-		}
-
-		loot, _ := s.loadBossLoot(ctx, id)
-		damage, _ := s.ListBossLeaderboard(ctx, id, 20)
-
-		entries = append(entries, BossHistoryEntry{
-			Boss:   *boss,
-			Loot:   loot,
-			Damage: damage,
-		})
-	}
-
-	return entries, nil
 }

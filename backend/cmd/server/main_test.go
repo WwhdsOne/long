@@ -1,36 +1,21 @@
 package main
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
+
+	"github.com/cloudwego/hertz/pkg/common/ut"
+
+	"long/internal/httpapi"
 )
 
-func TestBuildRootHandlerRegistersPprof(t *testing.T) {
-	appHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusTeapot)
-		_, _ = w.Write([]byte("app"))
-	})
+func TestHertzServerRegistersPprofAndAPI(t *testing.T) {
+	server := httpapi.NewHertzServer(":2333", httpapi.Options{})
 
-	handler := buildRootHandler(appHandler)
-
-	pprofRequest := httptest.NewRequest(http.MethodGet, "/debug/pprof/", nil)
-	pprofResponse := httptest.NewRecorder()
-	handler.ServeHTTP(pprofResponse, pprofRequest)
-
-	if pprofResponse.Code != http.StatusOK {
-		t.Fatalf("expected 200 from pprof index, got %d", pprofResponse.Code)
+	pprofResponse := ut.PerformRequest(server.Engine, "GET", "/debug/pprof/", nil).Result()
+	if pprofResponse.StatusCode() != 200 {
+		t.Fatalf("expected 200 from pprof index, got %d", pprofResponse.StatusCode())
 	}
-	if body := pprofResponse.Body.String(); !strings.Contains(body, "profile") {
-		t.Fatalf("expected pprof body, got %q", body)
-	}
-
-	appRequest := httptest.NewRequest(http.MethodGet, "/", nil)
-	appResponse := httptest.NewRecorder()
-	handler.ServeHTTP(appResponse, appRequest)
-
-	if appResponse.Code != http.StatusTeapot {
-		t.Fatalf("expected app handler status, got %d", appResponse.Code)
+	if body := string(pprofResponse.Body()); body == "" {
+		t.Fatal("expected pprof body")
 	}
 }

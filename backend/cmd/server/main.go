@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
-	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -90,7 +88,7 @@ func run() error {
 			ExpireSeconds:   cfg.OSS.ExpireSeconds,
 		})
 	}
-	handler := httpapi.NewHandler(httpapi.Options{
+	httpServer := httpapi.NewHertzServer(fmt.Sprintf(":%d", cfg.Port), httpapi.Options{
 		Store:           store,
 		StateView:       stateCache,
 		ChangePublisher: changeBus,
@@ -105,16 +103,10 @@ func run() error {
 		}),
 	})
 
-	server := &http.Server{
-		Addr:              fmt.Sprintf(":%d", cfg.Port),
-		Handler:           buildRootHandler(handler),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
-
 	errCh := make(chan error, 1)
 	go func() {
 		log.Printf("Vote wall listening on port %d", cfg.Port)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := httpServer.Run(); err != nil {
 			errCh <- err
 		}
 	}()
@@ -180,7 +172,7 @@ func run() error {
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown http server: %w", err)
 	}
 
@@ -189,21 +181,4 @@ func run() error {
 	}
 
 	return nil
-}
-
-func buildRootHandler(appHandler http.Handler) http.Handler {
-	rootMux := http.NewServeMux()
-	rootMux.HandleFunc("/debug/pprof/", pprof.Index)
-	rootMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	rootMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	rootMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	rootMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	rootMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-	rootMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-	rootMux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-	rootMux.Handle("/debug/pprof/block", pprof.Handler("block"))
-	rootMux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
-	rootMux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
-	rootMux.Handle("/", appHandler)
-	return rootMux
 }

@@ -1,264 +1,139 @@
-# AGENTS
+你当前的实现是通过 adaptor.HertzHandler 包装 net/http handler，这只是过渡方案，不符合要求。
 
-## 语言约定
+现在必须进行重构：**禁止使用 adaptor，必须改为原生 Hertz handler 实现。**
 
-- 所有回复、解释、代码注释、commit message 均使用中文。
-- 变量名、函数名等遵循项目约定，可保留英文。
-- 代码注释使用中文，除非项目已有英文注释惯例。
-- 错误信息和日志的解读用中文说明。
+------
 
-## RTK 工具约定
+## 🎯 目标
 
-- 所有命令前缀使用 `rtk`，优先使用 RTK 替代内置同类工具以节省 token。
-- 功能重叠时，RTK 优先于内置工具。
-- 仅当 RTK 无对应命令时，才使用内置工具或其他命令，例如写文件、补丁编辑、复杂多步操作。
-
-### 优先级规则
-
-| Claude Code 内置工具 | RTK 替代命令 | 说明 |
-| --- | --- | --- |
-| `Glob`（文件搜索） | `rtk find` / `rtk tree` / `rtk ls` | 压缩目录输出 |
-| `Grep`（内容搜索） | `rtk grep` | 按文件分组、截断、去空白 |
-| `Read`（读文件） | `rtk read` | 智能过滤，省去无用行 |
-| `Bash` + `git` | `rtk git` | 紧凑 git 输出 |
-| `Bash` + `gh` | `rtk gh` | 紧凑 GitHub CLI 输出 |
-| `Bash` + `curl` | `rtk curl` | 自动检测 JSON，schema-only 模式 |
-| `Bash` + `diff` | `rtk diff` | 仅显示变更行 |
-
-### Node.js / Frontend
-
-```bash
-rtk pnpm install / add / run build
-rtk npm run <script>
-rtk npx tsc / eslint / prisma
-rtk vitest run
-rtk next build
-rtk lint
-rtk prettier --check .
-rtk playwright test
-rtk tsc --noEmit
-```
-
-### Go
-
-```bash
-rtk go build / test / vet
-rtk golangci-lint run
-```
-
-## 项目结构
-
-- `Makefile` 是项目顶层命令入口，统一提供开发、构建、测试命令
-- `frontend/` 是 Vue 前端
-- `frontend/src/App.vue` 只负责根据路径切换公共页和后台页
-- `frontend/src/pages/PublicPage.vue` 是投票墙主页面，同时承载世界 Boss、背包、装备栏和排行榜展示
-- `frontend/src/pages/AdminPage.vue` 是 `/admin` 管理后台页面
-- `frontend/src/style.css` 是前台与后台共享样式入口
-- `backend/` 是 Go 后端，入口是 `backend/cmd/server/main.go`
-- `backend/internal/httpapi/router.go` 负责注册公开接口、装备接口和后台接口
-- `backend/internal/vote/store.go` 是投票、Boss、装备、掉落的核心状态与业务实现
-- `backend/internal/vote/admin.go` 放后台聚合读写逻辑
-- `backend/internal/admin/` 放后台鉴权相关逻辑
-- `backend/public/` 是前端构建产物目录，由后端静态托管，但不提交到仓库
-
-## 配置约定
-
-- 运行时和测试都通过 `CONSUL_ADDR` 与 `CONSUL_CONFIG_KEY` 从 Consul 读取配置
-- 不要重新引入本地 YAML 或 `.env` 作为后端配置来源
-- 如果改了配置结构，要同步更新 `backend/internal/config/config.go` 里的 YAML 解析结构和 `README.md` 里的 Consul 配置示例
-- 当前 Consul 配置除了 Redis、HTTP、昵称、限流等已有字段外，还必须包含：
-  - `admin.username`
-  - `admin.password`
-  - `admin.session_secret`
-- 不要把后台账号配置硬编码回路由或前端
-
-## 常用命令
-
-- 安装依赖：`make deps`
-- 开发：`make dev`
-- 前端构建：`make build`
-- 后端测试：`make test`
-- 后端单独运行：`make backend-run`
-- 前端单独运行：`make frontend-dev`
-- 前端单独构建：`make frontend-build`
-- 后端单独测试：`make backend-test`
-- Go 静态检查：`make backend-vet`
-- CI 校验：`make check`
-
-## 修改约定
-
-- 前端改动尽量保持现有“投票墙”视觉风格，不要回退成后台面板感
-- 公共页和 `/admin` 后台是两套页面体验；改公共页时优先维护活动页氛围，改后台时再考虑信息密度和管理效率
-- 后端逻辑优先放在 `backend/internal/` 下对应职责目录
-- 较大的功能、接口、规则或管理后台改动，要同步在 `docs/` 下新增或更新对应说明文档，文件名优先使用 `日期-主题.md`
-- 按钮在平时必须保持可点击；不要把“无活动 Boss”做成点击错误
-- 装备效果在平时点击和 Boss 战斗期间都要生效；如果调整点击结算，要同时检查普通计票和 Boss 伤害两条链路
-- 第一版只支持单个当前世界 Boss；如果改这个前提，要同步检查 Redis 键设计、后台接口和前端展示
-- 后台能力当前覆盖 Boss、装备、掉落池、按钮和玩家概览；新增后台模块时优先沿用现有 `/api/admin/*` 约定
-- 如果改了接口、配置或部署方式，要同步更新 `README.md`
-
-
-## 🧱 文件拆分与模块化强约束（非常重要）
-
-在生成任何代码时，必须遵循以下规则，禁止输出“单文件巨型实现”。
-
-### 1. 文件大小限制（强制）
-- 单个文件 **不允许超过 500 行**
-- 超过 500 行视为严重违规
-
-如果逻辑复杂，必须主动拆分，而不是继续往一个文件里追加代码
-
----
-
-### 2. 必须按职责拆分（后端）
-
-禁止将所有逻辑写在一个 handler / controller 文件中
-
-必须按职责拆分：
-
-- `handler`：只负责 HTTP 层（参数解析 + 返回）
-- `service`：业务逻辑
-- `repository`：数据访问
-- `model`：数据结构
-- `router`：路由注册
-- `middleware`：中间件
-
-#### 示例结构：
-```
-internal/
-httpapi/
-handler/
-equipment.go
-hero.go
-service/
-equipment.go
-repository/
-equipment.go
-router/
-equipment.go
-middleware/
-auth.go
-```
----
-
-### 3. 前端同样必须拆分
-
-禁止：
-
-- 一个 `.vue` / `.tsx` 文件写所有逻辑
-- 一个文件包含 UI + 请求 + 状态管理 + 工具函数
-
-必须拆：
-```
-/components
-/pages
-/api
-/hooks
-/utils
-/types
-```
----
-
-### 4. 路由必须拆分注册
-
-注意不用使用接口，由于每个接口都只有一个实现，直接实现即可
-
-禁止：
+将现有基于 net/http 的 handler：
 
 ```go
-func NewHandler() {
-    // 上千行路由
-}
+func(w http.ResponseWriter, r *http.Request)
 ```
 
-必须拆为：
+全部重写为 Hertz 原生 handler：
 
 ```go
-registerUserRoutes()
-registerEquipmentRoutes()
-registerAdminRoutes()
+func(ctx context.Context, c *app.RequestContext)
 ```
 
 ------
 
-### 5. Handler 必须轻量（硬性要求）
+## ❌ 明确禁止
+
+以下内容一律不允许出现：
+
+- adaptor.HertzHandler
+- http.ResponseWriter
+- *http.Request
+- 任何 net/http handler 包装
+
+如果出现，说明没有按要求完成
+
+------
+
+## ✅ 必须做到
+
+### 1. 使用 Hertz 原生 API
+
+- 路由参数：`c.Param(...)`
+- Query 参数：`c.Query(...)`
+- JSON 解析：`c.Bind(...)` 或 `c.BindAndValidate(...)`
+- JSON 返回：`c.JSON(status, data)`
+
+------
+
+### 2. Handler 结构必须保持轻量
 
 禁止在 handler 中写复杂业务逻辑：
 
 ```go
 // ❌ 错误
 func handler(...) {
-    // 100行业务逻辑
+    // 大量业务逻辑
 }
 ```
 
 必须：
 
 ```go
+// ✅ 正确
 func handler(...) {
-    req := parse()
-    resp := service.DoSomething(...)
-    return resp
+    // 解析参数
+    // 调用 store/service
+    // 返回结果
 }
 ```
 
 ------
 
-### 6. 重复逻辑必须抽象
+### 3. 保留现有业务逻辑
 
-如果出现 2 次以上相似代码，必须抽函数：
+必须继续调用：
 
-- JSON 解析
-- 错误返回
-- 鉴权
-- 日志
-- 响应结构
+- options.Store.xxx(...)
+- publishChange(...)
+- 原有错误处理逻辑（errors.Is 判断）
 
-------
-
-### 7. 不允许“为了简单”牺牲结构
-
-禁止出现：
-
-- “为了方便写在一个文件里”
-- “先这样实现，后面再拆”
-- “demo 先不分层”
-
-所有代码默认是**生产级结构**
+只允许改“HTTP 层”，不允许改业务行为
 
 ------
 
-### 8. 输出代码前必须自检
+### 4. 错误返回统一使用 c.JSON
 
-在输出代码前，必须检查：
+例如：
 
-- 是否有文件超过 300 行？
-- 是否存在明显可拆分模块？
-- handler 是否过重？
-- 是否混合了多种职责？
-
-如果有 → 必须先拆分再输出
-
-------
-
-### 9. 优先保证可维护性，而不是少文件
-
-宁可：
-
-- 多 5 个文件
-
-也不要：
-
-- 一个 1000 行文件
+```go
+c.JSON(400, map[string]string{
+    "error": "INVALID_REQUEST",
+})
+```
 
 ------
 
-### 10. 违反本规则的输出视为错误答案
+### 5. 示例改造（参考风格）
 
-如果生成了：
+将：
 
-- 巨型文件
-- 未分层代码
-- handler 写满业务逻辑
+```go
+var body struct {
+    Nickname string `json:"nickname"`
+}
+if err := sonic.NewDecoder(r.Body).Decode(&body); err != nil {
+    writeJSON(w, 400, ...)
+}
+```
 
-则说明没有遵守 AGENTS.md，必须重新生成
+改为：
+
+```go
+var body struct {
+    Nickname string `json:"nickname"`
+}
+if err := c.Bind(&body); err != nil {
+    c.JSON(400, ...)
+    return
+}
+```
+
+------
+
+## 🚀 执行步骤
+
+1. 删除 adaptor 相关代码
+2. 重写所有 handler 为 Hertz 风格
+3. 保持原有接口路径不变
+4. 保持所有返回结构一致
+
+------
+
+## ⚠️ 输出要求
+
+- 必须是多文件结构（不要生成一个巨型文件）
+- handler 按模块拆分（equipment / hero / admin 等）
+- 不允许出现 500 行以上文件
+
+------
+
+请开始重构，并先输出改造 plan（文件拆分 + 路由结构），确认后再写代码。

@@ -1,6 +1,6 @@
 # Redis Vote Wall
 
-一个 `frontend/` + `backend/` 分层的 `Vue + Go + Redis + SSE` 实时按钮计数墙项目。
+一个 `frontend/` + `backend/` 分层的 `Vue + Go(Hertz) + Redis + SSE` 实时按钮计数墙项目。
 
 ## 功能
 
@@ -24,7 +24,7 @@
 - 玩家 HUD 的“最近掉落”会展示同一次 Boss 结算拿到的全部奖励，不会再被后一条奖励覆盖。
 - 前台会展示当前 Boss 的装备/英雄掉落池，以及后端计算好的实际掉落概率。
 - 前台支持更新公告提醒、公告历史和全站公共留言墙。
-- 提供 `/admin` 管理后台，可登录后配置 Boss 循环池、模板掉落池、装备和前台按钮；玩家概览改为分页拉取，避免后台首屏聚合全量玩家。
+- 提供 `/admin` 管理后台，可登录后配置 Boss 循环池、模板掉落池、装备和前台按钮；玩家、按钮、装备、历史 Boss 都改为分页拉取，避免后台首屏聚合全量列表。
 - 后台支持为按钮图片申请阿里云 OSS 直传凭证，前端可直传 OSS 后回填公共图片 URL。
 - 左侧玩家 HUD 支持手动开启挂机，开启后会跟随最近一次手动点击的按钮持续自动点击；关闭页面后自动停止。
 - 你后面只要往 Redis 新增一个新键，前端就会自动展示新按钮。
@@ -37,7 +37,7 @@
 
 - `Makefile`: 项目顶层命令入口，统一开发、构建、测试流程
 - `frontend/`: Vue 页面、样式和 Vite 配置
-- `backend/`: Go 服务、Redis 读写、SSE、限流和测试
+- `backend/`: Hertz Go 服务、Redis 读写、SSE、限流和测试
 
 ## Redis 数据结构
 
@@ -301,6 +301,17 @@ oss:
   - 请求体：`{ "nickname": "阿明" }`
 - `POST /api/shop/cosmetics/equip`
   - 请求体：`{ "nickname": "阿明", "trailId": "trail-ribbon", "impactId": "impact-firefly" }`
+
+## 后台接口补充
+
+- `GET /api/admin/state`
+  - 现在返回后台首屏摘要，不再携带按钮和装备全量列表
+- `GET /api/admin/buttons?page=1&pageSize=20`
+  - 返回按钮分页：`items / page / pageSize / total / totalPages`
+- `GET /api/admin/equipment?page=1&pageSize=20`
+  - 返回装备分页：`items / page / pageSize / total / totalPages`
+- `GET /api/admin/boss/history?page=1&pageSize=20`
+  - 返回历史 Boss 分页：`items / page / pageSize / total / totalPages`
 
 ## 限流规则
 

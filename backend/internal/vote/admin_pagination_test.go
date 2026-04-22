@@ -1,0 +1,153 @@
+package vote
+
+import (
+	"context"
+	"testing"
+
+	"github.com/redis/go-redis/v9"
+)
+
+func TestGetAdminStateOmitsHeavyCollections(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "1",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
+		"name":         "木剑",
+		"slot":         "weapon",
+		"bonus_clicks": "2",
+	}).Err(); err != nil {
+		t.Fatalf("seed equipment: %v", err)
+	}
+	if err := store.client.SAdd(ctx, "vote:equipment:index", "wood-sword").Err(); err != nil {
+		t.Fatalf("seed equipment index: %v", err)
+	}
+
+	state, err := store.GetAdminState(ctx)
+	if err != nil {
+		t.Fatalf("get admin state: %v", err)
+	}
+
+	if len(state.Buttons) != 0 {
+		t.Fatalf("expected buttons omitted from admin summary, got %+v", state.Buttons)
+	}
+	if len(state.Equipment) != 0 {
+		t.Fatalf("expected equipment omitted from admin summary, got %+v", state.Equipment)
+	}
+}
+
+func TestListAdminButtonsPageReturnsStablePagination(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	seedAdminButtonForPage(t, store, ctx, "feel", "有感觉吗", 10)
+	seedAdminButtonForPage(t, store, ctx, "understand", "有没有懂的", 20)
+	seedAdminButtonForPage(t, store, ctx, "wechat-pity", "微信[可怜]表情", 30)
+
+	page, err := store.ListAdminButtonsPage(ctx, 2, 1)
+	if err != nil {
+		t.Fatalf("list admin buttons page: %v", err)
+	}
+
+	if page.Page != 2 || page.PageSize != 1 || page.Total != 3 || page.TotalPages != 3 {
+		t.Fatalf("unexpected page meta: %+v", page)
+	}
+	if len(page.Items) != 1 || page.Items[0].Key != "understand" {
+		t.Fatalf("unexpected button page items: %+v", page.Items)
+	}
+}
+
+func TestListAdminEquipmentPageReturnsStablePagination(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	seedEquipmentDefinitionForPage(t, store, ctx, "wood-sword", "木剑", "weapon")
+	seedEquipmentDefinitionForPage(t, store, ctx, "cloth-armor", "布甲", "armor")
+	seedEquipmentDefinitionForPage(t, store, ctx, "fire-ring", "火戒", "accessory")
+
+	page, err := store.ListAdminEquipmentPage(ctx, 2, 1)
+	if err != nil {
+		t.Fatalf("list admin equipment page: %v", err)
+	}
+
+	if page.Page != 2 || page.PageSize != 1 || page.Total != 3 || page.TotalPages != 3 {
+		t.Fatalf("unexpected page meta: %+v", page)
+	}
+	if len(page.Items) != 1 || page.Items[0].ItemID != "cloth-armor" {
+		t.Fatalf("unexpected equipment page items: %+v", page.Items)
+	}
+}
+
+func TestListAdminBossHistoryPageReturnsStablePagination(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	seedBossHistoryForPage(t, store, ctx, &Boss{ID: "boss-1", Name: "一号", Status: bossStatusDefeated, StartedAt: 1})
+	seedBossHistoryForPage(t, store, ctx, &Boss{ID: "boss-2", Name: "二号", Status: bossStatusDefeated, StartedAt: 2})
+	seedBossHistoryForPage(t, store, ctx, &Boss{ID: "boss-3", Name: "三号", Status: bossStatusDefeated, StartedAt: 3})
+
+	page, err := store.ListAdminBossHistoryPage(ctx, 2, 1)
+	if err != nil {
+		t.Fatalf("list admin boss history page: %v", err)
+	}
+
+	if page.Page != 2 || page.PageSize != 1 || page.Total != 3 || page.TotalPages != 3 {
+		t.Fatalf("unexpected page meta: %+v", page)
+	}
+	if len(page.Items) != 1 || page.Items[0].ID != "boss-2" {
+		t.Fatalf("unexpected boss history page items: %+v", page.Items)
+	}
+}
+
+func seedAdminButtonForPage(t *testing.T, store *Store, ctx context.Context, slug string, label string, sort int) {
+	t.Helper()
+
+	if err := store.client.HSet(ctx, "vote:button:"+slug, map[string]any{
+		"label":   label,
+		"count":   "0",
+		"sort":    sort,
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button %s: %v", slug, err)
+	}
+	if err := store.client.ZAdd(ctx, "vote:buttons:index", redis.Z{
+		Score:  float64(sort),
+		Member: slug,
+	}).Err(); err != nil {
+		t.Fatalf("seed button index %s: %v", slug, err)
+	}
+}
+
+func seedEquipmentDefinitionForPage(t *testing.T, store *Store, ctx context.Context, itemID string, name string, slot string) {
+	t.Helper()
+
+	if err := store.client.HSet(ctx, "vote:equip:def:"+itemID, map[string]any{
+		"name":         name,
+		"slot":         slot,
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed equipment %s: %v", itemID, err)
+	}
+	if err := store.client.SAdd(ctx, "vote:equipment:index", itemID).Err(); err != nil {
+		t.Fatalf("seed equipment index %s: %v", itemID, err)
+	}
+}
+
+func seedBossHistoryForPage(t *testing.T, store *Store, ctx context.Context, boss *Boss) {
+	t.Helper()
+
+	if err := store.SaveBossToHistory(ctx, boss); err != nil {
+		t.Fatalf("seed boss history %s: %v", boss.ID, err)
+	}
+}
