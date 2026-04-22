@@ -1,4 +1,6 @@
 <script setup>
+import { RARITY_OPTIONS } from '../../utils/rarity'
+
 defineProps({
   equipmentPage: { type: Object, required: true },
   equipmentForm: { type: Object, required: true },
@@ -29,6 +31,9 @@ defineProps({
             <option value="armor">armor</option>
             <option value="accessory">accessory</option>
           </select>
+          <select v-model="equipmentForm.rarity" class="nickname-form__input">
+            <option v-for="rarity in RARITY_OPTIONS" :key="rarity" :value="rarity">{{ rarity }}</option>
+          </select>
           <input v-model="equipmentForm.bonusClicks" class="nickname-form__input" type="number" min="0" placeholder="每次点击额外加几票" />
           <input v-model="equipmentForm.bonusCriticalChancePercent" class="nickname-form__input" type="number" min="0" max="100" placeholder="暴击概率 +N%" />
           <input v-model="equipmentForm.bonusCriticalCount" class="nickname-form__input" type="number" min="0" placeholder="暴击时额外加几票" />
@@ -47,7 +52,7 @@ defineProps({
           <li v-for="item in equipmentPage.items" :key="item.itemId" class="inventory-item">
             <div>
               <strong>{{ item.name }}</strong>
-              <p>{{ item.itemId }} · {{ item.slot }}</p>
+              <p>{{ item.itemId }} · {{ item.slot }} · {{ item.rarity || '普通' }}</p>
               <p>强化上限 {{ item.enhanceCap || '未设置' }}</p>
               <p>{{ formatItemStats(item) }}</p>
             </div>

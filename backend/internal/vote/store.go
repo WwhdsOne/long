@@ -106,6 +106,7 @@ type EquipmentDefinition struct {
 	ItemID                     string  `json:"itemId"`
 	Name                       string  `json:"name"`
 	Slot                       string  `json:"slot"`
+	Rarity                     string  `json:"rarity"`
 	BonusClicks                int64   `json:"bonusClicks"`
 	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
@@ -207,6 +208,7 @@ type InventoryItem struct {
 	ItemID                          string  `json:"itemId"`
 	Name                            string  `json:"name"`
 	Slot                            string  `json:"slot"`
+	Rarity                          string  `json:"rarity"`
 	Quantity                        int64   `json:"quantity"`
 	EnhanceLevel                    int     `json:"enhanceLevel"`
 	EnhanceCap                      int     `json:"enhanceCap"`
@@ -253,8 +255,10 @@ type BossLootEntry struct {
 	ItemID                     string  `json:"itemId"`
 	ItemName                   string  `json:"itemName"`
 	Slot                       string  `json:"slot"`
+	Rarity                     string  `json:"rarity"`
 	Weight                     int64   `json:"weight"`
 	DropRatePercent            float64 `json:"dropRatePercent"`
+	EnhanceCap                 int     `json:"enhanceCap"`
 	BonusClicks                int64   `json:"bonusClicks"`
 	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
@@ -268,6 +272,7 @@ type BossHeroLootEntry struct {
 	ImageAlt                   string        `json:"imageAlt,omitempty"`
 	Weight                     int64         `json:"weight"`
 	DropRatePercent            float64       `json:"dropRatePercent"`
+	AwakenCap                  int           `json:"awakenCap"`
 	BonusClicks                int64         `json:"bonusClicks"`
 	BonusCriticalChancePercent float64       `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
@@ -1423,6 +1428,7 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		ItemID:                     itemID,
 		Name:                       firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
 		Slot:                       strings.TrimSpace(values["slot"]),
+		Rarity:                     normalizeEquipmentRarity(values["rarity"]),
 		BonusClicks:                int64FromString(values["bonus_clicks"]),
 		BonusCriticalChancePercent: float64FromString(values["bonus_critical_chance_percent"]),
 		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
@@ -1634,8 +1640,10 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			ItemID:                     itemID,
 			ItemName:                   definition.Name,
 			Slot:                       definition.Slot,
+			Rarity:                     normalizeEquipmentRarity(definition.Rarity),
 			Weight:                     int64(entry.Score),
 			DropRatePercent:            dropRatePercent,
+			EnhanceCap:                 definition.EnhanceCap,
 			BonusClicks:                definition.BonusClicks,
 			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
 			BonusCriticalCount:         definition.BonusCriticalCount,

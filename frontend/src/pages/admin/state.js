@@ -1,3 +1,5 @@
+import { DEFAULT_RARITY, normalizeRarity } from '../../utils/rarity'
+
 export function emptyAdminState() {
   return {
     boss: null,
@@ -27,6 +29,7 @@ export function emptyEquipmentForm() {
     itemId: '',
     name: '',
     slot: 'weapon',
+    rarity: DEFAULT_RARITY,
     bonusClicks: '',
     bonusCriticalChancePercent: '',
     bonusCriticalCount: '',
@@ -126,10 +129,12 @@ export function normalizeLootEntry(entry) {
     itemId: entry?.itemId || '',
     itemName: entry?.itemName || '',
     slot: entry?.slot || '',
+    rarity: normalizeRarity(entry?.rarity),
     weight: Number(entry?.weight ?? 0),
     bonusClicks: Number(entry?.bonusClicks ?? 0),
     bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
     bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
+    enhanceCap: Number(entry?.enhanceCap ?? 0),
   }
 }
 
@@ -143,6 +148,7 @@ export function normalizeHeroLootEntry(entry) {
     imageAlt: entry?.imageAlt || '',
     weight: Number(entry?.weight ?? 0),
     dropRatePercent: Number(entry?.dropRatePercent ?? 0),
+    awakenCap: Number(entry?.awakenCap ?? 0),
     bonusClicks: Number(entry?.bonusClicks ?? 0),
     bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
     bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
@@ -206,7 +212,12 @@ export function normalizeButtonPage(payload) {
 
 export function normalizeEquipmentPage(payload) {
   return {
-    items: Array.isArray(payload?.items) ? payload.items : [],
+    items: Array.isArray(payload?.items)
+      ? payload.items.map((item) => ({
+          ...item,
+          rarity: normalizeRarity(item?.rarity),
+        }))
+      : [],
     page: Number(payload?.page ?? 1),
     pageSize: Number(payload?.pageSize ?? 20),
     total: Number(payload?.total ?? 0),

@@ -14,6 +14,7 @@ import {
   salvageableCount,
   summarizeEquippedCosmetics,
 } from '../utils/cosmetics'
+import { getRarityClassName, splitEquipmentName } from '../utils/rarity'
 import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
@@ -260,6 +261,22 @@ function formatItemStatLines(item) {
     formatPercentWithDelta('暴击率', item?.bonusCriticalChancePercent, item?.bonusCriticalChancePercentDelta),
     formatStatWithDelta('暴击', item?.bonusCriticalCount, item?.bonusCriticalCountDelta),
   ]
+}
+
+function equipmentNameParts(item) {
+  return splitEquipmentName(item?.itemName || item?.name || item?.itemId || '')
+}
+
+function equipmentNameClass(item) {
+  return getRarityClassName(item?.rarity)
+}
+
+function formatEnhanceCap(cap) {
+  return Number(cap) > 0 ? `可强化 ${Number(cap)} 次` : '可强化∞次'
+}
+
+function formatAwakenCap(cap) {
+  return Number(cap) > 0 ? `可觉醒 ${Number(cap)} 次` : '可觉醒∞次'
 }
 
 function formatHeroTrait(hero) {
@@ -1372,8 +1389,12 @@ onBeforeUnmount(() => {
               class="inventory-item inventory-item--stacked inventory-item--loot"
           >
             <div>
-              <strong>{{ item.itemName || item.itemId }}</strong>
+              <strong>
+                <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
+                <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
+              </strong>
               <p>{{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
+              <p>{{ formatEnhanceCap(item.enhanceCap) }}</p>
               <p>{{ formatItemStats(item) }}</p>
             </div>
           </li>
@@ -1404,6 +1425,7 @@ onBeforeUnmount(() => {
               <div>
                 <strong>{{ hero.heroName || hero.heroId }}</strong>
                 <p>掉落概率 {{ formatDropRate(hero.dropRatePercent) }}</p>
+                <p>{{ formatAwakenCap(hero.awakenCap) }}</p>
                 <p>{{ formatItemStats(hero) }}</p>
                 <p>{{ formatHeroTrait(hero) }}</p>
               </div>
@@ -1568,7 +1590,10 @@ onBeforeUnmount(() => {
                 <li v-for="item in inventory" :key="item.itemId" class="inventory-item inventory-item--panel">
                   <div class="inventory-item__top">
                     <div class="inventory-item__main">
-                      <strong>{{ item.name }}</strong>
+                      <strong>
+                        <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
+                        <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
+                      </strong>
                       <div class="inventory-item__meta">
                         <span class="inventory-item__chip">类型:{{ item.slot || '未分类' }}</span>
                         <span class="inventory-item__chip">库存:{{ item.quantity }}</span>
@@ -1653,7 +1678,11 @@ onBeforeUnmount(() => {
                 <article class="loadout-slot">
                   <div class="loadout-slot__main">
                     <span>武器</span>
-                    <strong>{{ loadout.weapon?.name || '未穿戴' }}</strong>
+                    <strong v-if="loadout.weapon">
+                      <span v-if="equipmentNameParts(loadout.weapon).prefix">{{ equipmentNameParts(loadout.weapon).prefix }}</span>
+                      <span :class="equipmentNameClass(loadout.weapon)">{{ equipmentNameParts(loadout.weapon).text }}</span>
+                    </strong>
+                    <strong v-else>未穿戴</strong>
                   </div>
                   <ul v-if="loadout.weapon" class="loadout-slot__attrs">
                     <li v-for="line in formatItemStatLines(loadout.weapon)" :key="line">
@@ -1665,7 +1694,11 @@ onBeforeUnmount(() => {
                 <article class="loadout-slot">
                   <div class="loadout-slot__main">
                     <span>护甲</span>
-                    <strong>{{ loadout.armor?.name || '未穿戴' }}</strong>
+                    <strong v-if="loadout.armor">
+                      <span v-if="equipmentNameParts(loadout.armor).prefix">{{ equipmentNameParts(loadout.armor).prefix }}</span>
+                      <span :class="equipmentNameClass(loadout.armor)">{{ equipmentNameParts(loadout.armor).text }}</span>
+                    </strong>
+                    <strong v-else>未穿戴</strong>
                   </div>
                   <ul v-if="loadout.armor" class="loadout-slot__attrs">
                     <li v-for="line in formatItemStatLines(loadout.armor)" :key="line">
@@ -1677,7 +1710,11 @@ onBeforeUnmount(() => {
                 <article class="loadout-slot">
                   <div class="loadout-slot__main">
                     <span>饰品</span>
-                    <strong>{{ loadout.accessory?.name || '未穿戴' }}</strong>
+                    <strong v-if="loadout.accessory">
+                      <span v-if="equipmentNameParts(loadout.accessory).prefix">{{ equipmentNameParts(loadout.accessory).prefix }}</span>
+                      <span :class="equipmentNameClass(loadout.accessory)">{{ equipmentNameParts(loadout.accessory).text }}</span>
+                    </strong>
+                    <strong v-else>未穿戴</strong>
                   </div>
                   <ul v-if="loadout.accessory" class="loadout-slot__attrs">
                     <li v-for="line in formatItemStatLines(loadout.accessory)" :key="line">
@@ -1816,7 +1853,10 @@ onBeforeUnmount(() => {
                 <ul v-else class="forge-action-list">
                   <li v-for="item in inventory" :key="`forge-${item.itemId}`">
                     <div class="forge-action-list__copy">
-                      <strong>{{ item.name }}</strong>
+                      <strong>
+                        <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
+                        <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
+                      </strong>
                       <div class="forge-action-list__meta">
                         <span>可分解 {{ salvageableEquipmentCount(item) }} 件</span>
                         <span>强化 {{ item.enhanceLevel || 0 }} / {{ item.enhanceCap || '∞' }}</span>
@@ -2101,8 +2141,12 @@ onBeforeUnmount(() => {
                       class="inventory-item inventory-item--stacked inventory-item--loot"
                   >
                     <div>
-                      <strong>{{ item.itemName || item.itemId }}</strong>
+                      <strong>
+                        <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
+                        <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
+                      </strong>
                       <p>{{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
+                      <p>{{ formatEnhanceCap(item.enhanceCap) }}</p>
                       <p>{{ formatItemStats(item) }}</p>
                     </div>
                   </li>
@@ -2133,6 +2177,7 @@ onBeforeUnmount(() => {
                       <div>
                         <strong>{{ hero.heroName || hero.heroId }}</strong>
                         <p>掉落概率 {{ formatDropRate(hero.dropRatePercent) }}</p>
+                        <p>{{ formatAwakenCap(hero.awakenCap) }}</p>
                         <p>{{ formatItemStats(hero) }}</p>
                         <p>{{ formatHeroTrait(hero) }}</p>
                       </div>

@@ -306,6 +306,7 @@ func (s *Store) buildInventoryItem(definition EquipmentDefinition, upgrade equip
 		ItemID:                          definition.ItemID,
 		Name:                            displayItemName(definition.Name, upgrade.EnhanceLevel),
 		Slot:                            definition.Slot,
+		Rarity:                          normalizeEquipmentRarity(definition.Rarity),
 		Quantity:                        quantity,
 		EnhanceLevel:                    upgrade.EnhanceLevel,
 		EnhanceCap:                      definition.EnhanceCap,
@@ -324,6 +325,7 @@ func unknownInventoryItem(itemID string, upgrade equipmentUpgrade, quantity int6
 	return InventoryItem{
 		ItemID:                          itemID,
 		Name:                            displayItemName(itemID, upgrade.EnhanceLevel),
+		Rarity:                          defaultEquipmentRarity,
 		Quantity:                        quantity,
 		EnhanceLevel:                    upgrade.EnhanceLevel,
 		BonusClicks:                     upgrade.BonusClicks,

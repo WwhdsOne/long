@@ -117,6 +117,7 @@ export function createAdminPageActions(state) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...equipmentForm.value,
+          rarity: equipmentForm.value.rarity,
           bonusClicks: Number(equipmentForm.value.bonusClicks),
           bonusCriticalChancePercent: Number(equipmentForm.value.bonusCriticalChancePercent),
           bonusCriticalCount: Number(equipmentForm.value.bonusCriticalCount),
