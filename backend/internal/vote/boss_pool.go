@@ -159,10 +159,7 @@ func (s *Store) activateRandomBossFromPool(ctx context.Context) (*Boss, error) {
 
 	index := 0
 	if len(templates) > 1 {
-		index = s.roll(len(templates))
-		if index < 0 {
-			index = 0
-		}
+		index = max(s.roll(len(templates)), 0)
 		if index >= len(templates) {
 			index = len(templates) - 1
 		}

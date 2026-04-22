@@ -20,6 +20,7 @@ import (
 )
 
 // 错误定义
+
 var ErrButtonNotFound = errors.New("button not found")
 var ErrInvalidNickname = errors.New("invalid nickname")
 var ErrSensitiveNickname = errors.New("sensitive nickname")
@@ -28,7 +29,6 @@ var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
 var ErrEquipmentNotEnough = errors.New("equipment not enough")
 var ErrEquipmentMaxEnhance = errors.New("equipment max enhance")
-var ErrEquipmentMaxStar = ErrEquipmentMaxEnhance
 var ErrHeroNotEnough = errors.New("hero not enough")
 var ErrHeroNotFound = errors.New("hero not found")
 var ErrHeroNotOwned = errors.New("hero not owned")
@@ -48,8 +48,6 @@ const (
 	bossStatusActive   = "active"
 	bossStatusDefeated = "defeated"
 )
-
-var loadoutSlots = []string{"weapon", "armor", "accessory"}
 
 // Button 按钮数据结构，返回给前端和 SSE 客户端
 type Button struct {
@@ -126,10 +124,7 @@ const (
 type HeroTraitType = HeroEffectType
 
 const (
-	HeroTraitBonusClicks           = HeroEffectBonusClicks
-	HeroTraitCriticalChancePercent = HeroEffectCriticalChancePercent
-	HeroTraitCriticalCountBonus    = HeroEffectCriticalCountBonus
-	HeroTraitFinalDamagePercent    = HeroEffectFinalDamagePercent
+	HeroTraitFinalDamagePercent = HeroEffectFinalDamagePercent
 )
 
 type HeroEffect struct {
@@ -531,9 +526,9 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 
-	bossLeaderboard := []BossLeaderboardEntry{}
-	bossLoot := []BossLootEntry{}
-	bossHeroLoot := []BossHeroLootEntry{}
+	var bossLeaderboard []BossLeaderboardEntry
+	var bossLoot []BossLootEntry
+	var bossHeroLoot []BossHeroLootEntry
 	if boss != nil {
 		bossLeaderboard, err = s.ListBossLeaderboard(ctx, boss.ID, 10)
 		if err != nil {
@@ -679,8 +674,7 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	}
 	userState.RecentRewards = recentRewards
 	if len(recentRewards) > 0 {
-		lastReward := recentRewards[len(recentRewards)-1]
-		userState.LastReward = &lastReward
+		userState.LastReward = new(recentRewards[len(recentRewards)-1])
 	}
 
 	boss, err := s.currentBoss(ctx)
@@ -816,8 +810,7 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 		}
 		result.RecentRewards = recentRewards
 		if len(recentRewards) > 0 {
-			lastReward := recentRewards[len(recentRewards)-1]
-			result.LastReward = &lastReward
+			result.LastReward = new(recentRewards[len(recentRewards)-1])
 		}
 	}
 
@@ -1256,13 +1249,11 @@ func (s *Store) chooseLoot(entries []BossLootEntry) *BossLootEntry {
 		}
 		running += int(entry.Weight)
 		if cursor < running {
-			selected := entry
-			return &selected
+			return new(entry)
 		}
 	}
 
-	selected := entries[len(entries)-1]
-	return &selected
+	return new(entries[len(entries)-1])
 }
 
 func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool, error) {
@@ -1535,8 +1526,7 @@ func (s *Store) lastRewardForNickname(ctx context.Context, nickname string) (*Re
 		return nil, nil
 	}
 
-	lastReward := recentRewards[len(recentRewards)-1]
-	return &lastReward, nil
+	return new(recentRewards[len(recentRewards)-1]), nil
 }
 
 func (s *Store) recentRewardsForNickname(ctx context.Context, nickname string) ([]Reward, error) {
@@ -1825,10 +1815,8 @@ func (s *Store) buttonStarlightActive(ctx context.Context, slug string, now time
 	}
 
 	startedAt := now.Unix() - (now.Unix() % int64(starlightWindow/time.Second))
-	for _, key := range activeStarlightKeys(keys, startedAt) {
-		if key == slug {
-			return true, nil
-		}
+	if slices.Contains(activeStarlightKeys(keys, startedAt), slug) {
+		return true, nil
 	}
 	return false, nil
 }
@@ -2223,16 +2211,6 @@ func float64FromString(raw string) float64 {
 		return 0
 	}
 
-	return value
-}
-
-func clampInt(value int, min int, max int) int {
-	if value < min {
-		return min
-	}
-	if value > max {
-		return max
-	}
 	return value
 }
 

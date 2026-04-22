@@ -106,10 +106,7 @@ func paginateAdminItems[T any](items []T, page int64, pageSize int64) ([]T, int6
 		return []T{}, page, pageSize, total, totalPages
 	}
 
-	end := start + pageSize
-	if end > total {
-		end = total
-	}
+	end := min(start+pageSize, total)
 
 	return items[start:end], page, pageSize, total, totalPages
 }

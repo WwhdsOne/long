@@ -3,6 +3,7 @@ package vote
 import (
 	"context"
 	"errors"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -807,12 +808,7 @@ func (s *Store) validateOwnedCosmetic(ctx context.Context, nickname string, cosm
 }
 
 func containsOwnedCosmetic(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, target)
 }
 
 func sortedCosmeticIDs(owned map[string]struct{}) []string {
