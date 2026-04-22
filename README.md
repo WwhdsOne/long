@@ -451,7 +451,7 @@ docker buildx build --platform linux/amd64 -t long . --load
 docker run -d \
   --name long \
   --network docker-compose_app-net \
-  -p 2333:2333 \
+  -p 16002:16002 \
   -e CONSUL_ADDR=http://your-consul:8500 \
   -e CONSUL_CONFIG_KEY=vote-wall/prod \
   long
@@ -459,8 +459,8 @@ docker run -d \
 
 这个单镜像现在内置了 `nginx + go` 双进程：
 
-- 宿主机访问入口：`http://localhost:2333`
-- 容器内 `nginx`：监听 `2333`
+- 宿主机访问入口：`http://localhost:16002`
+- 容器内 `nginx`：监听 `16002`
 - 容器内 Go：仅监听 `127.0.0.1:18080`
 
 外部不需要再额外部署一个 Nginx 给它做反代；镜像内置配置位于 `deploy/nginx.container.conf`，参考版见 `deploy/nginx.vote-wall.conf.example`。
