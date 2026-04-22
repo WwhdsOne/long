@@ -1351,6 +1351,9 @@ onBeforeUnmount(() => {
                       : '这只 Boss 已经倒下，等待后台手动开启下一只。'
             }}
           </p>
+          <p>
+            ⚠️小贴士⚠️：只有对Boss造成超过1%生命值的伤害，才有资格掉落装备哦～萌新也要努力输出呀！(๑•̀ㅂ•́)و✧ 
+          </p>
         </div>
         <div class="boss-stage__meta">
           <span class="boss-stage__pill">{{ bossStatusLabel }}</span>
