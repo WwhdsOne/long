@@ -14,12 +14,11 @@ import {
   salvageableCount,
   summarizeEquippedCosmetics,
 } from '../utils/cosmetics'
-import {buildPityProgress} from '../utils/progressionView'
 import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const AUTO_CLICK_RATE_LABEL = `每秒约 ${Math.round(1000 / AUTO_CLICK_INTERVAL_MS)} 次`
-const EQUIPMENT_REFORGE_COST = 20
+const EQUIPMENT_ENHANCE_COST = 20
 const HERO_AWAKEN_COST = 25
 
 const buttons = ref([])
@@ -245,30 +244,28 @@ function defaultCombatStats() {
 }
 
 function formatItemStats(item) {
-  return `点击+${item?.bonusClicks ?? 0} 暴击率+${item?.bonusCriticalChancePercent ?? 0}% 暴击+${item?.bonusCriticalCount ?? 0}`
+  return [
+    formatStatWithDelta('点击', item?.bonusClicks, item?.bonusClicksDelta),
+    formatPercentWithDelta('暴击率', item?.bonusCriticalChancePercent, item?.bonusCriticalChancePercentDelta),
+    formatStatWithDelta('暴击', item?.bonusCriticalCount, item?.bonusCriticalCountDelta),
+  ].join(' ')
 }
 
 function formatItemStatLines(item) {
   return [
-    `点击 +${item?.bonusClicks ?? 0}`,
-    `暴击率 +${item?.bonusCriticalChancePercent ?? 0}%`,
-    `暴击 +${item?.bonusCriticalCount ?? 0}`,
+    formatStatWithDelta('点击', item?.bonusClicks, item?.bonusClicksDelta),
+    formatPercentWithDelta('暴击率', item?.bonusCriticalChancePercent, item?.bonusCriticalChancePercentDelta),
+    formatStatWithDelta('暴击', item?.bonusCriticalCount, item?.bonusCriticalCountDelta),
   ]
 }
 
 function formatHeroTrait(hero) {
-  switch (hero?.traitType) {
-    case 'bonus_clicks':
-      return `被动：额外点击 +${hero?.traitValue ?? 0}`
-    case 'critical_chance_percent':
-      return `被动：暴击率 +${hero?.traitValue ?? 0}%`
-    case 'critical_count_bonus':
-      return `被动：暴击额外 +${hero?.traitValue ?? 0}`
-    case 'final_damage_percent':
-      return `被动：最终伤害 +${hero?.traitValue ?? 0}%`
-    default:
-      return '被动：暂无'
+  const effects = Array.isArray(hero?.effects) ? hero.effects : []
+  if (effects.length === 0) {
+    return '被动：暂无'
   }
+
+  return `被动：${effects.map((effect) => formatHeroEffect(effect)).join(' / ')}`
 }
 
 function heroImageAlt(hero) {
@@ -336,12 +333,32 @@ function formatTime(timestamp) {
   }).format(new Date(timestamp * 1000))
 }
 
-function canSynthesize(item) {
-  return Boolean(isLoggedIn.value && item && item.quantity >= 3)
+function formatNumber(value, digits = 0) {
+  const normalized = Number(value ?? 0)
+  return digits > 0 ? normalized.toFixed(digits) : `${normalized}`
 }
 
-function pityProgress(counter) {
-  return buildPityProgress(counter, 30)
+function formatStatWithDelta(label, total, delta) {
+  return `${label} ${formatNumber(total)}（+${formatNumber(delta)}）`
+}
+
+function formatPercentWithDelta(label, total, delta) {
+  return `${label} ${formatNumber(total, 2)}%（+${formatNumber(delta, 2)}%）`
+}
+
+function formatHeroEffect(effect) {
+  switch (effect?.type) {
+    case 'bonus_clicks':
+      return `额外点击 +${formatNumber(effect?.value)}`
+    case 'critical_chance_percent':
+      return `暴击率 +${formatNumber(effect?.value)}%`
+    case 'critical_count_bonus':
+      return `暴击额外 +${formatNumber(effect?.value)}`
+    case 'final_damage_percent':
+      return `最终伤害 +${formatNumber(effect?.value)}%`
+    default:
+      return effect?.displayName || effect?.type || '未知效果'
+  }
 }
 
 function salvageableEquipmentCount(item) {
@@ -952,8 +969,8 @@ async function salvageEquipment(item) {
   await postEquipmentAction(item.itemId, 'salvage', {quantity})
 }
 
-async function reforgeEquipment(item) {
-  await postEquipmentAction(item.itemId, 'reforge')
+async function enhanceEquipment(item) {
+  await postEquipmentAction(item.itemId, 'enhance')
 }
 
 async function salvageHero(hero) {
@@ -1051,38 +1068,6 @@ async function equipSelectedCosmetics() {
     applyState(data)
   } catch (error) {
     errorMessage.value = error.message || '外观装备失败，请稍后重试。'
-  } finally {
-    actioningItemId.value = ''
-  }
-}
-
-async function synthesizeItem(itemId) {
-  if (!nickname.value || !itemId) {
-    return
-  }
-
-  actioningItemId.value = itemId
-  errorMessage.value = ''
-
-  try {
-    const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/synthesize`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nickname: nickname.value,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '升星失败，请稍后重试。'))
-    }
-
-    const data = await response.json()
-    applyState(data)
-  } catch (error) {
-    errorMessage.value = error.message || '升星失败，请稍后重试。'
   } finally {
     actioningItemId.value = ''
   }
@@ -1550,8 +1535,8 @@ onBeforeUnmount(() => {
                       <div class="inventory-item__meta">
                         <span class="inventory-item__chip">类型:{{ item.slot || '未分类' }}</span>
                         <span class="inventory-item__chip">库存:{{ item.quantity }}</span>
-                        <span class="inventory-item__chip">星级:{{
-                            item.starLevel ? `+${item.starLevel}` : '未升星'
+                        <span class="inventory-item__chip">强化:{{
+                            item.enhanceLevel ? `+${item.enhanceLevel}` : '未强化'
                           }}</span>
                         <span class="inventory-item__chip">可分解:{{ salvageableEquipmentCount(item) }}</span>
                       </div>
@@ -1581,14 +1566,6 @@ onBeforeUnmount(() => {
                       >
                         {{ item.equipped ? '卸下' : '穿戴' }}
                       </button>
-                      <button
-                          class="nickname-form__ghost"
-                          type="button"
-                          :disabled="!canSynthesize(item) || actioningItemId === item.itemId"
-                          @click="synthesizeItem(item.itemId)"
-                      >
-                        3 合 1 升星
-                      </button>
                     </div>
                   </div>
                 </li>
@@ -1612,7 +1589,7 @@ onBeforeUnmount(() => {
                 </article>
                 <article>
                   <span>暴击率</span>
-                  <strong>{{ combatStats.criticalChancePercent }}%</strong>
+                  <strong>{{ formatNumber(combatStats.criticalChancePercent, 2) }}%</strong>
                 </article>
                 <article>
                   <span>我的 Boss 伤害</span>
@@ -1720,7 +1697,7 @@ onBeforeUnmount(() => {
                       <div class="inventory-item__meta">
                         <span class="inventory-item__chip">库存:{{ hero.quantity }}</span>
                         <span class="inventory-item__chip">{{ hero.active ? '出战中' : '待命中' }}</span>
-                        <span class="inventory-item__chip">觉醒:{{ hero.awakenLevel || 0 }}</span>
+                        <span class="inventory-item__chip">觉醒:{{ hero.awakenLevel || 0 }} / {{ hero.awakenCap || '∞' }}</span>
                         <span class="inventory-item__chip">可分解:{{ salvageableHeroCount(hero) }}</span>
                       </div>
                     </div>
@@ -1768,8 +1745,8 @@ onBeforeUnmount(() => {
                 </article>
                 <article class="forge-summary">
                   <span>本期价格</span>
-                  <strong>强化 {{ EQUIPMENT_REFORGE_COST }} · 觉醒 {{ HERO_AWAKEN_COST }}</strong>
-                  <p>装备走强化，英雄走觉醒；两边都共用 31 次大奖保底。</p>
+                  <strong>强化 {{ EQUIPMENT_ENHANCE_COST }} · 觉醒 {{ HERO_AWAKEN_COST }}</strong>
+                  <p>装备与英雄都按模板上限成长，每次只提升一个基础属性。</p>
                 </article>
               </div>
 
@@ -1799,14 +1776,8 @@ onBeforeUnmount(() => {
                       <strong>{{ item.name }}</strong>
                       <div class="forge-action-list__meta">
                         <span>可分解 {{ salvageableEquipmentCount(item) }} 件</span>
-                        <span>强化保底 {{ pityProgress(item.reforgePityCounter).label }}</span>
-                        <span>每次 {{ EQUIPMENT_REFORGE_COST }} 原石</span>
-                      </div>
-                      <div class="boss-stage__bar boss-stage__bar--compact">
-                        <span
-                            class="boss-stage__bar-fill"
-                            :style="{ width: `${pityProgress(item.reforgePityCounter).percent}%` }"
-                        ></span>
+                        <span>强化 {{ item.enhanceLevel || 0 }} / {{ item.enhanceCap || '∞' }}</span>
+                        <span>每次 {{ EQUIPMENT_ENHANCE_COST }} 原石</span>
                       </div>
                     </div>
                     <div class="inventory-item__actions">
@@ -1821,8 +1792,8 @@ onBeforeUnmount(() => {
                       <button
                           class="inventory-item__action"
                           type="button"
-                          :disabled="!isLoggedIn || gems < EQUIPMENT_REFORGE_COST || actioningItemId === item.itemId"
-                          @click="reforgeEquipment(item)"
+                          :disabled="!isLoggedIn || gems < EQUIPMENT_ENHANCE_COST || actioningItemId === item.itemId || (item.enhanceCap > 0 && item.enhanceLevel >= item.enhanceCap)"
+                          @click="enhanceEquipment(item)"
                       >
                         强化
                       </button>
@@ -1845,15 +1816,8 @@ onBeforeUnmount(() => {
                       <strong>{{ hero.name }}</strong>
                       <div class="forge-action-list__meta">
                         <span>可分解 {{ salvageableHeroCount(hero) }} 个</span>
-                        <span>觉醒 {{ hero.awakenLevel || 0 }} 层</span>
-                        <span>保底 {{ pityProgress(hero.pityCounter).label }}</span>
+                        <span>觉醒 {{ hero.awakenLevel || 0 }} / {{ hero.awakenCap || '∞' }}</span>
                         <span>每次 {{ HERO_AWAKEN_COST }} 原石</span>
-                      </div>
-                      <div class="boss-stage__bar boss-stage__bar--compact">
-                        <span
-                            class="boss-stage__bar-fill"
-                            :style="{ width: `${pityProgress(hero.pityCounter).percent}%` }"
-                        ></span>
                       </div>
                     </div>
                     <div class="inventory-item__actions">
@@ -1868,7 +1832,7 @@ onBeforeUnmount(() => {
                       <button
                           class="inventory-item__action"
                           type="button"
-                          :disabled="!isLoggedIn || gems < HERO_AWAKEN_COST || actioningItemId === hero.heroId"
+                          :disabled="!isLoggedIn || gems < HERO_AWAKEN_COST || actioningItemId === hero.heroId || (hero.awakenCap > 0 && hero.awakenLevel >= hero.awakenCap)"
                           @click="awakenHero(hero)"
                       >
                         觉醒

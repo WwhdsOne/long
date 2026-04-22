@@ -20,7 +20,7 @@ func writeJSON(c *app.RequestContext, status int, payload any) {
 }
 
 func bindJSON(c *app.RequestContext, body any, invalidPayload map[string]string) bool {
-	if err := c.BindJSON(body); err != nil {
+	if err := c.Bind(body); err != nil {
 		writeJSON(c, consts.StatusBadRequest, invalidPayload)
 		return false
 	}

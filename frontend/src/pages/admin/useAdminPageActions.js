@@ -120,6 +120,7 @@ export function createAdminPageActions(state) {
           bonusClicks: Number(equipmentForm.value.bonusClicks),
           bonusCriticalChancePercent: Number(equipmentForm.value.bonusCriticalChancePercent),
           bonusCriticalCount: Number(equipmentForm.value.bonusCriticalCount),
+          enhanceCap: Number(equipmentForm.value.enhanceCap),
         }),
       })
       if (!response.ok) {
@@ -144,11 +145,20 @@ export function createAdminPageActions(state) {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...heroForm.value,
           bonusClicks: Number(heroForm.value.bonusClicks),
           bonusCriticalChancePercent: Number(heroForm.value.bonusCriticalChancePercent),
           bonusCriticalCount: Number(heroForm.value.bonusCriticalCount),
-          traitValue: Number(heroForm.value.traitValue),
+          awakenCap: Number(heroForm.value.awakenCap),
+          heroId: heroForm.value.heroId,
+          name: heroForm.value.name,
+          imagePath: heroForm.value.imagePath,
+          imageAlt: heroForm.value.imageAlt,
+          effects: heroForm.value.traitType
+            ? [{
+                type: heroForm.value.traitType,
+                value: Number(heroForm.value.traitValue),
+              }]
+            : [],
         }),
       })
       if (!response.ok) {
@@ -255,10 +265,10 @@ export function createAdminPageActions(state) {
 
   async function uploadHeroImage(event) {
     await uploadImageInner(event, (finalURL, file) => {
-      heroForm.value = {
-        ...heroForm.value,
-        imagePath: finalURL,
-        imageAlt: heroForm.value.imageAlt || file.name.replace(/\.[^.]+$/, ''),
+    heroForm.value = {
+      ...heroForm.value,
+      imagePath: finalURL,
+      imageAlt: heroForm.value.imageAlt || file.name.replace(/\.[^.]+$/, ''),
       }
     }, '英雄头像已上传到 OSS。')
   }
@@ -370,6 +380,7 @@ export function createAdminPageActions(state) {
       bonusClicks: entry.bonusClicks,
       bonusCriticalChancePercent: entry.bonusCriticalChancePercent,
       bonusCriticalCount: entry.bonusCriticalCount,
+      awakenCap: entry.awakenCap,
       traitValue: entry.traitValue,
     }
     activeTab.value = 'heroes'

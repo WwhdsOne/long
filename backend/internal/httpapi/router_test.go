@@ -40,7 +40,7 @@ type mockStore struct {
 	lastCycleEnabled       bool
 	lastSalvageItemID      string
 	lastSalvageQuantity    int64
-	lastReforgeItemID      string
+	lastEnhanceItemID      string
 	lastAwakenHeroID       string
 	lastPurchasedCosmetic  string
 	lastCosmeticLoadout    vote.CosmeticLoadout
@@ -51,9 +51,8 @@ type mockStore struct {
 	equipErr               error
 	validateErr            error
 	messageErr             error
-	synthesizeErr          error
 	salvageErr             error
-	reforgeErr             error
+	enhanceErr             error
 	awakenErr              error
 	purchaseErr            error
 	cosmeticEquipErr       error
@@ -303,16 +302,6 @@ func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockStore) SynthesizeItem(_ context.Context, _ string, _ string) (vote.State, error) {
-	if m.synthesizeErr != nil {
-		return vote.State{}, m.synthesizeErr
-	}
-	if len(m.equipState.Buttons) == 0 && len(m.equipState.Inventory) == 0 && m.equipState.Loadout.Weapon == nil && m.equipState.Loadout.Armor == nil && m.equipState.Loadout.Accessory == nil {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
 func (m *mockStore) SalvageEquipment(_ context.Context, _ string, itemID string, quantity int64) (vote.State, error) {
 	if m.salvageErr != nil {
 		return vote.State{}, m.salvageErr
@@ -325,11 +314,11 @@ func (m *mockStore) SalvageEquipment(_ context.Context, _ string, itemID string,
 	return m.equipState, nil
 }
 
-func (m *mockStore) ReforgeEquipment(_ context.Context, _ string, itemID string) (vote.State, error) {
-	if m.reforgeErr != nil {
-		return vote.State{}, m.reforgeErr
+func (m *mockStore) EnhanceEquipment(_ context.Context, _ string, itemID string) (vote.State, error) {
+	if m.enhanceErr != nil {
+		return vote.State{}, m.enhanceErr
 	}
-	m.lastReforgeItemID = itemID
+	m.lastEnhanceItemID = itemID
 	if len(m.equipState.Inventory) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
 		return m.state, nil
 	}
@@ -839,33 +828,9 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 	}
 }
 
-func TestSynthesizeItemReturnsUpdatedState(t *testing.T) {
-	store := &mockStore{
-		equipState: vote.State{
-			Inventory: []vote.InventoryItem{
-				{
-					ItemID:      "wood-sword",
-					Name:        "木剑 +1",
-					Quantity:    1,
-					StarLevel:   1,
-					BonusClicks: 3,
-				},
-			},
-			Loadout: vote.Loadout{
-				Weapon: &vote.InventoryItem{
-					ItemID:      "wood-sword",
-					Name:        "木剑 +1",
-					Quantity:    1,
-					StarLevel:   1,
-					BonusClicks: 3,
-					Equipped:    true,
-				},
-			},
-		},
-	}
-
+func TestSynthesizeItemReturnsDeprecatedError(t *testing.T) {
 	handler := NewHandler(Options{
-		Store:       store,
+		Store:       &mockStore{},
 		Broadcaster: &mockBroadcaster{},
 	})
 
@@ -875,20 +840,16 @@ func TestSynthesizeItemReturnsUpdatedState(t *testing.T) {
 
 	handler.ServeHTTP(response, request)
 
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
+	if response.Code != http.StatusGone {
+		t.Fatalf("expected 410, got %d", response.Code)
 	}
 
-	var payload struct {
-		Loadout struct {
-			Weapon *vote.InventoryItem `json:"weapon"`
-		} `json:"loadout"`
-	}
+	var payload map[string]string
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if payload.Loadout.Weapon == nil || payload.Loadout.Weapon.Name != "木剑 +1" || payload.Loadout.Weapon.StarLevel != 1 {
-		t.Fatalf("unexpected synthesize payload: %+v", payload.Loadout.Weapon)
+	if payload["error"] == "" {
+		t.Fatalf("expected deprecated error payload, got %+v", payload)
 	}
 }
 
@@ -941,20 +902,22 @@ func TestSalvageEquipmentReturnsUpdatedState(t *testing.T) {
 	}
 }
 
-func TestReforgeEquipmentReturnsUpdatedState(t *testing.T) {
+func TestEnhanceEquipmentReturnsUpdatedState(t *testing.T) {
 	store := &mockStore{
 		equipState: vote.State{
 			Gems: 0,
 			Inventory: []vote.InventoryItem{
 				{
-					ItemID:      "wood-sword",
-					Name:        "木剑",
-					Quantity:    1,
-					BonusClicks: 3,
+					ItemID:           "wood-sword",
+					Name:             "木剑 +1",
+					Quantity:         1,
+					EnhanceLevel:     1,
+					BonusClicks:      3,
+					BonusClicksDelta: 1,
 				},
 			},
 			LastForgeResult: &vote.ForgeResult{
-				Kind:          "equipment_reforge",
+				Kind:          "equipment_enhance",
 				TargetID:      "wood-sword",
 				RemainingGems: 0,
 			},
@@ -966,7 +929,7 @@ func TestReforgeEquipmentReturnsUpdatedState(t *testing.T) {
 		Broadcaster: &mockBroadcaster{},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/reforge", strings.NewReader(`{"nickname":"阿明"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/enhance", strings.NewReader(`{"nickname":"阿明"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 
@@ -975,8 +938,8 @@ func TestReforgeEquipmentReturnsUpdatedState(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", response.Code)
 	}
-	if store.lastReforgeItemID != "wood-sword" {
-		t.Fatalf("expected reforge payload to be forwarded, got %+v", store.lastReforgeItemID)
+	if store.lastEnhanceItemID != "wood-sword" {
+		t.Fatalf("expected enhance payload to be forwarded, got %+v", store.lastEnhanceItemID)
 	}
 }
 
@@ -1041,10 +1004,11 @@ func TestAwakenHeroReturnsUpdatedState(t *testing.T) {
 			Gems: 0,
 			Heroes: []vote.HeroInventoryItem{
 				{
-					HeroID:      "spark-cat",
-					Name:        "星火猫",
-					AwakenLevel: 1,
-					BonusClicks: 3,
+					HeroID:           "spark-cat",
+					Name:             "星火猫",
+					AwakenLevel:      1,
+					BonusClicks:      3,
+					BonusClicksDelta: 1,
 				},
 			},
 			LastForgeResult: &vote.ForgeResult{
@@ -1386,7 +1350,7 @@ func TestAdminHeroRoutesForwardPayloads(t *testing.T) {
 		t.Fatal("expected session cookie from login")
 	}
 
-	saveHeroRequest := httptest.NewRequest(http.MethodPost, "/api/admin/heroes", strings.NewReader(`{"heroId":"spark-cat","name":"星火猫","bonusClicks":2,"traitType":"final_damage_percent","traitValue":50}`))
+	saveHeroRequest := httptest.NewRequest(http.MethodPost, "/api/admin/heroes", strings.NewReader(`{"heroId":"spark-cat","name":"星火猫","bonusClicks":2,"effects":[{"type":"final_damage_percent","value":50,"displayName":"终幕打击","description":"最终伤害 +50%"}]}`))
 	saveHeroRequest.Header.Set("Content-Type", "application/json")
 	saveHeroRequest.AddCookie(cookies[0])
 	saveHeroResponse := httptest.NewRecorder()
@@ -1395,7 +1359,7 @@ func TestAdminHeroRoutesForwardPayloads(t *testing.T) {
 	if saveHeroResponse.Code != http.StatusOK {
 		t.Fatalf("expected 200 from hero save, got %d", saveHeroResponse.Code)
 	}
-	if store.lastHero.HeroID != "spark-cat" || store.lastHero.TraitValue != 50 {
+	if store.lastHero.HeroID != "spark-cat" || len(store.lastHero.Effects) != 1 || store.lastHero.Effects[0].Value != 50 {
 		t.Fatalf("expected hero payload to be forwarded, got %+v", store.lastHero)
 	}
 

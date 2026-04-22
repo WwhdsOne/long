@@ -155,6 +155,11 @@ func registerHeroRoutes(router route.IRouter, options Options) {
 					"error":   "HERO_NOT_OWNED",
 					"message": "这位小小英雄还没加入你的队伍。",
 				})
+			case errors.Is(err, vote.ErrHeroMaxAwaken):
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "HERO_MAX_AWAKEN",
+					"message": "这位小小英雄已经达到觉醒上限。",
+				})
 			case errors.Is(err, vote.ErrGemsNotEnough):
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "GEMS_NOT_ENOUGH",

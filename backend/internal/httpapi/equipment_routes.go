@@ -99,33 +99,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		if !ok {
 			return
 		}
-
-		state, err := options.Store.SynthesizeItem(ctx, nickname, c.Param("itemId"))
-		if err != nil {
-			if writeNicknameError(c, err) {
-				return
-			}
-			switch {
-			case errors.Is(err, vote.ErrEquipmentNotFound):
-				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
-			case errors.Is(err, vote.ErrEquipmentNotOwned), errors.Is(err, vote.ErrEquipmentNotEnough):
-				writeJSON(c, consts.StatusBadRequest, map[string]string{
-					"error":   "EQUIPMENT_NOT_ENOUGH",
-					"message": "至少要有 3 件同名装备才能升星。",
-				})
-			case errors.Is(err, vote.ErrEquipmentMaxStar):
-				writeJSON(c, consts.StatusBadRequest, map[string]string{
-					"error":   "EQUIPMENT_MAX_STAR",
-					"message": "这件装备已经满星了。",
-				})
-			default:
-				writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "SYNTHESIZE_FAILED"})
-			}
-			return
-		}
-
-		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeJSON(c, consts.StatusOK, state)
+		_ = nickname
+		writeJSON(c, consts.StatusGone, map[string]string{
+			"error":   "EQUIPMENT_SYNTHESIZE_DEPRECATED",
+			"message": "3 合 1 升星已废弃，请改用装备强化。",
+		})
 	})
 
 	router.POST("/api/equipment/:itemId/salvage", func(ctx context.Context, c *app.RequestContext) {
@@ -172,7 +150,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, state)
 	})
 
-	router.POST("/api/equipment/:itemId/reforge", func(ctx context.Context, c *app.RequestContext) {
+	router.POST("/api/equipment/:itemId/enhance", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
@@ -187,7 +165,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		state, err := options.Store.ReforgeEquipment(ctx, nickname, c.Param("itemId"))
+		state, err := options.Store.EnhanceEquipment(ctx, nickname, c.Param("itemId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -200,13 +178,18 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 					"error":   "EQUIPMENT_NOT_OWNED",
 					"message": "这件装备还不在你的背包里。",
 				})
+			case errors.Is(err, vote.ErrEquipmentMaxEnhance):
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_MAX_ENHANCE",
+					"message": "这件装备已经达到强化上限。",
+				})
 			case errors.Is(err, vote.ErrGemsNotEnough):
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "GEMS_NOT_ENOUGH",
 					"message": "原石不够，先去分解点重复装备吧。",
 				})
 			default:
-				writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_REFORGE_FAILED"})
+				writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_ENHANCE_FAILED"})
 			}
 			return
 		}

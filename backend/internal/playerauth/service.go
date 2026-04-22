@@ -105,7 +105,7 @@ func (s *Service) Verify(ctx context.Context, token string) (string, error) {
 			return nil, ErrInvalidToken
 		}
 		return s.jwtSecret, nil
-	})
+	}, jwt.WithTimeFunc(s.now))
 	if err != nil {
 		return "", ErrInvalidToken
 	}

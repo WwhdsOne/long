@@ -32,6 +32,7 @@ defineProps({
           <input v-model="equipmentForm.bonusClicks" class="nickname-form__input" type="number" min="0" placeholder="每次点击额外加几票" />
           <input v-model="equipmentForm.bonusCriticalChancePercent" class="nickname-form__input" type="number" min="0" max="100" placeholder="暴击概率 +N%" />
           <input v-model="equipmentForm.bonusCriticalCount" class="nickname-form__input" type="number" min="0" placeholder="暴击时额外加几票" />
+          <input v-model="equipmentForm.enhanceCap" class="nickname-form__input" type="number" min="0" placeholder="强化上限（0 表示不设上限）" />
           <button class="nickname-form__submit" type="submit" :disabled="saving">
             保存装备
           </button>
@@ -47,6 +48,7 @@ defineProps({
             <div>
               <strong>{{ item.name }}</strong>
               <p>{{ item.itemId }} · {{ item.slot }}</p>
+              <p>强化上限 {{ item.enhanceCap || '未设置' }}</p>
               <p>{{ formatItemStats(item) }}</p>
             </div>
             <div class="admin-inline-actions">

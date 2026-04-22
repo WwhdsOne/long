@@ -3,10 +3,12 @@ package vote
 import (
 	"context"
 	"errors"
+	"log"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -48,16 +50,21 @@ func (s *Store) SaveHeroDefinition(ctx context.Context, definition HeroDefinitio
 	if heroID == "" {
 		return ErrHeroNotFound
 	}
+	effects := normalizedHeroEffects(definition.Effects, definition.TraitType, definition.TraitValue)
+	encodedEffects, _ := sonic.Marshal(effects)
+	traitType, traitValue := legacyTraitFromEffects(effects)
 
 	values := map[string]any{
 		"name":                          firstNonEmpty(strings.TrimSpace(definition.Name), heroID),
 		"image_path":                    strings.TrimSpace(definition.ImagePath),
 		"image_alt":                     strings.TrimSpace(definition.ImageAlt),
 		"bonus_clicks":                  strconv.FormatInt(definition.BonusClicks, 10),
-		"bonus_critical_chance_percent": strconv.Itoa(definition.BonusCriticalChancePercent),
+		"bonus_critical_chance_percent": formatFloatForRedis(definition.BonusCriticalChancePercent),
 		"bonus_critical_count":          strconv.FormatInt(definition.BonusCriticalCount, 10),
-		"trait_type":                    strings.TrimSpace(string(definition.TraitType)),
-		"trait_value":                   strconv.FormatInt(definition.TraitValue, 10),
+		"effects":                       string(encodedEffects),
+		"awaken_cap":                    strconv.Itoa(definition.AwakenCap),
+		"trait_type":                    strings.TrimSpace(string(traitType)),
+		"trait_value":                   strconv.FormatInt(traitValue, 10),
 	}
 
 	pipe := s.client.TxPipeline()
@@ -166,6 +173,11 @@ func (s *Store) getHeroDefinition(ctx context.Context, heroID string) (HeroDefin
 	if len(values) == 0 {
 		return HeroDefinition{}, ErrHeroNotFound
 	}
+	effects := decodeHeroEffects(values["effects"])
+	if len(effects) == 0 {
+		effects = normalizedHeroEffects(nil, HeroTraitType(strings.TrimSpace(values["trait_type"])), int64FromString(values["trait_value"]))
+	}
+	traitType, traitValue := legacyTraitFromEffects(effects)
 
 	return HeroDefinition{
 		HeroID:                     heroID,
@@ -173,10 +185,12 @@ func (s *Store) getHeroDefinition(ctx context.Context, heroID string) (HeroDefin
 		ImagePath:                  strings.TrimSpace(values["image_path"]),
 		ImageAlt:                   strings.TrimSpace(values["image_alt"]),
 		BonusClicks:                int64FromString(values["bonus_clicks"]),
-		BonusCriticalChancePercent: int(int64FromString(values["bonus_critical_chance_percent"])),
+		BonusCriticalChancePercent: float64FromString(values["bonus_critical_chance_percent"]),
 		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
-		TraitType:                  HeroTraitType(strings.TrimSpace(values["trait_type"])),
-		TraitValue:                 int64FromString(values["trait_value"]),
+		Effects:                    effects,
+		AwakenCap:                  int(int64FromString(values["awaken_cap"])),
+		TraitType:                  traitType,
+		TraitValue:                 traitValue,
 	}, nil
 }
 
@@ -258,20 +272,26 @@ func (s *Store) heroInventoryForNickname(ctx context.Context, nickname string, q
 }
 
 func buildHeroInventoryItem(definition HeroDefinition, upgrade heroUpgrade, quantity int64, active bool) HeroInventoryItem {
+	effects := normalizedHeroEffects(definition.Effects, definition.TraitType, definition.TraitValue)
+	traitType, traitValue := legacyTraitFromEffects(effects)
 	return HeroInventoryItem{
-		HeroID:                     definition.HeroID,
-		Name:                       definition.Name,
-		ImagePath:                  definition.ImagePath,
-		ImageAlt:                   definition.ImageAlt,
-		Quantity:                   quantity,
-		Active:                     active,
-		AwakenLevel:                upgrade.AwakenLevel,
-		PityCounter:                upgrade.PityCounter,
-		BonusClicks:                definition.BonusClicks + upgrade.BonusClicks,
-		BonusCriticalChancePercent: definition.BonusCriticalChancePercent + upgrade.BonusCriticalChancePercent,
-		BonusCriticalCount:         definition.BonusCriticalCount + upgrade.BonusCriticalCount,
-		TraitType:                  definition.TraitType,
-		TraitValue:                 definition.TraitValue + upgrade.TraitValue,
+		HeroID:                          definition.HeroID,
+		Name:                            definition.Name,
+		ImagePath:                       definition.ImagePath,
+		ImageAlt:                        definition.ImageAlt,
+		Quantity:                        quantity,
+		Active:                          active,
+		AwakenLevel:                     upgrade.AwakenLevel,
+		AwakenCap:                       definition.AwakenCap,
+		BonusClicks:                     definition.BonusClicks + upgrade.BonusClicks,
+		BonusClicksDelta:                upgrade.BonusClicks,
+		BonusCriticalChancePercent:      definition.BonusCriticalChancePercent + upgrade.BonusCriticalChancePercent,
+		BonusCriticalChancePercentDelta: upgrade.BonusCriticalChancePercent,
+		BonusCriticalCount:              definition.BonusCriticalCount + upgrade.BonusCriticalCount,
+		BonusCriticalCountDelta:         upgrade.BonusCriticalCount,
+		Effects:                         effects,
+		TraitType:                       traitType,
+		TraitValue:                      traitValue,
 	}
 }
 
@@ -367,6 +387,7 @@ func (s *Store) normalizeHeroLootEntries(ctx context.Context, entries []redis.Z)
 			BonusClicks:                definition.BonusClicks,
 			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
 			BonusCriticalCount:         definition.BonusCriticalCount,
+			Effects:                    normalizedHeroEffects(definition.Effects, definition.TraitType, definition.TraitValue),
 			TraitType:                  definition.TraitType,
 			TraitValue:                 definition.TraitValue,
 		})
@@ -407,7 +428,7 @@ func (s *Store) chooseHeroLoot(entries []BossHeroLootEntry) *BossHeroLootEntry {
 	return &selected
 }
 
-func heroBonuses(hero *HeroInventoryItem) (int64, int, int64, int64) {
+func heroBonuses(hero *HeroInventoryItem) (int64, float64, int64, int64) {
 	if hero == nil {
 		return 0, 0, 0, 0
 	}
@@ -417,18 +438,56 @@ func heroBonuses(hero *HeroInventoryItem) (int64, int, int64, int64) {
 	bonusCount := hero.BonusCriticalCount
 	finalDamagePercent := int64(0)
 
-	switch hero.TraitType {
-	case HeroTraitBonusClicks:
-		bonusClicks += hero.TraitValue
-	case HeroTraitCriticalChancePercent:
-		bonusChance += int(hero.TraitValue)
-	case HeroTraitCriticalCountBonus:
-		bonusCount += hero.TraitValue
-	case HeroTraitFinalDamagePercent:
-		finalDamagePercent += hero.TraitValue
+	for _, effect := range normalizedHeroEffects(hero.Effects, hero.TraitType, hero.TraitValue) {
+		switch effect.Type {
+		case HeroEffectBonusClicks:
+			bonusClicks += effect.Value
+		case HeroEffectCriticalChancePercent:
+			bonusChance += float64(effect.Value)
+		case HeroEffectCriticalCountBonus:
+			bonusCount += effect.Value
+		case HeroEffectFinalDamagePercent:
+			finalDamagePercent += effect.Value
+		default:
+			log.Printf("vote: ignore unknown hero effect type=%q", effect.Type)
+		}
 	}
 
 	return bonusClicks, bonusChance, bonusCount, finalDamagePercent
+}
+
+func decodeHeroEffects(raw string) []HeroEffect {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	var effects []HeroEffect
+	if err := sonic.Unmarshal([]byte(trimmed), &effects); err != nil {
+		return nil
+	}
+	return effects
+}
+
+func normalizedHeroEffects(effects []HeroEffect, traitType HeroTraitType, traitValue int64) []HeroEffect {
+	if len(effects) > 0 {
+		cloned := make([]HeroEffect, len(effects))
+		copy(cloned, effects)
+		return cloned
+	}
+	if strings.TrimSpace(string(traitType)) == "" || traitValue == 0 {
+		return nil
+	}
+	return []HeroEffect{{
+		Type:  HeroEffectType(traitType),
+		Value: traitValue,
+	}}
+}
+
+func legacyTraitFromEffects(effects []HeroEffect) (HeroTraitType, int64) {
+	if len(effects) == 0 {
+		return "", 0
+	}
+	return HeroTraitType(effects[0].Type), effects[0].Value
 }
 
 func applyFinalDamagePercent(stats CombatStats, percent int64) CombatStats {
