@@ -106,6 +106,7 @@ func run() error {
 		ClickGuard:          clickLimiter,
 		PlayerAuthenticator: playerAuthenticator,
 		Events:              eventHandler,
+		RealtimeHub:         hub,
 		PublicDir:           cfg.PublicDir,
 		OSSSigner:           ossSigner,
 		AdminAuthenticator: admin.NewAuthenticator(admin.Config{

@@ -11,9 +11,12 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 )
 
-func registerEventRoutes(router route.IRouter, options Options) {
+func registerRealtimeRoutes(router route.IRouter, options Options) {
 	if options.Events != nil {
 		router.GET("/api/events", options.Events)
+	}
+	if options.RealtimeHub != nil {
+		router.GET("/api/ws", newRealtimeSocketHandler(options))
 	}
 }
 

@@ -23,12 +23,12 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	}
 
 	amingEvent := <-aming
-	if amingEvent.Name != "public_state" {
+	if amingEvent.Name != PublicStateEventName {
 		t.Fatalf("expected public_state for 阿明, got %+v", amingEvent)
 	}
 
 	xiaohongEvent := <-xiaohong
-	if xiaohongEvent.Name != "public_state" {
+	if xiaohongEvent.Name != PublicStateEventName {
 		t.Fatalf("expected public_state for 小红, got %+v", xiaohongEvent)
 	}
 
@@ -40,7 +40,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	}
 
 	amingEvent = <-aming
-	if amingEvent.Name != "user_state" {
+	if amingEvent.Name != UserStateEventName {
 		t.Fatalf("expected user_state for 阿明, got %+v", amingEvent)
 	}
 

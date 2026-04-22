@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	publicStateEventName = "public_state"
-	userStateEventName   = "user_state"
+	PublicStateEventName = "public_state"
+	UserStateEventName   = "user_state"
 )
 
 // StateReader 提供 SSE 初始状态所需的公共态与个人态读取能力。
@@ -77,7 +77,7 @@ func (h *Hub) BroadcastPublic(snapshot vote.Snapshot) error {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for client := range h.clients {
-		deliverEvent(client.ch, ServerEvent{Name: publicStateEventName, Payload: payload})
+		deliverEvent(client.ch, ServerEvent{Name: PublicStateEventName, Payload: payload})
 	}
 
 	return nil
@@ -100,7 +100,7 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 		if client.nickname != normalizedNickname {
 			continue
 		}
-		deliverEvent(client.ch, ServerEvent{Name: userStateEventName, Payload: payload})
+		deliverEvent(client.ch, ServerEvent{Name: UserStateEventName, Payload: payload})
 	}
 
 	return nil
@@ -142,7 +142,7 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 		writer := sse.NewWriter(c)
 		defer writer.Close()
 
-		if err := writeEvent(writer, publicStateEventName, snapshot); err != nil {
+		if err := writeEvent(writer, PublicStateEventName, snapshot); err != nil {
 			return
 		}
 
@@ -152,7 +152,7 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 				return
 			}
-			if err := writeEvent(writer, userStateEventName, userState); err != nil {
+			if err := writeEvent(writer, UserStateEventName, userState); err != nil {
 				return
 			}
 		}

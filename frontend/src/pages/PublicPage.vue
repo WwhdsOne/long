@@ -16,6 +16,7 @@ import {
   summarizeEquippedCosmetics,
 } from '../utils/cosmetics'
 import { formatRarityLabel, getRarityClassName, splitEquipmentName } from '../utils/rarity'
+import {createRealtimeTransport} from '../utils/realtimeTransport'
 import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
@@ -83,12 +84,13 @@ const shopCatalog = ref([])
 const lastForgeResult = ref(null)
 const cosmeticBursts = ref({})
 
-let eventSource
+let realtimeTransport
 let autoClickLoop
 let starlightTimer = 0
 let lastExpiredStarlightEndsAt = 0
 const burstTimers = new Map()
 const cosmeticTimers = new Map()
+const pendingClickSources = new Map()
 
 const buttonCount = computed(() => buttons.value.length)
 const totalVotes = computed(() =>
@@ -320,7 +322,9 @@ function scheduleStarlightRefresh() {
   }
 
   starlightTimer = window.setTimeout(() => {
-    void loadState()
+    if (!realtimeTransport?.requestSync?.()) {
+      void loadState()
+    }
   }, plan.delayMs)
 }
 
@@ -754,6 +758,117 @@ function applyClickResult(payload) {
   markUpdated()
 }
 
+function clearUserRealtimeState() {
+  userStats.value = null
+  inventory.value = []
+  heroes.value = []
+  activeHero.value = null
+  loadout.value = emptyLoadout()
+  combatStats.value = defaultCombatStats()
+  gems.value = 0
+  ownedCosmetics.value = []
+  equippedCosmetics.value = createEmptyCosmeticLoadout()
+  syncCosmeticDraft(createEmptyCosmeticLoadout())
+  shopCatalog.value = []
+  lastForgeResult.value = null
+  myBossStats.value = null
+  bossLoot.value = []
+  bossHeroLoot.value = []
+  recentRewards.value = []
+  lastReward.value = null
+}
+
+function clearPendingClicks(key = '') {
+  if (!key) {
+    pendingClickSources.clear()
+    pendingKeys.value = new Set()
+    return 'normal'
+  }
+
+  const normalizedKey = String(key).trim()
+  const nextPending = new Set(pendingKeys.value)
+  nextPending.delete(normalizedKey)
+  pendingKeys.value = nextPending
+  const source = pendingClickSources.get(normalizedKey) || 'normal'
+  pendingClickSources.delete(normalizedKey)
+  return source
+}
+
+function applyRealtimeSnapshot(publicState, userState) {
+  applyPublicState(publicState)
+  if (userState) {
+    applyUserState(userState)
+  } else {
+    clearUserRealtimeState()
+  }
+  pendingKeys.value = new Set()
+  syncing.value = false
+  loading.value = false
+  errorMessage.value = ''
+  markUpdated()
+  maybePromptAnnouncement()
+}
+
+function ensureRealtimeTransport() {
+  if (realtimeTransport) {
+    return realtimeTransport
+  }
+
+  realtimeTransport = createRealtimeTransport({
+    onSnapshot(publicState, userState) {
+      applyRealtimeSnapshot(publicState, userState)
+    },
+    onPublicDelta(payload) {
+      applyPublicState(payload)
+      loading.value = false
+      errorMessage.value = ''
+    },
+    onUserDelta(payload) {
+      applyUserState(payload)
+      loading.value = false
+      errorMessage.value = ''
+    },
+    onClickAck(payload) {
+      const key = payload?.button?.key || ''
+      if (payload?.critical && key) {
+        triggerCriticalBurst(key, payload.delta)
+      }
+      const source = clearPendingClicks(key)
+      if (key) {
+        triggerCosmeticBurst(key, {mode: source})
+      }
+      applyClickResult(payload)
+      errorMessage.value = ''
+    },
+    onTransportState(nextState) {
+      liveConnected.value = nextState.connected
+      if (nextState.connected) {
+        syncing.value = false
+      }
+    },
+    onTransportError(message) {
+      clearPendingClicks()
+      if (message) {
+        errorMessage.value = message
+      }
+    },
+  })
+
+  return realtimeTransport
+}
+
+function connectRealtime(nextNickname = nickname.value) {
+  loading.value = true
+  syncing.value = true
+
+  if (!realtimeTransport) {
+    ensureRealtimeTransport().connect({nickname: nextNickname})
+    return
+  }
+
+  realtimeTransport.reconnect({nickname: nextNickname})
+}
+
 function clearCriticalBurst(key) {
   const timer = burstTimers.get(key)
   if (timer) {
@@ -912,9 +1027,14 @@ async function clickButton(key, options = {}) {
   const nextPending = new Set(pendingKeys.value)
   nextPending.add(key)
   pendingKeys.value = nextPending
+  pendingClickSources.set(key, options.source || 'normal')
   errorMessage.value = ''
 
   try {
+    if (ensureRealtimeTransport().sendClick(key)) {
+      return
+    }
+
     const response = await fetch(`/api/buttons/${encodeURIComponent(key)}/click`, {
       method: 'POST',
       headers: {
@@ -931,16 +1051,11 @@ async function clickButton(key, options = {}) {
     if (data.critical) {
       triggerCriticalBurst(key, data.delta)
     }
-    triggerCosmeticBurst(key, {mode: options.source})
-    const restored = new Set(pendingKeys.value)
-    restored.delete(key)
-    pendingKeys.value = restored
+    triggerCosmeticBurst(key, {mode: clearPendingClicks(key)})
     applyClickResult(data)
     errorMessage.value = ''
   } catch (error) {
-    const restored = new Set(pendingKeys.value)
-    restored.delete(key)
-    pendingKeys.value = restored
+    clearPendingClicks(key)
     errorMessage.value = error.message || '点击失败，请稍后重试。'
   }
 }
@@ -1124,35 +1239,6 @@ async function equipSelectedCosmetics() {
   }
 }
 
-function connectEventStream() {
-  eventSource?.close()
-  eventSource = new EventSource(`/api/events${currentNicknameQuery()}`)
-
-  eventSource.onopen = () => {
-    liveConnected.value = true
-    errorMessage.value = ''
-  }
-
-  const handleNamedEvent = (applier) => (event) => {
-    try {
-      const payload = JSON.parse(event.data)
-      applier(payload)
-      liveConnected.value = true
-      errorMessage.value = ''
-    } catch {
-      errorMessage.value = '实时消息解析失败，请稍后刷新页面。'
-    }
-  }
-
-  eventSource.addEventListener('public_state', handleNamedEvent(applyPublicState))
-  eventSource.addEventListener('user_state', handleNamedEvent(applyUserState))
-
-  eventSource.onerror = () => {
-    liveConnected.value = false
-    errorMessage.value = '实时连接暂时不可用，页面会自动重连。'
-  }
-}
-
 async function submitNickname() {
   const nextNickname = normalizeNickname(nicknameDraft.value)
   if (!nextNickname) {
@@ -1188,8 +1274,7 @@ async function submitNickname() {
     nickname.value = resolvedNickname
     nicknameDraft.value = resolvedNickname
     passwordDraft.value = ''
-    await loadState()
-    connectEventStream()
+    connectRealtime(resolvedNickname)
   } catch (error) {
     errorMessage.value = error.message || '登录失败，请稍后重试。'
   }
@@ -1206,32 +1291,16 @@ async function resetNickname() {
 
   stopAutoClick()
   clearPlayerSessionState()
-  await loadState()
-  connectEventStream()
+  connectRealtime('')
 }
 
 function clearPlayerSessionState() {
   nickname.value = ''
   nicknameDraft.value = ''
   passwordDraft.value = ''
-  userStats.value = null
-  inventory.value = []
-  heroes.value = []
-  activeHero.value = null
-  loadout.value = emptyLoadout()
-  combatStats.value = defaultCombatStats()
-  gems.value = 0
-  ownedCosmetics.value = []
-  equippedCosmetics.value = createEmptyCosmeticLoadout()
-  syncCosmeticDraft(createEmptyCosmeticLoadout())
-  shopCatalog.value = []
-  lastForgeResult.value = null
-  myBossStats.value = null
-  bossLoot.value = []
-  bossHeroLoot.value = []
-  recentRewards.value = []
-  lastReward.value = null
+  clearUserRealtimeState()
   autoClickTargetKey.value = ''
+  clearPendingClicks()
 }
 
 async function loadPlayerSession() {
@@ -1258,13 +1327,12 @@ async function loadPlayerSession() {
 
 onMounted(async () => {
   await loadPlayerSession()
-  await loadState()
-  connectEventStream()
+  connectRealtime(nickname.value)
 })
 
 onBeforeUnmount(() => {
   stopAutoClick()
-  eventSource?.close()
+  realtimeTransport?.close()
   clearStarlightTimer()
   burstTimers.forEach((timer) => window.clearTimeout(timer))
   burstTimers.clear()

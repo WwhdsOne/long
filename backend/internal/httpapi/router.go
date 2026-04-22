@@ -8,6 +8,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 
 	adminauth "long/internal/admin"
+	"long/internal/events"
 	ossupload "long/internal/oss"
 	"long/internal/vote"
 )
@@ -65,6 +66,11 @@ type StateView interface {
 	GetUserState(context.Context, string) (vote.UserState, error)
 }
 
+// RealtimeHub 为 SSE 与 WebSocket 共享的订阅中心。
+type RealtimeHub interface {
+	Subscribe(string) (<-chan events.ServerEvent, func())
+}
+
 // OSSSigner 负责生成 OSS 直传短时凭证。
 type OSSSigner interface {
 	CreatePolicy(context.Context) (ossupload.Policy, error)
@@ -101,6 +107,7 @@ type Options struct {
 	ClickGuard          ClickGuard
 	PlayerAuthenticator PlayerAuthenticator
 	Events              app.HandlerFunc
+	RealtimeHub         RealtimeHub
 	PublicDir           string
 	AdminAuthenticator  *adminauth.Authenticator
 	OSSSigner           OSSSigner
@@ -119,6 +126,6 @@ func registerRoutes(engine *route.Engine, options Options) {
 	registerPlayerAuthRoutes(engine, options)
 	registerPlayerActionRoutes(engine, options)
 	registerAdminRoutes(engine, options)
-	registerEventRoutes(engine, options)
+	registerRealtimeRoutes(engine, options)
 	registerStaticRoutes(engine, options)
 }
