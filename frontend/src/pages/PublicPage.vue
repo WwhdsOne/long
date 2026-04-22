@@ -18,8 +18,11 @@ import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const AUTO_CLICK_RATE_LABEL = `每秒约 ${Math.round(1000 / AUTO_CLICK_INTERVAL_MS)} 次`
-const EQUIPMENT_ENHANCE_COST = 20
-const HERO_AWAKEN_COST = 25
+const EQUIPMENT_ENHANCE_COST = 10
+const HERO_AWAKEN_COST = 15
+const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
+const HERO_GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率 + 最终伤害提升百分比) / 4)，至少 +1'
+
 
 const buttons = ref([])
 const leaderboard = ref([])
@@ -367,6 +370,40 @@ function salvageableEquipmentCount(item) {
 
 function salvageableHeroCount(hero) {
   return salvageableCount(hero, hero?.active)
+}
+
+function equipmentEnhanceHint(item) {
+  const currentLevel = Number(item?.enhanceLevel || 0)
+  const cap = Number(item?.enhanceCap || 0)
+
+  if (!isLoggedIn.value) {
+    return '登录后才能消耗原石强化。'
+  }
+  if (cap > 0 && currentLevel >= cap) {
+    return '已达模板上限，本件装备不能继续强化。'
+  }
+  if (gems.value < EQUIPMENT_ENHANCE_COST) {
+    return `原石不足，还差 ${EQUIPMENT_ENHANCE_COST - gems.value}。`
+  }
+
+  return ``
+}
+
+function heroAwakenHint(hero) {
+  const currentLevel = Number(hero?.awakenLevel || 0)
+  const cap = Number(hero?.awakenCap || 0)
+
+  if (!isLoggedIn.value) {
+    return '登录后才能消耗原石觉醒。'
+  }
+  if (cap > 0 && currentLevel >= cap) {
+    return '已达模板上限，本位英雄不能继续觉醒。'
+  }
+  if (gems.value < HERO_AWAKEN_COST) {
+    return `原石不足，还差 ${HERO_AWAKEN_COST - gems.value}。`
+  }
+
+  return ``
 }
 
 function dotIndexes(count) {
@@ -1480,7 +1517,7 @@ onBeforeUnmount(() => {
                 type="button"
                 @click="selectHudTab('heroes')"
             >
-              英雄
+              小小英雄
             </button>
             <button
                 class="player-hud__tab"
@@ -1746,7 +1783,25 @@ onBeforeUnmount(() => {
                 <article class="forge-summary">
                   <span>本期价格</span>
                   <strong>强化 {{ EQUIPMENT_ENHANCE_COST }} · 觉醒 {{ HERO_AWAKEN_COST }}</strong>
-                  <p>装备与英雄都按模板上限成长，每次只提升一个基础属性。</p>
+                  <p>装备与英雄都按模板上限成长，每次只提升一个基础属性，并直接返回本次成长结果。</p>
+                </article>
+                <article class="forge-summary">
+                  <span>装备强化规则</span>
+                  <strong>三项基础属性等概率命中</strong>
+                  <p class="forge-summary__tips">
+                    <span>仅提升点击 / 暴击 / 暴击率中的一项。</span>
+                    <span>{{ GROWTH_FORMULA_TEXT }}。</span>
+                    <span>暴击率每次固定 +0.20%。</span>
+                  </p>
+                  <br>
+                  <span>英雄强化规则</span>
+                  <strong>四项基础属性等概率命中</strong>
+                  <p class="forge-summary__tips">
+                    <span>仅提升点击 / 暴击 / 暴击率 / 最终伤害提升百分比中的一项。</span>
+                    <span>{{ HERO_GROWTH_FORMULA_TEXT }}。</span>
+                    <span>暴击率每次固定 +0.20%。</span>
+                    <span>小小英雄额外能力无法使用此手段强化。</span>
+                  </p>
                 </article>
               </div>
 
@@ -1763,10 +1818,6 @@ onBeforeUnmount(() => {
               </article>
 
               <section class="player-hud__info-block">
-                <div class="player-hud__mini-head">
-                  <span>装备强化</span>
-                  <strong>{{ inventory.length }} 件</strong>
-                </div>
                 <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
                   <p>背包里还没有装备，先去打 Boss 再回来强化。</p>
                 </div>
@@ -1779,6 +1830,7 @@ onBeforeUnmount(() => {
                         <span>强化 {{ item.enhanceLevel || 0 }} / {{ item.enhanceCap || '∞' }}</span>
                         <span>每次 {{ EQUIPMENT_ENHANCE_COST }} 原石</span>
                       </div>
+                      <p>{{ equipmentEnhanceHint(item) }}</p>
                     </div>
                     <div class="inventory-item__actions">
                       <button
@@ -1803,10 +1855,6 @@ onBeforeUnmount(() => {
               </section>
 
               <section class="player-hud__info-block">
-                <div class="player-hud__mini-head">
-                  <span>英雄觉醒</span>
-                  <strong>{{ heroCount }} 位</strong>
-                </div>
                 <div v-if="heroes.length === 0" class="leaderboard-list leaderboard-list--empty">
                   <p>你还没有招募到英雄，先去 Boss 池碰碰运气。</p>
                 </div>
@@ -1819,6 +1867,7 @@ onBeforeUnmount(() => {
                         <span>觉醒 {{ hero.awakenLevel || 0 }} / {{ hero.awakenCap || '∞' }}</span>
                         <span>每次 {{ HERO_AWAKEN_COST }} 原石</span>
                       </div>
+                      <p>{{ heroAwakenHint(hero) }}</p>
                     </div>
                     <div class="inventory-item__actions">
                       <button
@@ -2370,50 +2419,52 @@ onBeforeUnmount(() => {
       </section>
 
       <aside class="social-panel social-panel--ranking">
-        <section class="social-card leaderboard-card">
-          <div class="social-card__head">
-            <p class="vote-stage__eyebrow">实时排行榜</p>
-            <strong>前 {{ leaderboard.length || 0 }} 名</strong>
-          </div>
+        <section class="social-card leaderboard-card leaderboard-card--stacked">
+          <section class="leaderboard-card__section">
+            <div class="social-card__head">
+              <p class="vote-stage__eyebrow">Boss 伤害榜</p>
+              <strong>{{ bossLeaderboard.length || 0 }} 人</strong>
+            </div>
 
-          <ol v-if="leaderboard.length > 0" class="leaderboard-list">
-            <li
-                v-for="entry in leaderboard"
-                :key="entry.nickname"
-                class="leaderboard-list__item"
-                :class="{ 'leaderboard-list__item--me': entry.nickname === nickname }"
-            >
-              <span class="leaderboard-list__rank">#{{ entry.rank }}</span>
-              <span class="leaderboard-list__name">{{ entry.nickname }}</span>
-              <strong class="leaderboard-list__count">{{ entry.clickCount }}</strong>
-            </li>
-          </ol>
-          <div v-else class="leaderboard-list leaderboard-list--empty">
-            <p>还没人上榜，等你来开张。</p>
-          </div>
-        </section>
+            <ol v-if="bossLeaderboard.length > 0" class="leaderboard-list">
+              <li
+                  v-for="entry in bossLeaderboard"
+                  :key="entry.nickname"
+                  class="leaderboard-list__item"
+                  :class="{ 'leaderboard-list__item--me': entry.nickname === nickname }"
+              >
+                <span class="leaderboard-list__rank">#{{ entry.rank }}</span>
+                <span class="leaderboard-list__name">{{ entry.nickname }}</span>
+                <strong class="leaderboard-list__count">{{ entry.damage }}</strong>
+              </li>
+            </ol>
+            <div v-else class="leaderboard-list leaderboard-list--empty">
+              <p>当前 Boss 还没人动手，或者正在休战。</p>
+            </div>
+          </section>
 
-        <section class="social-card leaderboard-card">
-          <div class="social-card__head">
-            <p class="vote-stage__eyebrow">Boss 伤害榜</p>
-            <strong>{{ bossLeaderboard.length || 0 }} 人</strong>
-          </div>
+          <section class="leaderboard-card__section">
+            <div class="social-card__head">
+              <p class="vote-stage__eyebrow">实时排行榜</p>
+              <strong>前 {{ leaderboard.length || 0 }} 名</strong>
+            </div>
 
-          <ol v-if="bossLeaderboard.length > 0" class="leaderboard-list">
-            <li
-                v-for="entry in bossLeaderboard"
-                :key="entry.nickname"
-                class="leaderboard-list__item"
-                :class="{ 'leaderboard-list__item--me': entry.nickname === nickname }"
-            >
-              <span class="leaderboard-list__rank">#{{ entry.rank }}</span>
-              <span class="leaderboard-list__name">{{ entry.nickname }}</span>
-              <strong class="leaderboard-list__count">{{ entry.damage }}</strong>
-            </li>
-          </ol>
-          <div v-else class="leaderboard-list leaderboard-list--empty">
-            <p>当前 Boss 还没人动手，或者正在休战。</p>
-          </div>
+            <ol v-if="leaderboard.length > 0" class="leaderboard-list">
+              <li
+                  v-for="entry in leaderboard"
+                  :key="entry.nickname"
+                  class="leaderboard-list__item"
+                  :class="{ 'leaderboard-list__item--me': entry.nickname === nickname }"
+              >
+                <span class="leaderboard-list__rank">#{{ entry.rank }}</span>
+                <span class="leaderboard-list__name">{{ entry.nickname }}</span>
+                <strong class="leaderboard-list__count">{{ entry.clickCount }}</strong>
+              </li>
+            </ol>
+            <div v-else class="leaderboard-list leaderboard-list--empty">
+              <p>还没人上榜，等你来开张。</p>
+            </div>
+          </section>
         </section>
       </aside>
     </section>
