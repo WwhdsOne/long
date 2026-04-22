@@ -14,9 +14,9 @@ import (
 const (
 	equipmentSalvageGemValue = 1
 	heroSalvageGemValue      = 1
-	equipmentEnhanceCost     = 20
-	heroAwakenCost           = 25
-	criticalChanceGrowthStep = 1.0 / 6.0
+	equipmentEnhanceCost     = 10
+	heroAwakenCost           = 15
+	criticalChanceGrowthStep = 0.2
 )
 
 type CosmeticType string

@@ -123,7 +123,7 @@ func TestEnhanceEquipmentConsumesGemsAndAppliesSingleStatGrowth(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed inventory: %v", err)
 	}
-	if err := store.setGems(ctx, "阿明", 20); err != nil {
+	if err := store.setGems(ctx, "阿明", equipmentEnhanceCost); err != nil {
 		t.Fatalf("seed gems: %v", err)
 	}
 
@@ -172,7 +172,7 @@ func TestEnhanceEquipmentAppliesFixedCriticalChanceGrowth(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed inventory: %v", err)
 	}
-	if err := store.setGems(ctx, "阿明", 20); err != nil {
+	if err := store.setGems(ctx, "阿明", equipmentEnhanceCost); err != nil {
 		t.Fatalf("seed gems: %v", err)
 	}
 
@@ -182,10 +182,10 @@ func TestEnhanceEquipmentAppliesFixedCriticalChanceGrowth(t *testing.T) {
 	}
 
 	item := state.Inventory[0]
-	if item.BonusCriticalChancePercent != 1.0/6.0 || item.BonusCriticalChancePercentDelta != 1.0/6.0 {
+	if item.BonusCriticalChancePercent != 0.2 || item.BonusCriticalChancePercentDelta != 0.2 {
 		t.Fatalf("expected fixed crit chance growth, got %+v", item)
 	}
-	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "暴击率 +0.17%" {
+	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "暴击率 +0.20%" {
 		t.Fatalf("expected fixed crit chance summary, got %+v", state.LastForgeResult)
 	}
 }
@@ -213,7 +213,7 @@ func TestEnhanceEquipmentRejectsAtTemplateCap(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed upgrade: %v", err)
 	}
-	if err := store.setGems(ctx, "阿明", 20); err != nil {
+	if err := store.setGems(ctx, "阿明", equipmentEnhanceCost); err != nil {
 		t.Fatalf("seed gems: %v", err)
 	}
 
@@ -259,7 +259,7 @@ func TestAwakenHeroConsumesGemsAndFeedsCombatStats(t *testing.T) {
 	if err := store.client.Set(ctx, store.activeHeroKey("阿明"), "spark-cat", 0).Err(); err != nil {
 		t.Fatalf("seed active hero: %v", err)
 	}
-	if err := store.setGems(ctx, "阿明", 25); err != nil {
+	if err := store.setGems(ctx, "阿明", heroAwakenCost); err != nil {
 		t.Fatalf("seed gems: %v", err)
 	}
 	if err := store.client.HSet(ctx, store.bossCurrentKey, map[string]any{
@@ -386,10 +386,10 @@ func TestAwakenHeroAppliesFixedCriticalChanceGrowthAndRejectsAtCap(t *testing.T)
 	}
 
 	hero := state.Heroes[0]
-	if hero.BonusCriticalChancePercent != 1.0/6.0 || hero.BonusCriticalChancePercentDelta != 1.0/6.0 {
+	if hero.BonusCriticalChancePercent != 0.2 || hero.BonusCriticalChancePercentDelta != 0.2 {
 		t.Fatalf("expected fixed crit chance growth, got %+v", hero)
 	}
-	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "暴击率 +0.17%" {
+	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "暴击率 +0.20%" {
 		t.Fatalf("expected crit chance awaken summary, got %+v", state.LastForgeResult)
 	}
 	if _, err := store.AwakenHero(ctx, "阿明", "spark-cat"); !errors.Is(err, ErrHeroMaxAwaken) {
