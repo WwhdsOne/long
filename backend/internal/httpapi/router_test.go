@@ -698,6 +698,139 @@ func TestClickButtonReturnsCriticalMetadata(t *testing.T) {
 	}
 }
 
+func TestClickButtonReturnsMinimalResponseForRealtimeClients(t *testing.T) {
+	store := &mockStore{
+		result: vote.ClickResult{
+			Button: vote.Button{
+				Key:      "feel",
+				RedisKey: "vote:button:feel",
+				Label:    "有感觉吗",
+				Count:    7,
+				Sort:     10,
+				Enabled:  true,
+			},
+			Delta:     5,
+			Critical:  true,
+			UserStats: vote.UserStats{Nickname: "阿明", ClickCount: 7},
+			Boss: &vote.Boss{
+				ID:        "boss-1",
+				Name:      "木桩王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 40,
+			},
+			BossLeaderboard: []vote.BossLeaderboardEntry{
+				{Rank: 1, Nickname: "阿明", Damage: 60},
+			},
+			MyBossStats: &vote.BossUserStats{Nickname: "阿明", Damage: 60},
+			RecentRewards: []vote.Reward{
+				{BossID: "boss-1", BossName: "木桩王", ItemID: "club", ItemName: "木棒", GrantedAt: 123},
+			},
+			LastReward: &vote.Reward{BossID: "boss-1", BossName: "木桩王", ItemID: "club", ItemName: "木棒", GrantedAt: 123},
+		},
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 6, Sort: 10, Enabled: true},
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明","realtimeConnected":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload map[string]any
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	for _, key := range []string{"button", "delta", "critical"} {
+		if _, ok := payload[key]; !ok {
+			t.Fatalf("expected key %q in payload: %+v", key, payload)
+		}
+	}
+	for _, key := range []string{"userStats", "boss", "bossLeaderboard", "myBossStats", "recentRewards", "lastReward"} {
+		if _, ok := payload[key]; ok {
+			t.Fatalf("expected realtime payload to omit %q: %+v", key, payload)
+		}
+	}
+}
+
+func TestClickButtonReturnsFallbackStateWhenRealtimeDisconnected(t *testing.T) {
+	store := &mockStore{
+		result: vote.ClickResult{
+			Button: vote.Button{
+				Key:      "feel",
+				RedisKey: "vote:button:feel",
+				Label:    "有感觉吗",
+				Count:    7,
+				Sort:     10,
+				Enabled:  true,
+			},
+			Delta:     5,
+			Critical:  true,
+			UserStats: vote.UserStats{Nickname: "阿明", ClickCount: 7},
+			Boss: &vote.Boss{
+				ID:        "boss-1",
+				Name:      "木桩王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 40,
+			},
+			BossLeaderboard: []vote.BossLeaderboardEntry{
+				{Rank: 1, Nickname: "阿明", Damage: 60},
+			},
+			MyBossStats: &vote.BossUserStats{Nickname: "阿明", Damage: 60},
+			RecentRewards: []vote.Reward{
+				{BossID: "boss-1", BossName: "木桩王", ItemID: "club", ItemName: "木棒", GrantedAt: 123},
+			},
+			LastReward: &vote.Reward{BossID: "boss-1", BossName: "木桩王", ItemID: "club", ItemName: "木棒", GrantedAt: 123},
+		},
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 6, Sort: 10, Enabled: true},
+			},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明","realtimeConnected":false}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload map[string]any
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	for _, key := range []string{"button", "delta", "critical", "userStats", "boss", "bossLeaderboard", "myBossStats", "recentRewards", "lastReward"} {
+		if _, ok := payload[key]; !ok {
+			t.Fatalf("expected key %q in payload: %+v", key, payload)
+		}
+	}
+}
+
 func TestClickButtonPublishesStateChangeWithoutRefetchingState(t *testing.T) {
 	store := &mockStore{
 		getStateErr: context.DeadlineExceeded,
@@ -716,6 +849,7 @@ func TestClickButtonPublishesStateChangeWithoutRefetchingState(t *testing.T) {
 				Nickname:   "阿明",
 				ClickCount: 5,
 			},
+			BroadcastUserAll: true,
 		},
 		state: vote.State{
 			Buttons: []vote.Button{
@@ -758,6 +892,9 @@ func TestClickButtonPublishesStateChangeWithoutRefetchingState(t *testing.T) {
 	}
 	if changePublisher.changes[0].Type != vote.StateChangeButtonClicked || changePublisher.changes[0].Nickname != "阿明" {
 		t.Fatalf("unexpected published change: %+v", changePublisher.changes[0])
+	}
+	if !changePublisher.changes[0].BroadcastUserAll {
+		t.Fatalf("expected BroadcastUserAll to be preserved, got %+v", changePublisher.changes[0])
 	}
 }
 
