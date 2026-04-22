@@ -104,7 +104,7 @@ func TestSalvageHeroAddsGemsAndKeepsActiveCopy(t *testing.T) {
 	}
 }
 
-func TestReforgeEquipmentConsumesGemsAndAppliesNormalResult(t *testing.T) {
+func TestEnhanceEquipmentConsumesGemsAndAppliesSingleStatGrowth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -116,6 +116,7 @@ func TestReforgeEquipmentConsumesGemsAndAppliesNormalResult(t *testing.T) {
 		Name:        "木剑",
 		Slot:        "weapon",
 		BonusClicks: 2,
+		EnhanceCap:  3,
 	})
 	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), map[string]any{
 		"wood-sword": "1",
@@ -126,34 +127,37 @@ func TestReforgeEquipmentConsumesGemsAndAppliesNormalResult(t *testing.T) {
 		t.Fatalf("seed gems: %v", err)
 	}
 
-	state, err := store.ReforgeEquipment(ctx, "阿明", "wood-sword")
+	state, err := store.EnhanceEquipment(ctx, "阿明", "wood-sword")
 	if err != nil {
-		t.Fatalf("reforge equipment: %v", err)
+		t.Fatalf("enhance equipment: %v", err)
 	}
 
 	if state.Gems != 0 {
 		t.Fatalf("expected gems to become 0, got %d", state.Gems)
 	}
 	if len(state.Inventory) != 1 || state.Inventory[0].BonusClicks != 3 {
-		t.Fatalf("expected bonus clicks +1 after reforge, got %+v", state.Inventory)
+		t.Fatalf("expected click stat to grow by 1, got %+v", state.Inventory)
 	}
-	if state.LastForgeResult == nil || state.LastForgeResult.Jackpot {
-		t.Fatalf("expected normal reforge result, got %+v", state.LastForgeResult)
+	if state.Inventory[0].EnhanceLevel != 1 || state.Inventory[0].BonusClicksDelta != 1 {
+		t.Fatalf("expected enhance level and delta to update, got %+v", state.Inventory[0])
+	}
+	if state.LastForgeResult == nil || state.LastForgeResult.Kind != "equipment_enhance" || state.LastForgeResult.Jackpot {
+		t.Fatalf("expected normal enhance result, got %+v", state.LastForgeResult)
 	}
 	upgrade, err := store.getEquipmentUpgrade(ctx, "阿明", "wood-sword")
 	if err != nil {
 		t.Fatalf("load equipment upgrade: %v", err)
 	}
-	if upgrade.ReforgePityCounter != 1 {
-		t.Fatalf("expected pity counter 1 after normal reforge, got %+v", upgrade)
+	if upgrade.EnhanceLevel != 1 || upgrade.BonusClicks != 1 {
+		t.Fatalf("expected stored enhance delta, got %+v", upgrade)
 	}
 }
 
-func TestReforgeEquipmentSupportsJackpotAndPity(t *testing.T) {
+func TestEnhanceEquipmentAppliesFixedCriticalChanceGrowth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
-	store.roll = func(int) int { return 0 }
+	store.roll = func(int) int { return 2 }
 
 	ctx := context.Background()
 	seedEquipmentDefinition(t, store, EquipmentDefinition{
@@ -161,6 +165,42 @@ func TestReforgeEquipmentSupportsJackpotAndPity(t *testing.T) {
 		Name:        "木剑",
 		Slot:        "weapon",
 		BonusClicks: 2,
+		EnhanceCap:  3,
+	})
+	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), map[string]any{
+		"wood-sword": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if err := store.setGems(ctx, "阿明", 20); err != nil {
+		t.Fatalf("seed gems: %v", err)
+	}
+
+	state, err := store.EnhanceEquipment(ctx, "阿明", "wood-sword")
+	if err != nil {
+		t.Fatalf("enhance equipment: %v", err)
+	}
+
+	item := state.Inventory[0]
+	if item.BonusCriticalChancePercent != 1.0/6.0 || item.BonusCriticalChancePercentDelta != 1.0/6.0 {
+		t.Fatalf("expected fixed crit chance growth, got %+v", item)
+	}
+	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "暴击率 +0.17%" {
+		t.Fatalf("expected fixed crit chance summary, got %+v", state.LastForgeResult)
+	}
+}
+
+func TestEnhanceEquipmentRejectsAtTemplateCap(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	seedEquipmentDefinition(t, store, EquipmentDefinition{
+		ItemID:      "wood-sword",
+		Name:        "木剑",
+		Slot:        "weapon",
+		BonusClicks: 2,
+		EnhanceCap:  1,
 	})
 	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), map[string]any{
 		"wood-sword": "1",
@@ -168,76 +208,17 @@ func TestReforgeEquipmentSupportsJackpotAndPity(t *testing.T) {
 		t.Fatalf("seed inventory: %v", err)
 	}
 	if err := store.client.HSet(ctx, store.upgradeKey("阿明", "wood-sword"), map[string]any{
-		"reforge_pity_counter": "30",
+		"enhance_level": "1",
+		"bonus_clicks":  "1",
 	}).Err(); err != nil {
-		t.Fatalf("seed pity counter: %v", err)
+		t.Fatalf("seed upgrade: %v", err)
 	}
 	if err := store.setGems(ctx, "阿明", 20); err != nil {
 		t.Fatalf("seed gems: %v", err)
 	}
 
-	state, err := store.ReforgeEquipment(ctx, "阿明", "wood-sword")
-	if err != nil {
-		t.Fatalf("reforge equipment with pity: %v", err)
-	}
-
-	item := state.Inventory[0]
-	if item.BonusClicks != 3 || item.BonusCriticalChancePercent != 1 || item.BonusCriticalCount != 1 {
-		t.Fatalf("expected jackpot to raise all equipment stats, got %+v", item)
-	}
-	if state.LastForgeResult == nil || !state.LastForgeResult.Jackpot {
-		t.Fatalf("expected jackpot result payload, got %+v", state.LastForgeResult)
-	}
-	upgrade, err := store.getEquipmentUpgrade(ctx, "阿明", "wood-sword")
-	if err != nil {
-		t.Fatalf("load equipment upgrade: %v", err)
-	}
-	if upgrade.ReforgePityCounter != 0 {
-		t.Fatalf("expected pity counter reset after jackpot, got %+v", upgrade)
-	}
-}
-
-func TestReforgeEquipmentSupportsDoubleBonusResult(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	rolls := []int{90, 0}
-	store.roll = func(limit int) int {
-		next := rolls[0]
-		rolls = rolls[1:]
-		if next >= limit {
-			return limit - 1
-		}
-		return next
-	}
-
-	ctx := context.Background()
-	seedEquipmentDefinition(t, store, EquipmentDefinition{
-		ItemID:      "wood-sword",
-		Name:        "木剑",
-		Slot:        "weapon",
-		BonusClicks: 2,
-	})
-	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), map[string]any{
-		"wood-sword": "1",
-	}).Err(); err != nil {
-		t.Fatalf("seed inventory: %v", err)
-	}
-	if err := store.setGems(ctx, "阿明", 20); err != nil {
-		t.Fatalf("seed gems: %v", err)
-	}
-
-	state, err := store.ReforgeEquipment(ctx, "阿明", "wood-sword")
-	if err != nil {
-		t.Fatalf("reforge equipment with double bonus: %v", err)
-	}
-
-	item := state.Inventory[0]
-	if item.BonusClicks != 3 || item.BonusCriticalChancePercent != 1 || item.BonusCriticalCount != 0 {
-		t.Fatalf("expected double bonus to raise clicks and crit chance, got %+v", item)
-	}
-	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "点击 +1、暴击率 +1%" {
-		t.Fatalf("expected double bonus summary, got %+v", state.LastForgeResult)
+	if _, err := store.EnhanceEquipment(ctx, "阿明", "wood-sword"); !errors.Is(err, ErrEquipmentMaxEnhance) {
+		t.Fatalf("expected enhance cap error, got %v", err)
 	}
 }
 
@@ -268,6 +249,7 @@ func TestAwakenHeroConsumesGemsAndFeedsCombatStats(t *testing.T) {
 		HeroID:      "spark-cat",
 		Name:        "星火猫",
 		BonusClicks: 2,
+		AwakenCap:   3,
 	})
 	if err := store.client.HSet(ctx, store.heroInventoryKey("阿明"), map[string]any{
 		"spark-cat": "1",
@@ -301,6 +283,9 @@ func TestAwakenHeroConsumesGemsAndFeedsCombatStats(t *testing.T) {
 	if state.ActiveHero == nil || state.ActiveHero.BonusClicks != 3 || state.ActiveHero.AwakenLevel != 1 {
 		t.Fatalf("expected awakened hero stats, got %+v", state.ActiveHero)
 	}
+	if len(state.ActiveHero.Effects) != 0 {
+		t.Fatalf("expected awaken to affect only base stats, got %+v", state.ActiveHero.Effects)
+	}
 	if state.CombatStats.NormalDamage != 4 {
 		t.Fatalf("expected awakened hero to raise normal damage to 4, got %+v", state.CombatStats)
 	}
@@ -317,7 +302,7 @@ func TestAwakenHeroConsumesGemsAndFeedsCombatStats(t *testing.T) {
 	}
 }
 
-func TestAwakenHeroSupportsJackpotAndPity(t *testing.T) {
+func TestAwakenHeroKeepsEffectsAndIgnoresLegacyUpgradeFields(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -328,8 +313,15 @@ func TestAwakenHeroSupportsJackpotAndPity(t *testing.T) {
 		HeroID:      "spark-cat",
 		Name:        "星火猫",
 		BonusClicks: 2,
-		TraitType:   HeroTraitFinalDamagePercent,
-		TraitValue:  5,
+		AwakenCap:   3,
+		Effects: []HeroEffect{
+			{
+				Type:        HeroEffectFinalDamagePercent,
+				Value:       5,
+				DisplayName: "终幕打击",
+				Description: "最终伤害 +5%",
+			},
+		},
 	})
 	if err := store.client.HSet(ctx, store.heroInventoryKey("阿明"), map[string]any{
 		"spark-cat": "1",
@@ -337,77 +329,71 @@ func TestAwakenHeroSupportsJackpotAndPity(t *testing.T) {
 		t.Fatalf("seed hero inventory: %v", err)
 	}
 	if err := store.client.HSet(ctx, store.heroUpgradeKey("阿明", "spark-cat"), map[string]any{
-		"pity_counter": "30",
+		"pity_counter":                  "30",
+		"bonus_clicks":                  "99",
+		"bonus_critical_chance_percent": "50",
+		"bonus_critical_count":          "99",
+		"trait_value":                   "99",
 	}).Err(); err != nil {
-		t.Fatalf("seed hero pity counter: %v", err)
+		t.Fatalf("seed legacy hero upgrade: %v", err)
 	}
-	if err := store.setGems(ctx, "阿明", 25); err != nil {
+	if err := store.setGems(ctx, "阿明", 50); err != nil {
 		t.Fatalf("seed gems: %v", err)
 	}
 
 	state, err := store.AwakenHero(ctx, "阿明", "spark-cat")
 	if err != nil {
-		t.Fatalf("awaken hero with pity: %v", err)
+		t.Fatalf("awaken hero: %v", err)
 	}
 
 	hero := state.Heroes[0]
-	if hero.BonusClicks != 3 || hero.BonusCriticalChancePercent != 1 || hero.BonusCriticalCount != 1 || hero.TraitValue != 6 {
-		t.Fatalf("expected jackpot to raise all hero stats, got %+v", hero)
+	if hero.BonusClicks != 3 || hero.BonusClicksDelta != 1 {
+		t.Fatalf("expected awaken to apply fresh click growth only, got %+v", hero)
 	}
-	if state.LastForgeResult == nil || !state.LastForgeResult.Jackpot {
-		t.Fatalf("expected jackpot awaken payload, got %+v", state.LastForgeResult)
+	if len(hero.Effects) != 1 || hero.Effects[0].Type != HeroEffectFinalDamagePercent || hero.Effects[0].Value != 5 {
+		t.Fatalf("expected effects to remain unchanged, got %+v", hero.Effects)
 	}
-	upgrade, err := store.getHeroUpgrade(ctx, "阿明", "spark-cat")
-	if err != nil {
-		t.Fatalf("load hero upgrade: %v", err)
-	}
-	if upgrade.PityCounter != 0 {
-		t.Fatalf("expected pity counter reset after jackpot, got %+v", upgrade)
+	if state.LastForgeResult == nil || state.LastForgeResult.Jackpot {
+		t.Fatalf("expected non-jackpot awaken payload, got %+v", state.LastForgeResult)
 	}
 }
 
-func TestAwakenHeroSupportsDoubleBonusResult(t *testing.T) {
+func TestAwakenHeroAppliesFixedCriticalChanceGrowthAndRejectsAtCap(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
-	rolls := []int{90, 0}
-	store.roll = func(limit int) int {
-		next := rolls[0]
-		rolls = rolls[1:]
-		if next >= limit {
-			return limit - 1
-		}
-		return next
-	}
+	store.roll = func(int) int { return 2 }
 
 	ctx := context.Background()
 	seedHeroDefinition(t, store, HeroDefinition{
 		HeroID:      "spark-cat",
 		Name:        "星火猫",
 		BonusClicks: 2,
-		TraitType:   HeroTraitFinalDamagePercent,
-		TraitValue:  5,
+		AwakenCap:   1,
 	})
 	if err := store.client.HSet(ctx, store.heroInventoryKey("阿明"), map[string]any{
 		"spark-cat": "1",
 	}).Err(); err != nil {
 		t.Fatalf("seed hero inventory: %v", err)
 	}
-	if err := store.setGems(ctx, "阿明", 25); err != nil {
+	if err := store.setGems(ctx, "阿明", 50); err != nil {
 		t.Fatalf("seed gems: %v", err)
 	}
 
 	state, err := store.AwakenHero(ctx, "阿明", "spark-cat")
 	if err != nil {
-		t.Fatalf("awaken hero with double bonus: %v", err)
+		t.Fatalf("awaken hero: %v", err)
 	}
 
 	hero := state.Heroes[0]
-	if hero.BonusClicks != 3 || hero.BonusCriticalCount != 1 || hero.BonusCriticalChancePercent != 0 || hero.TraitValue != 5 {
-		t.Fatalf("expected double bonus to raise clicks and crit count, got %+v", hero)
+	if hero.BonusCriticalChancePercent != 1.0/6.0 || hero.BonusCriticalChancePercentDelta != 1.0/6.0 {
+		t.Fatalf("expected fixed crit chance growth, got %+v", hero)
 	}
-	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "点击 +1、暴击 +1" {
-		t.Fatalf("expected double bonus awaken summary, got %+v", state.LastForgeResult)
+	if state.LastForgeResult == nil || state.LastForgeResult.RewardSummary != "暴击率 +0.17%" {
+		t.Fatalf("expected crit chance awaken summary, got %+v", state.LastForgeResult)
+	}
+	if _, err := store.AwakenHero(ctx, "阿明", "spark-cat"); !errors.Is(err, ErrHeroMaxAwaken) {
+		t.Fatalf("expected awaken cap error, got %v", err)
 	}
 }
 
@@ -436,8 +422,8 @@ func TestProgressionActionsRejectInsufficientGems(t *testing.T) {
 		t.Fatalf("seed hero inventory: %v", err)
 	}
 
-	if _, err := store.ReforgeEquipment(ctx, "阿明", "wood-sword"); !errors.Is(err, ErrGemsNotEnough) {
-		t.Fatalf("expected reforge to reject insufficient gems, got %v", err)
+	if _, err := store.EnhanceEquipment(ctx, "阿明", "wood-sword"); !errors.Is(err, ErrGemsNotEnough) {
+		t.Fatalf("expected enhance to reject insufficient gems, got %v", err)
 	}
 	if _, err := store.AwakenHero(ctx, "阿明", "spark-cat"); !errors.Is(err, ErrGemsNotEnough) {
 		t.Fatalf("expected awaken to reject insufficient gems, got %v", err)

@@ -21,9 +21,8 @@ type ButtonStore interface {
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
-	SynthesizeItem(context.Context, string, string) (vote.State, error)
 	SalvageEquipment(context.Context, string, string, int64) (vote.State, error)
-	ReforgeEquipment(context.Context, string, string) (vote.State, error)
+	EnhanceEquipment(context.Context, string, string) (vote.State, error)
 	EquipHero(context.Context, string, string) (vote.State, error)
 	UnequipHero(context.Context, string, string) (vote.State, error)
 	SalvageHero(context.Context, string, string, int64) (vote.State, error)

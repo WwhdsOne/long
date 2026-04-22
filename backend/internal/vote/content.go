@@ -18,11 +18,11 @@ const (
 )
 
 type equipmentUpgrade struct {
+	EnhanceLevel               int
 	StarLevel                  int
 	BonusClicks                int64
-	BonusCriticalChancePercent int
+	BonusCriticalChancePercent float64
 	BonusCriticalCount         int64
-	ReforgePityCounter         int
 }
 
 // GetLatestAnnouncement 返回最新生效公告。
@@ -225,65 +225,6 @@ func (s *Store) DeleteMessage(ctx context.Context, id string) error {
 	return err
 }
 
-// SynthesizeItem 对指定装备类型执行一次升星。
-func (s *Store) SynthesizeItem(ctx context.Context, nickname string, itemID string) (State, error) {
-	normalizedNickname, err := s.validatedNickname(nickname)
-	if err != nil {
-		return State{}, err
-	}
-
-	itemID = strings.TrimSpace(itemID)
-	if itemID == "" {
-		return State{}, ErrEquipmentNotFound
-	}
-	if _, err := s.getEquipmentDefinition(ctx, itemID); err != nil {
-		return State{}, err
-	}
-
-	quantity, err := s.client.HGet(ctx, s.inventoryKey(normalizedNickname), itemID).Int64()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return State{}, ErrEquipmentNotOwned
-		}
-		return State{}, err
-	}
-	if quantity < 3 {
-		return State{}, ErrEquipmentNotEnough
-	}
-
-	upgrade, err := s.getEquipmentUpgrade(ctx, normalizedNickname, itemID)
-	if err != nil {
-		return State{}, err
-	}
-	switch s.roll(3) {
-	case 0:
-		upgrade.BonusClicks++
-	case 1:
-		upgrade.BonusCriticalChancePercent++
-	default:
-		upgrade.BonusCriticalCount++
-	}
-	upgrade.StarLevel++
-
-	pipe := s.client.TxPipeline()
-	pipe.HIncrBy(ctx, s.inventoryKey(normalizedNickname), itemID, -2)
-	pipe.HSet(ctx, s.upgradeKey(normalizedNickname, itemID), map[string]any{
-		"star_level":                    strconv.Itoa(upgrade.StarLevel),
-		"bonus_clicks":                  strconv.FormatInt(upgrade.BonusClicks, 10),
-		"bonus_critical_chance_percent": strconv.Itoa(upgrade.BonusCriticalChancePercent),
-		"bonus_critical_count":          strconv.FormatInt(upgrade.BonusCriticalCount, 10),
-	})
-	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
-		Score:  float64(time.Now().Unix()),
-		Member: normalizedNickname,
-	})
-	if _, err := pipe.Exec(ctx); err != nil {
-		return State{}, err
-	}
-
-	return s.GetState(ctx, normalizedNickname)
-}
-
 func (s *Store) loadAnnouncement(ctx context.Context, id string) (*Announcement, error) {
 	values, err := s.client.HGetAll(ctx, s.announcementItemKey(id)).Result()
 	if err != nil {
@@ -352,47 +293,54 @@ func (s *Store) getEquipmentUpgrade(ctx context.Context, nickname string, itemID
 	}
 
 	return equipmentUpgrade{
-		StarLevel:                  int(int64FromString(values["star_level"])),
-		BonusClicks:                int64FromString(values["bonus_clicks"]),
-		BonusCriticalChancePercent: int(int64FromString(values["bonus_critical_chance_percent"])),
-		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
-		ReforgePityCounter:         int(int64FromString(values["reforge_pity_counter"])),
+		EnhanceLevel:               int(int64FromString(values["enhance_level"])),
+		StarLevel:                  int(int64FromString(values["enhance_level"])),
+		BonusClicks:                int64FromString(values["clicks_delta"]),
+		BonusCriticalChancePercent: float64FromString(values["critical_chance_delta"]),
+		BonusCriticalCount:         int64FromString(values["critical_count_delta"]),
 	}, nil
 }
 
 func (s *Store) buildInventoryItem(definition EquipmentDefinition, upgrade equipmentUpgrade, quantity int64, equipped bool) InventoryItem {
 	return InventoryItem{
-		ItemID:                     definition.ItemID,
-		Name:                       displayItemName(definition.Name, upgrade.StarLevel),
-		Slot:                       definition.Slot,
-		Quantity:                   quantity,
-		StarLevel:                  upgrade.StarLevel,
-		ReforgePityCounter:         upgrade.ReforgePityCounter,
-		BonusClicks:                definition.BonusClicks + upgrade.BonusClicks,
-		BonusCriticalChancePercent: definition.BonusCriticalChancePercent + upgrade.BonusCriticalChancePercent,
-		BonusCriticalCount:         definition.BonusCriticalCount + upgrade.BonusCriticalCount,
-		Equipped:                   equipped,
+		ItemID:                          definition.ItemID,
+		Name:                            displayItemName(definition.Name, upgrade.EnhanceLevel),
+		Slot:                            definition.Slot,
+		Quantity:                        quantity,
+		EnhanceLevel:                    upgrade.EnhanceLevel,
+		EnhanceCap:                      definition.EnhanceCap,
+		BonusClicks:                     definition.BonusClicks + upgrade.BonusClicks,
+		BonusClicksDelta:                upgrade.BonusClicks,
+		BonusCriticalChancePercent:      definition.BonusCriticalChancePercent + upgrade.BonusCriticalChancePercent,
+		BonusCriticalChancePercentDelta: upgrade.BonusCriticalChancePercent,
+		BonusCriticalCount:              definition.BonusCriticalCount + upgrade.BonusCriticalCount,
+		BonusCriticalCountDelta:         upgrade.BonusCriticalCount,
+		Equipped:                        equipped,
+		StarLevel:                       upgrade.EnhanceLevel,
 	}
 }
 
 func unknownInventoryItem(itemID string, upgrade equipmentUpgrade, quantity int64, equipped bool) InventoryItem {
 	return InventoryItem{
-		ItemID:                     itemID,
-		Name:                       displayItemName(itemID, upgrade.StarLevel),
-		Quantity:                   quantity,
-		StarLevel:                  upgrade.StarLevel,
-		ReforgePityCounter:         upgrade.ReforgePityCounter,
-		BonusClicks:                upgrade.BonusClicks,
-		BonusCriticalChancePercent: upgrade.BonusCriticalChancePercent,
-		BonusCriticalCount:         upgrade.BonusCriticalCount,
-		Equipped:                   equipped,
+		ItemID:                          itemID,
+		Name:                            displayItemName(itemID, upgrade.EnhanceLevel),
+		Quantity:                        quantity,
+		EnhanceLevel:                    upgrade.EnhanceLevel,
+		BonusClicks:                     upgrade.BonusClicks,
+		BonusClicksDelta:                upgrade.BonusClicks,
+		BonusCriticalChancePercent:      upgrade.BonusCriticalChancePercent,
+		BonusCriticalChancePercentDelta: upgrade.BonusCriticalChancePercent,
+		BonusCriticalCount:              upgrade.BonusCriticalCount,
+		BonusCriticalCountDelta:         upgrade.BonusCriticalCount,
+		Equipped:                        equipped,
+		StarLevel:                       upgrade.EnhanceLevel,
 	}
 }
 
-func displayItemName(baseName string, starLevel int) string {
+func displayItemName(baseName string, enhanceLevel int) string {
 	name := firstNonEmpty(strings.TrimSpace(baseName), "未命名装备")
-	if starLevel <= 0 {
+	if enhanceLevel <= 0 {
 		return name
 	}
-	return fmt.Sprintf("%s +%d", name, starLevel)
+	return fmt.Sprintf("%s +%d", name, enhanceLevel)
 }

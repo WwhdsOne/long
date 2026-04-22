@@ -17,4 +17,11 @@ describe('PublicPage 强化布局', () => {
     expect(pageSource).toContain('class="forge-action-list__meta"')
     expect(compact(styleSource)).toContain('.forge-action-list li { display: grid; grid-template-columns: 1fr;')
   })
+
+  it('移除了旧 3 合 1 与 reforge/pity 文案，改为 enhance 强化接口', () => {
+    expect(pageSource).not.toContain('3 合 1 升星')
+    expect(pageSource).not.toContain("/reforge'")
+    expect(pageSource).not.toContain('reforgePityCounter')
+    expect(pageSource).toContain("'enhance'")
+  })
 })

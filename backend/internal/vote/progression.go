@@ -14,9 +14,9 @@ import (
 const (
 	equipmentSalvageGemValue = 1
 	heroSalvageGemValue      = 1
-	equipmentReforgeCost     = 20
+	equipmentEnhanceCost     = 20
 	heroAwakenCost           = 25
-	jackpotPityThreshold     = 30
+	criticalChanceGrowthStep = 1.0 / 6.0
 )
 
 type CosmeticType string
@@ -62,7 +62,7 @@ type ForgeResult struct {
 type heroUpgrade struct {
 	AwakenLevel                int
 	BonusClicks                int64
-	BonusCriticalChancePercent int
+	BonusCriticalChancePercent float64
 	BonusCriticalCount         int64
 	TraitValue                 int64
 	PityCounter                int
@@ -318,11 +318,9 @@ func (s *Store) getHeroUpgrade(ctx context.Context, nickname string, heroID stri
 
 	return heroUpgrade{
 		AwakenLevel:                int(int64FromString(values["awaken_level"])),
-		BonusClicks:                int64FromString(values["bonus_clicks"]),
-		BonusCriticalChancePercent: int(int64FromString(values["bonus_critical_chance_percent"])),
-		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
-		TraitValue:                 int64FromString(values["trait_value"]),
-		PityCounter:                int(int64FromString(values["pity_counter"])),
+		BonusClicks:                int64FromString(values["clicks_delta"]),
+		BonusCriticalChancePercent: float64FromString(values["critical_chance_delta"]),
+		BonusCriticalCount:         int64FromString(values["critical_count_delta"]),
 	}, nil
 }
 
@@ -356,6 +354,22 @@ func setLastForgeResultOnPipeline(ctx context.Context, pipe redis.Pipeliner, key
 		return
 	}
 	pipe.Set(ctx, key, string(encoded), 0)
+}
+
+func statGrowthBase(clicks int64, critCount int64, critChance float64) int64 {
+	total := float64(clicks+critCount) + critChance
+	if total <= 0 {
+		return 1
+	}
+	return maxInt64(int64(ceilFloat(total/4)), 1)
+}
+
+func formatFloatForRedis(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func formatPercentage(value float64) string {
+	return strconv.FormatFloat(roundToDecimals(value, 2), 'f', 2, 64)
 }
 
 func (s *Store) SalvageEquipment(ctx context.Context, nickname string, itemID string, quantity int64) (State, error) {
@@ -504,7 +518,7 @@ func (s *Store) SalvageHero(ctx context.Context, nickname string, heroID string,
 	return s.GetState(ctx, normalizedNickname)
 }
 
-func (s *Store) ReforgeEquipment(ctx context.Context, nickname string, itemID string) (State, error) {
+func (s *Store) EnhanceEquipment(ctx context.Context, nickname string, itemID string) (State, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return State{}, err
@@ -534,7 +548,7 @@ func (s *Store) ReforgeEquipment(ctx context.Context, nickname string, itemID st
 	if err != nil {
 		return State{}, err
 	}
-	if currentGems < equipmentReforgeCost {
+	if currentGems < equipmentEnhanceCost {
 		return State{}, ErrGemsNotEnough
 	}
 
@@ -542,27 +556,28 @@ func (s *Store) ReforgeEquipment(ctx context.Context, nickname string, itemID st
 	if err != nil {
 		return State{}, err
 	}
+	if definition.EnhanceCap > 0 && upgrade.EnhanceLevel >= definition.EnhanceCap {
+		return State{}, ErrEquipmentMaxEnhance
+	}
 
-	rewardSummary, jackpot := applyEquipmentReforge(&upgrade, s.roll)
-	remainingGems := currentGems - equipmentReforgeCost
+	rewardSummary := applyEquipmentEnhance(&upgrade, definition, s.roll)
+	remainingGems := currentGems - equipmentEnhanceCost
 	forgeResult := &ForgeResult{
-		Kind:          "equipment_reforge",
+		Kind:          "equipment_enhance",
 		TargetID:      itemID,
 		TargetName:    definition.Name,
 		RewardSummary: rewardSummary,
-		GemsDelta:     -equipmentReforgeCost,
+		GemsDelta:     -equipmentEnhanceCost,
 		RemainingGems: remainingGems,
-		Jackpot:       jackpot,
 	}
 
 	now := s.now().Unix()
 	pipe := s.client.TxPipeline()
 	pipe.HSet(ctx, s.upgradeKey(normalizedNickname, itemID), map[string]any{
-		"star_level":                    strconv.Itoa(upgrade.StarLevel),
-		"bonus_clicks":                  strconv.FormatInt(upgrade.BonusClicks, 10),
-		"bonus_critical_chance_percent": strconv.Itoa(upgrade.BonusCriticalChancePercent),
-		"bonus_critical_count":          strconv.FormatInt(upgrade.BonusCriticalCount, 10),
-		"reforge_pity_counter":          strconv.Itoa(upgrade.ReforgePityCounter),
+		"enhance_level":         strconv.Itoa(upgrade.EnhanceLevel),
+		"clicks_delta":          strconv.FormatInt(upgrade.BonusClicks, 10),
+		"critical_chance_delta": formatFloatForRedis(upgrade.BonusCriticalChancePercent),
+		"critical_count_delta":  strconv.FormatInt(upgrade.BonusCriticalCount, 10),
 	})
 	pipe.Set(ctx, s.gemsKey(normalizedNickname), strconv.FormatInt(remainingGems, 10), 0)
 	setLastForgeResultOnPipeline(ctx, pipe, s.lastForgeResultKey(normalizedNickname), forgeResult)
@@ -577,50 +592,21 @@ func (s *Store) ReforgeEquipment(ctx context.Context, nickname string, itemID st
 	return s.GetState(ctx, normalizedNickname)
 }
 
-func applyEquipmentReforge(upgrade *equipmentUpgrade, roll func(int) int) (string, bool) {
-	if upgrade.ReforgePityCounter >= jackpotPityThreshold {
-		upgrade.BonusClicks++
-		upgrade.BonusCriticalChancePercent++
-		upgrade.BonusCriticalCount++
-		upgrade.ReforgePityCounter = 0
-		return "大奖：点击 +1、暴击率 +1%、暴击 +1", true
-	}
+func applyEquipmentEnhance(upgrade *equipmentUpgrade, definition EquipmentDefinition, roll func(int) int) string {
+	growth := statGrowthBase(definition.BonusClicks+upgrade.BonusClicks, definition.BonusCriticalCount+upgrade.BonusCriticalCount, definition.BonusCriticalChancePercent+upgrade.BonusCriticalChancePercent)
+	upgrade.EnhanceLevel++
+	upgrade.StarLevel = upgrade.EnhanceLevel
 
-	switch next := roll(100); {
-	case next < 52:
-		upgrade.BonusClicks++
-		upgrade.ReforgePityCounter++
-		return "点击 +1", false
-	case next < 74:
-		upgrade.BonusCriticalCount++
-		upgrade.ReforgePityCounter++
-		return "暴击 +1", false
-	case next < 86:
-		upgrade.BonusCriticalChancePercent++
-		upgrade.ReforgePityCounter++
-		return "暴击率 +1%", false
-	case next < 99:
-		upgrade.ReforgePityCounter++
-		switch roll(3) {
-		case 0:
-			upgrade.BonusClicks++
-			upgrade.BonusCriticalChancePercent++
-			return "点击 +1、暴击率 +1%", false
-		case 1:
-			upgrade.BonusClicks++
-			upgrade.BonusCriticalCount++
-			return "点击 +1、暴击 +1", false
-		default:
-			upgrade.BonusCriticalChancePercent++
-			upgrade.BonusCriticalCount++
-			return "暴击率 +1%、暴击 +1", false
-		}
+	switch roll(3) {
+	case 0:
+		upgrade.BonusClicks += growth
+		return "点击 +" + strconv.FormatInt(growth, 10)
+	case 1:
+		upgrade.BonusCriticalCount += growth
+		return "暴击 +" + strconv.FormatInt(growth, 10)
 	default:
-		upgrade.BonusClicks++
-		upgrade.BonusCriticalChancePercent++
-		upgrade.BonusCriticalCount++
-		upgrade.ReforgePityCounter = 0
-		return "大奖：点击 +1、暴击率 +1%、暴击 +1", true
+		upgrade.BonusCriticalChancePercent += criticalChanceGrowthStep
+		return "暴击率 +" + formatPercentage(criticalChanceGrowthStep) + "%"
 	}
 }
 
@@ -662,8 +648,11 @@ func (s *Store) AwakenHero(ctx context.Context, nickname string, heroID string) 
 	if err != nil {
 		return State{}, err
 	}
+	if definition.AwakenCap > 0 && upgrade.AwakenLevel >= definition.AwakenCap {
+		return State{}, ErrHeroMaxAwaken
+	}
 
-	rewardSummary, jackpot := applyHeroAwaken(&upgrade, s.roll)
+	rewardSummary := applyHeroAwaken(&upgrade, definition, s.roll)
 	remainingGems := currentGems - heroAwakenCost
 	forgeResult := &ForgeResult{
 		Kind:          "hero_awaken",
@@ -672,18 +661,15 @@ func (s *Store) AwakenHero(ctx context.Context, nickname string, heroID string) 
 		RewardSummary: rewardSummary,
 		GemsDelta:     -heroAwakenCost,
 		RemainingGems: remainingGems,
-		Jackpot:       jackpot,
 	}
 
 	now := s.now().Unix()
 	pipe := s.client.TxPipeline()
 	pipe.HSet(ctx, s.heroUpgradeKey(normalizedNickname, heroID), map[string]any{
-		"awaken_level":                  strconv.Itoa(upgrade.AwakenLevel),
-		"bonus_clicks":                  strconv.FormatInt(upgrade.BonusClicks, 10),
-		"bonus_critical_chance_percent": strconv.Itoa(upgrade.BonusCriticalChancePercent),
-		"bonus_critical_count":          strconv.FormatInt(upgrade.BonusCriticalCount, 10),
-		"trait_value":                   strconv.FormatInt(upgrade.TraitValue, 10),
-		"pity_counter":                  strconv.Itoa(upgrade.PityCounter),
+		"awaken_level":          strconv.Itoa(upgrade.AwakenLevel),
+		"clicks_delta":          strconv.FormatInt(upgrade.BonusClicks, 10),
+		"critical_chance_delta": formatFloatForRedis(upgrade.BonusCriticalChancePercent),
+		"critical_count_delta":  strconv.FormatInt(upgrade.BonusCriticalCount, 10),
 	})
 	pipe.Set(ctx, s.gemsKey(normalizedNickname), strconv.FormatInt(remainingGems, 10), 0)
 	setLastForgeResultOnPipeline(ctx, pipe, s.lastForgeResultKey(normalizedNickname), forgeResult)
@@ -698,69 +684,20 @@ func (s *Store) AwakenHero(ctx context.Context, nickname string, heroID string) 
 	return s.GetState(ctx, normalizedNickname)
 }
 
-func applyHeroAwaken(upgrade *heroUpgrade, roll func(int) int) (string, bool) {
+func applyHeroAwaken(upgrade *heroUpgrade, definition HeroDefinition, roll func(int) int) string {
+	growth := statGrowthBase(definition.BonusClicks+upgrade.BonusClicks, definition.BonusCriticalCount+upgrade.BonusCriticalCount, definition.BonusCriticalChancePercent+upgrade.BonusCriticalChancePercent)
 	upgrade.AwakenLevel++
-	if upgrade.PityCounter >= jackpotPityThreshold {
-		upgrade.BonusClicks++
-		upgrade.BonusCriticalChancePercent++
-		upgrade.BonusCriticalCount++
-		upgrade.TraitValue++
-		upgrade.PityCounter = 0
-		return "大奖：点击 +1、暴击率 +1%、暴击 +1、被动 +1", true
-	}
 
-	switch next := roll(100); {
-	case next < 36:
-		upgrade.BonusClicks++
-		upgrade.PityCounter++
-		return "点击 +1", false
-	case next < 58:
-		upgrade.BonusCriticalCount++
-		upgrade.PityCounter++
-		return "暴击 +1", false
-	case next < 73:
-		upgrade.BonusCriticalChancePercent++
-		upgrade.PityCounter++
-		return "暴击率 +1%", false
-	case next < 87:
-		upgrade.TraitValue++
-		upgrade.PityCounter++
-		return "被动 +1", false
-	case next < 99:
-		upgrade.PityCounter++
-		switch roll(6) {
-		case 0:
-			upgrade.BonusClicks++
-			upgrade.BonusCriticalCount++
-			return "点击 +1、暴击 +1", false
-		case 1:
-			upgrade.BonusClicks++
-			upgrade.BonusCriticalChancePercent++
-			return "点击 +1、暴击率 +1%", false
-		case 2:
-			upgrade.BonusClicks++
-			upgrade.TraitValue++
-			return "点击 +1、被动 +1", false
-		case 3:
-			upgrade.BonusCriticalCount++
-			upgrade.BonusCriticalChancePercent++
-			return "暴击 +1、暴击率 +1%", false
-		case 4:
-			upgrade.BonusCriticalCount++
-			upgrade.TraitValue++
-			return "暴击 +1、被动 +1", false
-		default:
-			upgrade.BonusCriticalChancePercent++
-			upgrade.TraitValue++
-			return "暴击率 +1%、被动 +1", false
-		}
+	switch roll(3) {
+	case 0:
+		upgrade.BonusClicks += growth
+		return "点击 +" + strconv.FormatInt(growth, 10)
+	case 1:
+		upgrade.BonusCriticalCount += growth
+		return "暴击 +" + strconv.FormatInt(growth, 10)
 	default:
-		upgrade.BonusClicks++
-		upgrade.BonusCriticalChancePercent++
-		upgrade.BonusCriticalCount++
-		upgrade.TraitValue++
-		upgrade.PityCounter = 0
-		return "大奖：点击 +1、暴击率 +1%、暴击 +1、被动 +1", true
+		upgrade.BonusCriticalChancePercent += criticalChanceGrowthStep
+		return "暴击率 +" + formatPercentage(criticalChanceGrowthStep) + "%"
 	}
 }
 

@@ -1071,6 +1071,7 @@ func TestSaveButtonPersistsTagsAndStarlightEligibility(t *testing.T) {
 func TestGetSnapshotIncludesStarlightAndDropRates(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
+	store.roll = func(int) int { return 99 }
 
 	store.now = func() time.Time {
 		return time.Unix(1713744000, 0)

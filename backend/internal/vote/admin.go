@@ -111,8 +111,9 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 		"name":                          firstNonEmpty(strings.TrimSpace(definition.Name), itemID),
 		"slot":                          strings.TrimSpace(definition.Slot),
 		"bonus_clicks":                  strconv.FormatInt(definition.BonusClicks, 10),
-		"bonus_critical_chance_percent": strconv.Itoa(definition.BonusCriticalChancePercent),
+		"bonus_critical_chance_percent": formatFloatForRedis(definition.BonusCriticalChancePercent),
 		"bonus_critical_count":          strconv.FormatInt(definition.BonusCriticalCount, 10),
+		"enhance_cap":                   strconv.Itoa(definition.EnhanceCap),
 	}
 
 	pipe := s.client.TxPipeline()

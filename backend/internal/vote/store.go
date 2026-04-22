@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"math/rand/v2"
 	"slices"
 	"strconv"
@@ -26,10 +27,12 @@ var ErrSensitiveContent = errors.New("sensitive content")
 var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
 var ErrEquipmentNotEnough = errors.New("equipment not enough")
-var ErrEquipmentMaxStar = errors.New("equipment max star")
+var ErrEquipmentMaxEnhance = errors.New("equipment max enhance")
+var ErrEquipmentMaxStar = ErrEquipmentMaxEnhance
 var ErrHeroNotEnough = errors.New("hero not enough")
 var ErrHeroNotFound = errors.New("hero not found")
 var ErrHeroNotOwned = errors.New("hero not owned")
+var ErrHeroMaxAwaken = errors.New("hero max awaken")
 var ErrGemsNotEnough = errors.New("gems not enough")
 var ErrCosmeticNotFound = errors.New("cosmetic not found")
 var ErrCosmeticAlreadyOwned = errors.New("cosmetic already owned")
@@ -102,22 +105,40 @@ type BossUserStats struct {
 
 // EquipmentDefinition 装备模板
 type EquipmentDefinition struct {
-	ItemID                     string `json:"itemId"`
-	Name                       string `json:"name"`
-	Slot                       string `json:"slot"`
-	BonusClicks                int64  `json:"bonusClicks"`
-	BonusCriticalChancePercent int    `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
+	ItemID                     string  `json:"itemId"`
+	Name                       string  `json:"name"`
+	Slot                       string  `json:"slot"`
+	BonusClicks                int64   `json:"bonusClicks"`
+	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
+	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
+	EnhanceCap                 int     `json:"enhanceCap"`
 }
 
-type HeroTraitType string
+type HeroEffectType string
 
 const (
-	HeroTraitBonusClicks           HeroTraitType = "bonus_clicks"
-	HeroTraitCriticalChancePercent HeroTraitType = "critical_chance_percent"
-	HeroTraitCriticalCountBonus    HeroTraitType = "critical_count_bonus"
-	HeroTraitFinalDamagePercent    HeroTraitType = "final_damage_percent"
+	HeroEffectBonusClicks           HeroEffectType = "bonus_clicks"
+	HeroEffectCriticalChancePercent HeroEffectType = "critical_chance_percent"
+	HeroEffectCriticalCountBonus    HeroEffectType = "critical_count_bonus"
+	HeroEffectFinalDamagePercent    HeroEffectType = "final_damage_percent"
 )
+
+type HeroTraitType = HeroEffectType
+
+const (
+	HeroTraitBonusClicks           = HeroEffectBonusClicks
+	HeroTraitCriticalChancePercent = HeroEffectCriticalChancePercent
+	HeroTraitCriticalCountBonus    = HeroEffectCriticalCountBonus
+	HeroTraitFinalDamagePercent    = HeroEffectFinalDamagePercent
+)
+
+type HeroEffect struct {
+	Type        HeroEffectType `json:"type"`
+	Value       int64          `json:"value"`
+	Params      map[string]any `json:"params,omitempty"`
+	DisplayName string         `json:"displayName,omitempty"`
+	Description string         `json:"description,omitempty"`
+}
 
 // HeroDefinition 小小英雄模板。
 type HeroDefinition struct {
@@ -126,27 +147,34 @@ type HeroDefinition struct {
 	ImagePath                  string        `json:"imagePath,omitempty"`
 	ImageAlt                   string        `json:"imageAlt,omitempty"`
 	BonusClicks                int64         `json:"bonusClicks"`
-	BonusCriticalChancePercent int           `json:"bonusCriticalChancePercent"`
+	BonusCriticalChancePercent float64       `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
-	TraitType                  HeroTraitType `json:"traitType"`
-	TraitValue                 int64         `json:"traitValue"`
+	Effects                    []HeroEffect  `json:"effects,omitempty"`
+	AwakenCap                  int           `json:"awakenCap"`
+	TraitType                  HeroTraitType `json:"traitType,omitempty"`
+	TraitValue                 int64         `json:"traitValue,omitempty"`
 }
 
 // HeroInventoryItem 玩家持有的小小英雄。
 type HeroInventoryItem struct {
-	HeroID                     string        `json:"heroId"`
-	Name                       string        `json:"name"`
-	ImagePath                  string        `json:"imagePath,omitempty"`
-	ImageAlt                   string        `json:"imageAlt,omitempty"`
-	Quantity                   int64         `json:"quantity"`
-	Active                     bool          `json:"active"`
-	AwakenLevel                int           `json:"awakenLevel"`
-	PityCounter                int           `json:"pityCounter"`
-	BonusClicks                int64         `json:"bonusClicks"`
-	BonusCriticalChancePercent int           `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
-	TraitType                  HeroTraitType `json:"traitType"`
-	TraitValue                 int64         `json:"traitValue"`
+	HeroID                          string        `json:"heroId"`
+	Name                            string        `json:"name"`
+	ImagePath                       string        `json:"imagePath,omitempty"`
+	ImageAlt                        string        `json:"imageAlt,omitempty"`
+	Quantity                        int64         `json:"quantity"`
+	Active                          bool          `json:"active"`
+	AwakenLevel                     int           `json:"awakenLevel"`
+	AwakenCap                       int           `json:"awakenCap"`
+	BonusClicks                     int64         `json:"bonusClicks"`
+	BonusClicksDelta                int64         `json:"bonusClicksDelta"`
+	BonusCriticalChancePercent      float64       `json:"bonusCriticalChancePercent"`
+	BonusCriticalChancePercentDelta float64       `json:"bonusCriticalChancePercentDelta"`
+	BonusCriticalCount              int64         `json:"bonusCriticalCount"`
+	BonusCriticalCountDelta         int64         `json:"bonusCriticalCountDelta"`
+	Effects                         []HeroEffect  `json:"effects,omitempty"`
+	PityCounter                     int           `json:"-"` // deprecated: hidden from API
+	TraitType                       HeroTraitType `json:"traitType,omitempty"`
+	TraitValue                      int64         `json:"traitValue,omitempty"`
 }
 
 // Announcement 更新公告
@@ -181,16 +209,21 @@ type MessagePage struct {
 
 // InventoryItem 背包道具
 type InventoryItem struct {
-	ItemID                     string `json:"itemId"`
-	Name                       string `json:"name"`
-	Slot                       string `json:"slot"`
-	Quantity                   int64  `json:"quantity"`
-	StarLevel                  int    `json:"starLevel"`
-	ReforgePityCounter         int    `json:"reforgePityCounter"`
-	BonusClicks                int64  `json:"bonusClicks"`
-	BonusCriticalChancePercent int    `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64  `json:"bonusCriticalCount"`
-	Equipped                   bool   `json:"equipped"`
+	ItemID                          string  `json:"itemId"`
+	Name                            string  `json:"name"`
+	Slot                            string  `json:"slot"`
+	Quantity                        int64   `json:"quantity"`
+	EnhanceLevel                    int     `json:"enhanceLevel"`
+	EnhanceCap                      int     `json:"enhanceCap"`
+	BonusClicks                     int64   `json:"bonusClicks"`
+	BonusClicksDelta                int64   `json:"bonusClicksDelta"`
+	BonusCriticalChancePercent      float64 `json:"bonusCriticalChancePercent"`
+	BonusCriticalChancePercentDelta float64 `json:"bonusCriticalChancePercentDelta"`
+	BonusCriticalCount              int64   `json:"bonusCriticalCount"`
+	BonusCriticalCountDelta         int64   `json:"bonusCriticalCountDelta"`
+	Equipped                        bool    `json:"equipped"`
+	StarLevel                       int     `json:"-"` // deprecated: hidden from API
+	ReforgePityCounter              int     `json:"-"` // deprecated: hidden from API
 }
 
 // Loadout 已穿戴装备
@@ -202,13 +235,13 @@ type Loadout struct {
 
 // CombatStats 当前生效的点击战斗属性
 type CombatStats struct {
-	BaseIncrement         int64 `json:"baseIncrement"`
-	BonusClicks           int64 `json:"bonusClicks"`
-	EffectiveIncrement    int64 `json:"effectiveIncrement"`
-	NormalDamage          int64 `json:"normalDamage"`
-	CriticalDamage        int64 `json:"criticalDamage"`
-	CriticalChancePercent int   `json:"criticalChancePercent"`
-	CriticalCount         int64 `json:"criticalCount"`
+	BaseIncrement         int64   `json:"baseIncrement"`
+	BonusClicks           int64   `json:"bonusClicks"`
+	EffectiveIncrement    int64   `json:"effectiveIncrement"`
+	NormalDamage          int64   `json:"normalDamage"`
+	CriticalDamage        int64   `json:"criticalDamage"`
+	CriticalChancePercent float64 `json:"criticalChancePercent"`
+	CriticalCount         int64   `json:"criticalCount"`
 }
 
 // Reward 最近一次掉落
@@ -228,7 +261,7 @@ type BossLootEntry struct {
 	Weight                     int64   `json:"weight"`
 	DropRatePercent            float64 `json:"dropRatePercent"`
 	BonusClicks                int64   `json:"bonusClicks"`
-	BonusCriticalChancePercent int     `json:"bonusCriticalChancePercent"`
+	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
 }
 
@@ -241,10 +274,11 @@ type BossHeroLootEntry struct {
 	Weight                     int64         `json:"weight"`
 	DropRatePercent            float64       `json:"dropRatePercent"`
 	BonusClicks                int64         `json:"bonusClicks"`
-	BonusCriticalChancePercent int           `json:"bonusCriticalChancePercent"`
+	BonusCriticalChancePercent float64       `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
-	TraitType                  HeroTraitType `json:"traitType"`
-	TraitValue                 int64         `json:"traitValue"`
+	Effects                    []HeroEffect  `json:"effects,omitempty"`
+	TraitType                  HeroTraitType `json:"traitType,omitempty"`
+	TraitValue                 int64         `json:"traitValue,omitempty"`
 }
 
 // StarlightState 描述当前生效的星光卡片窗口。
@@ -1262,7 +1296,8 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 		return delta, false, nil
 	}
 
-	if s.roll(100) < combatStats.CriticalChancePercent {
+	rollLimit, threshold := criticalRollPlan(combatStats.CriticalChancePercent)
+	if s.roll(rollLimit) < threshold {
 		return combatStats.CriticalDamage, true, nil
 	}
 
@@ -1274,12 +1309,12 @@ func (s *Store) combatStatsForNickname(_ context.Context, _ string, loadout Load
 
 	bonusClicks, bonusChance, bonusCount := loadoutBonuses(loadout)
 	stats.BonusClicks = bonusClicks
-	stats.CriticalChancePercent = clampInt(stats.CriticalChancePercent+bonusChance, 0, 100)
+	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+bonusChance, 0, 100)
 	stats.CriticalCount += bonusCount
 
 	heroBonusClicks, heroBonusChance, heroBonusCount, heroFinalDamagePercent := heroBonuses(activeHero)
 	stats.BonusClicks += heroBonusClicks
-	stats.CriticalChancePercent = clampInt(stats.CriticalChancePercent+heroBonusChance, 0, 100)
+	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+heroBonusChance, 0, 100)
 	stats.CriticalCount += heroBonusCount
 
 	return applyFinalDamagePercent(deriveCombatStats(stats), heroFinalDamagePercent), nil
@@ -1289,15 +1324,15 @@ func (s *Store) baseCombatStats() CombatStats {
 	return deriveCombatStats(CombatStats{
 		BaseIncrement:         1,
 		BonusClicks:           0,
-		CriticalChancePercent: clampInt(s.critical.CriticalChancePercent, 0, 100),
+		CriticalChancePercent: clampFloat(float64(s.critical.CriticalChancePercent), 0, 100),
 		CriticalCount:         s.critical.CriticalCount,
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (int64, int, int64) {
+func loadoutBonuses(loadout Loadout) (int64, float64, int64) {
 	items := []*InventoryItem{loadout.Weapon, loadout.Armor, loadout.Accessory}
 	var bonusClicks int64
-	var bonusChance int
+	var bonusChance float64
 	var bonusCount int64
 	for _, item := range items {
 		if item == nil {
@@ -1398,8 +1433,9 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		Name:                       firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
 		Slot:                       strings.TrimSpace(values["slot"]),
 		BonusClicks:                int64FromString(values["bonus_clicks"]),
-		BonusCriticalChancePercent: int(int64FromString(values["bonus_critical_chance_percent"])),
+		BonusCriticalChancePercent: float64FromString(values["bonus_critical_chance_percent"]),
 		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
+		EnhanceCap:                 int(int64FromString(values["enhance_cap"])),
 	}, nil
 }
 
@@ -2177,6 +2213,19 @@ func int64FromString(raw string) int64 {
 	return value
 }
 
+func float64FromString(raw string) float64 {
+	if strings.TrimSpace(raw) == "" {
+		return 0
+	}
+
+	value, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil {
+		return 0
+	}
+
+	return value
+}
+
 func clampInt(value int, min int, max int) int {
 	if value < min {
 		return min
@@ -2185,6 +2234,38 @@ func clampInt(value int, min int, max int) int {
 		return max
 	}
 	return value
+}
+
+func clampFloat(value float64, min float64, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}
+
+func ceilFloat(value float64) float64 {
+	return math.Ceil(value)
+}
+
+func roundToDecimals(value float64, decimals int) float64 {
+	if decimals <= 0 {
+		return math.Round(value)
+	}
+	scale := math.Pow(10, float64(decimals))
+	return math.Round(value*scale) / scale
+}
+
+func criticalRollPlan(chance float64) (int, int) {
+	if chance <= 0 {
+		return 100, 0
+	}
+	if roundToDecimals(chance, 6) == roundToDecimals(chance, 0) {
+		return 100, int(chance)
+	}
+	return 600, int(roundToDecimals(chance*6, 0))
 }
 
 func firstNonEmpty(values ...string) string {

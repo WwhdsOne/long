@@ -73,11 +73,9 @@ func TestCreateMessageAndListMessages(t *testing.T) {
 	}
 }
 
-func TestSynthesizeItemConsumesThreeCopiesAndImprovesStats(t *testing.T) {
+func TestGetStateIgnoresLegacyEquipmentUpgradeFields(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
-
-	store.roll = func(int) int { return 0 }
 
 	ctx := context.Background()
 	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
@@ -88,79 +86,36 @@ func TestSynthesizeItemConsumesThreeCopiesAndImprovesStats(t *testing.T) {
 		t.Fatalf("seed equipment definition: %v", err)
 	}
 	if err := store.client.HSet(ctx, "vote:user-inventory:阿明", map[string]any{
-		"wood-sword": "3",
-	}).Err(); err != nil {
-		t.Fatalf("seed inventory: %v", err)
-	}
-	if err := store.client.HSet(ctx, "vote:user-loadout:阿明", map[string]any{
-		"weapon": "wood-sword",
-	}).Err(); err != nil {
-		t.Fatalf("seed loadout: %v", err)
-	}
-
-	state, err := store.SynthesizeItem(ctx, "阿明", "wood-sword")
-	if err != nil {
-		t.Fatalf("synthesize item: %v", err)
-	}
-
-	if state.Loadout.Weapon == nil {
-		t.Fatal("expected weapon to remain equipped after synthesize")
-	}
-	if state.Loadout.Weapon.Name != "木剑 +1" {
-		t.Fatalf("expected display name 木剑 +1, got %+v", state.Loadout.Weapon)
-	}
-	if state.Loadout.Weapon.StarLevel != 1 {
-		t.Fatalf("expected star level 1, got %+v", state.Loadout.Weapon)
-	}
-	if state.Loadout.Weapon.Quantity != 1 {
-		t.Fatalf("expected quantity 1 after consuming 3 copies, got %+v", state.Loadout.Weapon)
-	}
-	if state.Loadout.Weapon.BonusClicks != 3 {
-		t.Fatalf("expected click bonus 3 after synthesize, got %+v", state.Loadout.Weapon)
-	}
-	if state.CombatStats.NormalDamage != 4 {
-		t.Fatalf("expected normal damage 4 after synthesize, got %+v", state.CombatStats)
-	}
-}
-
-func TestSynthesizeItemAllowsBeyondFormerMaxStar(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	store.roll = func(int) int { return 0 }
-
-	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
-		"name":         "木剑",
-		"slot":         "weapon",
-		"bonus_clicks": "2",
-	}).Err(); err != nil {
-		t.Fatalf("seed equipment definition: %v", err)
-	}
-	if err := store.client.HSet(ctx, "vote:user-inventory:阿明", map[string]any{
-		"wood-sword": "9",
+		"wood-sword": "1",
 	}).Err(); err != nil {
 		t.Fatalf("seed inventory: %v", err)
 	}
 	if err := store.client.HSet(ctx, "vote:user-equip-upgrade:阿明:wood-sword", map[string]any{
-		"star_level": "5",
+		"star_level":                    "9",
+		"bonus_clicks":                  "99",
+		"bonus_critical_chance_percent": "50",
+		"bonus_critical_count":          "99",
+		"reforge_pity_counter":          "30",
 	}).Err(); err != nil {
-		t.Fatalf("seed upgrade: %v", err)
+		t.Fatalf("seed legacy upgrade: %v", err)
 	}
 
-	state, err := store.SynthesizeItem(ctx, "阿明", "wood-sword")
+	state, err := store.GetState(ctx, "阿明")
 	if err != nil {
-		t.Fatalf("expected synthesize to continue beyond old max star, got %v", err)
+		t.Fatalf("get state: %v", err)
 	}
 
 	item := state.Inventory[0]
-	if item.StarLevel != 6 {
-		t.Fatalf("expected star level 6, got %+v", item)
+	if item.EnhanceLevel != 0 {
+		t.Fatalf("expected legacy star level to be ignored, got %+v", item)
 	}
-	if item.Quantity != 7 {
-		t.Fatalf("expected quantity 7 after consuming two extra copies, got %+v", item)
+	if item.BonusClicks != 2 || item.BonusClicksDelta != 0 {
+		t.Fatalf("expected legacy click bonus to be ignored, got %+v", item)
 	}
-	if item.BonusClicks != 3 {
-		t.Fatalf("expected bonus clicks to keep growing after old cap, got %+v", item)
+	if item.BonusCriticalChancePercent != 0 || item.BonusCriticalChancePercentDelta != 0 {
+		t.Fatalf("expected legacy crit chance bonus to be ignored, got %+v", item)
+	}
+	if item.BonusCriticalCount != 0 || item.BonusCriticalCountDelta != 0 {
+		t.Fatalf("expected legacy crit bonus to be ignored, got %+v", item)
 	}
 }

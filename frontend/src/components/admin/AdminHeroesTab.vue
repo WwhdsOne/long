@@ -47,6 +47,7 @@ defineProps({
           <input v-model="heroForm.bonusClicks" class="nickname-form__input" type="number" min="0" placeholder="点击加成" />
           <input v-model="heroForm.bonusCriticalChancePercent" class="nickname-form__input" type="number" min="0" max="100" placeholder="暴击率加成" />
           <input v-model="heroForm.bonusCriticalCount" class="nickname-form__input" type="number" min="0" placeholder="暴击额外加成" />
+          <input v-model="heroForm.awakenCap" class="nickname-form__input" type="number" min="0" placeholder="觉醒上限（0 表示不设上限）" />
           <select v-model="heroForm.traitType" class="nickname-form__input">
             <option value="bonus_clicks">额外点击</option>
             <option value="critical_chance_percent">暴击率</option>
@@ -73,6 +74,7 @@ defineProps({
               <div>
                 <strong>{{ hero.name }}</strong>
                 <p>{{ hero.heroId }}</p>
+                <p>觉醒上限 {{ hero.awakenCap || '未设置' }}</p>
                 <p>{{ formatItemStats(hero) }}</p>
                 <p>{{ formatHeroTrait(hero) }}</p>
               </div>

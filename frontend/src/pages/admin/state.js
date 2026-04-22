@@ -30,6 +30,7 @@ export function emptyEquipmentForm() {
     bonusClicks: '',
     bonusCriticalChancePercent: '',
     bonusCriticalCount: '',
+    enhanceCap: '',
   }
 }
 
@@ -55,6 +56,7 @@ export function emptyHeroForm() {
     bonusClicks: '',
     bonusCriticalChancePercent: '',
     bonusCriticalCount: '',
+    awakenCap: '',
     traitType: 'bonus_clicks',
     traitValue: '',
   }
@@ -132,6 +134,8 @@ export function normalizeLootEntry(entry) {
 }
 
 export function normalizeHeroLootEntry(entry) {
+  const effects = Array.isArray(entry?.effects) ? entry.effects : []
+  const primaryEffect = effects[0] ?? null
   return {
     heroId: entry?.heroId || '',
     heroName: entry?.heroName || '',
@@ -142,12 +146,15 @@ export function normalizeHeroLootEntry(entry) {
     bonusClicks: Number(entry?.bonusClicks ?? 0),
     bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
     bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
-    traitType: entry?.traitType || '',
-    traitValue: Number(entry?.traitValue ?? 0),
+    effects,
+    traitType: primaryEffect?.type || entry?.traitType || '',
+    traitValue: Number(primaryEffect?.value ?? entry?.traitValue ?? 0),
   }
 }
 
 export function normalizeHeroDefinition(entry) {
+  const effects = Array.isArray(entry?.effects) ? entry.effects : []
+  const primaryEffect = effects[0] ?? null
   return {
     heroId: entry?.heroId || '',
     name: entry?.name || '',
@@ -156,8 +163,10 @@ export function normalizeHeroDefinition(entry) {
     bonusClicks: Number(entry?.bonusClicks ?? 0),
     bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
     bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
-    traitType: entry?.traitType || 'bonus_clicks',
-    traitValue: Number(entry?.traitValue ?? 0),
+    awakenCap: Number(entry?.awakenCap ?? 0),
+    effects,
+    traitType: primaryEffect?.type || entry?.traitType || 'bonus_clicks',
+    traitValue: Number(primaryEffect?.value ?? entry?.traitValue ?? 0),
   }
 }
 
@@ -263,22 +272,17 @@ export function normalizePlayerPage(payload) {
 }
 
 export function formatItemStats(item) {
-  return `点击+${item?.bonusClicks ?? 0} 暴击率+${item?.bonusCriticalChancePercent ?? 0}% 暴击+${item?.bonusCriticalCount ?? 0}`
+  const critChance = Number(item?.bonusCriticalChancePercent ?? 0).toFixed(2)
+  return `点击+${item?.bonusClicks ?? 0} 暴击率+${critChance}% 暴击+${item?.bonusCriticalCount ?? 0}`
 }
 
 export function formatHeroTrait(hero) {
-  switch (hero?.traitType) {
-    case 'bonus_clicks':
-      return `被动：额外点击 +${hero?.traitValue ?? 0}`
-    case 'critical_chance_percent':
-      return `被动：暴击率 +${hero?.traitValue ?? 0}%`
-    case 'critical_count_bonus':
-      return `被动：暴击额外 +${hero?.traitValue ?? 0}`
-    case 'final_damage_percent':
-      return `被动：最终伤害 +${hero?.traitValue ?? 0}%`
-    default:
-      return '被动：暂无'
+  const effects = Array.isArray(hero?.effects) ? hero.effects : []
+  if (effects.length === 0) {
+    return '被动：暂无'
   }
+
+  return `被动：${effects.map((effect) => formatHeroEffect(effect)).join(' / ')}`
 }
 
 export function heroImageAlt(hero) {
@@ -296,4 +300,19 @@ export function formatTime(timestamp) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(timestamp * 1000))
+}
+
+function formatHeroEffect(effect) {
+  switch (effect?.type) {
+    case 'bonus_clicks':
+      return `额外点击 +${effect?.value ?? 0}`
+    case 'critical_chance_percent':
+      return `暴击率 +${effect?.value ?? 0}%`
+    case 'critical_count_bonus':
+      return `暴击额外 +${effect?.value ?? 0}`
+    case 'final_damage_percent':
+      return `最终伤害 +${effect?.value ?? 0}%`
+    default:
+      return effect?.displayName || effect?.type || '未知效果'
+  }
 }
