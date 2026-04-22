@@ -1,154 +1,49 @@
-你当前的实现是通过 adaptor.HertzHandler 包装 net/http handler，这只是过渡方案，不符合要求。
+# Purpose
 
-现在必须进行重构：**禁止使用 adaptor，必须改为原生 Hertz handler 实现。**
+`AGENTS.md` 只放长期协作规则，不放一次性开发需求、临时任务单或实现方案。
 
-------
+一次性任务说明写进 `docs/`，不要继续堆进这里。
 
-## 🎯 目标
+# Read Policy
 
-将现有基于 net/http 的 handler：
+先搜索，后读取。
 
-```go
-func(w http.ResponseWriter, r *http.Request)
-```
+先用 `rg --files` 或 `rg -n` 缩小范围，再按需用 `sed -n`、`rg -n`、定点打开文件。
 
-全部重写为 Hertz 原生 handler：
+一次只读当前决策需要的少量文件；读到足够做决定就停止。
 
-```go
-func(ctx context.Context, c *app.RequestContext)
-```
+禁止因为“不确定在哪”而连续展开多个目录、批量通读大量文件或做无目标扫仓库。
 
-------
+# Change Policy
 
-## ❌ 明确禁止
+改动前先说明准备查看哪些入口文件、为什么看它们。
 
-以下内容一律不允许出现：
+只改与当前任务直接相关的文件，不顺手做无关重构、清理或样式统一。
 
-- adaptor.HertzHandler
-- http.ResponseWriter
-- *http.Request
-- 任何 net/http handler 包装
+如果发现相邻问题但不影响当前任务，只记录，不顺手扩散修改。
 
-如果出现，说明没有按要求完成
+# Tool Policy
 
-------
+本仓库内禁止使用 MCP、connector、app 和其他远程集成能力。
 
-## ✅ 必须做到
+默认只用本地 shell、git、仓库文件和本地非破坏性检查。
 
-### 1. 使用 Hertz 原生 API
+优先使用本地命令：`rg`、`sed`、`git`、项目测试命令。
 
-- 路由参数：`c.Param(...)`
-- Query 参数：`c.Query(...)`
-- JSON 解析：`c.Bind(...)` 或 `c.BindAndValidate(...)`
-- JSON 返回：`c.JSON(status, data)`
+# Git Workflow
 
-------
+遇到功能改动、接口改动、权限改动、数据模型改动时，必须先从 `main` 拉出新分支再开始开发。
 
-### 2. Handler 结构必须保持轻量
+禁止直接在 `main` 上做这类开发改动。
 
-禁止在 handler 中写复杂业务逻辑：
+完成后先在功能分支提交，再合并回 `main`；需要推送时，同时推送 `main` 和对应功能分支。
 
-```go
-// ❌ 错误
-func handler(...) {
-    // 大量业务逻辑
-}
-```
+最终说明中明确给出本次功能分支名、功能分支提交和合并后的 `main` 提交。
 
-必须：
+# Task Docs
 
-```go
-// ✅ 正确
-func handler(...) {
-    // 解析参数
-    // 调用 store/service
-    // 返回结果
-}
-```
+一次性任务、设计说明、执行计划、阶段记录统一写入 `docs/`。
 
-------
+新任务文档应使用清晰文件名，优先采用 `YYYY-MM-DD-主题.md` 形式，便于检索和归档。
 
-### 3. 保留现有业务逻辑
-
-必须继续调用：
-
-- options.Store.xxx(...)
-- publishChange(...)
-- 原有错误处理逻辑（errors.Is 判断）
-
-只允许改“HTTP 层”，不允许改业务行为
-
-------
-
-### 4. 错误返回统一使用 c.JSON
-
-例如：
-
-```go
-c.JSON(400, map[string]string{
-    "error": "INVALID_REQUEST",
-})
-```
-
-------
-
-### 5. 示例改造（参考风格）
-
-将：
-
-```go
-var body struct {
-    Nickname string `json:"nickname"`
-}
-if err := sonic.NewDecoder(r.Body).Decode(&body); err != nil {
-    writeJSON(w, 400, ...)
-}
-```
-
-改为：
-
-```go
-var body struct {
-    Nickname string `json:"nickname"`
-}
-if err := c.Bind(&body); err != nil {
-    c.JSON(400, ...)
-    return
-}
-```
-
-------
-
-## 🚀 执行步骤
-
-1. 删除 adaptor 相关代码
-2. 重写所有 handler 为 Hertz 风格
-3. 保持原有接口路径不变
-4. 保持所有返回结构一致
-
-------
-
-## ⚠️ 输出要求
-
-- 必须是多文件结构（不要生成一个巨型文件）
-- handler 按模块拆分（equipment / hero / admin 等）
-- 不允许出现 500 行以上文件
-
-------
-
-请开始重构，并先输出改造 plan（文件拆分 + 路由结构），确认后再写代码。
-
-------
-
-## Git 工作流要求
-
-- 以后遇到这类功能性改动、接口改动、权限改动、数据模型改动时，**必须先从 `main` 拉出一个新分支再开始修改**
-- 禁止直接在 `main` 上做这类开发改动
-- 改完后必须：
-  - 先在功能分支提交完整改动
-  - 再合并回 `main`
-  - 推送 `main` 和本次功能分支
-- 最终输出时需要明确告知：
-  - 本次功能分支名
-  - 合并后的 `main` 提交
-  - 功能分支提交
+不要把临时背景、单次约束或阶段性 TODO 回写到 `AGENTS.md`。
