@@ -1787,21 +1787,12 @@ onBeforeUnmount(() => {
                   <p>装备与英雄都按模板上限成长，每次只提升一个基础属性，并直接返回本次成长结果。</p>
                 </article>
                 <article class="forge-summary">
-                  <span>装备强化规则</span>
+                  <span>强化规则</span>
                   <strong>三项基础属性等概率命中</strong>
                   <p class="forge-summary__tips">
                     <span>仅提升点击 / 暴击 / 暴击率中的一项。</span>
                     <span>{{ GROWTH_FORMULA_TEXT }}。</span>
                     <span>暴击率每次固定 +0.20%。</span>
-                  </p>
-                  <br>
-                  <span>英雄强化规则</span>
-                  <strong>四项基础属性等概率命中</strong>
-                  <p class="forge-summary__tips">
-                    <span>仅提升点击 / 暴击 / 暴击率 / 最终伤害提升百分比中的一项。</span>
-                    <span>{{ HERO_GROWTH_FORMULA_TEXT }}。</span>
-                    <span>暴击率每次固定 +0.20%。</span>
-                    <span>小小英雄额外能力无法使用此手段强化。</span>
                   </p>
                 </article>
               </div>
