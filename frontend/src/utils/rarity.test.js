@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   DEFAULT_RARITY,
+  formatRarityLabel,
   getRarityClassName,
   normalizeRarity,
   splitEquipmentName,
@@ -31,5 +32,10 @@ describe('rarity utils', () => {
     expect(getRarityClassName('传说')).toContain('rarity-text--legendary')
     expect(getRarityClassName('至臻')).toContain('rarity-text--supreme')
     expect(getRarityClassName('至臻')).toContain('rarity-text--animated')
+  })
+
+  it('会输出带字段名的稀有度标签文案', () => {
+    expect(formatRarityLabel('传说')).toBe('稀有度：传说')
+    expect(formatRarityLabel('神话')).toBe('稀有度：普通')
   })
 })

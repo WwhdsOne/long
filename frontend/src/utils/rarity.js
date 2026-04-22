@@ -23,6 +23,10 @@ export function getRarityClassName(value) {
   }
 }
 
+export function formatRarityLabel(value) {
+  return `稀有度：${normalizeRarity(value)}`
+}
+
 export function splitEquipmentName(name) {
   const normalized = String(name || '')
   const match = normalized.match(/^(\p{Extended_Pictographic}\s*)(.+)$/u)

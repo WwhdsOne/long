@@ -18,6 +18,7 @@ describe('PublicPage 稀有度展示', () => {
     expect(pageSource).toContain("from '../utils/rarity'")
     expect(pageSource).toContain('splitEquipmentName')
     expect(pageSource).toContain('getRarityClassName')
+    expect(pageSource).toContain('formatRarityLabel')
   })
 
   it('样式定义了六档稀有度与至臻动态文字效果', () => {

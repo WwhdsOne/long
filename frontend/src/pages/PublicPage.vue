@@ -14,7 +14,7 @@ import {
   salvageableCount,
   summarizeEquippedCosmetics,
 } from '../utils/cosmetics'
-import { getRarityClassName, splitEquipmentName } from '../utils/rarity'
+import { formatRarityLabel, getRarityClassName, splitEquipmentName } from '../utils/rarity'
 import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
@@ -1396,7 +1396,7 @@ onBeforeUnmount(() => {
                 <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
                 <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
               </strong>
-              <p>{{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
+              <p>{{ formatRarityLabel(item.rarity) }} · {{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
               <p>{{ formatEnhanceCap(item.enhanceCap) }}</p>
               <p>{{ formatItemStats(item) }}</p>
             </div>
@@ -1598,6 +1598,7 @@ onBeforeUnmount(() => {
                         <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
                       </strong>
                       <div class="inventory-item__meta">
+                        <span class="inventory-item__chip">{{ formatRarityLabel(item.rarity) }}</span>
                         <span class="inventory-item__chip">类型:{{ item.slot || '未分类' }}</span>
                         <span class="inventory-item__chip">库存:{{ item.quantity }}</span>
                         <span class="inventory-item__chip">强化:{{
@@ -1688,6 +1689,7 @@ onBeforeUnmount(() => {
                     <strong v-else>未穿戴</strong>
                   </div>
                   <ul v-if="loadout.weapon" class="loadout-slot__attrs">
+                    <li>{{ formatRarityLabel(loadout.weapon.rarity) }}</li>
                     <li v-for="line in formatItemStatLines(loadout.weapon)" :key="line">
                       {{ line }}
                     </li>
@@ -1704,6 +1706,7 @@ onBeforeUnmount(() => {
                     <strong v-else>未穿戴</strong>
                   </div>
                   <ul v-if="loadout.armor" class="loadout-slot__attrs">
+                    <li>{{ formatRarityLabel(loadout.armor.rarity) }}</li>
                     <li v-for="line in formatItemStatLines(loadout.armor)" :key="line">
                       {{ line }}
                     </li>
@@ -1720,6 +1723,7 @@ onBeforeUnmount(() => {
                     <strong v-else>未穿戴</strong>
                   </div>
                   <ul v-if="loadout.accessory" class="loadout-slot__attrs">
+                    <li>{{ formatRarityLabel(loadout.accessory.rarity) }}</li>
                     <li v-for="line in formatItemStatLines(loadout.accessory)" :key="line">
                       {{ line }}
                     </li>
@@ -1861,6 +1865,7 @@ onBeforeUnmount(() => {
                         <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
                       </strong>
                       <div class="forge-action-list__meta">
+                        <span>{{ formatRarityLabel(item.rarity) }}</span>
                         <span>可分解 {{ salvageableEquipmentCount(item) }} 件</span>
                         <span>强化 {{ item.enhanceLevel || 0 }} / {{ item.enhanceCap || '∞' }}</span>
                         <span>每次 {{ EQUIPMENT_ENHANCE_COST }} 原石</span>
@@ -2023,7 +2028,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                       <strong>{{ item.name }}</strong>
-                      <p>{{ item.rarity }} · 轨迹 · {{ cosmeticStatusText(item) }}</p>
+                      <p>{{ formatRarityLabel(item.rarity) }} · 轨迹 · {{ cosmeticStatusText(item) }}</p>
                     </div>
                     <div class="inventory-item__actions">
                       <button
@@ -2070,7 +2075,7 @@ onBeforeUnmount(() => {
                     </div>
                     <div>
                       <strong>{{ item.name }}</strong>
-                      <p>{{ item.rarity }} · 点击特效 · {{ cosmeticStatusText(item) }}</p>
+                      <p>{{ formatRarityLabel(item.rarity) }} · 点击特效 · {{ cosmeticStatusText(item) }}</p>
                     </div>
                     <div class="inventory-item__actions">
                       <button
@@ -2148,7 +2153,7 @@ onBeforeUnmount(() => {
                         <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
                         <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
                       </strong>
-                      <p>{{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
+                      <p>{{ formatRarityLabel(item.rarity) }} · {{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
                       <p>{{ formatEnhanceCap(item.enhanceCap) }}</p>
                       <p>{{ formatItemStats(item) }}</p>
                     </div>
