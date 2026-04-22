@@ -1133,6 +1133,10 @@ select {
   height: 84px;
 }
 
+.inventory-item__hero-meta{
+  font-size: 12px;
+}
+
 .player-hud__hero-active {
   display: flex;
   justify-content: center;

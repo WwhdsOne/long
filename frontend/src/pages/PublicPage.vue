@@ -1425,7 +1425,7 @@ onBeforeUnmount(() => {
                   :src="hero.imagePath"
                   :alt="heroImageAlt(hero)"
               />
-              <div>
+              <div class="inventory-item__hero-meta">
                 <strong>{{ hero.heroName || hero.heroId }}</strong>
                 <p>掉落概率 {{ formatDropRate(hero.dropRatePercent) }}</p>
                 <p>{{ formatAwakenCap(hero.awakenCap) }}</p>
