@@ -11,6 +11,10 @@ import (
 	"long/internal/vote"
 )
 
+type bossResourceReader interface {
+	GetBossResources(context.Context) (vote.BossResources, error)
+}
+
 func registerPublicRoutes(router route.IRouter, options Options, stateView StateView) {
 	router.GET("/api/health", func(_ context.Context, c *app.RequestContext) {
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
@@ -27,6 +31,21 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 		}
 
 		writeJSON(c, consts.StatusOK, state)
+	})
+
+	router.GET("/api/buttons/pages", func(ctx context.Context, c *app.RequestContext) {
+		page, pageSize, ok := parsePublicPageParams(c)
+		if !ok {
+			return
+		}
+
+		result, err := options.Store.ListButtonsPage(ctx, page, pageSize)
+		if err != nil {
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BUTTON_PAGE_FETCH_FAILED"})
+			return
+		}
+
+		writeJSON(c, consts.StatusOK, result)
 	})
 
 	router.GET("/api/shop", func(ctx context.Context, c *app.RequestContext) {
@@ -55,6 +74,21 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 		}
 
 		writeJSON(c, consts.StatusOK, history)
+	})
+
+	router.GET("/api/boss/resources", func(ctx context.Context, c *app.RequestContext) {
+		reader := bossResourceReader(options.Store)
+		if cachedReader, ok := stateView.(bossResourceReader); ok {
+			reader = cachedReader
+		}
+
+		resources, err := reader.GetBossResources(ctx)
+		if err != nil {
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_RESOURCES_FETCH_FAILED"})
+			return
+		}
+
+		writeJSON(c, consts.StatusOK, resources)
 	})
 
 	router.GET("/api/announcements/latest", func(ctx context.Context, c *app.RequestContext) {

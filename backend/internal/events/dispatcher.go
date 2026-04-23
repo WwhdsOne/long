@@ -31,6 +31,11 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change vote.StateChange) 
 		if err != nil {
 			return err
 		}
+		if change.Type == vote.StateChangeBossChanged {
+			if _, err := d.cache.RefreshBossResources(ctx); err != nil {
+				return err
+			}
+		}
 		if err := d.hub.BroadcastPublic(snapshot); err != nil {
 			return err
 		}

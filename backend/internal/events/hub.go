@@ -23,6 +23,7 @@ const (
 type StateReader interface {
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	GetUserState(context.Context, string) (vote.UserState, error)
+	GetBossResources(context.Context) (vote.BossResources, error)
 }
 
 // ServerEvent 是发往浏览器的一条 SSE 事件。

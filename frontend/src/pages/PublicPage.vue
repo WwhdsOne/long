@@ -20,6 +20,7 @@ import {createRealtimeTransport} from '../utils/realtimeTransport'
 import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
+const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
 const AUTO_CLICK_RATE_LABEL = `每秒约 ${Math.round(1000 / AUTO_CLICK_INTERVAL_MS)} 次`
 const EQUIPMENT_ENHANCE_COST = 10
 const HERO_AWAKEN_COST = 15
@@ -28,12 +29,19 @@ const HERO_GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点�
 
 
 const buttons = ref([])
+const firstPageButtons = ref([])
+const buttonPage = ref(1)
+const buttonPageSize = ref(9)
+const buttonTotalPages = ref(1)
+const buttonTotalCount = ref(0)
+const buttonTotalVotes = ref(0)
 const leaderboard = ref([])
 const boss = ref(null)
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
 const bossHeroLoot = ref([])
 const starlight = ref({activeKeys: [], startedAt: 0, endsAt: 0})
+const announcementVersion = ref('')
 const latestAnnouncement = ref(null)
 const announcements = ref([])
 const myBossStats = ref(null)
@@ -67,6 +75,8 @@ const buttonSearch = ref('')
 const loadingAnnouncements = ref(false)
 const announcementsLoaded = ref(false)
 const announcementError = ref('')
+const loadingBossResources = ref(false)
+const latestAnnouncementLoaded = ref(false)
 const announcementModalOpen = ref(false)
 const messages = ref([])
 const messageNextCursor = ref('')
@@ -88,13 +98,14 @@ let realtimeTransport
 let autoClickLoop
 let starlightTimer = 0
 let lastExpiredStarlightEndsAt = 0
+let lastBossResourceVersion = ''
 const burstTimers = new Map()
 const cosmeticTimers = new Map()
 const pendingClickSources = new Map()
 
-const buttonCount = computed(() => buttons.value.length)
+const buttonCount = computed(() => buttonTotalCount.value || buttons.value.length)
 const totalVotes = computed(() =>
-    buttons.value.reduce((total, button) => total + button.count, 0),
+    buttonTotalVotes.value || buttons.value.reduce((total, button) => total + button.count, 0),
 )
 const buttonTags = computed(() => ['全部', ...collectButtonTags(buttons.value)])
 const activeStarlightKeys = computed(() => starlight.value?.activeKeys ?? [])
@@ -457,6 +468,93 @@ async function readErrorMessage(response, fallback) {
   return fallback
 }
 
+function normalizePageNumber(value, fallback = 1) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
+  return Math.floor(parsed)
+}
+
+function updateCurrentPageButtons(nextButtons) {
+  buttons.value = Array.isArray(nextButtons) ? nextButtons : []
+  if (!buttonTags.value.includes(selectedButtonTag.value)) {
+    selectedButtonTag.value = '全部'
+  }
+  syncAutoClickTarget()
+}
+
+function applyButtonPagePayload(payload, options = {}) {
+  if (!payload || typeof payload !== 'object') {
+    return
+  }
+
+  const nextButtons = Array.isArray(payload.buttons)
+      ? payload.buttons
+      : Array.isArray(payload.items)
+          ? payload.items
+          : []
+  const nextPage = normalizePageNumber(payload.buttonPage ?? payload.page, options.defaultPage ?? 1)
+  const nextPageSize = normalizePageNumber(payload.buttonPageSize ?? payload.pageSize, buttonPageSize.value || 9)
+  const nextTotalPages = normalizePageNumber(payload.buttonTotalPages ?? payload.totalPages, buttonTotalPages.value || 1)
+  const nextTotal = Number(payload.buttonTotal ?? payload.total ?? nextButtons.length)
+  const nextTotalVotes = Number(payload.totalVotes ?? buttonTotalVotes.value)
+
+  buttonPageSize.value = nextPageSize
+  buttonTotalPages.value = Math.max(1, nextTotalPages)
+  buttonTotalCount.value = Number.isFinite(nextTotal) ? nextTotal : nextButtons.length
+  buttonTotalVotes.value = Number.isFinite(nextTotalVotes) ? nextTotalVotes : buttonTotalVotes.value
+
+  if (nextPage === 1) {
+    firstPageButtons.value = nextButtons
+  }
+
+  if (options.preserveCurrentPage && buttonPage.value !== nextPage) {
+    return
+  }
+
+  buttonPage.value = nextPage
+  updateCurrentPageButtons(nextButtons)
+}
+
+function bossResourceVersion(value = boss.value) {
+  if (!value?.id) {
+    return ''
+  }
+  return `${value.id}:${value.status || ''}`
+}
+
+function readCachedLatestAnnouncement() {
+  try {
+    const raw = window.localStorage.getItem(ANNOUNCEMENT_CACHE_KEY)
+    if (!raw) {
+      return null
+    }
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || !parsed.id) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeCachedLatestAnnouncement(item) {
+  if (!item?.id) {
+    window.localStorage.removeItem(ANNOUNCEMENT_CACHE_KEY)
+    return
+  }
+  window.localStorage.setItem(ANNOUNCEMENT_CACHE_KEY, JSON.stringify(item))
+}
+
+function restoreCachedLatestAnnouncement() {
+  const cached = readCachedLatestAnnouncement()
+  if (cached?.id) {
+    latestAnnouncement.value = cached
+  }
+}
+
 function maybePromptAnnouncement() {
   if (!latestAnnouncement.value?.id) {
     return
@@ -473,6 +571,78 @@ function closeAnnouncementModal() {
     window.localStorage.setItem(ANNOUNCEMENT_READ_KEY, latestAnnouncement.value.id)
   }
   announcementModalOpen.value = false
+}
+
+async function loadBossResources(force = false) {
+  const currentVersion = bossResourceVersion()
+  if (!currentVersion) {
+    bossLoot.value = []
+    bossHeroLoot.value = []
+    lastBossResourceVersion = ''
+    return
+  }
+  if (loadingBossResources.value) {
+    return
+  }
+  if (!force && lastBossResourceVersion === currentVersion) {
+    return
+  }
+
+  loadingBossResources.value = true
+  try {
+    const response = await fetch('/api/boss/resources')
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, 'Boss 掉落池加载失败'))
+    }
+    const payload = await response.json()
+    bossLoot.value = Array.isArray(payload?.bossLoot) ? payload.bossLoot : []
+    bossHeroLoot.value = Array.isArray(payload?.bossHeroLoot) ? payload.bossHeroLoot : []
+    lastBossResourceVersion = currentVersion
+  } catch {
+    if (force) {
+      bossLoot.value = []
+      bossHeroLoot.value = []
+    }
+  } finally {
+    loadingBossResources.value = false
+  }
+}
+
+async function loadLatestAnnouncement(force = false) {
+  if (!announcementVersion.value) {
+    latestAnnouncement.value = null
+    latestAnnouncementLoaded.value = true
+    writeCachedLatestAnnouncement(null)
+    announcementModalOpen.value = false
+    return
+  }
+
+  const cached = readCachedLatestAnnouncement()
+  if (cached?.id === announcementVersion.value) {
+    latestAnnouncement.value = cached
+    if (!force && latestAnnouncementLoaded.value) {
+      maybePromptAnnouncement()
+      return
+    }
+  }
+
+  try {
+    const response = await fetch('/api/announcements/latest')
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '最新公告加载失败'))
+    }
+    const payload = await response.json()
+    latestAnnouncement.value = payload?.id ? payload : null
+    latestAnnouncementLoaded.value = true
+    writeCachedLatestAnnouncement(latestAnnouncement.value)
+    maybePromptAnnouncement()
+  } catch {
+    if (cached?.id === announcementVersion.value) {
+      latestAnnouncement.value = cached
+      latestAnnouncementLoaded.value = true
+      maybePromptAnnouncement()
+    }
+  }
 }
 
 async function loadAnnouncements(force = false) {
@@ -639,34 +809,61 @@ function applyPublicState(payload) {
   }
 
   if ('buttons' in payload) {
-    buttons.value = Array.isArray(payload.buttons) ? payload.buttons : []
-    if (!buttonTags.value.includes(selectedButtonTag.value)) {
-      selectedButtonTag.value = '全部'
+    applyButtonPagePayload(payload, { defaultPage: 1, preserveCurrentPage: true })
+    if (buttonPage.value > buttonTotalPages.value) {
+      void loadButtonPage(buttonTotalPages.value)
     }
-    syncAutoClickTarget()
+  } else {
+    if ('buttonPage' in payload) {
+      buttonPage.value = normalizePageNumber(payload.buttonPage, buttonPage.value)
+    }
+    if ('buttonPageSize' in payload) {
+      buttonPageSize.value = normalizePageNumber(payload.buttonPageSize, buttonPageSize.value || 9)
+    }
+    if ('buttonTotalPages' in payload) {
+      buttonTotalPages.value = normalizePageNumber(payload.buttonTotalPages, buttonTotalPages.value || 1)
+    }
+    if ('buttonTotal' in payload) {
+      buttonTotalCount.value = Number(payload.buttonTotal ?? buttonTotalCount.value)
+    }
+    if ('totalVotes' in payload) {
+      buttonTotalVotes.value = Number(payload.totalVotes ?? buttonTotalVotes.value)
+    }
   }
   if ('leaderboard' in payload) {
     leaderboard.value = Array.isArray(payload.leaderboard) ? payload.leaderboard : []
   }
+  const previousBoss = boss.value
   if ('boss' in payload) {
     boss.value = mergeBossState(boss.value, payload.boss)
   }
   if ('bossLeaderboard' in payload) {
     bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
   }
-  if ('bossLoot' in payload) {
-    bossLoot.value = Array.isArray(payload.bossLoot) ? payload.bossLoot : []
-  }
-  if ('bossHeroLoot' in payload) {
-    bossHeroLoot.value = Array.isArray(payload.bossHeroLoot) ? payload.bossHeroLoot : []
-  }
   if ('starlight' in payload) {
     starlight.value = payload.starlight ?? {activeKeys: [], startedAt: 0, endsAt: 0}
     scheduleStarlightRefresh()
   }
-  if ('latestAnnouncement' in payload) {
-    latestAnnouncement.value = payload.latestAnnouncement ?? null
-    maybePromptAnnouncement()
+  if ('announcementVersion' in payload) {
+    const nextVersion = String(payload.announcementVersion || '').trim()
+    const versionChanged = announcementVersion.value !== nextVersion
+    announcementVersion.value = nextVersion
+    if (versionChanged) {
+      latestAnnouncementLoaded.value = false
+    }
+    if (!nextVersion) {
+      latestAnnouncement.value = null
+      latestAnnouncementLoaded.value = true
+      writeCachedLatestAnnouncement(null)
+      announcementModalOpen.value = false
+    } else if (versionChanged || !latestAnnouncementLoaded.value) {
+      void loadLatestAnnouncement(versionChanged)
+    }
+  }
+  if (bossResourceVersion(previousBoss) !== bossResourceVersion()) {
+    void loadBossResources(true)
+  } else if (boss.value?.id && !lastBossResourceVersion) {
+    void loadBossResources(true)
   }
   syncing.value = false
   markUpdated()
@@ -735,8 +932,14 @@ function applyClickResult(payload) {
             ? {...button, ...payload.button}
             : button,
     )
+    firstPageButtons.value = firstPageButtons.value.map((button) =>
+        button.key === payload.button.key
+            ? {...button, ...payload.button}
+            : button,
+    )
     syncAutoClickTarget()
   }
+  buttonTotalVotes.value = Math.max(0, buttonTotalVotes.value + Number(payload.delta || 0))
   const nextClickState = mergeClickFallbackState(
     {
       userStats: userStats.value,
@@ -772,8 +975,6 @@ function clearUserRealtimeState() {
   shopCatalog.value = []
   lastForgeResult.value = null
   myBossStats.value = null
-  bossLoot.value = []
-  bossHeroLoot.value = []
   recentRewards.value = []
   lastReward.value = null
 }
@@ -949,6 +1150,29 @@ function triggerCosmeticBurst(key, options = {}) {
 
 function currentNicknameQuery() {
   return ''
+}
+
+async function loadButtonPage(page) {
+  const nextPage = normalizePageNumber(page, 1)
+  if (nextPage === 1 && firstPageButtons.value.length > 0) {
+    buttonPage.value = 1
+    updateCurrentPageButtons(firstPageButtons.value)
+    return
+  }
+
+  syncing.value = true
+  try {
+    const response = await fetch(`/api/buttons/pages?page=${nextPage}&pageSize=${buttonPageSize.value || 9}`)
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '按钮分页加载失败'))
+    }
+    const payload = await response.json()
+    applyButtonPagePayload(payload, { defaultPage: nextPage })
+  } catch (error) {
+    errorMessage.value = error.message || '按钮分页加载失败'
+  } finally {
+    syncing.value = false
+  }
 }
 
 function stopAutoClick() {
@@ -1326,6 +1550,7 @@ async function loadPlayerSession() {
 }
 
 onMounted(async () => {
+  restoreCachedLatestAnnouncement()
   await loadPlayerSession()
   connectRealtime(nickname.value)
 })
@@ -2440,6 +2665,9 @@ onBeforeUnmount(() => {
                 {{ tag }}
               </button>
             </div>
+            <p class="vote-stage__hint">
+              当前第 {{ buttonPage }} / {{ buttonTotalPages }} 页，搜索和标签只筛当前页。
+            </p>
           </div>
 
           <div v-if="displayedButtons.length === 0" class="feedback-panel">
@@ -2523,6 +2751,26 @@ onBeforeUnmount(() => {
               <strong v-else class="vote-card__label">{{ button.label }}</strong>
 
               <span class="vote-card__count">{{ button.count }}</span>
+            </button>
+          </div>
+
+          <div v-if="buttonTotalPages > 1" class="inventory-item__actions">
+            <button
+                class="nickname-form__ghost"
+                type="button"
+                :disabled="buttonPage <= 1"
+                @click="loadButtonPage(buttonPage - 1)"
+            >
+              上一页
+            </button>
+            <span>第 {{ buttonPage }} / {{ buttonTotalPages }} 页</span>
+            <button
+                class="nickname-form__ghost"
+                type="button"
+                :disabled="buttonPage >= buttonTotalPages"
+                @click="loadButtonPage(buttonPage + 1)"
+            >
+              下一页
             </button>
           </div>
         </div>

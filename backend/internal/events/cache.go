@@ -10,11 +10,13 @@ import (
 
 // Cache 在进程内缓存公共快照与个人态，避免每次推送都回源 Redis 聚合。
 type Cache struct {
-	reader        StateReader
-	mu            sync.RWMutex
-	snapshot      vote.Snapshot
-	snapshotReady bool
-	users         map[string]vote.UserState
+	reader              StateReader
+	mu                  sync.RWMutex
+	snapshot            vote.Snapshot
+	snapshotReady       bool
+	bossResources       vote.BossResources
+	bossResourcesReady  bool
+	users               map[string]vote.UserState
 }
 
 // NewCache 创建一个可作为只读视图使用的状态缓存。
@@ -48,9 +50,46 @@ func (c *Cache) RefreshSnapshot(ctx context.Context) (vote.Snapshot, error) {
 	c.mu.Lock()
 	c.snapshot = snapshot
 	c.snapshotReady = true
+	if snapshot.Boss == nil {
+		c.bossResources = vote.BossResources{
+			BossLoot:     []vote.BossLootEntry{},
+			BossHeroLoot: []vote.BossHeroLootEntry{},
+		}
+		c.bossResourcesReady = true
+	} else if c.bossResources.BossID != snapshot.Boss.ID {
+		c.bossResourcesReady = false
+	}
 	c.mu.Unlock()
 
 	return snapshot, nil
+}
+
+// GetBossResources 返回当前 Boss 的低频公共资源；未命中时回源加载。
+func (c *Cache) GetBossResources(ctx context.Context) (vote.BossResources, error) {
+	c.mu.RLock()
+	if c.bossResourcesReady {
+		resources := c.bossResources
+		c.mu.RUnlock()
+		return resources, nil
+	}
+	c.mu.RUnlock()
+
+	return c.RefreshBossResources(ctx)
+}
+
+// RefreshBossResources 强制回源刷新 Boss 低频资源。
+func (c *Cache) RefreshBossResources(ctx context.Context) (vote.BossResources, error) {
+	resources, err := c.reader.GetBossResources(ctx)
+	if err != nil {
+		return vote.BossResources{}, err
+	}
+
+	c.mu.Lock()
+	c.bossResources = resources
+	c.bossResourcesReady = true
+	c.mu.Unlock()
+
+	return resources, nil
 }
 
 // GetUserState 返回指定昵称的个人态；未命中时回源加载。

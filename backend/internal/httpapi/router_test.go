@@ -17,8 +17,11 @@ import (
 
 type mockStore struct {
 	state                  vote.State
+	snapshot               vote.Snapshot
 	equipState             vote.State
 	adminState             vote.AdminState
+	buttonPage             vote.ButtonPage
+	bossResources          vote.BossResources
 	adminButtonPage        vote.AdminButtonPage
 	adminEquipmentPage     vote.AdminEquipmentPage
 	adminBossHistoryPage   vote.AdminBossHistoryPage
@@ -64,6 +67,9 @@ func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, er
 	if m.getStateErr != nil {
 		return vote.State{}, m.getStateErr
 	}
+	if len(m.snapshot.Buttons) > 0 || len(m.snapshot.Leaderboard) > 0 || m.snapshot.Boss != nil || m.snapshot.AnnouncementVersion != "" {
+		return vote.ComposeState(m.snapshot, m.userStateForNickname(nickname)), nil
+	}
 	state := m.state
 	if nickname == "" {
 		state.UserStats = nil
@@ -72,23 +78,38 @@ func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, er
 }
 
 func (m *mockStore) GetSnapshot(_ context.Context) (vote.Snapshot, error) {
+	if len(m.snapshot.Buttons) > 0 || len(m.snapshot.Leaderboard) > 0 || m.snapshot.Boss != nil || m.snapshot.AnnouncementVersion != "" {
+		return m.snapshot, nil
+	}
 	return vote.Snapshot{
 		Buttons:     m.state.Buttons,
 		Leaderboard: m.state.Leaderboard,
 	}, nil
 }
 
+func (m *mockStore) ListButtonsPage(_ context.Context, _ int64, _ int64) (vote.ButtonPage, error) {
+	return m.buttonPage, nil
+}
+
+func (m *mockStore) GetBossResources(_ context.Context) (vote.BossResources, error) {
+	return m.bossResources, nil
+}
+
 func (m *mockStore) GetUserState(_ context.Context, nickname string) (vote.UserState, error) {
 	if m.getStateErr != nil {
 		return vote.UserState{}, m.getStateErr
 	}
+	return m.userStateForNickname(nickname), nil
+}
+
+func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	userState := vote.UserState{
 		Inventory:   []vote.InventoryItem{},
 		Loadout:     vote.Loadout{},
 		CombatStats: vote.CombatStats{},
 	}
 	if nickname == "" {
-		return userState, nil
+		return userState
 	}
 
 	userState.UserStats = m.state.UserStats
@@ -97,7 +118,7 @@ func (m *mockStore) GetUserState(_ context.Context, nickname string) (vote.UserS
 	userState.Loadout = m.state.Loadout
 	userState.CombatStats = m.state.CombatStats
 	userState.LastReward = m.state.LastReward
-	return userState, nil
+	return userState
 }
 
 func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
@@ -449,6 +470,36 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 					BonusCriticalChancePercent: 2,
 				},
 			},
+			LatestAnnouncement: &vote.Announcement{
+				ID:          "7",
+				Title:       "更新公告",
+				Content:     "公告正文",
+				PublishedAt: 1710000000,
+				Active:      true,
+			},
+		},
+		snapshot: vote.Snapshot{
+			Buttons: []vote.Button{
+				{
+					Key:      "feel",
+					RedisKey: "vote:button:feel",
+					Label:    "有感觉吗",
+					Count:    2,
+					Sort:     10,
+					Enabled:  true,
+				},
+			},
+			Leaderboard: []vote.LeaderboardEntry{
+				{Rank: 1, Nickname: "阿明", ClickCount: 9},
+			},
+			Boss: &vote.Boss{
+				ID:        "slime-king",
+				Name:      "史莱姆王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 80,
+			},
+			AnnouncementVersion: "7",
 		},
 	}
 	broadcaster := &mockBroadcaster{}
@@ -466,27 +517,73 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 		t.Fatalf("expected 200, got %d", response.Code)
 	}
 
-	var payload struct {
-		Buttons     []vote.Button           `json:"buttons"`
-		Leaderboard []vote.LeaderboardEntry `json:"leaderboard"`
-		BossLoot    []vote.BossLootEntry    `json:"bossLoot"`
-	}
+	var payload map[string]any
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if len(payload.Buttons) != 1 || payload.Buttons[0].Count != 2 {
-		t.Fatalf("unexpected buttons payload: %+v", payload.Buttons)
+	buttons, ok := payload["buttons"].([]any)
+	if !ok || len(buttons) != 1 {
+		t.Fatalf("unexpected buttons payload: %+v", payload["buttons"])
 	}
-	if len(payload.Leaderboard) != 1 || payload.Leaderboard[0].Nickname != "阿明" {
-		t.Fatalf("unexpected leaderboard payload: %+v", payload.Leaderboard)
+	leaderboard, ok := payload["leaderboard"].([]any)
+	if !ok || len(leaderboard) != 1 {
+		t.Fatalf("unexpected leaderboard payload: %+v", payload["leaderboard"])
 	}
-	if len(payload.BossLoot) != 1 || payload.BossLoot[0].ItemID != "cloth-armor" || payload.BossLoot[0].BonusClicks != 1 {
-		t.Fatalf("unexpected boss loot payload: %+v", payload.BossLoot)
+	if payload["announcementVersion"] != "7" {
+		t.Fatalf("unexpected announcement version payload: %+v", payload)
+	}
+	if _, exists := payload["bossLoot"]; exists {
+		t.Fatalf("expected public buttons payload to omit bossLoot, got %+v", payload)
+	}
+	if _, exists := payload["bossHeroLoot"]; exists {
+		t.Fatalf("expected public buttons payload to omit bossHeroLoot, got %+v", payload)
+	}
+	if _, exists := payload["latestAnnouncement"]; exists {
+		t.Fatalf("expected public buttons payload to omit latestAnnouncement, got %+v", payload)
 	}
 
 	if len(broadcaster.snapshots) != 0 {
 		t.Fatalf("expected no broadcasts, got %d", len(broadcaster.snapshots))
+	}
+}
+
+func TestGetButtonPagesReturnsRequestedPage(t *testing.T) {
+	store := &mockStore{
+		buttonPage: vote.ButtonPage{
+			Items: []vote.Button{
+				{Key: "normal-d", Label: "普通 D", Count: 4, Enabled: true},
+				{Key: "normal-e", Label: "普通 E", Count: 5, Enabled: true},
+			},
+			Page:       2,
+			PageSize:   9,
+			Total:      11,
+			TotalPages: 2,
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/buttons/pages?page=2&pageSize=9", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload vote.ButtonPage
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Page != 2 || payload.PageSize != 9 || payload.Total != 11 || payload.TotalPages != 2 {
+		t.Fatalf("unexpected button page payload: %+v", payload)
+	}
+	if len(payload.Items) != 2 || payload.Items[0].Key != "normal-d" {
+		t.Fatalf("unexpected button page items: %+v", payload.Items)
 	}
 }
 
@@ -569,6 +666,57 @@ func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 	}
 	if payload.ID != "7" || payload.Title != "更新公告" {
 		t.Fatalf("unexpected latest announcement payload: %+v", payload)
+	}
+}
+
+func TestGetBossResourcesReturnsPayload(t *testing.T) {
+	store := &mockStore{
+		bossResources: vote.BossResources{
+			BossID:     "dragon-1",
+			TemplateID: "dragon",
+			Status:     "active",
+			BossLoot: []vote.BossLootEntry{
+				{
+					ItemID:          "cloth-armor",
+					ItemName:        "布甲",
+					DropRatePercent: 75,
+				},
+			},
+			BossHeroLoot: []vote.BossHeroLootEntry{
+				{
+					HeroID:          "slime",
+					HeroName:        "史莱姆勇者",
+					DropRatePercent: 25,
+				},
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/boss/resources", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload vote.BossResources
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.BossID != "dragon-1" || payload.TemplateID != "dragon" || payload.Status != "active" {
+		t.Fatalf("unexpected boss resource meta: %+v", payload)
+	}
+	if len(payload.BossLoot) != 1 || payload.BossLoot[0].ItemID != "cloth-armor" {
+		t.Fatalf("unexpected boss loot payload: %+v", payload.BossLoot)
+	}
+	if len(payload.BossHeroLoot) != 1 || payload.BossHeroLoot[0].HeroID != "slime" {
+		t.Fatalf("unexpected boss hero loot payload: %+v", payload.BossHeroLoot)
 	}
 }
 
@@ -890,7 +1038,7 @@ func TestClickButtonPublishesStateChangeWithoutRefetchingState(t *testing.T) {
 	if len(changePublisher.changes) != 1 {
 		t.Fatalf("expected one published change, got %+v", changePublisher.changes)
 	}
-	if changePublisher.changes[0].Type != vote.StateChangeButtonClicked || changePublisher.changes[0].Nickname != "阿明" {
+	if changePublisher.changes[0].Type != vote.StateChangeBossChanged || changePublisher.changes[0].Nickname != "阿明" {
 		t.Fatalf("unexpected published change: %+v", changePublisher.changes[0])
 	}
 	if !changePublisher.changes[0].BroadcastUserAll {

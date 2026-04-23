@@ -34,8 +34,12 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 			return
 		}
 
+		changeType := vote.StateChangeButtonClicked
+		if result.BroadcastUserAll {
+			changeType = vote.StateChangeBossChanged
+		}
 		change := vote.StateChange{
-			Type:      vote.StateChangeButtonClicked,
+			Type:      changeType,
 			Nickname:  resolvedNickname,
 			Timestamp: time.Now().Unix(),
 		}

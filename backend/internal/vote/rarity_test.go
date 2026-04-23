@@ -101,23 +101,23 @@ func TestGetStateAndSnapshotExposeRarityAndGrowthCaps(t *testing.T) {
 		t.Fatalf("expected inventory rarity 至臻, got %q", state.Inventory[0].Rarity)
 	}
 
-	snapshot, err := store.GetSnapshot(ctx)
+	resources, err := store.GetBossResources(ctx)
 	if err != nil {
-		t.Fatalf("get snapshot: %v", err)
+		t.Fatalf("get boss resources: %v", err)
 	}
-	if len(snapshot.BossLoot) != 1 {
-		t.Fatalf("expected 1 boss loot item, got %d", len(snapshot.BossLoot))
+	if len(resources.BossLoot) != 1 {
+		t.Fatalf("expected 1 boss loot item, got %d", len(resources.BossLoot))
 	}
-	if snapshot.BossLoot[0].Rarity != "至臻" {
-		t.Fatalf("expected boss loot rarity 至臻, got %q", snapshot.BossLoot[0].Rarity)
+	if resources.BossLoot[0].Rarity != "至臻" {
+		t.Fatalf("expected boss loot rarity 至臻, got %q", resources.BossLoot[0].Rarity)
 	}
-	if snapshot.BossLoot[0].EnhanceCap != 7 {
-		t.Fatalf("expected enhance cap 7, got %d", snapshot.BossLoot[0].EnhanceCap)
+	if resources.BossLoot[0].EnhanceCap != 7 {
+		t.Fatalf("expected enhance cap 7, got %d", resources.BossLoot[0].EnhanceCap)
 	}
-	if len(snapshot.BossHeroLoot) != 1 {
-		t.Fatalf("expected 1 boss hero loot item, got %d", len(snapshot.BossHeroLoot))
+	if len(resources.BossHeroLoot) != 1 {
+		t.Fatalf("expected 1 boss hero loot item, got %d", len(resources.BossHeroLoot))
 	}
-	if snapshot.BossHeroLoot[0].AwakenCap != 5 {
-		t.Fatalf("expected awaken cap 5, got %d", snapshot.BossHeroLoot[0].AwakenCap)
+	if resources.BossHeroLoot[0].AwakenCap != 5 {
+		t.Fatalf("expected awaken cap 5, got %d", resources.BossHeroLoot[0].AwakenCap)
 	}
 }

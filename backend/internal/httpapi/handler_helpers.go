@@ -180,3 +180,28 @@ func parseAdminPageParams(c *app.RequestContext) (int64, int64, bool) {
 
 	return page, pageSize, true
 }
+
+func parsePublicPageParams(c *app.RequestContext) (int64, int64, bool) {
+	page := int64(1)
+	pageSize := int64(9)
+
+	if rawPage := strings.TrimSpace(c.Query("page")); rawPage != "" {
+		parsedPage, err := strconv.ParseInt(rawPage, 10, 64)
+		if err != nil {
+			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_PAGE"})
+			return 0, 0, false
+		}
+		page = parsedPage
+	}
+
+	if rawPageSize := strings.TrimSpace(c.Query("pageSize")); rawPageSize != "" {
+		parsedPageSize, err := strconv.ParseInt(rawPageSize, 10, 64)
+		if err != nil {
+			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_PAGE_SIZE"})
+			return 0, 0, false
+		}
+		pageSize = parsedPageSize
+	}
+
+	return page, pageSize, true
+}

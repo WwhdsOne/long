@@ -3,10 +3,13 @@ package vote
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/config"
@@ -688,14 +691,19 @@ func TestClickButtonDefeatsActiveBossAndAwardsLootOnce(t *testing.T) {
 	if len(state.BossLeaderboard) != 1 || state.BossLeaderboard[0].Damage != 3 {
 		t.Fatalf("expected boss leaderboard damage 3, got %+v", state.BossLeaderboard)
 	}
-	if len(state.BossLoot) != 1 || state.BossLoot[0].ItemID != "cloth-armor" {
-		t.Fatalf("expected current boss loot to be returned, got %+v", state.BossLoot)
-	}
-	if state.BossLoot[0].ItemName != "布甲" || state.BossLoot[0].BonusClicks != 1 {
-		t.Fatalf("expected boss loot attributes to include equipment stats, got %+v", state.BossLoot[0])
-	}
 	if state.Inventory[0].ItemID == "" {
 		t.Fatalf("expected inventory entries, got %+v", state.Inventory)
+	}
+
+	resources, err := store.GetBossResources(ctx)
+	if err != nil {
+		t.Fatalf("get boss resources after boss kill: %v", err)
+	}
+	if len(resources.BossLoot) != 1 || resources.BossLoot[0].ItemID != "cloth-armor" {
+		t.Fatalf("expected current boss loot to be returned, got %+v", resources.BossLoot)
+	}
+	if resources.BossLoot[0].ItemName != "布甲" || resources.BossLoot[0].BonusClicks != 1 {
+		t.Fatalf("expected boss loot attributes to include equipment stats, got %+v", resources.BossLoot[0])
 	}
 
 	var foundReward bool
@@ -873,8 +881,13 @@ func TestClickButtonDefeatAutoSpawnsNextBossWhenCycleEnabled(t *testing.T) {
 	if state.Boss == nil || state.Boss.Status != bossStatusActive || state.Boss.TemplateID != "dragon" {
 		t.Fatalf("expected current boss to be dragon, got %+v", state.Boss)
 	}
-	if len(state.BossLoot) != 1 || state.BossLoot[0].ItemID != "fire-ring" {
-		t.Fatalf("expected current boss loot to switch to dragon loot, got %+v", state.BossLoot)
+
+	resources, err := store.GetBossResources(ctx)
+	if err != nil {
+		t.Fatalf("get boss resources after auto rotate: %v", err)
+	}
+	if len(resources.BossLoot) != 1 || resources.BossLoot[0].ItemID != "fire-ring" {
+		t.Fatalf("expected current boss loot to switch to dragon loot, got %+v", resources.BossLoot)
 	}
 
 	history, err := store.ListBossHistory(ctx)
@@ -1068,6 +1081,77 @@ func TestSaveButtonPersistsTagsAndStarlightEligibility(t *testing.T) {
 	}
 }
 
+func TestListButtonsPageReturnsFeaturedFirstPageAndPaginatesNormalButtons(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	featured := []ButtonUpsert{
+		{Slug: "spark-a", Label: "星光 A", Sort: 10, Enabled: true, StarlightEligible: true},
+		{Slug: "spark-b", Label: "星光 B", Sort: 20, Enabled: true, StarlightEligible: true},
+		{Slug: "spark-c", Label: "星光 C", Sort: 30, Enabled: true, StarlightEligible: true},
+		{Slug: "spark-d", Label: "星光 D", Sort: 40, Enabled: true, StarlightEligible: true},
+		{Slug: "spark-e", Label: "星光 E", Sort: 50, Enabled: true, StarlightEligible: true},
+		{Slug: "spark-f", Label: "星光 F", Sort: 60, Enabled: true, StarlightEligible: true},
+	}
+	normal := []ButtonUpsert{
+		{Slug: "normal-a", Label: "普通 A", Sort: 70, Enabled: true},
+		{Slug: "normal-b", Label: "普通 B", Sort: 80, Enabled: true},
+		{Slug: "normal-c", Label: "普通 C", Sort: 90, Enabled: true},
+		{Slug: "normal-d", Label: "普通 D", Sort: 100, Enabled: true},
+		{Slug: "normal-e", Label: "普通 E", Sort: 110, Enabled: true},
+	}
+
+	for _, item := range append(featured, normal...) {
+		if err := store.SaveButton(ctx, item); err != nil {
+			t.Fatalf("save button %s: %v", item.Slug, err)
+		}
+	}
+
+	firstPage, err := store.ListButtonsPage(ctx, 1, 9)
+	if err != nil {
+		t.Fatalf("list first page: %v", err)
+	}
+	if firstPage.Page != 1 || firstPage.PageSize != 9 || firstPage.Total != 11 || firstPage.TotalPages != 2 {
+		t.Fatalf("unexpected first page meta: %+v", firstPage)
+	}
+	if len(firstPage.Items) != 9 {
+		t.Fatalf("expected 9 first-page buttons, got %+v", firstPage.Items)
+	}
+
+	firstPageKeys := make([]string, 0, len(firstPage.Items))
+	for _, item := range firstPage.Items {
+		firstPageKeys = append(firstPageKeys, item.Key)
+	}
+	expectedFirstPage := []string{
+		"spark-a", "spark-b", "spark-c", "spark-d", "spark-e", "spark-f",
+		"normal-a", "normal-b", "normal-c",
+	}
+	if !slices.Equal(firstPageKeys, expectedFirstPage) {
+		t.Fatalf("unexpected first page order: %+v", firstPageKeys)
+	}
+
+	secondPage, err := store.ListButtonsPage(ctx, 2, 9)
+	if err != nil {
+		t.Fatalf("list second page: %v", err)
+	}
+	if secondPage.Page != 2 || secondPage.PageSize != 9 || secondPage.Total != 11 || secondPage.TotalPages != 2 {
+		t.Fatalf("unexpected second page meta: %+v", secondPage)
+	}
+	if len(secondPage.Items) != 2 {
+		t.Fatalf("expected 2 second-page buttons, got %+v", secondPage.Items)
+	}
+
+	secondPageKeys := []string{secondPage.Items[0].Key, secondPage.Items[1].Key}
+	if !slices.Equal(secondPageKeys, []string{"normal-d", "normal-e"}) {
+		t.Fatalf("unexpected second page order: %+v", secondPageKeys)
+	}
+}
+
 func TestGetSnapshotIncludesStarlightAndDropRates(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -1137,17 +1221,146 @@ func TestGetSnapshotIncludesStarlightAndDropRates(t *testing.T) {
 	if snapshot.Starlight.EndsAt <= snapshot.Starlight.StartedAt {
 		t.Fatalf("expected starlight window timestamps, got %+v", snapshot.Starlight)
 	}
-	if len(snapshot.BossLoot) != 2 {
-		t.Fatalf("expected boss loot snapshot, got %+v", snapshot.BossLoot)
+
+	resources, err := store.GetBossResources(ctx)
+	if err != nil {
+		t.Fatalf("get boss resources: %v", err)
 	}
-	if snapshot.BossLoot[0].DropRatePercent+snapshot.BossLoot[1].DropRatePercent != 100 {
-		t.Fatalf("expected drop rates to add up to 100, got %+v", snapshot.BossLoot)
+	if len(resources.BossLoot) != 2 {
+		t.Fatalf("expected boss loot resources, got %+v", resources.BossLoot)
 	}
-	if snapshot.BossLoot[0].ItemID != "cloth-armor" || snapshot.BossLoot[0].DropRatePercent != 25 {
-		t.Fatalf("expected cloth-armor probability 25%%, got %+v", snapshot.BossLoot)
+	if resources.BossLoot[0].DropRatePercent+resources.BossLoot[1].DropRatePercent != 100 {
+		t.Fatalf("expected drop rates to add up to 100, got %+v", resources.BossLoot)
 	}
-	if snapshot.BossLoot[1].ItemID != "fire-ring" || snapshot.BossLoot[1].DropRatePercent != 75 {
-		t.Fatalf("expected fire-ring probability 75%%, got %+v", snapshot.BossLoot)
+	if resources.BossLoot[0].ItemID != "cloth-armor" || resources.BossLoot[0].DropRatePercent != 25 {
+		t.Fatalf("expected cloth-armor probability 25%%, got %+v", resources.BossLoot)
+	}
+	if resources.BossLoot[1].ItemID != "fire-ring" || resources.BossLoot[1].DropRatePercent != 75 {
+		t.Fatalf("expected fire-ring probability 75%%, got %+v", resources.BossLoot)
+	}
+}
+
+func TestGetSnapshotReturnsSlimPayloadAndAnnouncementVersion(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:              "feel",
+		Label:             "有感觉吗",
+		Sort:              20,
+		Enabled:           true,
+		StarlightEligible: true,
+	}); err != nil {
+		t.Fatalf("save button: %v", err)
+	}
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed equipment definition: %v", err)
+	}
+	if err := store.setCurrentBoss(ctx, &Boss{
+		ID:        "dragon-1",
+		Name:      "火龙",
+		Status:    bossStatusActive,
+		MaxHP:     100,
+		CurrentHP: 88,
+		StartedAt: store.now().Unix(),
+	}, []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 1},
+	}, nil); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+
+	announcement, err := store.SaveAnnouncement(ctx, AnnouncementUpsert{
+		Title:   "更新公告",
+		Content: "公告正文",
+		Active:  true,
+	})
+	if err != nil {
+		t.Fatalf("save announcement: %v", err)
+	}
+
+	snapshot, err := store.GetSnapshot(ctx)
+	if err != nil {
+		t.Fatalf("get snapshot: %v", err)
+	}
+	if snapshot.AnnouncementVersion != announcement.ID {
+		t.Fatalf("expected announcement version %q, got %+v", announcement.ID, snapshot)
+	}
+
+	encoded, err := sonic.Marshal(snapshot)
+	if err != nil {
+		t.Fatalf("marshal snapshot: %v", err)
+	}
+	jsonText := string(encoded)
+	if strings.Contains(jsonText, "\"bossLoot\"") {
+		t.Fatalf("expected slim snapshot without bossLoot, got %s", jsonText)
+	}
+	if strings.Contains(jsonText, "\"bossHeroLoot\"") {
+		t.Fatalf("expected slim snapshot without bossHeroLoot, got %s", jsonText)
+	}
+	if strings.Contains(jsonText, "\"latestAnnouncement\"") {
+		t.Fatalf("expected slim snapshot without latestAnnouncement, got %s", jsonText)
+	}
+}
+
+func TestGetBossResourcesReturnsCurrentBossLootAndHeroLoot(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, "vote:equip:def:cloth-armor", map[string]any{
+		"name":         "布甲",
+		"slot":         "armor",
+		"bonus_clicks": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed equipment definition: %v", err)
+	}
+	if err := store.SaveHeroDefinition(ctx, HeroDefinition{
+		HeroID:     "slime",
+		Name:       "史莱姆勇者",
+		AwakenCap:  5,
+		ImagePath:  "/hero/slime.png",
+		ImageAlt:   "史莱姆勇者",
+		BonusClicks: 2,
+	}); err != nil {
+		t.Fatalf("save hero definition: %v", err)
+	}
+	if err := store.setCurrentBoss(ctx, &Boss{
+		ID:         "dragon-2",
+		TemplateID: "dragon",
+		Name:       "火龙",
+		Status:     bossStatusActive,
+		MaxHP:      200,
+		CurrentHP:  120,
+		StartedAt:  1713744000,
+	}, []BossLootEntry{
+		{ItemID: "cloth-armor", Weight: 3},
+	}, []BossHeroLootEntry{
+		{HeroID: "slime", Weight: 2},
+	}); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+
+	resources, err := store.GetBossResources(ctx)
+	if err != nil {
+		t.Fatalf("get boss resources: %v", err)
+	}
+	if resources.BossID != "dragon-2" || resources.TemplateID != "dragon" || resources.Status != bossStatusActive {
+		t.Fatalf("unexpected boss resource meta: %+v", resources)
+	}
+	if len(resources.BossLoot) != 1 || resources.BossLoot[0].ItemID != "cloth-armor" {
+		t.Fatalf("unexpected boss loot resources: %+v", resources.BossLoot)
+	}
+	if len(resources.BossHeroLoot) != 1 || resources.BossHeroLoot[0].HeroID != "slime" {
+		t.Fatalf("unexpected boss hero loot resources: %+v", resources.BossHeroLoot)
 	}
 }
 

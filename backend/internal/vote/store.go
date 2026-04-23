@@ -288,16 +288,28 @@ type StarlightState struct {
 	EndsAt     int64    `json:"endsAt"`
 }
 
+// BossResources 描述当前 Boss 的低频公共资源。
+type BossResources struct {
+	BossID       string              `json:"bossId,omitempty"`
+	TemplateID   string              `json:"templateId,omitempty"`
+	Status       string              `json:"status,omitempty"`
+	BossLoot     []BossLootEntry     `json:"bossLoot"`
+	BossHeroLoot []BossHeroLootEntry `json:"bossHeroLoot"`
+}
+
 // Snapshot 公共实时状态，广播给所有连接的客户端
 type Snapshot struct {
-	Buttons            []Button               `json:"buttons"`
-	Leaderboard        []LeaderboardEntry     `json:"leaderboard"`
-	Boss               *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard    []BossLeaderboardEntry `json:"bossLeaderboard"`
-	BossLoot           []BossLootEntry        `json:"bossLoot"`
-	BossHeroLoot       []BossHeroLootEntry    `json:"bossHeroLoot"`
-	Starlight          StarlightState         `json:"starlight"`
-	LatestAnnouncement *Announcement          `json:"latestAnnouncement,omitempty"`
+	Buttons             []Button               `json:"buttons"`
+	ButtonPage          int64                  `json:"buttonPage"`
+	ButtonPageSize      int64                  `json:"buttonPageSize"`
+	ButtonTotal         int64                  `json:"buttonTotal"`
+	ButtonTotalPages    int64                  `json:"buttonTotalPages"`
+	TotalVotes          int64                  `json:"totalVotes"`
+	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
+	Boss                *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard     []BossLeaderboardEntry `json:"bossLeaderboard"`
+	Starlight           StarlightState         `json:"starlight"`
+	AnnouncementVersion string                 `json:"announcementVersion,omitempty"`
 }
 
 // UserState 个人实时状态，只推送给对应昵称的连接
@@ -320,28 +332,34 @@ type UserState struct {
 
 // State 完整状态，包含个人统计与玩法状态
 type State struct {
-	Buttons            []Button               `json:"buttons"`
-	Leaderboard        []LeaderboardEntry     `json:"leaderboard"`
-	UserStats          *UserStats             `json:"userStats,omitempty"`
-	Boss               *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard    []BossLeaderboardEntry `json:"bossLeaderboard"`
-	BossLoot           []BossLootEntry        `json:"bossLoot"`
-	BossHeroLoot       []BossHeroLootEntry    `json:"bossHeroLoot"`
-	Starlight          StarlightState         `json:"starlight"`
-	LatestAnnouncement *Announcement          `json:"latestAnnouncement,omitempty"`
-	MyBossStats        *BossUserStats         `json:"myBossStats,omitempty"`
-	Inventory          []InventoryItem        `json:"inventory"`
-	Heroes             []HeroInventoryItem    `json:"heroes"`
-	ActiveHero         *HeroInventoryItem     `json:"activeHero,omitempty"`
-	Loadout            Loadout                `json:"loadout"`
-	CombatStats        CombatStats            `json:"combatStats"`
-	Gems               int64                  `json:"gems"`
-	OwnedCosmetics     []string               `json:"ownedCosmetics"`
-	EquippedCosmetics  CosmeticLoadout        `json:"equippedCosmetics"`
-	LastForgeResult    *ForgeResult           `json:"lastForgeResult,omitempty"`
-	ShopCatalog        []CosmeticCatalogItem  `json:"shopCatalog"`
-	RecentRewards      []Reward               `json:"recentRewards,omitempty"`
-	LastReward         *Reward                `json:"lastReward,omitempty"`
+	Buttons             []Button               `json:"buttons"`
+	ButtonPage          int64                  `json:"buttonPage"`
+	ButtonPageSize      int64                  `json:"buttonPageSize"`
+	ButtonTotal         int64                  `json:"buttonTotal"`
+	ButtonTotalPages    int64                  `json:"buttonTotalPages"`
+	TotalVotes          int64                  `json:"totalVotes"`
+	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
+	UserStats           *UserStats             `json:"userStats,omitempty"`
+	Boss                *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard     []BossLeaderboardEntry `json:"bossLeaderboard"`
+	BossLoot            []BossLootEntry        `json:"bossLoot,omitempty"`
+	BossHeroLoot        []BossHeroLootEntry    `json:"bossHeroLoot,omitempty"`
+	Starlight           StarlightState         `json:"starlight"`
+	AnnouncementVersion string                 `json:"announcementVersion,omitempty"`
+	LatestAnnouncement  *Announcement          `json:"latestAnnouncement,omitempty"`
+	MyBossStats         *BossUserStats         `json:"myBossStats,omitempty"`
+	Inventory           []InventoryItem        `json:"inventory"`
+	Heroes              []HeroInventoryItem    `json:"heroes"`
+	ActiveHero          *HeroInventoryItem     `json:"activeHero,omitempty"`
+	Loadout             Loadout                `json:"loadout"`
+	CombatStats         CombatStats            `json:"combatStats"`
+	Gems                int64                  `json:"gems"`
+	OwnedCosmetics      []string               `json:"ownedCosmetics"`
+	EquippedCosmetics   CosmeticLoadout        `json:"equippedCosmetics"`
+	LastForgeResult     *ForgeResult           `json:"lastForgeResult,omitempty"`
+	ShopCatalog         []CosmeticCatalogItem  `json:"shopCatalog"`
+	RecentRewards       []Reward               `json:"recentRewards,omitempty"`
+	LastReward          *Reward                `json:"lastReward,omitempty"`
 }
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
@@ -520,6 +538,8 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	starlight := starlightStateForButtons(buttons, s.now())
+	page := buildButtonPage(buttons, starlight.ActiveKeys, 1, defaultPublicButtonPageSize)
 
 	leaderboard, err := s.ListLeaderboard(ctx, 10)
 	if err != nil {
@@ -532,37 +552,30 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	}
 
 	var bossLeaderboard []BossLeaderboardEntry
-	var bossLoot []BossLootEntry
-	var bossHeroLoot []BossHeroLootEntry
 	if boss != nil {
 		bossLeaderboard, err = s.ListBossLeaderboard(ctx, boss.ID, 10)
 		if err != nil {
 			return Snapshot{}, err
 		}
-		bossLoot, err = s.loadBossLoot(ctx, boss.ID)
-		if err != nil {
-			return Snapshot{}, err
-		}
-		bossHeroLoot, err = s.loadBossHeroLoot(ctx, boss.ID)
-		if err != nil {
-			return Snapshot{}, err
-		}
 	}
 
-	latestAnnouncement, err := s.GetLatestAnnouncement(ctx)
+	announcementVersion, err := s.GetLatestAnnouncementVersion(ctx)
 	if err != nil {
 		return Snapshot{}, err
 	}
 
 	return Snapshot{
-		Buttons:            buttons,
-		Leaderboard:        leaderboard,
-		Boss:               boss,
-		BossLeaderboard:    bossLeaderboard,
-		BossLoot:           bossLoot,
-		BossHeroLoot:       bossHeroLoot,
-		Starlight:          starlightStateForButtons(buttons, s.now()),
-		LatestAnnouncement: latestAnnouncement,
+		Buttons:             page.Items,
+		ButtonPage:          page.Page,
+		ButtonPageSize:      page.PageSize,
+		ButtonTotal:         page.Total,
+		ButtonTotalPages:    page.TotalPages,
+		TotalVotes:          page.TotalVotes,
+		Leaderboard:         leaderboard,
+		Boss:                boss,
+		BossLeaderboard:     bossLeaderboard,
+		Starlight:           starlight,
+		AnnouncementVersion: announcementVersion,
 	}, nil
 }
 
@@ -1015,28 +1028,31 @@ func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, e
 // ComposeState 将公共快照与个人态组合成完整状态。
 func ComposeState(snapshot Snapshot, userState UserState) State {
 	return State{
-		Buttons:            snapshot.Buttons,
-		Leaderboard:        snapshot.Leaderboard,
-		UserStats:          userState.UserStats,
-		Boss:               snapshot.Boss,
-		BossLeaderboard:    snapshot.BossLeaderboard,
-		BossLoot:           snapshot.BossLoot,
-		BossHeroLoot:       snapshot.BossHeroLoot,
-		Starlight:          snapshot.Starlight,
-		LatestAnnouncement: snapshot.LatestAnnouncement,
-		MyBossStats:        userState.MyBossStats,
-		Inventory:          userState.Inventory,
-		Heroes:             userState.Heroes,
-		ActiveHero:         userState.ActiveHero,
-		Loadout:            userState.Loadout,
-		CombatStats:        userState.CombatStats,
-		Gems:               userState.Gems,
-		OwnedCosmetics:     userState.OwnedCosmetics,
-		EquippedCosmetics:  userState.EquippedCosmetics,
-		LastForgeResult:    userState.LastForgeResult,
-		ShopCatalog:        userState.ShopCatalog,
-		RecentRewards:      userState.RecentRewards,
-		LastReward:         userState.LastReward,
+		Buttons:             snapshot.Buttons,
+		ButtonPage:          snapshot.ButtonPage,
+		ButtonPageSize:      snapshot.ButtonPageSize,
+		ButtonTotal:         snapshot.ButtonTotal,
+		ButtonTotalPages:    snapshot.ButtonTotalPages,
+		TotalVotes:          snapshot.TotalVotes,
+		Leaderboard:         snapshot.Leaderboard,
+		UserStats:           userState.UserStats,
+		Boss:                snapshot.Boss,
+		BossLeaderboard:     snapshot.BossLeaderboard,
+		Starlight:           snapshot.Starlight,
+		AnnouncementVersion: snapshot.AnnouncementVersion,
+		MyBossStats:         userState.MyBossStats,
+		Inventory:           userState.Inventory,
+		Heroes:              userState.Heroes,
+		ActiveHero:          userState.ActiveHero,
+		Loadout:             userState.Loadout,
+		CombatStats:         userState.CombatStats,
+		Gems:                userState.Gems,
+		OwnedCosmetics:      userState.OwnedCosmetics,
+		EquippedCosmetics:   userState.EquippedCosmetics,
+		LastForgeResult:     userState.LastForgeResult,
+		ShopCatalog:         userState.ShopCatalog,
+		RecentRewards:       userState.RecentRewards,
+		LastReward:          userState.LastReward,
 	}
 }
 

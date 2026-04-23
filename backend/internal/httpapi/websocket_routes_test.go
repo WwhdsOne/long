@@ -162,6 +162,59 @@ func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 	}
 }
 
+func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
+	store := &mockStore{
+		snapshot: vote.Snapshot{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+			},
+			Leaderboard: []vote.LeaderboardEntry{
+				{Rank: 1, Nickname: "阿明", ClickCount: 3},
+			},
+			AnnouncementVersion: "7",
+		},
+		state: vote.State{
+			UserStats:   &vote.UserStats{Nickname: "阿明", ClickCount: 3},
+			Inventory:   []vote.InventoryItem{{ItemID: "wood-sword", Name: "木剑", Quantity: 1}},
+			CombatStats: vote.CombatStats{EffectiveIncrement: 2},
+		},
+	}
+	session := newRealtimeSession(realtimeSessionOptions{
+		stateView:            store,
+		store:                store,
+		hub:                  events.NewHub(),
+		authenticatorEnabled: false,
+		clientID:             "127.0.0.1",
+	})
+
+	messages := captureRealtimeMessages(t, func(send func(any) error) error {
+		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	})
+	if len(messages) != 1 {
+		t.Fatalf("expected one realtime message, got %d", len(messages))
+	}
+
+	response := decodeRealtimeMessage[struct {
+		Type   string          `json:"type"`
+		Public vote.Snapshot   `json:"public"`
+		User   *vote.UserState `json:"user"`
+	}](t, messages[0])
+	if response.Public.AnnouncementVersion != "7" {
+		t.Fatalf("expected announcement version in snapshot, got %+v", response.Public)
+	}
+
+	encoded, err := sonic.Marshal(response.Public)
+	if err != nil {
+		t.Fatalf("marshal public snapshot: %v", err)
+	}
+	if strings.Contains(string(encoded), "\"bossLoot\"") {
+		t.Fatalf("expected websocket public snapshot to omit bossLoot, got %s", string(encoded))
+	}
+	if strings.Contains(string(encoded), "\"latestAnnouncement\"") {
+		t.Fatalf("expected websocket public snapshot to omit latestAnnouncement, got %s", string(encoded))
+	}
+}
+
 func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{

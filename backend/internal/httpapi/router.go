@@ -18,6 +18,7 @@ type ButtonStore interface {
 	GetState(context.Context, string) (vote.State, error)
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	GetUserState(context.Context, string) (vote.UserState, error)
+	ListButtonsPage(context.Context, int64, int64) (vote.ButtonPage, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
@@ -50,6 +51,7 @@ type ButtonStore interface {
 	SetBossTemplateHeroLoot(context.Context, string, []vote.BossHeroLootEntry) error
 	SetBossCycleEnabled(context.Context, bool) (*vote.Boss, error)
 	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
+	GetBossResources(context.Context) (vote.BossResources, error)
 	GetLatestAnnouncement(context.Context) (*vote.Announcement, error)
 	ListAnnouncements(context.Context, bool) ([]vote.Announcement, error)
 	SaveAnnouncement(context.Context, vote.AnnouncementUpsert) (*vote.Announcement, error)

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestGetStateIncludesLatestAnnouncement(t *testing.T) {
+func TestGetSnapshotIncludesAnnouncementVersion(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -20,16 +20,13 @@ func TestGetStateIncludesLatestAnnouncement(t *testing.T) {
 		t.Fatalf("save announcement: %v", err)
 	}
 
-	state, err := store.GetState(ctx, "")
+	snapshot, err := store.GetSnapshot(ctx)
 	if err != nil {
-		t.Fatalf("get state: %v", err)
+		t.Fatalf("get snapshot: %v", err)
 	}
 
-	if state.LatestAnnouncement == nil {
-		t.Fatal("expected latest announcement in state, got nil")
-	}
-	if state.LatestAnnouncement.ID != announcement.ID || state.LatestAnnouncement.Title != "新版本上线" {
-		t.Fatalf("unexpected latest announcement: %+v", state.LatestAnnouncement)
+	if snapshot.AnnouncementVersion != announcement.ID {
+		t.Fatalf("unexpected latest announcement version: %+v", snapshot)
 	}
 }
 
