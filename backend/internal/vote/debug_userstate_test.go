@@ -2,12 +2,17 @@ package vote
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/redis/go-redis/v9"
 )
 
 func TestDebugWwhdsUserState(t *testing.T) {
+	if os.Getenv("LONG_RUN_DEBUG_REDIS_TEST") == "" {
+		t.Skip("跳过依赖外部 Redis 的调试测试；设置 LONG_RUN_DEBUG_REDIS_TEST=1 可启用")
+	}
+
 	client := redis.NewClient(&redis.Options{
 		Addr:     "47.93.83.136:6379",
 		Password: "Wwh852456",

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"long/internaml/config"
+	"long/internal/config"
 )
 
 func main() {
@@ -12,4 +12,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Printf("%+v\n", cfg)
 }

@@ -1014,9 +1014,22 @@ func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, e
 		return UserStats{}, err
 	}
 
-	values, err := s.client.HMGet(ctx, s.userPrefix+normalizedNickname, "nickname", "click_count").Result()
+	redisKey := s.userPrefix + normalizedNickname
+	values, err := s.client.HMGet(ctx, redisKey, "nickname", "click_count").Result()
 	if err != nil {
-		return UserStats{}, err
+		if !isRedisWrongTypeError(err) {
+			return UserStats{}, err
+		}
+
+		legacyValue, legacyErr := s.client.Get(ctx, redisKey).Result()
+		if legacyErr != nil {
+			return UserStats{}, legacyErr
+		}
+
+		return UserStats{
+			Nickname:   normalizedNickname,
+			ClickCount: int64FromString(legacyValue),
+		}, nil
 	}
 
 	return UserStats{
@@ -2223,6 +2236,14 @@ func int64FromString(raw string) int64 {
 	}
 
 	return value
+}
+
+func isRedisWrongTypeError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(err.Error(), "WRONGTYPE")
 }
 
 func float64FromString(raw string) float64 {
