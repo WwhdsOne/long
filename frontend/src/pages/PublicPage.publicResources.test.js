@@ -8,6 +8,11 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const pageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue'), 'utf8')
 
 describe('PublicPage 公共资源拆分', () => {
+  it('页面挂载时会先走一次 HTTP 首屏加载，再连接实时链路', () => {
+    expect(pageSource).toContain('await loadState()')
+    expect(pageSource).toContain('connectRealtime(nickname.value)')
+  })
+
   it('按钮列表改为维护当前页状态并通过分页接口加载', () => {
     expect(pageSource).toContain('const buttonPage = ref(1)')
     expect(pageSource).toContain('const buttonTotalPages = ref(1)')

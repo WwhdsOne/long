@@ -1059,7 +1059,9 @@ function ensureRealtimeTransport() {
 }
 
 function connectRealtime(nextNickname = nickname.value) {
-  loading.value = true
+  if (buttons.value.length === 0) {
+    loading.value = true
+  }
   syncing.value = true
 
   if (!realtimeTransport) {
@@ -1552,6 +1554,7 @@ async function loadPlayerSession() {
 onMounted(async () => {
   restoreCachedLatestAnnouncement()
   await loadPlayerSession()
+  await loadState()
   connectRealtime(nickname.value)
 })
 

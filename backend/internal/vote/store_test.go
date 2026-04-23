@@ -118,6 +118,28 @@ func TestListButtonsPrefersExplicitIndexWhenPresent(t *testing.T) {
 	}
 }
 
+func TestGetUserStatsFallsBackToLegacyStringValue(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.Set(ctx, store.userPrefix+"阿明", "100", 0).Err(); err != nil {
+		t.Fatalf("seed legacy user stat: %v", err)
+	}
+
+	stats, err := store.GetUserStats(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user stats: %v", err)
+	}
+
+	if stats.Nickname != "阿明" {
+		t.Fatalf("expected nickname 阿明, got %q", stats.Nickname)
+	}
+	if stats.ClickCount != 100 {
+		t.Fatalf("expected click count 100, got %d", stats.ClickCount)
+	}
+}
+
 func TestSyncButtonIndexFindsButtonsAddedOutsideSupportedWritePath(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
