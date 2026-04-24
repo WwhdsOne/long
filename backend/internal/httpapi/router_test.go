@@ -115,8 +115,16 @@ func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	userState.UserStats = m.state.UserStats
 	userState.MyBossStats = m.state.MyBossStats
 	userState.Inventory = m.state.Inventory
+	userState.Heroes = m.state.Heroes
+	userState.ActiveHero = m.state.ActiveHero
 	userState.Loadout = m.state.Loadout
 	userState.CombatStats = m.state.CombatStats
+	userState.Gems = m.state.Gems
+	userState.OwnedCosmetics = m.state.OwnedCosmetics
+	userState.EquippedCosmetics = m.state.EquippedCosmetics
+	userState.ShopCatalog = m.state.ShopCatalog
+	userState.LastForgeResult = m.state.LastForgeResult
+	userState.RecentRewards = m.state.RecentRewards
 	userState.LastReward = m.state.LastReward
 	return userState
 }
