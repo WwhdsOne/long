@@ -7,7 +7,6 @@ describe('clickResponse', () => {
     expect(buildClickRequestBody('ticket-1', true, {
       pointerType: 'mouse',
       pressDurationMs: 120,
-      trajectory: [{ x: 1, y: 2, t: 0 }],
       fingerprintHash: 'fp-1',
       fingerprintProof: 'proof-1',
     })).toEqual({
@@ -15,7 +14,6 @@ describe('clickResponse', () => {
       realtimeConnected: true,
       pointerType: 'mouse',
       pressDurationMs: 120,
-      trajectory: [{ x: 1, y: 2, t: 0 }],
       fingerprintHash: 'fp-1',
       fingerprintProof: 'proof-1',
     })
@@ -23,7 +21,6 @@ describe('clickResponse', () => {
     expect(buildClickRequestBody('ticket-1', false, {
       pointerType: 'mouse',
       pressDurationMs: 120,
-      trajectory: [{ x: 1, y: 2, t: 0 }],
       fingerprintHash: 'fp-1',
       fingerprintProof: 'proof-1',
     })).toEqual({
@@ -31,7 +28,6 @@ describe('clickResponse', () => {
       realtimeConnected: false,
       pointerType: 'mouse',
       pressDurationMs: 120,
-      trajectory: [{ x: 1, y: 2, t: 0 }],
       fingerprintHash: 'fp-1',
       fingerprintProof: 'proof-1',
     })

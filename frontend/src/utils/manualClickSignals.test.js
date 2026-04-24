@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildFingerprintProof, createClickBehaviorTracker, summarizePointerTrajectory } from './manualClickSignals'
+import { buildFingerprintProof, createClickBehaviorTracker } from './manualClickSignals'
 
 describe('manualClickSignals', () => {
   it('会生成稳定的指纹挑战证明', async () => {
@@ -12,21 +12,6 @@ describe('manualClickSignals', () => {
 
     expect(proof).toHaveLength(64)
     expect(proof).toMatch(/^[0-9a-f]+$/)
-  })
-
-  it('会计算轨迹距离 曲率和速度方差', () => {
-    const summary = summarizePointerTrajectory([
-      { x: 10, y: 10, t: 0 },
-      { x: 13, y: 12, t: 30 },
-      { x: 17, y: 18, t: 70 },
-      { x: 22, y: 21, t: 120 },
-    ])
-
-    expect(summary.pointCount).toBe(4)
-    expect(summary.pathDistance).toBeGreaterThan(10)
-    expect(summary.displacement).toBeGreaterThan(2)
-    expect(summary.curvature).toBeGreaterThan(0)
-    expect(summary.speedVariance).toBeGreaterThan(0)
   })
 
   it('会优先使用事件时间戳计算按压时长', () => {
@@ -50,10 +35,6 @@ describe('manualClickSignals', () => {
     expect(tracker.consume('feel')).toMatchObject({
       pointerType: 'mouse',
       pressDurationMs: 13,
-      trajectory: [
-        { x: 10, y: 10, t: 0 },
-        { x: 10, y: 10, t: 13 },
-      ],
     })
   })
 

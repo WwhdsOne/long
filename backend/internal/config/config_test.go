@@ -51,12 +51,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               ban_ms: 600000
               min_press_duration_ms: 20
               max_press_duration_ms: 2000
-              min_trajectory_points: 4
-              max_trajectory_points: 12
-              min_path_distance: 10
-              min_displacement: 2
-              min_curvature: 0.05
-              min_speed_variance: 0.01
             oss:
               access_key_id: "test-ak"
               access_key_secret: "test-secret"

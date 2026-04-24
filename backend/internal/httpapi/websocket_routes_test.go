@@ -349,6 +349,44 @@ func TestRealtimeSessionClickForwardsTicketToManualClickController(t *testing.T)
 	}
 }
 
+func TestRealtimeSessionCanIssueClickTicketThroughWebsocket(t *testing.T) {
+	controller := &mockManualClickController{
+		ticket: ClickTicket{
+			Value:          "ticket-1",
+			IssuedAt:       1710000000,
+			ExpiresAt:      1710000002,
+			ChallengeNonce: "nonce-1",
+		},
+	}
+	session := newRealtimeSession(realtimeSessionOptions{
+		store:                 &mockStore{state: voteStateForPlayerTests()},
+		manualClick:           controller,
+		authenticatorEnabled:  true,
+		authenticatedNickname: "阿明",
+		clientID:              "127.0.0.1",
+	})
+
+	messages := captureRealtimeMessages(t, func(send func(any) error) error {
+		return session.handleMessage(context.Background(), []byte(`{"type":"click_ticket_request","requestId":"req-1","slug":"feel","fingerprintHash":"fp-1"}`), send)
+	})
+	if len(messages) != 1 {
+		t.Fatalf("expected one realtime message, got %d", len(messages))
+	}
+
+	response := decodeRealtimeMessage[struct {
+		Type           string `json:"type"`
+		RequestID      string `json:"requestId"`
+		Ticket         string `json:"ticket"`
+		ChallengeNonce string `json:"challengeNonce"`
+	}](t, messages[0])
+	if response.Type != "click_ticket" || response.RequestID != "req-1" || response.Ticket != "ticket-1" || response.ChallengeNonce != "nonce-1" {
+		t.Fatalf("unexpected click ticket response: %+v", response)
+	}
+	if controller.lastIssueReq.Nickname != "阿明" || controller.lastIssueReq.Slug != "feel" || controller.lastIssueReq.FingerprintHash != "fp-1" {
+		t.Fatalf("expected websocket ticket request to reach controller, got %+v", controller.lastIssueReq)
+	}
+}
+
 func TestRealtimeSessionReturnsProtocolErrors(t *testing.T) {
 	session := newRealtimeSession(realtimeSessionOptions{
 		stateView:            &mockStore{},

@@ -1128,10 +1128,6 @@ function clearCosmeticBurst(key) {
   cosmeticBursts.value = nextBursts
 }
 
-function handleGlobalPointerMove(event) {
-  clickBehaviorTracker.handleGlobalPointerMove(event)
-}
-
 function handlePressStart(key, event) {
   clickBehaviorTracker.handlePressStart(key, event)
 }
@@ -1317,6 +1313,19 @@ async function toggleAutoClick() {
 
 async function requestClickTicket(key) {
   const nextFingerprintHash = await ensureFingerprintHash()
+  try {
+    const realtimeTicket = await ensureRealtimeTransport().requestClickTicket(key, nextFingerprintHash)
+    if (realtimeTicket?.ticket && realtimeTicket?.challengeNonce) {
+      return {
+        ticket: realtimeTicket.ticket,
+        challengeNonce: realtimeTicket.challengeNonce,
+        fingerprintHash: nextFingerprintHash,
+      }
+    }
+  } catch {
+    // ws 票据申请失败时退回 HTTP 兜底，避免点击体验被主链路抖动放大。
+  }
+
   const response = await fetch('/api/click-tickets', {
     method: 'POST',
     headers: {
@@ -1685,7 +1694,6 @@ async function loadPlayerSession() {
 }
 
 onMounted(async () => {
-  window.addEventListener('pointermove', handleGlobalPointerMove, {passive: true})
   restoreCachedLatestAnnouncement()
   await loadPlayerSession()
   await loadState()
@@ -1693,7 +1701,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('pointermove', handleGlobalPointerMove)
   clickBehaviorTracker.clear()
   realtimeTransport?.close()
   clearStarlightTimer()

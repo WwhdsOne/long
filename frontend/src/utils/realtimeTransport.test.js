@@ -145,7 +145,6 @@ describe('realtimeTransport', () => {
     expect(transport.sendClick('feel', 'ticket-1', {
       pointerType: 'mouse',
       pressDurationMs: 120,
-      trajectory: [{ x: 1, y: 2, t: 0 }],
       fingerprintHash: 'fp-1',
       fingerprintProof: 'proof-1',
     })).toBe(true)
@@ -155,7 +154,6 @@ describe('realtimeTransport', () => {
       ticket: 'ticket-1',
       pointerType: 'mouse',
       pressDurationMs: 120,
-      trajectory: [{ x: 1, y: 2, t: 0 }],
       fingerprintHash: 'fp-1',
       fingerprintProof: 'proof-1',
     }))
@@ -176,6 +174,44 @@ describe('realtimeTransport', () => {
         critical: false,
       },
     ])
+  })
+
+  it('会优先通过 WebSocket 申请点击票据', async () => {
+    const sockets = []
+    const transport = createRealtimeTransport({
+      createWebSocket(url) {
+        const socket = new FakeWebSocket(url)
+        sockets.push(socket)
+        return socket
+      },
+      createEventSource() {
+        throw new Error('should not create event source')
+      },
+    })
+
+    transport.connect({ nickname: '阿明' })
+    sockets[0].emitOpen()
+
+    const ticketPromise = transport.requestClickTicket('feel', 'fp-1')
+    const requestPayload = JSON.parse(sockets[0].sent.at(-1))
+    expect(requestPayload.type).toBe('click_ticket_request')
+    expect(requestPayload.slug).toBe('feel')
+    expect(requestPayload.fingerprintHash).toBe('fp-1')
+    expect(requestPayload.requestId).toContain('ticket-')
+
+    sockets[0].emitMessage({
+      type: 'click_ticket',
+      requestId: requestPayload.requestId,
+      ticket: 'ticket-1',
+      challengeNonce: 'nonce-1',
+    })
+
+    await expect(ticketPromise).resolves.toEqual({
+      ticket: 'ticket-1',
+      challengeNonce: 'nonce-1',
+      issuedAt: 0,
+      expiresAt: 0,
+    })
   })
 
   it('WebSocket 断开后会自动退回 SSE 并继续消费增量事件', () => {

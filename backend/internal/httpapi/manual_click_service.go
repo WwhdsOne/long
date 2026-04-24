@@ -10,7 +10,6 @@ import (
 	"errors"
 	"io"
 	"log"
-	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -40,18 +39,10 @@ type TicketIssueRequest struct {
 	FingerprintHash string
 }
 
-// ClickPointerSample 描述一次点击中的轨迹点。
-type ClickPointerSample struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-	T int64   `json:"t"`
-}
-
 // ClickBehavior 描述前端上报的交互行为信号。
 type ClickBehavior struct {
-	PointerType     string               `json:"pointerType"`
-	PressDurationMS int64                `json:"pressDurationMs"`
-	Trajectory      []ClickPointerSample `json:"trajectory"`
+	PointerType     string `json:"pointerType"`
+	PressDurationMS int64  `json:"pressDurationMs"`
 }
 
 // ManualClickRequest 描述一次手动点击协议载荷。
@@ -490,107 +481,7 @@ func validateClickBehavior(behavior ClickBehavior, config ManualClickConfig) err
 		return errors.New("press_duration_too_long")
 	}
 
-	points := normalizeTrajectory(behavior.Trajectory, config.MaxTrajectoryPoints)
-	if len(points) < 2 {
-		return errors.New("trajectory_points_too_few")
-	}
-
-	metrics, ok := computeTrajectoryMetrics(points)
-	if !ok {
-		return errors.New("trajectory_invalid")
-	}
-
-	if metrics.pathDistance < config.MinPathDistance && metrics.displacement < config.MinDisplacement {
-		return nil
-	}
-	if len(points) < config.MinTrajectoryPoints {
-		return errors.New("trajectory_points_too_few")
-	}
-	if metrics.curvature < config.MinCurvature {
-		return errors.New("trajectory_curvature_too_low")
-	}
-	if metrics.speedVariance < config.MinSpeedVariance {
-		return errors.New("trajectory_speed_variance_too_low")
-	}
-
 	return nil
-}
-
-type trajectoryMetrics struct {
-	pathDistance  float64
-	displacement  float64
-	curvature     float64
-	speedVariance float64
-}
-
-func normalizeTrajectory(points []ClickPointerSample, maxPoints int) []ClickPointerSample {
-	if len(points) == 0 {
-		return nil
-	}
-	normalized := make([]ClickPointerSample, 0, len(points))
-	for _, point := range points {
-		if math.IsNaN(point.X) || math.IsNaN(point.Y) || math.IsInf(point.X, 0) || math.IsInf(point.Y, 0) {
-			continue
-		}
-		normalized = append(normalized, point)
-	}
-	if maxPoints > 0 && len(normalized) > maxPoints {
-		normalized = normalized[len(normalized)-maxPoints:]
-	}
-	return normalized
-}
-
-func computeTrajectoryMetrics(points []ClickPointerSample) (trajectoryMetrics, bool) {
-	if len(points) < 2 {
-		return trajectoryMetrics{}, false
-	}
-
-	metrics := trajectoryMetrics{}
-	speeds := make([]float64, 0, len(points)-1)
-	for index := 1; index < len(points); index++ {
-		dx := points[index].X - points[index-1].X
-		dy := points[index].Y - points[index-1].Y
-		dt := points[index].T - points[index-1].T
-		if dt <= 0 {
-			return trajectoryMetrics{}, false
-		}
-
-		distance := math.Hypot(dx, dy)
-		metrics.pathDistance += distance
-		speeds = append(speeds, distance/float64(dt))
-
-		if index >= 2 {
-			prevDX := points[index-1].X - points[index-2].X
-			prevDY := points[index-1].Y - points[index-2].Y
-			prevAngle := math.Atan2(prevDY, prevDX)
-			nextAngle := math.Atan2(dy, dx)
-			turn := math.Abs(nextAngle - prevAngle)
-			if turn > math.Pi {
-				turn = 2*math.Pi - turn
-			}
-			metrics.curvature += turn
-		}
-	}
-
-	metrics.displacement = math.Hypot(points[len(points)-1].X-points[0].X, points[len(points)-1].Y-points[0].Y)
-
-	mean := 0.0
-	for _, speed := range speeds {
-		mean += speed
-	}
-	mean /= float64(len(speeds))
-	if mean <= 0 {
-		return metrics, true
-	}
-
-	variance := 0.0
-	for _, speed := range speeds {
-		diff := speed - mean
-		variance += diff * diff
-	}
-	variance /= float64(len(speeds))
-	metrics.speedVariance = math.Sqrt(variance) / mean
-	return metrics, true
 }
 
 func filterRecentTimes(items []time.Time, cutoff time.Time) []time.Time {

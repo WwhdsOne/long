@@ -9,7 +9,7 @@ const pageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue'), 'u
 
 describe('PublicPage 点击响应链路', () => {
   it('点击前会先申请一次性票据，并显式上报当前实时连接状态', () => {
-    expect(pageSource).toContain("fetch('/api/click-tickets'")
+    expect(pageSource).toContain("ensureRealtimeTransport().requestClickTicket(key, nextFingerprintHash)")
     expect(pageSource).toContain('buildClickRequestBody(ticketInfo.ticket, liveConnected.value, behavior)')
     expect(pageSource).toContain('consumeClickBehavior(key)')
     expect(pageSource).toContain('buildFingerprintProof({')

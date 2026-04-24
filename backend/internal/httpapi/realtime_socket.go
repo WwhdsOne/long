@@ -16,10 +16,12 @@ import (
 
 const (
 	realtimeMessageTypeHello       = "hello"
+	realtimeMessageTypeClickTicketRequest = "click_ticket_request"
 	realtimeMessageTypeClick       = "click"
 	realtimeMessageTypeSyncRequest = "sync_request"
 	realtimeMessageTypePing        = "ping"
 
+	realtimeMessageTypeClickTicket = "click_ticket"
 	realtimeMessageTypeSnapshot    = "snapshot"
 	realtimeMessageTypePublicDelta = "public_delta"
 	realtimeMessageTypeUserDelta   = "user_delta"
@@ -33,15 +35,24 @@ const (
 )
 
 type realtimeClientMessage struct {
-	Type             string               `json:"type"`
-	Nickname         string               `json:"nickname"`
-	Slug             string               `json:"slug"`
-	Ticket           string               `json:"ticket"`
-	PointerType      string               `json:"pointerType"`
-	PressDurationMS  int64                `json:"pressDurationMs"`
-	Trajectory       []ClickPointerSample `json:"trajectory"`
-	FingerprintHash  string               `json:"fingerprintHash"`
-	FingerprintProof string               `json:"fingerprintProof"`
+	Type             string `json:"type"`
+	RequestID        string `json:"requestId"`
+	Nickname         string `json:"nickname"`
+	Slug             string `json:"slug"`
+	Ticket           string `json:"ticket"`
+	PointerType      string `json:"pointerType"`
+	PressDurationMS  int64  `json:"pressDurationMs"`
+	FingerprintHash  string `json:"fingerprintHash"`
+	FingerprintProof string `json:"fingerprintProof"`
+}
+
+type realtimeClickTicketMessage struct {
+	Type           string `json:"type"`
+	RequestID      string `json:"requestId"`
+	Ticket         string `json:"ticket"`
+	IssuedAt       int64  `json:"issuedAt"`
+	ExpiresAt      int64  `json:"expiresAt"`
+	ChallengeNonce string `json:"challengeNonce"`
 }
 
 type realtimeSnapshotMessage struct {
@@ -213,6 +224,46 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		return s.sendSnapshot(ctx, send)
 	case realtimeMessageTypePing:
 		return send(realtimePongMessage{Type: realtimeMessageTypePong})
+	case realtimeMessageTypeClickTicketRequest:
+		slug := strings.TrimSpace(message.Slug)
+		if slug == "" {
+			return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击票据消息缺少按钮标识。"))
+		}
+		if s.manualClick == nil {
+			return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击票据服务暂不可用，请稍后重试。"))
+		}
+
+		nickname, apiErr := resolveClickNickname(clickRequestContext{
+			Slug:                  slug,
+			NicknameHint:          s.nickname,
+			AuthenticatedNickname: s.authenticatedNickname,
+			AuthenticatorEnabled:  s.authenticatorEnabled,
+		})
+		if apiErr != nil {
+			return send(s.protocolError(apiErr.Code, apiErr.Message))
+		}
+
+		ticket, err := s.manualClick.IssueTicket(ctx, TicketIssueRequest{
+			Nickname:        nickname,
+			Slug:            slug,
+			ClientID:        s.clientID,
+			FingerprintHash: message.FingerprintHash,
+		})
+		if err != nil {
+			if apiErr := manualClickRequestError(err); apiErr != nil {
+				return send(s.protocolError(apiErr.Code, apiErr.Message))
+			}
+			return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击票据签发失败，请稍后重试。"))
+		}
+
+		return send(realtimeClickTicketMessage{
+			Type:           realtimeMessageTypeClickTicket,
+			RequestID:      strings.TrimSpace(message.RequestID),
+			Ticket:         ticket.Value,
+			IssuedAt:       ticket.IssuedAt,
+			ExpiresAt:      ticket.ExpiresAt,
+			ChallengeNonce: ticket.ChallengeNonce,
+		})
 	case realtimeMessageTypeClick:
 		slug := strings.TrimSpace(message.Slug)
 		if slug == "" {
@@ -237,7 +288,6 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 			Behavior: ClickBehavior{
 				PointerType:     message.PointerType,
 				PressDurationMS: message.PressDurationMS,
-				Trajectory:      message.Trajectory,
 			},
 		})
 		if apiErr != nil {

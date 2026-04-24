@@ -302,12 +302,7 @@ func TestManualClickServiceRejectsMissingFingerprintOrBehavior(t *testing.T) {
 		FingerprintHash:  "fp-1",
 		FingerprintProof: fingerprintProof("fp-1", ticket.Value, ticket.ChallengeNonce),
 		Behavior: ClickBehavior{
-			PressDurationMS: 5,
-			Trajectory: []ClickPointerSample{
-				{X: 1, Y: 1, T: 0},
-				{X: 8, Y: 4, T: 2},
-				{X: 15, Y: 10, T: 5},
-			},
+			PressDurationMS: -1,
 		},
 	})
 	if !manualClickRequiresRetry(err) {
@@ -375,10 +370,6 @@ func TestManualClickServiceAcceptsLowMovementHumanClick(t *testing.T) {
 		Behavior: ClickBehavior{
 			PointerType:     "mouse",
 			PressDurationMS: 120,
-			Trajectory: []ClickPointerSample{
-				{X: 100, Y: 100, T: 0},
-				{X: 100, Y: 100, T: 120},
-			},
 		},
 	})
 	if err != nil {
@@ -446,10 +437,6 @@ func TestManualClickServiceAcceptsShortLowMovementClick(t *testing.T) {
 		Behavior: ClickBehavior{
 			PointerType:     "mouse",
 			PressDurationMS: 5,
-			Trajectory: []ClickPointerSample{
-				{X: 100, Y: 100, T: 0},
-				{X: 100, Y: 100, T: 5},
-			},
 		},
 	})
 	if err != nil {
@@ -517,12 +504,6 @@ func TestManualClickServiceAcceptsFastHumanClick(t *testing.T) {
 		Behavior: ClickBehavior{
 			PointerType:     "mouse",
 			PressDurationMS: 6,
-			Trajectory: []ClickPointerSample{
-				{X: 100, Y: 100, T: 0},
-				{X: 104, Y: 102, T: 2},
-				{X: 109, Y: 107, T: 4},
-				{X: 113, Y: 110, T: 6},
-			},
 		},
 	})
 	if err != nil {
@@ -534,11 +515,5 @@ func validClickBehavior() ClickBehavior {
 	return ClickBehavior{
 		PointerType:     "mouse",
 		PressDurationMS: 120,
-		Trajectory: []ClickPointerSample{
-			{X: 10, Y: 10, T: 0},
-			{X: 13, Y: 12, T: 30},
-			{X: 17, Y: 18, T: 70},
-			{X: 22, Y: 21, T: 120},
-		},
 	}
 }
