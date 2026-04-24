@@ -49,6 +49,29 @@ const {
 
 const bossDropModalOpen = ref(false)
 
+const bossPartGrid = computed(() => {
+  if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return []
+  const grid = Array.from({length: 5}, () => Array(5).fill(null))
+  for (const part of boss.value.parts) {
+    if (part.x >= 0 && part.x < 5 && part.y >= 0 && part.y < 5) {
+      grid[part.y][part.x] = part
+    }
+  }
+  return grid
+})
+
+const partTypeLabels = {
+  soft: '\u8f6f\u7ec4\u7ec7',
+  heavy: '\u91cd\u7532',
+  weak: '\u5f31\u70b9',
+}
+
+const partTypeColors = {
+  soft: '#4ade80',
+  heavy: '#fbbf24',
+  weak: '#f472b6',
+}
+
 const bossDropPool = computed(() => [
   ...bossLoot.value.map((item) => ({
     id: `equipment:${item.itemId}`,
@@ -134,6 +157,29 @@ function closeBossDropPool() {
           </div>
           <div v-if="boss" class="boss-stage__bar boss-stage__bar--compact">
             <span class="boss-stage__bar-fill" :style="{ width: `${bossProgress}%` }"></span>
+          </div>
+          <div v-if="boss?.parts?.length > 0" class="boss-part-grid">
+            <div v-for="(row, yi) in bossPartGrid" :key="yi" class="boss-part-grid__row">
+              <div
+                v-for="(part, xi) in row"
+                :key="yi + '-' + xi"
+                class="boss-part-cell"
+                :class="{ 'boss-part-cell--alive': part?.alive, 'boss-part-cell--dead': part && !part.alive }"
+                :style="part ? { '--part-color': partTypeColors[part.type] || '#64748b' } : {}"
+              >
+                <template v-if="part">
+                  <div class="boss-part-cell__type">{{ partTypeLabels[part.type] || part.type }}</div>
+                  <div class="boss-part-cell__bar">
+                    <span
+                      class="boss-part-cell__fill"
+                      :style="{ width: (part.currentHp / part.maxHp * 100) + '%' }"
+                    ></span>
+                  </div>
+                  <div class="boss-part-cell__hp">{{ part.currentHp }}/{{ part.maxHp }}</div>
+                </template>
+                <div v-else class="boss-part-cell__empty"></div>
+              </div>
+            </div>
           </div>
           <div class="vote-stage__boss-hud-stats">
             <span>我的伤害 {{ myBossDamage }}</span>

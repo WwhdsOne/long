@@ -56,6 +56,12 @@ type ButtonStore interface {
 	CreateMessage(context.Context, string, string) (*vote.Message, error)
 	ListMessages(context.Context, string, int64) (vote.MessagePage, error)
 	DeleteMessage(context.Context, string) error
+	// 天赋系统
+	SelectTalentTree(context.Context, string, vote.TalentTree, vote.TalentTree) error
+	GetTalentState(context.Context, string) (*vote.TalentState, error)
+	LearnTalent(context.Context, string, string) error
+	ResetTalents(context.Context, string) error
+	ComputeTalentModifiers(context.Context, string) (*vote.TalentModifiers, error)
 }
 
 // StateView 为只读聚合提供公共态、个人态和完整态读取能力。
@@ -140,6 +146,7 @@ func registerRoutes(engine *route.Engine, options Options) {
 	registerPublicRoutes(engine, options, stateView)
 	registerPlayerAuthRoutes(engine, options)
 	registerPlayerActionRoutes(engine, options)
+	registerTalentRoutes(engine, options)
 	registerAdminRoutes(engine, options)
 	registerRealtimeRoutes(engine, options)
 	registerStaticRoutes(engine, options)

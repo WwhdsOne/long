@@ -38,6 +38,15 @@ var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
 var ErrBossPoolEmpty = errors.New("boss pool empty")
+var ErrBossPartNotFound = errors.New("boss part not found")
+var ErrBossPartAlreadyDead = errors.New("boss part already dead")
+var ErrTalentTreeNotSet = errors.New("talent tree not set")
+var ErrTalentAlreadyLearned = errors.New("talent already learned")
+var ErrTalentPrerequisite = errors.New("talent prerequisite not met")
+var ErrTalentNotFound = errors.New("talent not found")
+var ErrTalentMaxLevel = errors.New("talent max level reached")
+var ErrInvalidPartType = errors.New("invalid part type")
+var ErrInvalidTalentTree = errors.New("invalid talent tree")
 
 const (
 	bossStatusActive   = "active"
@@ -70,16 +79,51 @@ type LeaderboardEntry struct {
 	ClickCount int64  `json:"clickCount"`
 }
 
+// PartType 部位类型
+type PartType string
+
+const (
+	PartTypeSoft  PartType = "soft"  // 软组织
+	PartTypeHeavy PartType = "heavy" // 重甲
+	PartTypeWeak  PartType = "weak"  // 弱点
+)
+
+// PartDamageCoefficient 返回部位类型的伤害系数
+func (p PartType) DamageCoefficient() float64 {
+	switch p {
+	case PartTypeSoft:
+		return 1.0
+	case PartTypeHeavy:
+		return 0.4
+	case PartTypeWeak:
+		return 2.5
+	default:
+		return 1.0
+	}
+}
+
+// BossPart Boss 的战斗部位
+type BossPart struct {
+	X         int      `json:"x"`
+	Y         int      `json:"y"`
+	Type      PartType `json:"type"`
+	MaxHP     int64    `json:"maxHp"`
+	CurrentHP int64    `json:"currentHp"`
+	Armor     int64    `json:"armor"`
+	Alive     bool     `json:"alive"`
+}
+
 // Boss 世界 Boss 状态
 type Boss struct {
-	ID         string `json:"id"`
-	TemplateID string `json:"templateId,omitempty"`
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	MaxHP      int64  `json:"maxHp"`
-	CurrentHP  int64  `json:"currentHp"`
-	StartedAt  int64  `json:"startedAt,omitempty"`
-	DefeatedAt int64  `json:"defeatedAt,omitempty"`
+	ID         string     `json:"id"`
+	TemplateID string     `json:"templateId,omitempty"`
+	Name       string     `json:"name"`
+	Status     string     `json:"status"`
+	MaxHP      int64      `json:"maxHp"`
+	CurrentHP  int64      `json:"currentHp"`
+	Parts      []BossPart `json:"parts,omitempty"`
+	StartedAt  int64      `json:"startedAt,omitempty"`
+	DefeatedAt int64      `json:"defeatedAt,omitempty"`
 }
 
 // BossLeaderboardEntry Boss 伤害榜
@@ -105,6 +149,14 @@ type EquipmentDefinition struct {
 	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
 	EnhanceCap                 int     `json:"enhanceCap"`
+	// 多部位战斗新增属性
+	AttackPower         int64   `json:"attackPower,omitempty"`
+	ArmorPenPercent     float64 `json:"armorPenPercent,omitempty"`
+	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
+	BossDamagePercent   float64 `json:"bossDamagePercent,omitempty"`
+	PartTypeDamageSoft  float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
+	PartTypeDamageHeavy float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
+	PartTypeDamageWeak  float64 `json:"partTypeDamageWeak,omitempty"`  // 弱点增伤
 }
 
 type HeroEffectType string
@@ -215,6 +267,18 @@ type InventoryItem struct {
 	Equipped                        bool    `json:"equipped"`
 	StarLevel                       int     `json:"-"` // deprecated: hidden from API
 	ReforgePityCounter              int     `json:"-"` // deprecated: hidden from API
+	// 多部位战斗新增属性
+	AttackPower                 int64   `json:"attackPower,omitempty"`
+	AttackPowerDelta            int64   `json:"attackPowerDelta,omitempty"`
+	ArmorPenPercent             float64 `json:"armorPenPercent,omitempty"`
+	ArmorPenPercentDelta        float64 `json:"armorPenPercentDelta,omitempty"`
+	CritDamageMultiplier        float64 `json:"critDamageMultiplier,omitempty"`
+	CritDamageMultiplierDelta   float64 `json:"critDamageMultiplierDelta,omitempty"`
+	BossDamagePercent           float64 `json:"bossDamagePercent,omitempty"`
+	BossDamagePercentDelta      float64 `json:"bossDamagePercentDelta,omitempty"`
+	PartTypeDamageSoft          float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy         float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak          float64 `json:"partTypeDamageWeak,omitempty"`
 }
 
 // Loadout 已穿戴装备
@@ -233,6 +297,12 @@ type CombatStats struct {
 	CriticalDamage        int64   `json:"criticalDamage"`
 	CriticalChancePercent float64 `json:"criticalChancePercent"`
 	CriticalCount         int64   `json:"criticalCount"`
+	// 多部位战斗新增属性
+	AttackPower          int64   `json:"attackPower"`
+	ArmorPenPercent      float64 `json:"armorPenPercent"`      // 破甲率
+	CritDamageMultiplier float64 `json:"critDamageMultiplier"` // 暴击伤害倍率乘区
+	BossDamagePercent    float64 `json:"bossDamagePercent"`
+	AllDamageAmplify     float64 `json:"allDamageAmplify"` // 全伤害增幅
 }
 
 // Reward 最近一次掉落
@@ -256,6 +326,13 @@ type BossLootEntry struct {
 	BonusClicks                int64   `json:"bonusClicks"`
 	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
 	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
+	AttackPower                int64   `json:"attackPower,omitempty"`
+	ArmorPenPercent            float64 `json:"armorPenPercent,omitempty"`
+	CritDamageMultiplier       float64 `json:"critDamageMultiplier,omitempty"`
+	BossDamagePercent          float64 `json:"bossDamagePercent,omitempty"`
+	PartTypeDamageSoft         float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy        float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak         float64 `json:"partTypeDamageWeak,omitempty"`
 }
 
 // BossHeroLootEntry Boss 英雄掉落池条目。
@@ -1038,6 +1115,9 @@ func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, 
 	if boss == nil || boss.Status != bossStatusActive {
 		return s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
 	}
+	if len(boss.Parts) > 0 {
+		return s.applyBossPartClick(ctx, current, boss, nickname, delta, critical)
+	}
 
 	now := time.Now().Unix()
 	scriptResult, err := s.bossClickScript.Run(ctx, s.luaRunner, []string{
@@ -1098,6 +1178,122 @@ func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, 
 
 	return result, nil
 }
+
+func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
+	result, err := s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
+	if err != nil {
+		return ClickResult{}, err
+	}
+
+	quantities, err := s.inventoryQuantities(ctx, nickname)
+	if err != nil {
+		return result, nil
+	}
+	loadout, _, err := s.loadoutForNickname(ctx, nickname, quantities)
+	if err != nil {
+		return result, nil
+	}
+	heroQuantities, err := s.heroInventoryQuantities(ctx, nickname)
+	if err != nil {
+		return result, nil
+	}
+	activeHero, err := s.activeHeroForNickname(ctx, nickname, heroQuantities)
+	if err != nil {
+		return result, nil
+	}
+	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout, activeHero)
+	if err != nil {
+		return result, nil
+	}
+
+	targetIdx := s.selectTargetPart(boss.Parts, nickname)
+	if targetIdx < 0 {
+		return result, nil
+	}
+	part := &boss.Parts[targetIdx]
+
+	aliveCount := 0
+	for _, p := range boss.Parts {
+		if p.Alive {
+			aliveCount++
+		}
+	}
+
+	damageStats := CalcBossPartDamage(combatStats, part.Type, part.Armor, true, aliveCount)
+	partDamage := damageStats.NormalDamage
+	if critical {
+		partDamage = damageStats.CriticalDamage
+	}
+
+	part.CurrentHP -= partDamage
+	if part.CurrentHP < 0 {
+		part.CurrentHP = 0
+	}
+	if part.CurrentHP <= 0 {
+		part.Alive = false
+	}
+
+	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
+	if marshalErr != nil {
+		return result, nil
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.bossCurrentKey, "parts", string(partsRaw))
+	pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(partDamage), nickname)
+	pipe.Exec(ctx)
+
+	result.Delta = partDamage
+	result.Critical = critical
+
+	boss.CurrentHP -= partDamage
+	if boss.CurrentHP < 0 {
+		boss.CurrentHP = 0
+	}
+	result.Boss = boss
+
+	allDead := true
+	for _, p := range boss.Parts {
+		if p.Alive {
+			allDead = false
+			break
+		}
+	}
+
+	if allDead {
+		boss.Status = bossStatusDefeated
+		result.BroadcastUserAll = true
+		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss)
+		if finalizeErr != nil {
+			return result, nil
+		}
+		if nextBoss != nil {
+			result.Boss = nextBoss
+		}
+	}
+
+	return result, nil
+}
+
+func (s *Store) selectTargetPart(parts []BossPart, nickname string) int {
+	if len(parts) == 0 {
+		return -1
+	}
+	alive := make([]int, 0, len(parts))
+	for i, p := range parts {
+		if p.Alive {
+			alive = append(alive, i)
+		}
+	}
+	if len(alive) == 0 {
+		return -1
+	}
+	if len(alive) == 1 {
+		return alive[0]
+	}
+	return alive[s.roll(len(alive))]
+}
+
 
 func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error) {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
@@ -1262,17 +1458,22 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 func (s *Store) combatStatsForNickname(_ context.Context, _ string, loadout Loadout, activeHero *HeroInventoryItem) (CombatStats, error) {
 	stats := s.baseCombatStats()
 
-	bonusClicks, bonusChance, bonusCount := loadoutBonuses(loadout)
+	bonusClicks, bonusChance, bonusCount, attackPower, armorPen, critDmgMult, bossDmg := loadoutBonuses(loadout)
 	stats.BonusClicks = bonusClicks
 	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+bonusChance, 0, 100)
 	stats.CriticalCount += bonusCount
+	stats.AttackPower += attackPower
+	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 0.80)
+	stats.CritDamageMultiplier += critDmgMult
+	stats.BossDamagePercent += bossDmg
 
 	heroBonusClicks, heroBonusChance, heroBonusCount, heroFinalDamagePercent := heroBonuses(activeHero)
 	stats.BonusClicks += heroBonusClicks
 	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+heroBonusChance, 0, 100)
 	stats.CriticalCount += heroBonusCount
 
-	return applyFinalDamagePercent(deriveCombatStats(stats), heroFinalDamagePercent), nil
+	result := applyFinalDamagePercent(deriveCombatStats(stats), heroFinalDamagePercent)
+	return result, nil
 }
 
 func (s *Store) baseCombatStats() CombatStats {
@@ -1281,14 +1482,16 @@ func (s *Store) baseCombatStats() CombatStats {
 		BonusClicks:           0,
 		CriticalChancePercent: clampFloat(float64(s.critical.CriticalChancePercent), 0, 100),
 		CriticalCount:         s.critical.CriticalCount,
+		AttackPower:           0,
+		ArmorPenPercent:       0,
+		CritDamageMultiplier:  1.0,
+		BossDamagePercent:     0,
+		AllDamageAmplify:      0,
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (int64, float64, int64) {
+func loadoutBonuses(loadout Loadout) (bonusClicks int64, bonusChance float64, bonusCount int64, attackPower int64, armorPen float64, critDmgMult float64, bossDmg float64) {
 	items := []*InventoryItem{loadout.Weapon, loadout.Armor, loadout.Accessory}
-	var bonusClicks int64
-	var bonusChance float64
-	var bonusCount int64
 	for _, item := range items {
 		if item == nil {
 			continue
@@ -1296,8 +1499,12 @@ func loadoutBonuses(loadout Loadout) (int64, float64, int64) {
 		bonusClicks += item.BonusClicks
 		bonusChance += item.BonusCriticalChancePercent
 		bonusCount += item.BonusCriticalCount
+		attackPower += item.AttackPower
+		armorPen += item.ArmorPenPercent
+		critDmgMult += item.CritDamageMultiplier
+		bossDmg += item.BossDamagePercent
 	}
-	return bonusClicks, bonusChance, bonusCount
+	return
 }
 
 func deriveCombatStats(stats CombatStats) CombatStats {
@@ -1317,7 +1524,82 @@ func deriveCombatStats(stats CombatStats) CombatStats {
 
 	stats.CriticalDamage = max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
 
+	if stats.CritDamageMultiplier < 1.0 {
+		stats.CritDamageMultiplier = 1.0
+	}
+
 	return stats
+}
+
+// CalcBossPartDamage 计算对 Boss 部位的伤害（新减法公式）。
+//   partType: 部位类型
+//   partArmor: 部位护甲值
+//   isBoss: 是否 Boss 目标（影响 Boss 增伤）
+//   alivePartCount: 存活的部位数量（围剿技能用）
+func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, isBoss bool, alivePartCount int) CombatStats {
+	// 基础攻击力
+	atk := max(1, stats.AttackPower)
+
+	// 部位伤害系数
+	coeff := partType.DamageCoefficient()
+
+	// 有效护甲 = partArmor * (1 - 破甲率)，上限 80% 减免
+	effectiveArmor := int64(float64(partArmor) * (1.0 - clampFloat(stats.ArmorPenPercent, 0, 0.80)))
+	if effectiveArmor < 0 {
+		effectiveArmor = 0
+	}
+
+	// 基础伤害 = max(攻击力 * 系数 - 护甲, 1)
+	baseDamage := max(atk*int64(coeff*100)/100-effectiveArmor, 1)
+
+	// 增伤乘区 = (1 + 全伤害增幅 + Boss 增伤)
+	amplify := 1.0 + stats.AllDamageAmplify
+	if isBoss {
+		amplify += stats.BossDamagePercent
+	}
+
+	// 暴击乘区
+	critMult := 1.0
+	rollLimit, threshold := criticalRollPlan(stats.CriticalChancePercent)
+	if rollLimit > 0 && stats.CriticalCount > 1 && s_roll(rollLimit) < threshold {
+		critMult = max(1.0, stats.CritDamageMultiplier)
+	}
+
+	// 最终伤害
+	finalDamage := int64(float64(baseDamage) * amplify * critMult)
+	if finalDamage < 1 {
+		finalDamage = 1
+	}
+
+	normalDamage := int64(float64(baseDamage) * amplify)
+	if normalDamage < 1 {
+		normalDamage = 1
+	}
+
+	criticalDamage := int64(float64(baseDamage) * amplify * critMult)
+	if criticalDamage < 1 {
+		criticalDamage = 1
+	}
+
+	return CombatStats{
+		NormalDamage:          normalDamage,
+		CriticalDamage:        criticalDamage,
+		CriticalChancePercent: stats.CriticalChancePercent,
+		CriticalCount:         stats.CriticalCount,
+		AttackPower:           atk,
+		ArmorPenPercent:       stats.ArmorPenPercent,
+		CritDamageMultiplier:  critMult,
+		AllDamageAmplify:      amplify - 1.0,
+		BossDamagePercent:     stats.BossDamagePercent,
+	}
+}
+
+// s_roll returns random int in [0, n), uses nil-safe global rand.
+func s_roll(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return globalRand.IntN(n)
 }
 
 func (s *Store) currentBoss(ctx context.Context) (*Boss, error) {
@@ -1343,6 +1625,11 @@ func normalizeBoss(values map[string]string) *Boss {
 		return nil
 	}
 
+	var parts []BossPart
+	if partsRaw, ok := values["parts"]; ok && partsRaw != "" {
+		_ = sonic.Unmarshal([]byte(partsRaw), &parts)
+	}
+
 	return &Boss{
 		ID:         id,
 		TemplateID: strings.TrimSpace(values["template_id"]),
@@ -1350,6 +1637,7 @@ func normalizeBoss(values map[string]string) *Boss {
 		Status:     strings.TrimSpace(values["status"]),
 		MaxHP:      int64FromString(values["max_hp"]),
 		CurrentHP:  int64FromString(values["current_hp"]),
+		Parts:      parts,
 		StartedAt:  int64FromString(values["started_at"]),
 		DefeatedAt: int64FromString(values["defeated_at"]),
 	}
@@ -1392,6 +1680,13 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		BonusCriticalChancePercent: float64FromString(values["bonus_critical_chance_percent"]),
 		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
 		EnhanceCap:                 int(int64FromString(values["enhance_cap"])),
+		AttackPower:                int64FromString(values["attack_power"]),
+		ArmorPenPercent:            float64FromString(values["armor_pen_percent"]),
+		CritDamageMultiplier:       float64FromString(values["crit_damage_multiplier"]),
+		BossDamagePercent:          float64FromString(values["boss_damage_percent"]),
+		PartTypeDamageSoft:         float64FromString(values["part_type_damage_soft"]),
+		PartTypeDamageHeavy:        float64FromString(values["part_type_damage_heavy"]),
+		PartTypeDamageWeak:         float64FromString(values["part_type_damage_weak"]),
 	}, nil
 }
 

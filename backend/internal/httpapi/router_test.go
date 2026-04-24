@@ -381,6 +381,26 @@ func (m *mockStore) UnequipHero(_ context.Context, _ string, _ string) (vote.Sta
 	return m.equipState, nil
 }
 
+func (m *mockStore) SelectTalentTree(_ context.Context, _ string, _ vote.TalentTree, _ vote.TalentTree) error {
+	return nil
+}
+
+func (m *mockStore) GetTalentState(_ context.Context, _ string) (*vote.TalentState, error) {
+	return nil, nil
+}
+
+func (m *mockStore) LearnTalent(_ context.Context, _ string, _ string) error {
+	return nil
+}
+
+func (m *mockStore) ResetTalents(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockStore) ComputeTalentModifiers(_ context.Context, _ string) (*vote.TalentModifiers, error) {
+	return nil, nil
+}
+
 type mockOSSSigner struct {
 	policy ossupload.Policy
 	err    error

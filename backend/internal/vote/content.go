@@ -316,6 +316,13 @@ func (s *Store) buildInventoryItem(definition EquipmentDefinition, upgrade equip
 		BonusCriticalChancePercentDelta: upgrade.BonusCriticalChancePercent,
 		BonusCriticalCount:              definition.BonusCriticalCount + upgrade.BonusCriticalCount,
 		BonusCriticalCountDelta:         upgrade.BonusCriticalCount,
+		AttackPower:                     definition.AttackPower,
+		ArmorPenPercent:                 definition.ArmorPenPercent,
+		CritDamageMultiplier:            definition.CritDamageMultiplier,
+		BossDamagePercent:               definition.BossDamagePercent,
+		PartTypeDamageSoft:              definition.PartTypeDamageSoft,
+		PartTypeDamageHeavy:             definition.PartTypeDamageHeavy,
+		PartTypeDamageWeak:              definition.PartTypeDamageWeak,
 		Equipped:                        equipped,
 		StarLevel:                       upgrade.EnhanceLevel,
 	}

@@ -2,6 +2,7 @@
 import BattlePage from './BattlePage.vue'
 import MessagesPage from './MessagesPage.vue'
 import ProfilePage from './ProfilePage.vue'
+import TalentsPage from './TalentsPage.vue'
 import {usePublicPageState} from './publicPageState'
 
 const {
@@ -75,6 +76,7 @@ registerPublicPageLifecycle()
 
 
     <BattlePage v-if="currentPublicPage === 'battle'" />
+    <TalentsPage v-else-if="currentPublicPage === 'talents'" />
     <ProfilePage v-else-if="currentPublicPage === 'profile'" />
     <MessagesPage v-else />
   </main>

@@ -115,6 +115,13 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 		"bonus_critical_chance_percent": formatFloatForRedis(definition.BonusCriticalChancePercent),
 		"bonus_critical_count":          strconv.FormatInt(definition.BonusCriticalCount, 10),
 		"enhance_cap":                   strconv.Itoa(definition.EnhanceCap),
+		"attack_power":                  strconv.FormatInt(definition.AttackPower, 10),
+		"armor_pen_percent":             formatFloatForRedis(definition.ArmorPenPercent),
+		"crit_damage_multiplier":        formatFloatForRedis(definition.CritDamageMultiplier),
+		"boss_damage_percent":           formatFloatForRedis(definition.BossDamagePercent),
+		"part_type_damage_soft":         formatFloatForRedis(definition.PartTypeDamageSoft),
+		"part_type_damage_heavy":        formatFloatForRedis(definition.PartTypeDamageHeavy),
+		"part_type_damage_weak":         formatFloatForRedis(definition.PartTypeDamageWeak),
 	}
 
 	pipe := s.client.TxPipeline()

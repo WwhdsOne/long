@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -45,12 +46,18 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 			return nil, err
 		}
 
+		var layout []BossPart
+		if layoutRaw, ok := values["layout"]; ok && layoutRaw != "" {
+			_ = sonic.Unmarshal([]byte(layoutRaw), &layout)
+		}
+
 		templates = append(templates, BossTemplate{
 			ID:       templateID,
 			Name:     firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
 			MaxHP:    maxInt64(1, int64FromString(values["max_hp"])),
 			Loot:     loot,
 			HeroLoot: heroLoot,
+			Layout:   layout,
 		})
 	}
 
@@ -74,6 +81,10 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 	values := map[string]any{
 		"name":   firstNonEmpty(strings.TrimSpace(template.Name), templateID),
 		"max_hp": strconv.FormatInt(maxInt64(1, template.MaxHP), 10),
+	}
+	if len(template.Layout) > 0 {
+		layoutRaw, _ := sonic.Marshal(template.Layout)
+		values["layout"] = string(layoutRaw)
 	}
 
 	pipe := s.client.TxPipeline()
@@ -181,6 +192,7 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 		Status:     bossStatusActive,
 		MaxHP:      maxInt64(1, template.MaxHP),
 		CurrentHP:  maxInt64(1, template.MaxHP),
+		Parts:      template.Layout,
 		StartedAt:  time.Now().Unix(),
 	}
 
@@ -223,6 +235,10 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	}
 	if boss.DefeatedAt != 0 {
 		values["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
+	}
+	if len(boss.Parts) > 0 {
+		partsRaw, _ := sonic.Marshal(boss.Parts)
+		values["parts"] = string(partsRaw)
 	}
 
 	pipe := s.client.TxPipeline()
@@ -299,6 +315,13 @@ func (s *Store) loadBossTemplateLoot(ctx context.Context, templateID string) ([]
 			BonusClicks:                definition.BonusClicks,
 			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
 			BonusCriticalCount:         definition.BonusCriticalCount,
+			AttackPower:                definition.AttackPower,
+			ArmorPenPercent:            definition.ArmorPenPercent,
+			CritDamageMultiplier:       definition.CritDamageMultiplier,
+			BossDamagePercent:          definition.BossDamagePercent,
+			PartTypeDamageSoft:         definition.PartTypeDamageSoft,
+			PartTypeDamageHeavy:        definition.PartTypeDamageHeavy,
+			PartTypeDamageWeak:         definition.PartTypeDamageWeak,
 		})
 	}
 
