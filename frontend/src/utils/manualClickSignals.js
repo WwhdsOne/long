@@ -6,6 +6,14 @@ function encodeText(value) {
   return new TextEncoder().encode(String(value ?? ''))
 }
 
+function eventTimestamp(event, fallbackNow) {
+  const timestamp = Number(event?.timeStamp)
+  if (Number.isFinite(timestamp) && timestamp >= 0) {
+    return timestamp
+  }
+  return Number(fallbackNow())
+}
+
 export async function sha256Hex(value) {
   const subtle = safeCrypto()
   if (!subtle) {
@@ -142,7 +150,7 @@ export function createClickBehaviorTracker(options = {}) {
   const completedPresses = new Map()
 
   function appendRecentPoint(event) {
-    const timestamp = now()
+    const timestamp = eventTimestamp(event, now)
     recentTrail.push({
       ...pointFromEvent(event, timestamp),
       pointerType: String(event?.pointerType || 'mouse'),
@@ -172,7 +180,7 @@ export function createClickBehaviorTracker(options = {}) {
       appendRecentPoint(event)
     },
     handlePressStart(key, event) {
-      const timestamp = now()
+      const timestamp = eventTimestamp(event, now)
       const pointerType = String(event?.pointerType || 'mouse')
       const trajectory = [...recentPrelude(pointerType, timestamp), pointFromEvent(event, timestamp)]
       activePresses.set(String(key), {
@@ -188,13 +196,13 @@ export function createClickBehaviorTracker(options = {}) {
         return
       }
 
-      const timestamp = now()
+      const timestamp = eventTimestamp(event, now)
       const trajectory = trimTrajectory([...active.trajectory, pointFromEvent(event, timestamp)], maxPoints)
       completedPresses.set(normalizedKey, {
         pointerType: active.pointerType,
         pressDurationMs: Math.max(0, Math.round(timestamp - active.startedAt)),
         trajectory,
-        completedAt: timestamp,
+        completedAt: Number(now()),
       })
       activePresses.delete(normalizedKey)
     },

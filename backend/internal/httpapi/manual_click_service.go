@@ -483,7 +483,7 @@ func fingerprintProof(fingerprintHash string, ticket string, challengeNonce stri
 }
 
 func validateClickBehavior(behavior ClickBehavior, config ManualClickConfig) error {
-	if behavior.PressDurationMS < config.MinPressDuration.Milliseconds() {
+	if behavior.PressDurationMS < 0 {
 		return errors.New("press_duration_too_short")
 	}
 	if behavior.PressDurationMS > config.MaxPressDuration.Milliseconds() {
@@ -491,7 +491,7 @@ func validateClickBehavior(behavior ClickBehavior, config ManualClickConfig) err
 	}
 
 	points := normalizeTrajectory(behavior.Trajectory, config.MaxTrajectoryPoints)
-	if len(points) < config.MinTrajectoryPoints {
+	if len(points) < 2 {
 		return errors.New("trajectory_points_too_few")
 	}
 
@@ -499,11 +499,12 @@ func validateClickBehavior(behavior ClickBehavior, config ManualClickConfig) err
 	if !ok {
 		return errors.New("trajectory_invalid")
 	}
-	if metrics.pathDistance < config.MinPathDistance {
-		return errors.New("trajectory_path_too_short")
+
+	if metrics.pathDistance < config.MinPathDistance && metrics.displacement < config.MinDisplacement {
+		return nil
 	}
-	if metrics.displacement < config.MinDisplacement {
-		return errors.New("trajectory_displacement_too_short")
+	if len(points) < config.MinTrajectoryPoints {
+		return errors.New("trajectory_points_too_few")
 	}
 	if metrics.curvature < config.MinCurvature {
 		return errors.New("trajectory_curvature_too_low")
@@ -579,7 +580,7 @@ func computeTrajectoryMetrics(points []ClickPointerSample) (trajectoryMetrics, b
 	}
 	mean /= float64(len(speeds))
 	if mean <= 0 {
-		return trajectoryMetrics{}, false
+		return metrics, true
 	}
 
 	variance := 0.0

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildFingerprintProof, summarizePointerTrajectory } from './manualClickSignals'
+import { buildFingerprintProof, createClickBehaviorTracker, summarizePointerTrajectory } from './manualClickSignals'
 
 describe('manualClickSignals', () => {
   it('会生成稳定的指纹挑战证明', async () => {
@@ -27,5 +27,54 @@ describe('manualClickSignals', () => {
     expect(summary.displacement).toBeGreaterThan(2)
     expect(summary.curvature).toBeGreaterThan(0)
     expect(summary.speedVariance).toBeGreaterThan(0)
+  })
+
+  it('会优先使用事件时间戳计算按压时长', () => {
+    const tracker = createClickBehaviorTracker({
+      now: () => 0,
+    })
+
+    tracker.handlePressStart('feel', {
+      pointerType: 'mouse',
+      clientX: 10,
+      clientY: 10,
+      timeStamp: 100.2,
+    })
+    tracker.handlePressEnd('feel', {
+      pointerType: 'mouse',
+      clientX: 10,
+      clientY: 10,
+      timeStamp: 112.8,
+    })
+
+    expect(tracker.consume('feel')).toMatchObject({
+      pointerType: 'mouse',
+      pressDurationMs: 13,
+      trajectory: [
+        { x: 10, y: 10, t: 0 },
+        { x: 10, y: 10, t: 13 },
+      ],
+    })
+  })
+
+  it('不会把事件时间戳和当前时钟混用成过期记录', () => {
+    const tracker = createClickBehaviorTracker({
+      now: () => 100000,
+    })
+
+    tracker.handlePressStart('feel', {
+      pointerType: 'mouse',
+      clientX: 10,
+      clientY: 10,
+      timeStamp: 100.2,
+    })
+    tracker.handlePressEnd('feel', {
+      pointerType: 'mouse',
+      clientX: 10,
+      clientY: 10,
+      timeStamp: 112.8,
+    })
+
+    expect(tracker.consume('feel')).not.toBeNull()
   })
 })

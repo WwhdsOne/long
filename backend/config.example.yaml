@@ -22,20 +22,6 @@ admin:
 player_auth:
   jwt_secret: "player-session-secret"
   jwt_ttl_seconds: 604800
-manual_click:
-  ticket_ttl_ms: 2000
-  issue_limit_per_second: 6
-  consume_limit_per_second: 6
-  risk_threshold: 4
-  ban_ms: 600000
-  min_press_duration_ms: 20
-  max_press_duration_ms: 2000
-  min_trajectory_points: 4
-  max_trajectory_points: 12
-  min_path_distance: 10
-  min_displacement: 2
-  min_curvature: 0.05
-  min_speed_variance: 0.01
 oss:
   access_key_id: "*****"
   access_key_secret: "*****"
@@ -44,3 +30,88 @@ oss:
   public_base_url: "https://******.oss-cn-beijing.aliyuncs.com"
   upload_dir_prefix: "buttons"
   expire_seconds: 300
+manual_click:
+  
+  # ---------- 票据/令牌配置 ----------
+  ticket_ttl_ms: 2000
+  # 票据有效期（毫秒）
+  # 每次点击前需要先申请票据，超过此时间未使用则失效
+  # 防止攻击者提前获取票据后延迟重放
+  # 2000ms = 2秒
+
+  # ---------- 限流配置 ----------
+  issue_limit_per_second: 15
+  # 票据颁发限流（每秒最多颁发几个票据）
+  # 限制攻击者无法在短时间内大量申请票据
+  # 6 = 每秒最多6次申请，超过则拒绝
+
+  consume_limit_per_second: 15
+  # 票据消费限流（每秒最多验证几个点击）
+  # 与颁发限流配合，形成双向速率控制
+  # 6 = 每秒最多处理6次点击，超过则拒绝
+
+  # ---------- 风险/封禁配置 ----------
+  risk_threshold: 5
+  # 风险累积阈值
+  # 每检测到一次异常行为，风险分+1
+  # 当风险分 >= 5 时，触发封禁
+  # 正常用户几乎不会累积任何风险分
+
+  ban_ms: 600000
+  # 封禁时长（毫秒）
+  # 触发封禁后，该用户在此时间内无法进行任何点击操作
+  # 600000ms = 10分钟
+
+  # ---------- 点击时长配置（按下到抬起的时间差）----------
+  min_press_duration_ms: 20
+  # 最小按下持续时间（毫秒）
+  # 人类正常点击至少需要20ms（极快点击）
+  # 脚本直接调用click()事件时，duration ≈ 0，会被拦截
+  # 低于此值 → 认定为脚本
+
+  max_press_duration_ms: 2000
+  # 最大按下持续时间（毫秒）
+  # 人类不可能按住一个按钮超过2秒还称为“点击”
+  # 超过此值 → 认定为异常（可能是卡键或脚本）
+
+  # ---------- 鼠标轨迹配置 ----------
+  min_trajectory_points: 4
+  # 最小轨迹点数
+  # 鼠标从静止到点击按钮，至少会经过4个以上的位置点
+  # 脚本直接发送点击时，轨迹点数量为0
+  # 低于此值 → 认定为脚本
+
+  max_trajectory_points: 12
+  # 最大轨迹点数
+  # 限制单次点击上报的轨迹点数量上限
+  # 防止攻击者构造超大请求包进行DoS攻击
+  # 超过此值 → 截断或拒绝
+
+  min_path_distance: 10
+  # 最小路径距离（像素）
+  # 鼠标从起点移动到点击位置，至少移动10像素
+  # 如果点击时鼠标本来就停在按钮上，则距离可能较小
+  # 但结合其他指标（如下方的min_displacement）综合判断
+  # 低于此值 → 加分项（但不一定拒绝，需结合其他规则）
+
+  min_displacement: 2
+  # 最小位移量（像素）
+  # 鼠标在最后一次移动中的最小位移
+  # 人类手部有细微抖动，位移不可能为0
+  # 位移=0 → 高度怀疑是程序直接触发点击
+  # 低于此值 → 增加风险分
+
+  min_curvature: 0.05
+  # 最小轨迹曲率
+  # 曲率 = 轨迹弯曲程度
+  # 人类移动鼠标时，轨迹是自然弯曲的（肌肉控制不完美）
+  # 曲率 0.05 是一个经验值，代表“有肉眼可见的弯曲”
+  # 脚本通常画完美直线 → 曲率 ≈ 0
+  # 低于此值 → 认定为脚本
+
+  min_speed_variance: 0.01
+  # 最小速度方差
+  # 速度方差代表鼠标移动速度的变化程度
+  # 人类移动鼠标：起点慢 → 中间快 → 终点慢（钟形曲线），速度变化大
+  # 脚本通常匀速移动 → 速度方差 ≈ 0
+  # 低于此值 → 认定为脚本

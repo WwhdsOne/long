@@ -305,12 +305,228 @@ func TestManualClickServiceRejectsMissingFingerprintOrBehavior(t *testing.T) {
 			PressDurationMS: 5,
 			Trajectory: []ClickPointerSample{
 				{X: 1, Y: 1, T: 0},
-				{X: 1, Y: 1, T: 5},
+				{X: 8, Y: 4, T: 2},
+				{X: 15, Y: 10, T: 5},
 			},
 		},
 	})
 	if !manualClickRequiresRetry(err) {
 		t.Fatalf("expected invalid behavior to require retry, got %v", err)
+	}
+}
+
+func TestManualClickServiceAcceptsLowMovementHumanClick(t *testing.T) {
+	now := time.Unix(1710000000, 0)
+	store := &mockStore{
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+			},
+		},
+		result: vote.ClickResult{
+			Button: vote.Button{Key: "feel", Label: "有感觉吗", Count: 4, Enabled: true},
+			Delta:  1,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 4,
+			},
+		},
+	}
+	service := NewManualClickService(ManualClickServiceOptions{
+		Store: store,
+		Config: ManualClickConfig{
+			TicketTTL:             2 * time.Second,
+			IssueLimitPerSecond:   5,
+			ConsumeLimitPerSecond: 5,
+			RiskThreshold:         3,
+			BanDuration:           time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+			MinTrajectoryPoints:   4,
+			MaxTrajectoryPoints:   12,
+			MinPathDistance:       10,
+			MinDisplacement:       2,
+			MinCurvature:          0.05,
+			MinSpeedVariance:      0.01,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
+	})
+	if err != nil {
+		t.Fatalf("issue ticket: %v", err)
+	}
+
+	_, err = service.Click(context.Background(), ManualClickRequest{
+		Nickname:         "阿明",
+		Slug:             "feel",
+		Ticket:           ticket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: fingerprintProof("fp-1", ticket.Value, ticket.ChallengeNonce),
+		Behavior: ClickBehavior{
+			PointerType:     "mouse",
+			PressDurationMS: 120,
+			Trajectory: []ClickPointerSample{
+				{X: 100, Y: 100, T: 0},
+				{X: 100, Y: 100, T: 120},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected low movement human click to pass, got %v", err)
+	}
+}
+
+func TestManualClickServiceAcceptsShortLowMovementClick(t *testing.T) {
+	now := time.Unix(1710000000, 0)
+	store := &mockStore{
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+			},
+		},
+		result: vote.ClickResult{
+			Button: vote.Button{Key: "feel", Label: "有感觉吗", Count: 4, Enabled: true},
+			Delta:  1,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 4,
+			},
+		},
+	}
+	service := NewManualClickService(ManualClickServiceOptions{
+		Store: store,
+		Config: ManualClickConfig{
+			TicketTTL:             2 * time.Second,
+			IssueLimitPerSecond:   5,
+			ConsumeLimitPerSecond: 5,
+			RiskThreshold:         3,
+			BanDuration:           time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+			MinTrajectoryPoints:   4,
+			MaxTrajectoryPoints:   12,
+			MinPathDistance:       10,
+			MinDisplacement:       2,
+			MinCurvature:          0.05,
+			MinSpeedVariance:      0.01,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
+	})
+	if err != nil {
+		t.Fatalf("issue ticket: %v", err)
+	}
+
+	_, err = service.Click(context.Background(), ManualClickRequest{
+		Nickname:         "阿明",
+		Slug:             "feel",
+		Ticket:           ticket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: fingerprintProof("fp-1", ticket.Value, ticket.ChallengeNonce),
+		Behavior: ClickBehavior{
+			PointerType:     "mouse",
+			PressDurationMS: 5,
+			Trajectory: []ClickPointerSample{
+				{X: 100, Y: 100, T: 0},
+				{X: 100, Y: 100, T: 5},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected short low movement click to pass, got %v", err)
+	}
+}
+
+func TestManualClickServiceAcceptsFastHumanClick(t *testing.T) {
+	now := time.Unix(1710000000, 0)
+	store := &mockStore{
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+			},
+		},
+		result: vote.ClickResult{
+			Button: vote.Button{Key: "feel", Label: "有感觉吗", Count: 4, Enabled: true},
+			Delta:  1,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 4,
+			},
+		},
+	}
+	service := NewManualClickService(ManualClickServiceOptions{
+		Store: store,
+		Config: ManualClickConfig{
+			TicketTTL:             2 * time.Second,
+			IssueLimitPerSecond:   5,
+			ConsumeLimitPerSecond: 5,
+			RiskThreshold:         3,
+			BanDuration:           time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+			MinTrajectoryPoints:   4,
+			MaxTrajectoryPoints:   12,
+			MinPathDistance:       10,
+			MinDisplacement:       2,
+			MinCurvature:          0.05,
+			MinSpeedVariance:      0.01,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
+	})
+	if err != nil {
+		t.Fatalf("issue ticket: %v", err)
+	}
+
+	_, err = service.Click(context.Background(), ManualClickRequest{
+		Nickname:         "阿明",
+		Slug:             "feel",
+		Ticket:           ticket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: fingerprintProof("fp-1", ticket.Value, ticket.ChallengeNonce),
+		Behavior: ClickBehavior{
+			PointerType:     "mouse",
+			PressDurationMS: 6,
+			Trajectory: []ClickPointerSample{
+				{X: 100, Y: 100, T: 0},
+				{X: 104, Y: 102, T: 2},
+				{X: 109, Y: 107, T: 4},
+				{X: 113, Y: 110, T: 6},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected fast human click to pass, got %v", err)
 	}
 }
 

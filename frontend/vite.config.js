@@ -12,7 +12,11 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': 'http://127.0.0.1:2333',
+      '/api': {
+        target: 'http://127.0.0.1:2333',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })
