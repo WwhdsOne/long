@@ -24,7 +24,8 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 		}
 
 		var body struct {
-			Slug string `json:"slug"`
+			Slug            string `json:"slug"`
+			FingerprintHash string `json:"fingerprintHash"`
 		}
 		if !bindJSON(c, &body, map[string]string{
 			"error":   "INVALID_REQUEST",
@@ -34,9 +35,10 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 		}
 
 		ticket, err := options.ManualClick.IssueTicket(ctx, TicketIssueRequest{
-			Nickname: nickname,
-			Slug:     body.Slug,
-			ClientID: clientIdentifier(c),
+			Nickname:        nickname,
+			Slug:            body.Slug,
+			ClientID:        clientIdentifier(c),
+			FingerprintHash: body.FingerprintHash,
 		})
 		if err != nil {
 			if apiErr := manualClickRequestError(err); apiErr != nil {
@@ -55,9 +57,14 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 
 	router.POST("/api/buttons/:slug/click", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
-			Nickname          string `json:"nickname"`
-			RealtimeConnected bool   `json:"realtimeConnected"`
-			Ticket            string `json:"ticket"`
+			Nickname          string               `json:"nickname"`
+			RealtimeConnected bool                 `json:"realtimeConnected"`
+			Ticket            string               `json:"ticket"`
+			PointerType       string               `json:"pointerType"`
+			PressDurationMS   int64                `json:"pressDurationMs"`
+			Trajectory        []ClickPointerSample `json:"trajectory"`
+			FingerprintHash   string               `json:"fingerprintHash"`
+			FingerprintProof  string               `json:"fingerprintProof"`
 		}
 		if !bindJSON(c, &body, map[string]string{
 			"error":   "INVALID_REQUEST",
@@ -74,6 +81,13 @@ func registerButtonClickRoutes(router route.IRouter, options Options) {
 			ClientID:              clientIdentifier(c),
 			Ticket:                body.Ticket,
 			EntryType:             clickEntryHTTP,
+			FingerprintHash:       body.FingerprintHash,
+			FingerprintProof:      body.FingerprintProof,
+			Behavior: ClickBehavior{
+				PointerType:     body.PointerType,
+				PressDurationMS: body.PressDurationMS,
+				Trajectory:      body.Trajectory,
+			},
 		})
 		if apiErr != nil {
 			apiErr.writeTo(c)

@@ -49,6 +49,14 @@ type ManualClickConfig struct {
 	ConsumeLimitPerSecond int
 	RiskThreshold         int
 	BanDuration           time.Duration
+	MinPressDuration      time.Duration
+	MaxPressDuration      time.Duration
+	MinTrajectoryPoints   int
+	MaxTrajectoryPoints   int
+	MinPathDistance       float64
+	MinDisplacement       float64
+	MinCurvature          float64
+	MinSpeedVariance      float64
 }
 
 // CriticalHitConfig 暴击机制配置
@@ -127,11 +135,19 @@ type fileConfig struct {
 		JWTTTLSecond int    `yaml:"jwt_ttl_seconds"`
 	} `yaml:"player_auth"`
 	ManualClick struct {
-		TicketTTLMS           int `yaml:"ticket_ttl_ms"`
-		IssueLimitPerSecond   int `yaml:"issue_limit_per_second"`
-		ConsumeLimitPerSecond int `yaml:"consume_limit_per_second"`
-		RiskThreshold         int `yaml:"risk_threshold"`
-		BanMS                 int `yaml:"ban_ms"`
+		TicketTTLMS           int     `yaml:"ticket_ttl_ms"`
+		IssueLimitPerSecond   int     `yaml:"issue_limit_per_second"`
+		ConsumeLimitPerSecond int     `yaml:"consume_limit_per_second"`
+		RiskThreshold         int     `yaml:"risk_threshold"`
+		BanMS                 int     `yaml:"ban_ms"`
+		MinPressDurationMS    int     `yaml:"min_press_duration_ms"`
+		MaxPressDurationMS    int     `yaml:"max_press_duration_ms"`
+		MinTrajectoryPoints   int     `yaml:"min_trajectory_points"`
+		MaxTrajectoryPoints   int     `yaml:"max_trajectory_points"`
+		MinPathDistance       float64 `yaml:"min_path_distance"`
+		MinDisplacement       float64 `yaml:"min_displacement"`
+		MinCurvature          float64 `yaml:"min_curvature"`
+		MinSpeedVariance      float64 `yaml:"min_speed_variance"`
 	} `yaml:"manual_click"`
 	OSS struct {
 		AccessKeyID     string `yaml:"access_key_id"`
@@ -237,6 +253,14 @@ func loadFromConsul() (Config, consulSource, error) {
 			ConsumeLimitPerSecond: parsed.ManualClick.ConsumeLimitPerSecond,
 			RiskThreshold:         parsed.ManualClick.RiskThreshold,
 			BanDuration:           time.Duration(parsed.ManualClick.BanMS) * time.Millisecond,
+			MinPressDuration:      time.Duration(parsed.ManualClick.MinPressDurationMS) * time.Millisecond,
+			MaxPressDuration:      time.Duration(parsed.ManualClick.MaxPressDurationMS) * time.Millisecond,
+			MinTrajectoryPoints:   parsed.ManualClick.MinTrajectoryPoints,
+			MaxTrajectoryPoints:   parsed.ManualClick.MaxTrajectoryPoints,
+			MinPathDistance:       parsed.ManualClick.MinPathDistance,
+			MinDisplacement:       parsed.ManualClick.MinDisplacement,
+			MinCurvature:          parsed.ManualClick.MinCurvature,
+			MinSpeedVariance:      parsed.ManualClick.MinSpeedVariance,
 		},
 		OSS: OSSConfig{
 			AccessKeyID:     parsed.OSS.AccessKeyID,
@@ -295,6 +319,32 @@ func validate(config Config) error {
 		return errors.New("player_auth.jwt_secret is required")
 	case config.PlayerAuth.JWTTTL <= 0:
 		return errors.New("player_auth.jwt_ttl_seconds must be greater than 0")
+	case config.ManualClick.TicketTTL <= 0:
+		return errors.New("manual_click.ticket_ttl_ms must be greater than 0")
+	case config.ManualClick.IssueLimitPerSecond <= 0:
+		return errors.New("manual_click.issue_limit_per_second must be greater than 0")
+	case config.ManualClick.ConsumeLimitPerSecond <= 0:
+		return errors.New("manual_click.consume_limit_per_second must be greater than 0")
+	case config.ManualClick.RiskThreshold <= 0:
+		return errors.New("manual_click.risk_threshold must be greater than 0")
+	case config.ManualClick.BanDuration <= 0:
+		return errors.New("manual_click.ban_ms must be greater than 0")
+	case config.ManualClick.MinPressDuration <= 0:
+		return errors.New("manual_click.min_press_duration_ms must be greater than 0")
+	case config.ManualClick.MaxPressDuration <= config.ManualClick.MinPressDuration:
+		return errors.New("manual_click.max_press_duration_ms must be greater than min_press_duration_ms")
+	case config.ManualClick.MinTrajectoryPoints < 2:
+		return errors.New("manual_click.min_trajectory_points must be at least 2")
+	case config.ManualClick.MaxTrajectoryPoints < config.ManualClick.MinTrajectoryPoints:
+		return errors.New("manual_click.max_trajectory_points must be greater than or equal to min_trajectory_points")
+	case config.ManualClick.MinPathDistance <= 0:
+		return errors.New("manual_click.min_path_distance must be greater than 0")
+	case config.ManualClick.MinDisplacement <= 0:
+		return errors.New("manual_click.min_displacement must be greater than 0")
+	case config.ManualClick.MinCurvature <= 0:
+		return errors.New("manual_click.min_curvature must be greater than 0")
+	case config.ManualClick.MinSpeedVariance <= 0:
+		return errors.New("manual_click.min_speed_variance must be greater than 0")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeyID) == "":
 		return errors.New("oss.access_key_id is required when oss is configured")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeySecret) == "":

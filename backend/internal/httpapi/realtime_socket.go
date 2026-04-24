@@ -33,10 +33,15 @@ const (
 )
 
 type realtimeClientMessage struct {
-	Type     string `json:"type"`
-	Nickname string `json:"nickname"`
-	Slug     string `json:"slug"`
-	Ticket   string `json:"ticket"`
+	Type             string               `json:"type"`
+	Nickname         string               `json:"nickname"`
+	Slug             string               `json:"slug"`
+	Ticket           string               `json:"ticket"`
+	PointerType      string               `json:"pointerType"`
+	PressDurationMS  int64                `json:"pressDurationMs"`
+	Trajectory       []ClickPointerSample `json:"trajectory"`
+	FingerprintHash  string               `json:"fingerprintHash"`
+	FingerprintProof string               `json:"fingerprintProof"`
 }
 
 type realtimeSnapshotMessage struct {
@@ -227,6 +232,13 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 			ClientID:              s.clientID,
 			Ticket:                message.Ticket,
 			EntryType:             clickEntryWS,
+			FingerprintHash:       message.FingerprintHash,
+			FingerprintProof:      message.FingerprintProof,
+			Behavior: ClickBehavior{
+				PointerType:     message.PointerType,
+				PressDurationMS: message.PressDurationMS,
+				Trajectory:      message.Trajectory,
+			},
 		})
 		if apiErr != nil {
 			return send(s.protocolError(apiErr.Code, apiErr.Message))

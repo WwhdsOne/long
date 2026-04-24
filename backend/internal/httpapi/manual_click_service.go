@@ -3,16 +3,19 @@ package httpapi
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"io"
 	"log"
+	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"long/internal/ratelimit"
 	"long/internal/vote"
 )
 
@@ -23,34 +26,61 @@ const (
 
 // ClickTicket 描述单次手动点击用的短时票据。
 type ClickTicket struct {
-	Value     string `json:"ticket"`
-	IssuedAt  int64  `json:"issuedAt"`
-	ExpiresAt int64  `json:"expiresAt"`
+	Value          string `json:"ticket"`
+	IssuedAt       int64  `json:"issuedAt"`
+	ExpiresAt      int64  `json:"expiresAt"`
+	ChallengeNonce string `json:"challengeNonce"`
 }
 
 // TicketIssueRequest 描述签发点击票据所需的最小上下文。
 type TicketIssueRequest struct {
-	Nickname string
-	Slug     string
-	ClientID string
+	Nickname        string
+	Slug            string
+	ClientID        string
+	FingerprintHash string
+}
+
+// ClickPointerSample 描述一次点击中的轨迹点。
+type ClickPointerSample struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	T int64   `json:"t"`
+}
+
+// ClickBehavior 描述前端上报的交互行为信号。
+type ClickBehavior struct {
+	PointerType     string               `json:"pointerType"`
+	PressDurationMS int64                `json:"pressDurationMs"`
+	Trajectory      []ClickPointerSample `json:"trajectory"`
 }
 
 // ManualClickRequest 描述一次手动点击协议载荷。
 type ManualClickRequest struct {
-	Nickname  string
-	Slug      string
-	Ticket    string
-	ClientID  string
-	EntryType string
+	Nickname         string
+	Slug             string
+	Ticket           string
+	ClientID         string
+	EntryType        string
+	FingerprintHash  string
+	FingerprintProof string
+	Behavior         ClickBehavior
 }
 
-// ManualClickConfig 为单体版票据与风控提供最小可调参数。
+// ManualClickConfig 为单体版票据与风控提供可调参数。
 type ManualClickConfig struct {
 	TicketTTL             time.Duration
 	IssueLimitPerSecond   int
 	ConsumeLimitPerSecond int
 	RiskThreshold         int
 	BanDuration           time.Duration
+	MinPressDuration      time.Duration
+	MaxPressDuration      time.Duration
+	MinTrajectoryPoints   int
+	MaxTrajectoryPoints   int
+	MinPathDistance       float64
+	MinDisplacement       float64
+	MinCurvature          float64
+	MinSpeedVariance      float64
 }
 
 // ManualClickServiceOptions 描述手动点击服务依赖。
@@ -63,11 +93,12 @@ type ManualClickServiceOptions struct {
 }
 
 type manualClickTicketRecord struct {
-	Nickname  string
-	Slug      string
-	IssuedAt  time.Time
-	ExpiresAt time.Time
-	Nonce     string
+	Nickname        string
+	Slug            string
+	IssuedAt        time.Time
+	ExpiresAt       time.Time
+	Nonce           string
+	FingerprintHash string
 }
 
 type manualClickUserState struct {
@@ -166,21 +197,22 @@ func NewManualClickService(options ManualClickServiceOptions) *ManualClickServic
 
 // UpdateConfig 允许上层在运行时替换风控参数。
 func (s *ManualClickService) UpdateConfig(config ManualClickConfig) {
-	s.config.Store(normalizeManualClickConfig(config))
+	s.config.Store(config)
 }
 
 func (s *ManualClickService) currentConfig() ManualClickConfig {
 	if raw := s.config.Load(); raw != nil {
 		return raw.(ManualClickConfig)
 	}
-	return normalizeManualClickConfig(ManualClickConfig{})
+	return ManualClickConfig{}
 }
 
 // IssueTicket 为指定玩家和按钮签发一次性短时票据。
 func (s *ManualClickService) IssueTicket(_ context.Context, request TicketIssueRequest) (ClickTicket, error) {
 	nickname := strings.TrimSpace(request.Nickname)
 	slug := strings.TrimSpace(request.Slug)
-	if nickname == "" || slug == "" {
+	fingerprintHash := strings.TrimSpace(request.FingerprintHash)
+	if nickname == "" || slug == "" || fingerprintHash == "" {
 		return ClickTicket{}, &manualClickError{kind: manualClickErrorRetryRequired}
 	}
 
@@ -193,7 +225,7 @@ func (s *ManualClickService) IssueTicket(_ context.Context, request TicketIssueR
 	s.cleanupLocked(now)
 	userState := s.userStateLocked(nickname)
 	if retryErr := s.blockedErrorLocked(now, userState); retryErr != nil {
-		s.recordEventLocked(now, request, "ticket_banned", userState)
+		s.recordTicketEventLocked(now, request, "ticket_banned", userState)
 		return ClickTicket{}, retryErr
 	}
 	if retryErr := s.allowIssueLocked(now, request, userState, config); retryErr != nil {
@@ -206,20 +238,22 @@ func (s *ManualClickService) IssueTicket(_ context.Context, request TicketIssueR
 	}
 
 	record := manualClickTicketRecord{
-		Nickname:  nickname,
-		Slug:      slug,
-		IssuedAt:  now,
-		ExpiresAt: now.Add(config.TicketTTL),
-		Nonce:     nonce,
+		Nickname:        nickname,
+		Slug:            slug,
+		IssuedAt:        now,
+		ExpiresAt:       now.Add(config.TicketTTL),
+		Nonce:           nonce,
+		FingerprintHash: fingerprintHash,
 	}
 	s.tickets[token] = record
 	userState.issuedAt = append(userState.issuedAt, now)
 	userState.abnormalCount = 0
 
 	return ClickTicket{
-		Value:     token,
-		IssuedAt:  record.IssuedAt.Unix(),
-		ExpiresAt: record.ExpiresAt.Unix(),
+		Value:          token,
+		IssuedAt:       record.IssuedAt.Unix(),
+		ExpiresAt:      record.ExpiresAt.Unix(),
+		ChallengeNonce: record.Nonce,
 	}, nil
 }
 
@@ -239,11 +273,7 @@ func (s *ManualClickService) Click(ctx context.Context, request ManualClickReque
 	s.cleanupLocked(now)
 	userState := s.userStateLocked(nickname)
 	if retryErr := s.blockedErrorLocked(now, userState); retryErr != nil {
-		s.recordEventLocked(now, TicketIssueRequest{
-			Nickname: nickname,
-			Slug:     slug,
-			ClientID: request.ClientID,
-		}, "click_banned", userState)
+		s.recordManualEventLocked(now, request, "click_banned", userState)
 		s.mu.Unlock()
 		return vote.ClickResult{}, retryErr
 	}
@@ -272,6 +302,26 @@ func (s *ManualClickService) Click(ctx context.Context, request ManualClickReque
 	}
 	if record.Slug != slug {
 		err := s.markAbnormalLocked(now, request, userState, manualClickErrorRetryRequired, "ticket_slug_mismatch", 0)
+		s.mu.Unlock()
+		return vote.ClickResult{}, err
+	}
+	if strings.TrimSpace(request.FingerprintHash) == "" {
+		err := s.markAbnormalLocked(now, request, userState, manualClickErrorRetryRequired, "fingerprint_missing", 0)
+		s.mu.Unlock()
+		return vote.ClickResult{}, err
+	}
+	if record.FingerprintHash != strings.TrimSpace(request.FingerprintHash) {
+		err := s.markAbnormalLocked(now, request, userState, manualClickErrorRetryRequired, "fingerprint_mismatch", 0)
+		s.mu.Unlock()
+		return vote.ClickResult{}, err
+	}
+	if !validFingerprintProof(record.FingerprintHash, ticketValue, record.Nonce, request.FingerprintProof) {
+		err := s.markAbnormalLocked(now, request, userState, manualClickErrorRetryRequired, "fingerprint_proof_invalid", 0)
+		s.mu.Unlock()
+		return vote.ClickResult{}, err
+	}
+	if err := validateClickBehavior(request.Behavior, config); err != nil {
+		err = s.markAbnormalLocked(now, request, userState, manualClickErrorRetryRequired, err.Error(), 0)
 		s.mu.Unlock()
 		return vote.ClickResult{}, err
 	}
@@ -313,7 +363,6 @@ func (s *ManualClickService) userStateLocked(nickname string) *manualClickUserSt
 }
 
 func (s *ManualClickService) cleanupLocked(now time.Time) {
-	config := s.currentConfig()
 	cutoff := now.Add(-time.Second)
 	for nickname, state := range s.users {
 		state.issuedAt = filterRecentTimes(state.issuedAt, cutoff)
@@ -331,10 +380,6 @@ func (s *ManualClickService) cleanupLocked(now time.Time) {
 
 	if len(s.events) > 256 {
 		s.events = append([]ManualClickRiskEvent(nil), s.events[len(s.events)-128:]...)
-	}
-
-	if config.TicketTTL <= 0 {
-		s.UpdateConfig(config)
 	}
 }
 
@@ -354,10 +399,11 @@ func (s *ManualClickService) allowIssueLocked(now time.Time, request TicketIssue
 		return nil
 	}
 	return s.markAbnormalLocked(now, ManualClickRequest{
-		Nickname:  request.Nickname,
-		Slug:      request.Slug,
-		ClientID:  request.ClientID,
-		EntryType: clickEntryHTTP,
+		Nickname:        request.Nickname,
+		Slug:            request.Slug,
+		ClientID:        request.ClientID,
+		EntryType:       clickEntryHTTP,
+		FingerprintHash: request.FingerprintHash,
 	}, state, manualClickErrorTooFrequent, "ticket_issue_rate_limited", time.Second)
 }
 
@@ -379,23 +425,31 @@ func (s *ManualClickService) markAbnormalLocked(now time.Time, request ManualCli
 	if retryAfter <= 0 {
 		retryAfter = time.Second
 	}
-	s.recordEventLocked(now, TicketIssueRequest{
-		Nickname: request.Nickname,
-		Slug:     request.Slug,
-		ClientID: request.ClientID,
-	}, reason, state)
+	s.recordManualEventLocked(now, request, reason, state)
 	return &manualClickError{
 		kind:       kind,
 		retryAfter: retryAfter,
 	}
 }
 
-func (s *ManualClickService) recordEventLocked(now time.Time, request TicketIssueRequest, reason string, state *manualClickUserState) {
+func (s *ManualClickService) recordTicketEventLocked(now time.Time, request TicketIssueRequest, reason string, state *manualClickUserState) {
+	s.recordEventLocked(now, request.Nickname, request.ClientID, request.Slug, clickEntryHTTP, reason, state)
+}
+
+func (s *ManualClickService) recordManualEventLocked(now time.Time, request ManualClickRequest, reason string, state *manualClickUserState) {
+	entryType := strings.TrimSpace(request.EntryType)
+	if entryType == "" {
+		entryType = clickEntryHTTP
+	}
+	s.recordEventLocked(now, request.Nickname, request.ClientID, request.Slug, entryType, reason, state)
+}
+
+func (s *ManualClickService) recordEventLocked(now time.Time, nickname string, clientID string, slug string, entryType string, reason string, state *manualClickUserState) {
 	event := ManualClickRiskEvent{
-		Nickname:      strings.TrimSpace(request.Nickname),
-		ClientID:      strings.TrimSpace(request.ClientID),
-		Slug:          strings.TrimSpace(request.Slug),
-		EntryType:     clickEntryHTTP,
+		Nickname:      strings.TrimSpace(nickname),
+		ClientID:      strings.TrimSpace(clientID),
+		Slug:          strings.TrimSpace(slug),
+		EntryType:     strings.TrimSpace(entryType),
 		Reason:        reason,
 		AbnormalCount: state.abnormalCount,
 		CreatedAt:     now.Unix(),
@@ -405,26 +459,137 @@ func (s *ManualClickService) recordEventLocked(now time.Time, request TicketIssu
 		event.BanEndedAt = state.bannedUntil.Unix()
 	}
 	s.events = append(s.events, event)
-	log.Printf("manual_click_risk nickname=%s ip=%s slug=%s reason=%s abnormal=%d ban_end=%d", event.Nickname, event.ClientID, event.Slug, event.Reason, event.AbnormalCount, event.BanEndedAt)
+	log.Printf("manual_click_risk nickname=%s ip=%s slug=%s entry=%s reason=%s abnormal=%d ban_end=%d", event.Nickname, event.ClientID, event.Slug, event.EntryType, event.Reason, event.AbnormalCount, event.BanEndedAt)
 }
 
-func normalizeManualClickConfig(config ManualClickConfig) ManualClickConfig {
-	if config.TicketTTL <= 0 {
-		config.TicketTTL = 2 * time.Second
+func validFingerprintProof(fingerprintHash string, ticket string, challengeNonce string, provided string) bool {
+	expected := fingerprintProof(fingerprintHash, ticket, challengeNonce)
+	if expected == "" || strings.TrimSpace(provided) == "" {
+		return false
 	}
-	if config.IssueLimitPerSecond <= 0 {
-		config.IssueLimitPerSecond = 6
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(strings.TrimSpace(provided))) == 1
+}
+
+func fingerprintProof(fingerprintHash string, ticket string, challengeNonce string) string {
+	fingerprintHash = strings.TrimSpace(fingerprintHash)
+	ticket = strings.TrimSpace(ticket)
+	challengeNonce = strings.TrimSpace(challengeNonce)
+	if fingerprintHash == "" || ticket == "" || challengeNonce == "" {
+		return ""
 	}
-	if config.ConsumeLimitPerSecond <= 0 {
-		config.ConsumeLimitPerSecond = 6
+
+	sum := sha256.Sum256([]byte(fingerprintHash + ":" + ticket + ":" + challengeNonce))
+	return hex.EncodeToString(sum[:])
+}
+
+func validateClickBehavior(behavior ClickBehavior, config ManualClickConfig) error {
+	if behavior.PressDurationMS < config.MinPressDuration.Milliseconds() {
+		return errors.New("press_duration_too_short")
 	}
-	if config.RiskThreshold <= 0 {
-		config.RiskThreshold = 4
+	if behavior.PressDurationMS > config.MaxPressDuration.Milliseconds() {
+		return errors.New("press_duration_too_long")
 	}
-	if config.BanDuration <= 0 {
-		config.BanDuration = 10 * time.Minute
+
+	points := normalizeTrajectory(behavior.Trajectory, config.MaxTrajectoryPoints)
+	if len(points) < config.MinTrajectoryPoints {
+		return errors.New("trajectory_points_too_few")
 	}
-	return config
+
+	metrics, ok := computeTrajectoryMetrics(points)
+	if !ok {
+		return errors.New("trajectory_invalid")
+	}
+	if metrics.pathDistance < config.MinPathDistance {
+		return errors.New("trajectory_path_too_short")
+	}
+	if metrics.displacement < config.MinDisplacement {
+		return errors.New("trajectory_displacement_too_short")
+	}
+	if metrics.curvature < config.MinCurvature {
+		return errors.New("trajectory_curvature_too_low")
+	}
+	if metrics.speedVariance < config.MinSpeedVariance {
+		return errors.New("trajectory_speed_variance_too_low")
+	}
+
+	return nil
+}
+
+type trajectoryMetrics struct {
+	pathDistance  float64
+	displacement  float64
+	curvature     float64
+	speedVariance float64
+}
+
+func normalizeTrajectory(points []ClickPointerSample, maxPoints int) []ClickPointerSample {
+	if len(points) == 0 {
+		return nil
+	}
+	normalized := make([]ClickPointerSample, 0, len(points))
+	for _, point := range points {
+		if math.IsNaN(point.X) || math.IsNaN(point.Y) || math.IsInf(point.X, 0) || math.IsInf(point.Y, 0) {
+			continue
+		}
+		normalized = append(normalized, point)
+	}
+	if maxPoints > 0 && len(normalized) > maxPoints {
+		normalized = normalized[len(normalized)-maxPoints:]
+	}
+	return normalized
+}
+
+func computeTrajectoryMetrics(points []ClickPointerSample) (trajectoryMetrics, bool) {
+	if len(points) < 2 {
+		return trajectoryMetrics{}, false
+	}
+
+	metrics := trajectoryMetrics{}
+	speeds := make([]float64, 0, len(points)-1)
+	for index := 1; index < len(points); index++ {
+		dx := points[index].X - points[index-1].X
+		dy := points[index].Y - points[index-1].Y
+		dt := points[index].T - points[index-1].T
+		if dt <= 0 {
+			return trajectoryMetrics{}, false
+		}
+
+		distance := math.Hypot(dx, dy)
+		metrics.pathDistance += distance
+		speeds = append(speeds, distance/float64(dt))
+
+		if index >= 2 {
+			prevDX := points[index-1].X - points[index-2].X
+			prevDY := points[index-1].Y - points[index-2].Y
+			prevAngle := math.Atan2(prevDY, prevDX)
+			nextAngle := math.Atan2(dy, dx)
+			turn := math.Abs(nextAngle - prevAngle)
+			if turn > math.Pi {
+				turn = 2*math.Pi - turn
+			}
+			metrics.curvature += turn
+		}
+	}
+
+	metrics.displacement = math.Hypot(points[len(points)-1].X-points[0].X, points[len(points)-1].Y-points[0].Y)
+
+	mean := 0.0
+	for _, speed := range speeds {
+		mean += speed
+	}
+	mean /= float64(len(speeds))
+	if mean <= 0 {
+		return trajectoryMetrics{}, false
+	}
+
+	variance := 0.0
+	for _, speed := range speeds {
+		diff := speed - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(speeds))
+	metrics.speedVariance = math.Sqrt(variance) / mean
+	return metrics, true
 }
 
 func filterRecentTimes(items []time.Time, cutoff time.Time) []time.Time {
@@ -436,5 +601,3 @@ func filterRecentTimes(items []time.Time, cutoff time.Time) []time.Time {
 	}
 	return filtered
 }
-
-var _ = ratelimit.ErrTooManyRequests

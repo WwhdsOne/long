@@ -17,6 +17,7 @@ import {
 import { formatRarityLabel, getRarityClassName, splitEquipmentName } from '../utils/rarity'
 import {createRealtimeTransport} from '../utils/realtimeTransport'
 import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
+import { buildFingerprintProof, collectFingerprintHash, createClickBehaviorTracker } from '../utils/manualClickSignals'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
@@ -92,6 +93,7 @@ const cosmeticDraft = ref(createEmptyCosmeticLoadout())
 const shopCatalog = ref([])
 const lastForgeResult = ref(null)
 const cosmeticBursts = ref({})
+const fingerprintHash = ref('')
 
 let realtimeTransport
 let starlightTimer = 0
@@ -100,6 +102,8 @@ let lastBossResourceVersion = ''
 const burstTimers = new Map()
 const cosmeticTimers = new Map()
 const pendingClickSources = new Map()
+const clickBehaviorTracker = createClickBehaviorTracker()
+let fingerprintPromise
 
 const buttonCount = computed(() => buttonTotalCount.value || buttons.value.length)
 const totalVotes = computed(() =>
@@ -1124,6 +1128,41 @@ function clearCosmeticBurst(key) {
   cosmeticBursts.value = nextBursts
 }
 
+function handleGlobalPointerMove(event) {
+  clickBehaviorTracker.handleGlobalPointerMove(event)
+}
+
+function handlePressStart(key, event) {
+  clickBehaviorTracker.handlePressStart(key, event)
+}
+
+function handlePressEnd(key, event) {
+  clickBehaviorTracker.handlePressEnd(key, event)
+}
+
+function handlePressCancel(key) {
+  clickBehaviorTracker.handlePressCancel(key)
+}
+
+async function ensureFingerprintHash() {
+  if (fingerprintHash.value) {
+    return fingerprintHash.value
+  }
+  if (!fingerprintPromise) {
+    fingerprintPromise = collectFingerprintHash()
+  }
+  fingerprintHash.value = await fingerprintPromise
+  return fingerprintHash.value
+}
+
+function consumeClickBehavior(key) {
+  const behavior = clickBehaviorTracker.consume(key)
+  if (!behavior) {
+    throw new Error('操作采样失败，请重试。')
+  }
+  return behavior
+}
+
 function triggerCosmeticBurst(key, options = {}) {
   const effect = resolveCosmeticEffectConfig(shopCatalog.value, equippedCosmetics.value, {
     mode: options.mode === 'auto' ? 'auto' : 'normal',
@@ -1277,12 +1316,16 @@ async function toggleAutoClick() {
 }
 
 async function requestClickTicket(key) {
+  const nextFingerprintHash = await ensureFingerprintHash()
   const response = await fetch('/api/click-tickets', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({slug: key}),
+    body: JSON.stringify({
+      slug: key,
+      fingerprintHash: nextFingerprintHash,
+    }),
   })
 
   if (!response.ok) {
@@ -1291,10 +1334,15 @@ async function requestClickTicket(key) {
 
   const payload = await response.json()
   const ticket = String(payload?.ticket || '').trim()
-  if (!ticket) {
+  const challengeNonce = String(payload?.challengeNonce || '').trim()
+  if (!ticket || !challengeNonce) {
     throw new Error('操作已过期，请重试。')
   }
-  return ticket
+  return {
+    ticket,
+    challengeNonce,
+    fingerprintHash: nextFingerprintHash,
+  }
 }
 
 async function loadState() {
@@ -1329,9 +1377,16 @@ async function clickButton(key, options = {}) {
   errorMessage.value = ''
 
   try {
-    const ticket = await requestClickTicket(key)
+    const ticketInfo = await requestClickTicket(key)
+    const behavior = consumeClickBehavior(key)
+    behavior.fingerprintHash = ticketInfo.fingerprintHash
+    behavior.fingerprintProof = await buildFingerprintProof({
+      fingerprintHash: ticketInfo.fingerprintHash,
+      ticket: ticketInfo.ticket,
+      challengeNonce: ticketInfo.challengeNonce,
+    })
 
-    if (ensureRealtimeTransport().sendClick(key, ticket)) {
+    if (ensureRealtimeTransport().sendClick(key, ticketInfo.ticket, behavior)) {
       return
     }
 
@@ -1340,7 +1395,7 @@ async function clickButton(key, options = {}) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(buildClickRequestBody(ticket, liveConnected.value)),
+      body: JSON.stringify(buildClickRequestBody(ticketInfo.ticket, liveConnected.value, behavior)),
     })
 
     if (!response.ok) {
@@ -1630,6 +1685,7 @@ async function loadPlayerSession() {
 }
 
 onMounted(async () => {
+  window.addEventListener('pointermove', handleGlobalPointerMove, {passive: true})
   restoreCachedLatestAnnouncement()
   await loadPlayerSession()
   await loadState()
@@ -1637,6 +1693,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('pointermove', handleGlobalPointerMove)
+  clickBehaviorTracker.clear()
   realtimeTransport?.close()
   clearStarlightTimer()
   burstTimers.forEach((timer) => window.clearTimeout(timer))
@@ -2769,6 +2827,9 @@ onBeforeUnmount(() => {
                 type="button"
                 :disabled="pendingKeys.has(button.key) || !isLoggedIn"
                 :aria-label="`${button.label}，当前 ${button.count} 票`"
+                @pointerdown="handlePressStart(button.key, $event)"
+                @pointerup="handlePressEnd(button.key, $event)"
+                @pointercancel="handlePressCancel(button.key)"
                 @click="clickButton(button.key)"
             >
               <span class="vote-card__shine"></span>

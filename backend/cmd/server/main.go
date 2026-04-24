@@ -96,6 +96,14 @@ func run() error {
 			ConsumeLimitPerSecond: cfg.ManualClick.ConsumeLimitPerSecond,
 			RiskThreshold:         cfg.ManualClick.RiskThreshold,
 			BanDuration:           cfg.ManualClick.BanDuration,
+			MinPressDuration:      cfg.ManualClick.MinPressDuration,
+			MaxPressDuration:      cfg.ManualClick.MaxPressDuration,
+			MinTrajectoryPoints:   cfg.ManualClick.MinTrajectoryPoints,
+			MaxTrajectoryPoints:   cfg.ManualClick.MaxTrajectoryPoints,
+			MinPathDistance:       cfg.ManualClick.MinPathDistance,
+			MinDisplacement:       cfg.ManualClick.MinDisplacement,
+			MinCurvature:          cfg.ManualClick.MinCurvature,
+			MinSpeedVariance:      cfg.ManualClick.MinSpeedVariance,
 		},
 	})
 	autoClickService := httpapi.NewAutoClickService(httpapi.AutoClickServiceOptions{

@@ -4,14 +4,36 @@ import { buildClickRequestBody, mergeClickFallbackState } from './clickResponse'
 
 describe('clickResponse', () => {
   it('会把票据和实时连接状态带进点击请求体', () => {
-    expect(buildClickRequestBody('ticket-1', true)).toEqual({
+    expect(buildClickRequestBody('ticket-1', true, {
+      pointerType: 'mouse',
+      pressDurationMs: 120,
+      trajectory: [{ x: 1, y: 2, t: 0 }],
+      fingerprintHash: 'fp-1',
+      fingerprintProof: 'proof-1',
+    })).toEqual({
       ticket: 'ticket-1',
       realtimeConnected: true,
+      pointerType: 'mouse',
+      pressDurationMs: 120,
+      trajectory: [{ x: 1, y: 2, t: 0 }],
+      fingerprintHash: 'fp-1',
+      fingerprintProof: 'proof-1',
     })
 
-    expect(buildClickRequestBody('ticket-1', false)).toEqual({
+    expect(buildClickRequestBody('ticket-1', false, {
+      pointerType: 'mouse',
+      pressDurationMs: 120,
+      trajectory: [{ x: 1, y: 2, t: 0 }],
+      fingerprintHash: 'fp-1',
+      fingerprintProof: 'proof-1',
+    })).toEqual({
       ticket: 'ticket-1',
       realtimeConnected: false,
+      pointerType: 'mouse',
+      pressDurationMs: 120,
+      trajectory: [{ x: 1, y: 2, t: 0 }],
+      fingerprintHash: 'fp-1',
+      fingerprintProof: 'proof-1',
     })
   })
 

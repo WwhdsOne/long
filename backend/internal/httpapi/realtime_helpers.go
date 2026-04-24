@@ -30,6 +30,9 @@ type clickRequestContext struct {
 	ClientID              string
 	Ticket                string
 	EntryType             string
+	FingerprintHash       string
+	FingerprintProof      string
+	Behavior              ClickBehavior
 }
 
 func (e *apiResponseError) writeTo(c *app.RequestContext) {
@@ -168,11 +171,14 @@ func executeButtonClick(ctx context.Context, options Options, request clickReque
 
 	if options.ManualClick != nil {
 		result, err := options.ManualClick.Click(ctx, ManualClickRequest{
-			Nickname:  nickname,
-			Slug:      request.Slug,
-			Ticket:    request.Ticket,
-			ClientID:  request.ClientID,
-			EntryType: request.EntryType,
+			Nickname:         nickname,
+			Slug:             request.Slug,
+			Ticket:           request.Ticket,
+			ClientID:         request.ClientID,
+			EntryType:        request.EntryType,
+			FingerprintHash:  request.FingerprintHash,
+			FingerprintProof: request.FingerprintProof,
+			Behavior:         request.Behavior,
 		})
 		if err != nil {
 			return "", vote.ClickResult{}, clickRequestError(err)

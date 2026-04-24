@@ -33,6 +33,14 @@ func TestManualClickServiceAcceptsFreshTicketOnce(t *testing.T) {
 			ConsumeLimitPerSecond: 5,
 			RiskThreshold:         3,
 			BanDuration:           time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+			MinTrajectoryPoints:   4,
+			MaxTrajectoryPoints:   12,
+			MinPathDistance:       10,
+			MinDisplacement:       2,
+			MinCurvature:          0.05,
+			MinSpeedVariance:      0.01,
 		},
 		Now: func() time.Time {
 			return now
@@ -40,20 +48,24 @@ func TestManualClickServiceAcceptsFreshTicketOnce(t *testing.T) {
 	})
 
 	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
-		Nickname: "阿明",
-		Slug:     "feel",
-		ClientID: "127.0.0.1",
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
 	})
 	if err != nil {
 		t.Fatalf("issue ticket: %v", err)
 	}
 
 	result, err := service.Click(context.Background(), ManualClickRequest{
-		Nickname:  "阿明",
-		Slug:      "feel",
-		Ticket:    ticket.Value,
-		ClientID:  "127.0.0.1",
-		EntryType: clickEntryHTTP,
+		Nickname:         "阿明",
+		Slug:             "feel",
+		Ticket:           ticket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: fingerprintProof("fp-1", ticket.Value, ticket.ChallengeNonce),
+		Behavior:         validClickBehavior(),
 	})
 	if err != nil {
 		t.Fatalf("consume ticket: %v", err)
@@ -66,11 +78,14 @@ func TestManualClickServiceAcceptsFreshTicketOnce(t *testing.T) {
 	}
 
 	_, err = service.Click(context.Background(), ManualClickRequest{
-		Nickname:  "阿明",
-		Slug:      "feel",
-		Ticket:    ticket.Value,
-		ClientID:  "127.0.0.1",
-		EntryType: clickEntryHTTP,
+		Nickname:         "阿明",
+		Slug:             "feel",
+		Ticket:           ticket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: "bad-proof",
+		Behavior:         validClickBehavior(),
 	})
 	if !manualClickRequiresRetry(err) {
 		t.Fatalf("expected reused ticket to require retry, got %v", err)
@@ -93,6 +108,14 @@ func TestManualClickServiceRejectsExpiredOrMismatchedTicket(t *testing.T) {
 			ConsumeLimitPerSecond: 5,
 			RiskThreshold:         3,
 			BanDuration:           time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+			MinTrajectoryPoints:   4,
+			MaxTrajectoryPoints:   12,
+			MinPathDistance:       10,
+			MinDisplacement:       2,
+			MinCurvature:          0.05,
+			MinSpeedVariance:      0.01,
 		},
 		Now: func() time.Time {
 			return now
@@ -100,20 +123,24 @@ func TestManualClickServiceRejectsExpiredOrMismatchedTicket(t *testing.T) {
 	})
 
 	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
-		Nickname: "阿明",
-		Slug:     "feel",
-		ClientID: "127.0.0.1",
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
 	})
 	if err != nil {
 		t.Fatalf("issue ticket: %v", err)
 	}
 
 	_, err = service.Click(context.Background(), ManualClickRequest{
-		Nickname:  "阿明",
-		Slug:      "other",
-		Ticket:    ticket.Value,
-		ClientID:  "127.0.0.1",
-		EntryType: clickEntryHTTP,
+		Nickname:         "阿明",
+		Slug:             "other",
+		Ticket:           ticket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: fingerprintProof("fp-1", ticket.Value, ticket.ChallengeNonce),
+		Behavior:         validClickBehavior(),
 	})
 	if !manualClickRequiresRetry(err) {
 		t.Fatalf("expected mismatched slug to require retry, got %v", err)
@@ -121,9 +148,10 @@ func TestManualClickServiceRejectsExpiredOrMismatchedTicket(t *testing.T) {
 
 	now = now.Add(3 * time.Second)
 	expiredTicket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
-		Nickname: "阿明",
-		Slug:     "feel",
-		ClientID: "127.0.0.1",
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
 	})
 	if err != nil {
 		t.Fatalf("issue expired ticket: %v", err)
@@ -131,11 +159,14 @@ func TestManualClickServiceRejectsExpiredOrMismatchedTicket(t *testing.T) {
 
 	now = now.Add(2 * time.Second)
 	_, err = service.Click(context.Background(), ManualClickRequest{
-		Nickname:  "阿明",
-		Slug:      "feel",
-		Ticket:    expiredTicket.Value,
-		ClientID:  "127.0.0.1",
-		EntryType: clickEntryHTTP,
+		Nickname:         "阿明",
+		Slug:             "feel",
+		Ticket:           expiredTicket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: fingerprintProof("fp-1", expiredTicket.Value, expiredTicket.ChallengeNonce),
+		Behavior:         validClickBehavior(),
 	})
 	if !manualClickRequiresRetry(err) {
 		t.Fatalf("expected expired ticket to require retry, got %v", err)
@@ -158,6 +189,14 @@ func TestManualClickServiceBansRepeatedAbuseTemporarily(t *testing.T) {
 			ConsumeLimitPerSecond: 5,
 			RiskThreshold:         2,
 			BanDuration:           2 * time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+			MinTrajectoryPoints:   4,
+			MaxTrajectoryPoints:   12,
+			MinPathDistance:       10,
+			MinDisplacement:       2,
+			MinCurvature:          0.05,
+			MinSpeedVariance:      0.01,
 		},
 		Now: func() time.Time {
 			return now
@@ -165,25 +204,28 @@ func TestManualClickServiceBansRepeatedAbuseTemporarily(t *testing.T) {
 	})
 
 	if _, err := service.IssueTicket(context.Background(), TicketIssueRequest{
-		Nickname: "阿明",
-		Slug:     "feel",
-		ClientID: "127.0.0.1",
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
 	}); err != nil {
 		t.Fatalf("first issue ticket: %v", err)
 	}
 
 	if _, err := service.IssueTicket(context.Background(), TicketIssueRequest{
-		Nickname: "阿明",
-		Slug:     "feel",
-		ClientID: "127.0.0.1",
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
 	}); !manualClickTooFrequent(err) {
 		t.Fatalf("expected second issue to be throttled, got %v", err)
 	}
 
 	_, err := service.IssueTicket(context.Background(), TicketIssueRequest{
-		Nickname: "阿明",
-		Slug:     "feel",
-		ClientID: "127.0.0.1",
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
 	})
 	if !manualClickTooFrequent(err) {
 		t.Fatalf("expected third issue to be blocked, got %v", err)
@@ -194,10 +236,93 @@ func TestManualClickServiceBansRepeatedAbuseTemporarily(t *testing.T) {
 
 	now = now.Add(3 * time.Minute)
 	if _, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
+	}); err != nil {
+		t.Fatalf("expected issue to recover after ban window, got %v", err)
+	}
+}
+
+func TestManualClickServiceRejectsMissingFingerprintOrBehavior(t *testing.T) {
+	now := time.Unix(1710000000, 0)
+	service := NewManualClickService(ManualClickServiceOptions{
+		Store: &mockStore{
+			state: vote.State{
+				Buttons: []vote.Button{
+					{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+				},
+			},
+		},
+		Config: ManualClickConfig{
+			TicketTTL:             2 * time.Second,
+			IssueLimitPerSecond:   5,
+			ConsumeLimitPerSecond: 5,
+			RiskThreshold:         3,
+			BanDuration:           time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+			MinTrajectoryPoints:   4,
+			MaxTrajectoryPoints:   12,
+			MinPathDistance:       10,
+			MinDisplacement:       2,
+			MinCurvature:          0.05,
+			MinSpeedVariance:      0.01,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	if _, err := service.IssueTicket(context.Background(), TicketIssueRequest{
 		Nickname: "阿明",
 		Slug:     "feel",
 		ClientID: "127.0.0.1",
-	}); err != nil {
-		t.Fatalf("expected issue to recover after ban window, got %v", err)
+	}); !manualClickRequiresRetry(err) {
+		t.Fatalf("expected missing fingerprint on issue to require retry, got %v", err)
+	}
+
+	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname:        "阿明",
+		Slug:            "feel",
+		ClientID:        "127.0.0.1",
+		FingerprintHash: "fp-1",
+	})
+	if err != nil {
+		t.Fatalf("issue ticket: %v", err)
+	}
+
+	_, err = service.Click(context.Background(), ManualClickRequest{
+		Nickname:         "阿明",
+		Slug:             "feel",
+		Ticket:           ticket.Value,
+		ClientID:         "127.0.0.1",
+		EntryType:        clickEntryHTTP,
+		FingerprintHash:  "fp-1",
+		FingerprintProof: fingerprintProof("fp-1", ticket.Value, ticket.ChallengeNonce),
+		Behavior: ClickBehavior{
+			PressDurationMS: 5,
+			Trajectory: []ClickPointerSample{
+				{X: 1, Y: 1, T: 0},
+				{X: 1, Y: 1, T: 5},
+			},
+		},
+	})
+	if !manualClickRequiresRetry(err) {
+		t.Fatalf("expected invalid behavior to require retry, got %v", err)
+	}
+}
+
+func validClickBehavior() ClickBehavior {
+	return ClickBehavior{
+		PointerType:     "mouse",
+		PressDurationMS: 120,
+		Trajectory: []ClickPointerSample{
+			{X: 10, Y: 10, T: 0},
+			{X: 13, Y: 12, T: 30},
+			{X: 17, Y: 18, T: 70},
+			{X: 22, Y: 21, T: 120},
+		},
 	}
 }

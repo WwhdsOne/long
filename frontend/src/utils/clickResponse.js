@@ -1,9 +1,10 @@
 import { mergeBossState } from './bossState'
 
-export function buildClickRequestBody(ticket, realtimeConnected) {
+export function buildClickRequestBody(ticket, realtimeConnected, behavior = {}) {
   return {
     ticket,
     realtimeConnected: Boolean(realtimeConnected),
+    ...behavior,
   }
 }
 

@@ -142,8 +142,23 @@ describe('realtimeTransport', () => {
     transport.connect({ nickname: '阿明' })
     sockets[0].emitOpen()
 
-    expect(transport.sendClick('feel', 'ticket-1')).toBe(true)
-    expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({ type: 'click', slug: 'feel', ticket: 'ticket-1' }))
+    expect(transport.sendClick('feel', 'ticket-1', {
+      pointerType: 'mouse',
+      pressDurationMs: 120,
+      trajectory: [{ x: 1, y: 2, t: 0 }],
+      fingerprintHash: 'fp-1',
+      fingerprintProof: 'proof-1',
+    })).toBe(true)
+    expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({
+      type: 'click',
+      slug: 'feel',
+      ticket: 'ticket-1',
+      pointerType: 'mouse',
+      pressDurationMs: 120,
+      trajectory: [{ x: 1, y: 2, t: 0 }],
+      fingerprintHash: 'fp-1',
+      fingerprintProof: 'proof-1',
+    }))
 
     sockets[0].emitMessage({
       type: 'click_ack',
