@@ -48,4 +48,13 @@ describe('PublicPage 三页前台边界', () => {
     expect(pageSource).toContain('await refreshProfileAfterMutation(data)')
     expect(pageSource).toContain('async function refreshProfileAfterMutation')
   })
+
+  it('战斗页使用按钮主区加右侧排行的两列布局', () => {
+    const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
+
+    expect(pageSource).toContain('class="stage-layout stage-layout--battle"')
+    expect(styleSource.replace(/\s+/g, ' ')).toContain(
+      '.stage-layout--battle { grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);',
+    )
+  })
 })
