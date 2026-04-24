@@ -24,7 +24,7 @@ export function getRarityClassName(value) {
 }
 
 export function formatRarityLabel(value) {
-  return `稀有度：${normalizeRarity(value)}`
+  return `${normalizeRarity(value)}`
 }
 
 export function splitEquipmentName(name) {
