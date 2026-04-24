@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -129,6 +130,89 @@ func TestPlayerWriteRoutesRequireAuthenticatedSession(t *testing.T) {
 
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 without player session, got %d", response.Code)
+	}
+}
+
+func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 7},
+			Inventory: []vote.InventoryItem{
+				{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
+			},
+			Heroes: []vote.HeroInventoryItem{
+				{HeroID: "hero-1", Name: "小火苗"},
+			},
+			ActiveHero: &vote.HeroInventoryItem{HeroID: "hero-1", Name: "小火苗", Active: true},
+			Loadout: vote.Loadout{
+				Weapon: &vote.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
+			},
+			CombatStats: vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
+			Gems:        11,
+			OwnedCosmetics: []string{
+				"trail-red",
+			},
+			EquippedCosmetics: vote.CosmeticLoadout{TrailID: "trail-red"},
+			ShopCatalog: []vote.CosmeticCatalogItem{
+				{CosmeticID: "trail-red", Name: "红色轨迹", Type: "trail", Owned: true, Equipped: true},
+			},
+			LastForgeResult: &vote.ForgeResult{Kind: "equipment_enhance", RemainingGems: 11},
+		},
+	}
+	authenticator := &mockPlayerAuthenticator{verifyNickname: "阿明"}
+	handler := NewHandler(Options{
+		Store:               store,
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: authenticator,
+	})
+
+	unauthorizedRequest := httptest.NewRequest(http.MethodGet, "/api/player/profile", nil)
+	unauthorizedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedResponse, unauthorizedRequest)
+	if unauthorizedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without player session, got %d", unauthorizedResponse.Code)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/player/profile", nil)
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from profile endpoint, got %d", response.Code)
+	}
+
+	var payload struct {
+		UserStats         *vote.UserStats            `json:"userStats"`
+		Inventory         []vote.InventoryItem       `json:"inventory"`
+		Heroes            []vote.HeroInventoryItem   `json:"heroes"`
+		ActiveHero        *vote.HeroInventoryItem    `json:"activeHero"`
+		Loadout           vote.Loadout               `json:"loadout"`
+		CombatStats       vote.CombatStats           `json:"combatStats"`
+		Gems              int64                      `json:"gems"`
+		OwnedCosmetics    []string                   `json:"ownedCosmetics"`
+		EquippedCosmetics vote.CosmeticLoadout       `json:"equippedCosmetics"`
+		ShopCatalog       []vote.CosmeticCatalogItem `json:"shopCatalog"`
+		LastForgeResult   *vote.ForgeResult          `json:"lastForgeResult"`
+		RecentRewards     []vote.Reward              `json:"recentRewards"`
+		LastReward        *vote.Reward               `json:"lastReward"`
+		Buttons           []vote.Button              `json:"buttons"`
+		Leaderboard       []vote.LeaderboardEntry    `json:"leaderboard"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode profile response: %v", err)
+	}
+	if payload.UserStats == nil || payload.UserStats.Nickname != "阿明" {
+		t.Fatalf("expected profile user stats for 阿明, got %+v", payload.UserStats)
+	}
+	if len(payload.Inventory) != 1 || len(payload.Heroes) != 1 || payload.ActiveHero == nil {
+		t.Fatalf("expected inventory, heroes and active hero in profile, got %+v", payload)
+	}
+	if payload.Gems != 11 || len(payload.ShopCatalog) != 1 || payload.LastForgeResult == nil {
+		t.Fatalf("expected shop and forge fields in profile, got %+v", payload)
+	}
+	if len(payload.Buttons) != 0 || len(payload.Leaderboard) != 0 {
+		t.Fatalf("profile endpoint should not include public battle fields, got buttons=%d leaderboard=%d", len(payload.Buttons), len(payload.Leaderboard))
 	}
 }
 

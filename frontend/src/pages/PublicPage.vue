@@ -27,6 +27,11 @@ const HERO_AWAKEN_COST = 15
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
 const HERO_GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率 + 最终伤害提升百分比) / 4)，至少 +1'
 
+const publicPages = [
+  {id: 'battle', label: '战斗', path: '/'},
+  {id: 'profile', label: '资料', path: '/profile'},
+  {id: 'messages', label: '消息', path: '/messages'},
+]
 
 const buttons = ref([])
 const firstPageButtons = ref([])
@@ -94,6 +99,10 @@ const shopCatalog = ref([])
 const lastForgeResult = ref(null)
 const cosmeticBursts = ref({})
 const fingerprintHash = ref('')
+const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
+const profileLoading = ref(false)
+const profileLoaded = ref(false)
+const profileNotice = ref('')
 
 let realtimeTransport
 let starlightTimer = 0
@@ -307,6 +316,50 @@ function heroImageAlt(hero) {
 
 function normalizeNickname(value) {
   return value.trim()
+}
+
+function resolvePublicPage(pathname) {
+  if (pathname.startsWith('/messages')) {
+    return 'messages'
+  }
+  if (pathname.startsWith('/profile')) {
+    return 'profile'
+  }
+  return 'battle'
+}
+
+async function navigatePublicPage(page) {
+  const target = publicPages.find((item) => item.id === page) ?? publicPages[0]
+  if (currentPublicPage.value !== target.id) {
+    window.history.pushState({}, '', target.path)
+    currentPublicPage.value = target.id
+  }
+  await activatePublicPage(target.id)
+}
+
+async function activatePublicPage(page) {
+  if (page === 'profile') {
+    if (activeHudTab.value === 'messages' || activeHudTab.value === 'info') {
+      activeHudTab.value = 'inventory'
+    }
+    await loadPlayerProfile(true)
+    return
+  }
+  if (page === 'messages') {
+    activeHudTab.value = 'messages'
+    await loadMessages()
+    await loadAnnouncements()
+  }
+}
+
+function handlePublicRouteChange() {
+  const nextPage = resolvePublicPage(window.location.pathname)
+  if (nextPage === 'battle') {
+    currentPublicPage.value = 'battle'
+  } else {
+    currentPublicPage.value = nextPage
+  }
+  void activatePublicPage(currentPublicPage.value)
 }
 
 function isStarlightButton(key) {
@@ -795,7 +848,7 @@ function selectHudTab(tab) {
 
 function applyState(payload) {
   applyPublicState(payload)
-  applyUserState(payload)
+  applyBattleUserState(payload)
   pendingKeys.value = new Set()
   syncing.value = false
   markUpdated()
@@ -873,12 +926,41 @@ function applyUserState(payload) {
     return
   }
 
+  applyBattleUserState(payload)
+  applyPlayerProfileState(payload)
+  syncing.value = false
+  markUpdated()
+}
+
+function applyBattleUserState(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return
+  }
+
   if ('userStats' in payload) {
     userStats.value = payload.userStats ?? null
   }
   if ('myBossStats' in payload) {
     myBossStats.value = payload.myBossStats ?? null
   }
+  if ('combatStats' in payload && !profileLoaded.value) {
+    combatStats.value = payload.combatStats ?? defaultCombatStats()
+  }
+  if ('recentRewards' in payload) {
+    recentRewards.value = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
+  }
+  if ('lastReward' in payload) {
+    lastReward.value = payload.lastReward ?? null
+  }
+  syncing.value = false
+  markUpdated()
+}
+
+function applyPlayerProfileState(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return
+  }
+
   if ('inventory' in payload) {
     inventory.value = Array.isArray(payload.inventory) ? payload.inventory : []
   }
@@ -910,14 +992,6 @@ function applyUserState(payload) {
   if ('shopCatalog' in payload) {
     shopCatalog.value = Array.isArray(payload.shopCatalog) ? payload.shopCatalog : []
   }
-  if ('recentRewards' in payload) {
-    recentRewards.value = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
-  }
-  if ('lastReward' in payload) {
-    lastReward.value = payload.lastReward ?? null
-  }
-  syncing.value = false
-  markUpdated()
 }
 
 function applyClickResult(payload) {
@@ -997,7 +1071,7 @@ function clearPendingClicks(key = '') {
 function applyRealtimeSnapshot(publicState, userState) {
   applyPublicState(publicState)
   if (userState) {
-    applyUserState(userState)
+    applyBattleUserState(userState)
   } else {
     clearUserRealtimeState()
   }
@@ -1024,7 +1098,7 @@ function ensureRealtimeTransport() {
       errorMessage.value = ''
     },
     onUserDelta(payload) {
-      applyUserState(payload)
+      applyBattleUserState(payload)
       loading.value = false
       errorMessage.value = ''
     },
@@ -1374,6 +1448,45 @@ async function loadState() {
   }
 }
 
+async function loadPlayerProfile(force = false) {
+  if (!nickname.value) {
+    profileLoaded.value = false
+    profileNotice.value = '登录后进入资料页会刷新角色资料。'
+    return
+  }
+  if (profileLoading.value || (profileLoaded.value && !force)) {
+    return
+  }
+
+  profileLoading.value = true
+  errorMessage.value = ''
+  try {
+    const response = await fetch('/api/player/profile')
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '资料加载失败，请稍后重试。'))
+    }
+
+    const data = await response.json()
+    applyBattleUserState(data)
+    applyPlayerProfileState(data)
+    profileLoaded.value = true
+    profileNotice.value = '进入本页已刷新资料。'
+  } catch (error) {
+    errorMessage.value = error.message || '资料加载失败，请稍后重试。'
+  } finally {
+    profileLoading.value = false
+  }
+}
+
+async function refreshProfileAfterMutation(data) {
+  applyBattleUserState(data)
+  if (currentPublicPage.value === 'profile') {
+    await loadPlayerProfile(true)
+    return
+  }
+  profileLoaded.value = false
+}
+
 async function clickButton(key, options = {}) {
   if (!nickname.value || pendingKeys.value.has(key)) {
     return
@@ -1453,7 +1566,7 @@ async function postEquipmentAction(itemId, action, extraBody = {}) {
     }
 
     const data = await response.json()
-    applyState(data)
+    await refreshProfileAfterMutation(data)
   } catch (error) {
     errorMessage.value = error.message || '装备操作失败，请稍后重试。'
   } finally {
@@ -1486,7 +1599,7 @@ async function postHeroAction(heroId, action, extraBody = {}) {
     }
 
     const data = await response.json()
-    applyState(data)
+    await refreshProfileAfterMutation(data)
   } catch (error) {
     errorMessage.value = error.message || '英雄操作失败，请稍后重试。'
   } finally {
@@ -1544,7 +1657,7 @@ async function purchaseCosmetic(item) {
     }
 
     const data = await response.json()
-    applyState(data)
+    await refreshProfileAfterMutation(data)
   } catch (error) {
     errorMessage.value = error.message || '外观购买失败，请稍后重试。'
   } finally {
@@ -1599,7 +1712,7 @@ async function equipSelectedCosmetics() {
     }
 
     const data = await response.json()
-    applyState(data)
+    await refreshProfileAfterMutation(data)
   } catch (error) {
     errorMessage.value = error.message || '外观装备失败，请稍后重试。'
   } finally {
@@ -1642,6 +1755,9 @@ async function submitNickname() {
     nicknameDraft.value = resolvedNickname
     passwordDraft.value = ''
     await loadAutoClickStatus()
+    if (currentPublicPage.value === 'profile') {
+      await loadPlayerProfile(true)
+    }
     connectRealtime(resolvedNickname)
   } catch (error) {
     errorMessage.value = error.message || '登录失败，请稍后重试。'
@@ -1668,6 +1784,8 @@ function clearPlayerSessionState() {
   clearUserRealtimeState()
   clearAutoClickLocalState()
   clearPendingClicks()
+  profileLoaded.value = false
+  profileNotice.value = ''
 }
 
 async function loadPlayerSession() {
@@ -1695,12 +1813,15 @@ async function loadPlayerSession() {
 
 onMounted(async () => {
   restoreCachedLatestAnnouncement()
+  window.addEventListener('popstate', handlePublicRouteChange)
   await loadPlayerSession()
   await loadState()
+  await activatePublicPage(currentPublicPage.value)
   connectRealtime(nickname.value)
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('popstate', handlePublicRouteChange)
   clickBehaviorTracker.clear()
   realtimeTransport?.close()
   clearStarlightTimer()
@@ -1716,6 +1837,19 @@ onBeforeUnmount(() => {
     <div class="page-shell__glow page-shell__glow--pink"></div>
     <div class="page-shell__glow page-shell__glow--blue"></div>
     <div class="page-shell__glow page-shell__glow--yellow"></div>
+
+    <nav class="public-nav" aria-label="前台导航">
+      <button
+          v-for="page in publicPages"
+          :key="page.id"
+          class="public-nav__item"
+          :class="{ 'public-nav__item--active': currentPublicPage === page.id }"
+          type="button"
+          @click="navigatePublicPage(page.id)"
+      >
+        {{ page.label }}
+      </button>
+    </nav>
 
     <section class="hero">
       <div class="hero__copy">
@@ -1873,12 +2007,12 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <section class="stage-layout">
-      <aside class="player-hud">
+    <section class="stage-layout" :class="{ 'stage-layout--single': currentPublicPage !== 'battle' }">
+      <aside v-if="currentPublicPage !== 'battle'" class="player-hud player-hud--page">
         <section class="player-hud__shell">
           <div class="player-hud__head">
             <div>
-              <p class="vote-stage__eyebrow">Player HUD</p>
+              <p class="vote-stage__eyebrow">{{ currentPublicPage === 'messages' ? '公共消息' : '角色资料' }}</p>
               <strong>{{ isLoggedIn ? nickname : '未登录角色' }}</strong>
             </div>
             <span class="player-hud__pill">{{ isLoggedIn ? '已上墙' : '访客' }}</span>
@@ -1886,7 +2020,9 @@ onBeforeUnmount(() => {
 
           <p class="player-hud__copy">
             {{
-              isLoggedIn ? `你现在登录的是 ${nickname}。背包、属性和装备都会跟着这个账号走。` : '先输入昵称和密码登录；第一次使用该昵称时会直接为它设置密码。'
+              currentPublicPage === 'messages'
+                  ? '消息页保留留言、公告和规则信息；战斗实时链路继续在后台保持连接。'
+                  : (profileNotice || (isLoggedIn ? `你现在登录的是 ${nickname}。进入本页会刷新背包、属性和装备。` : '先输入昵称和密码登录；第一次使用该昵称时会直接为它设置密码。'))
             }}
           </p>
 
@@ -1946,7 +2082,7 @@ onBeforeUnmount(() => {
             </button>
           </section>
 
-          <div class="player-hud__tabs">
+          <div v-if="currentPublicPage === 'profile'" class="player-hud__tabs">
             <button
                 class="player-hud__tab"
                 :class="{ 'player-hud__tab--active': activeHudTab === 'inventory' }"
@@ -1995,24 +2131,9 @@ onBeforeUnmount(() => {
             >
               商店
             </button>
-            <button
-                class="player-hud__tab"
-                :class="{ 'player-hud__tab--active': activeHudTab === 'info' }"
-                type="button"
-                @click="selectHudTab('info')"
-            >
-              信息
-            </button>
-            <button
-                class="player-hud__tab"
-                :class="{ 'player-hud__tab--active': activeHudTab === 'messages' }"
-                type="button"
-                @click="selectHudTab('messages')"
-            >
-              留言
-            </button>
           </div>
 
+          <p v-if="currentPublicPage === 'profile' && profileLoading" class="feedback">资料刷新中...</p>
           <div class="player-hud__content">
             <section v-if="activeHudTab === 'inventory'" class="player-hud__panel">
               <div class="player-hud__section-head">
@@ -2750,7 +2871,7 @@ onBeforeUnmount(() => {
         </section>
       </aside>
 
-      <section class="vote-stage">
+      <section v-if="currentPublicPage === 'battle'" class="vote-stage">
         <div class="vote-stage__head">
           <div>
             <p class="vote-stage__eyebrow">现场投票墙</p>
@@ -2922,9 +3043,37 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
+
+        <section class="player-hud__auto battle-auto-panel">
+          <div class="player-hud__section-head">
+            <div>
+              <p class="vote-stage__eyebrow">挂机</p>
+              <strong>官方挂机托管</strong>
+            </div>
+            <span class="player-hud__pill" :class="{ 'player-hud__pill--active': autoClickEnabled }">
+              {{ autoClickEnabled ? '运行中' : '未开启' }}
+            </span>
+          </div>
+
+          <p class="player-hud__note">{{ autoClickStatus }}</p>
+
+          <div class="player-hud__auto-meta">
+            <span class="player-hud__auto-chip">目标：{{ autoClickTargetLabel }}</span>
+            <span class="player-hud__auto-chip">{{ AUTO_CLICK_RATE_LABEL }}</span>
+          </div>
+
+          <button
+              class="nickname-form__submit player-hud__auto-button"
+              type="button"
+              :disabled="!autoClickEnabled && !canStartAutoClick"
+              @click="toggleAutoClick"
+          >
+            {{ autoClickEnabled ? '关闭挂机' : '开启挂机' }}
+          </button>
+        </section>
       </section>
 
-      <aside class="social-panel social-panel--ranking">
+      <aside v-if="currentPublicPage === 'battle'" class="social-panel social-panel--ranking">
         <section class="social-card leaderboard-card leaderboard-card--stacked">
           <section class="leaderboard-card__section">
             <div class="social-card__head">

@@ -70,4 +70,23 @@ func registerPlayerAuthRoutes(router route.IRouter, options Options) {
 			"nickname":      nickname,
 		})
 	})
+
+	router.GET("/api/player/profile", func(ctx context.Context, c *app.RequestContext) {
+		nickname := authenticatedPlayerNickname(ctx, c, options.PlayerAuthenticator)
+		if nickname == "" {
+			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+			return
+		}
+
+		state, err := options.Store.GetUserState(ctx, nickname)
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "PLAYER_PROFILE_FETCH_FAILED"})
+			return
+		}
+
+		writeJSON(c, consts.StatusOK, state)
+	})
 }

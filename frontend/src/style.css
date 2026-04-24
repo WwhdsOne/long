@@ -140,6 +140,38 @@ select {
   background: rgba(255, 209, 102, 0.24);
 }
 
+.public-nav {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  width: min(1380px, 100%);
+  margin: 0 auto 14px;
+  padding: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 18px;
+  background: rgba(20, 24, 37, 0.88);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(16px);
+}
+
+.public-nav__item {
+  min-width: 86px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.public-nav__item--active {
+  background: #ffffff;
+  color: #151827;
+}
+
 .hero,
 .stats-band,
 .stage-layout,
@@ -281,6 +313,19 @@ select {
   grid-template-columns: minmax(260px, 300px) minmax(0, 1.45fr) minmax(260px, 320px);
   gap: 22px;
   align-items: start;
+  margin-top: 18px;
+}
+
+.stage-layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.player-hud--page {
+  width: min(980px, 100%);
+  margin: 0 auto;
+}
+
+.battle-auto-panel {
   margin-top: 18px;
 }
 
