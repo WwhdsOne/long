@@ -373,6 +373,10 @@ select {
   border: 1px dashed rgba(183, 53, 97, 0.22);
 }
 
+.vote-stage__hint--wide {
+  margin-top: 8px;
+}
+
 .feedback {
   margin: 18px 0 0;
 }
@@ -1030,6 +1034,163 @@ select {
   gap: 10px 14px;
   color: var(--ink-soft);
   font-size: 0.95rem;
+}
+
+.vote-stage__boss-note {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.boss-drop-pool {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  margin-bottom: 22px;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255, 251, 252, 0.82);
+  border: 1px solid rgba(183, 53, 97, 0.14);
+}
+
+.boss-drop-pool__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+}
+
+.boss-drop-pool__head strong {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--display);
+  font-size: 1.35rem;
+}
+
+.boss-drop-pool__head p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.boss-drop-pool__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.boss-drop-card {
+  display: grid;
+  gap: 8px;
+  min-height: 124px;
+  padding: 14px;
+  border: 1px solid rgba(183, 53, 97, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(120, 37, 70, 0.08);
+}
+
+.boss-drop-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(183, 53, 97, 0.34);
+}
+
+.boss-drop-card__type {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(183, 53, 97, 0.1);
+  color: var(--primary-deep);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.boss-drop-card__avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+
+.boss-drop-card strong {
+  line-height: 1.2;
+}
+
+.boss-drop-card > span:last-child {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.boss-drop-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.boss-drop-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: blur(10px);
+}
+
+.boss-drop-modal__card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+  width: min(520px, 100%);
+  padding: 24px;
+  border-radius: 28px;
+  background: rgba(255, 251, 252, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 30px 90px rgba(15, 23, 42, 0.28);
+}
+
+.boss-drop-modal__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.boss-drop-modal__head strong {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--display);
+  font-size: 1.6rem;
+}
+
+.boss-drop-modal__hero {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.boss-drop-modal__hero p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.boss-drop-modal__stats {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.boss-drop-modal__stats li {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink-soft);
 }
 
 .loadout-grid {

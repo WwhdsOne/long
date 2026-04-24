@@ -1,4 +1,6 @@
 <script setup>
+import {computed, ref} from 'vue'
+
 import {usePublicPageState} from './publicPageState'
 
 const {
@@ -223,6 +225,31 @@ const {
   loadPlayerSession,
   registerPublicPageLifecycle,
 } = usePublicPageState()
+
+const selectedBossDrop = ref(null)
+
+const bossDropPool = computed(() => [
+  ...bossLoot.value.map((item) => ({
+    id: `equipment:${item.itemId}`,
+    type: 'equipment',
+    label: '装备',
+    item,
+  })),
+  ...bossHeroLoot.value.map((hero) => ({
+    id: `hero:${hero.heroId}`,
+    type: 'hero',
+    label: '英雄',
+    item: hero,
+  })),
+])
+
+function openBossDropDetail(drop) {
+  selectedBossDrop.value = drop
+}
+
+function closeBossDropDetail() {
+  selectedBossDrop.value = null
+}
 </script>
 
 <template>
@@ -249,114 +276,21 @@ const {
       </article>
     </section>
 
-    <section class="boss-stage social-card">
-      <div class="boss-stage__head">
-        <div>
-          <p class="vote-stage__eyebrow">世界 Boss</p>
-          <strong>{{ boss?.name || '当前休战中' }}</strong>
-          <p class="social-card__copy">
-            {{
-              !boss
-                  ? '现在没有活动 Boss，按钮依然能正常计票，装备加成也照常生效。'
-                  : boss.status === 'active'
-                      ? '全服正在集火当前 Boss，每次点击都会把装备加成一起折算成伤害。'
-                      : '这只 Boss 已经倒下，等待后台手动开启下一只。'
-            }}
-          </p>
-          <p>
-            ⚠️小贴士⚠️：只有对Boss造成超过1%生命值的伤害，才有资格掉落装备哦～萌新也要努力输出呀！(๑•̀ㅂ•́)و✧ 
-          </p>
-        </div>
-        <div class="boss-stage__meta">
-          <span class="boss-stage__pill">{{ bossStatusLabel }}</span>
-          <strong v-if="boss">HP {{ boss.currentHp }} / {{ boss.maxHp }}</strong>
-          <strong v-else>我的伤害 {{ myBossDamage }}</strong>
-        </div>
-      </div>
-
-      <div v-if="boss" class="boss-stage__progress">
-        <div class="boss-stage__bar">
-          <span class="boss-stage__bar-fill" :style="{ width: `${bossProgress}%` }"></span>
-        </div>
-        <div class="boss-stage__stats">
-          <span>我的伤害 {{ myBossDamage }}</span>
-          <span>当前 Boss 榜 {{ bossLeaderboard.length }} 人</span>
-          <span>掉落池 {{ bossLoot.length }} 件</span>
-          <span v-if="displayedRecentRewards.length > 0">最近掉落 {{ recentRewardTitle }}</span>
-        </div>
-      </div>
-
-      <div v-if="boss" class="boss-stage__drops">
-        <div class="boss-stage__drops-head">
-          <div>
-            <p class="vote-stage__eyebrow">Boss 掉落池</p>
-            <strong>{{ bossLoot.length }} 件</strong>
-          </div>
-        </div>
-
-        <div v-if="bossLoot.length === 0" class="leaderboard-list leaderboard-list--empty">
-          <p>当前 Boss 还没配置掉落池。</p>
-        </div>
-        <ul v-else class="inventory-list inventory-list--loot">
-          <li
-              v-for="item in bossLoot"
-              :key="item.itemId"
-              class="inventory-item inventory-item--stacked inventory-item--loot"
-          >
-            <div>
-              <strong>
-                <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
-                <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
-              </strong>
-              <p>{{ formatRarityLabel(item.rarity) }} · {{ item.slot || '未分类' }} · 掉落概率 {{ formatDropRate(item.dropRatePercent) }}</p>
-              <p>{{ formatEnhanceCap(item.enhanceCap) }}</p>
-              <p>{{ formatItemStats(item) }}</p>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <div v-if="boss && bossHeroLoot.length > 0" class="boss-stage__drops">
-        <div class="boss-stage__drops-head">
-          <div>
-            <p class="vote-stage__eyebrow">Boss 英雄池</p>
-            <strong>{{ bossHeroLoot.length }} 位</strong>
-          </div>
-        </div>
-
-        <ul class="inventory-list inventory-list--loot">
-          <li
-              v-for="hero in bossHeroLoot"
-              :key="hero.heroId"
-              class="inventory-item inventory-item--stacked inventory-item--loot"
-          >
-            <div class="inventory-item__hero">
-              <img
-                  v-if="hero.imagePath"
-                  class="inventory-item__avatar"
-                  :src="hero.imagePath"
-                  :alt="heroImageAlt(hero)"
-              />
-              <div class="inventory-item__hero-meta">
-                <strong>{{ hero.heroName || hero.heroId }}</strong>
-                <p>掉落概率 {{ formatDropRate(hero.dropRatePercent) }}</p>
-                <p>{{ formatAwakenCap(hero.awakenCap) }}</p>
-                <p>{{ formatItemStats(hero) }}</p>
-                <p>{{ formatHeroTrait(hero) }}</p>
-              </div>
-            </div>
-          </li>
-        </ul>
-      </div>
-    </section>
-
-
     <section class="stage-layout stage-layout--battle">
       <section class="vote-stage">
         <div class="vote-stage__head">
           <div>
-            <p class="vote-stage__eyebrow">现场投票墙</p>
-            <h2>看见哪个想按，就直接拍下去。</h2>
+            <p class="vote-stage__eyebrow">现场投票墙 · 世界 Boss</p>
+            <h2>{{ boss?.name || '看见哪个想按，就直接拍下去。' }}</h2>
+            <p class="vote-stage__hint vote-stage__hint--wide">
+              {{
+                !boss
+                    ? '当前休战中，按钮依然正常计票。'
+                    : boss.status === 'active'
+                        ? '全服正在集火当前 Boss，每次点击都会把装备加成一起折算成伤害。'
+                        : '这只 Boss 已经倒下，等待后台开启下一只。'
+              }}
+            </p>
           </div>
           <p v-if="!errorMessage" class="vote-stage__hint">
             {{ isLoggedIn ? `现在上墙的是 ${nickname}` : '先登录账号，再开始冲榜。' }}
@@ -365,22 +299,67 @@ const {
 
         <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
 
-        <section v-if="boss" class="vote-stage__boss-hud">
+        <section class="vote-stage__boss-hud vote-stage__boss-hud--merged">
           <div class="vote-stage__boss-hud-head">
             <div>
               <p class="vote-stage__eyebrow">当前 Boss</p>
-              <strong>{{ boss.name }}</strong>
+              <strong>{{ boss?.name || '休战中' }}</strong>
             </div>
-            <strong>HP {{ boss.currentHp }} / {{ boss.maxHp }}</strong>
+            <div class="boss-stage__meta">
+              <span class="boss-stage__pill">{{ bossStatusLabel }}</span>
+              <strong v-if="boss">HP {{ boss.currentHp }} / {{ boss.maxHp }}</strong>
+              <strong v-else>我的伤害 {{ myBossDamage }}</strong>
+            </div>
           </div>
-          <div class="boss-stage__bar boss-stage__bar--compact">
+          <div v-if="boss" class="boss-stage__bar boss-stage__bar--compact">
             <span class="boss-stage__bar-fill" :style="{ width: `${bossProgress}%` }"></span>
           </div>
           <div class="vote-stage__boss-hud-stats">
             <span>我的伤害 {{ myBossDamage }}</span>
             <span>Boss 榜 {{ bossLeaderboard.length }} 人</span>
-            <span>掉落池 {{ bossLoot.length }} 件</span>
+            <span>掉落池 {{ bossDropPool.length }} 件</span>
             <span v-if="displayedRecentRewards.length > 0">最近掉落 {{ recentRewardTitle }}</span>
+          </div>
+          <p class="vote-stage__boss-note">
+            只有对 Boss 造成超过 1% 生命值的伤害，才有资格掉落装备。
+          </p>
+        </section>
+
+        <section v-if="boss" class="boss-drop-pool">
+          <div class="boss-drop-pool__head">
+            <div>
+              <p class="vote-stage__eyebrow">Boss 掉落池</p>
+              <strong>{{ bossDropPool.length }} 件</strong>
+            </div>
+            <p>点击掉落物查看详细属性。</p>
+          </div>
+
+          <div v-if="bossDropPool.length === 0" class="leaderboard-list leaderboard-list--empty">
+            <p>当前 Boss 还没配置掉落池。</p>
+          </div>
+
+          <div v-else class="boss-drop-pool__grid">
+            <button
+                v-for="drop in bossDropPool"
+                :key="drop.id"
+                class="boss-drop-card"
+                type="button"
+                @click="openBossDropDetail(drop)"
+            >
+              <span class="boss-drop-card__type">{{ drop.label }}</span>
+              <img
+                  v-if="drop.type === 'hero' && drop.item.imagePath"
+                  class="boss-drop-card__avatar"
+                  :src="drop.item.imagePath"
+                  :alt="heroImageAlt(drop.item)"
+              />
+              <strong v-if="drop.type === 'equipment'">
+                <span v-if="equipmentNameParts(drop.item).prefix">{{ equipmentNameParts(drop.item).prefix }}</span>
+                <span :class="equipmentNameClass(drop.item)">{{ equipmentNameParts(drop.item).text }}</span>
+              </strong>
+              <strong v-else>{{ drop.item.heroName || drop.item.name || drop.item.heroId }}</strong>
+              <span>{{ formatDropRate(drop.item.dropRatePercent) }}</span>
+            </button>
           </div>
         </section>
 
@@ -552,6 +531,46 @@ const {
             {{ autoClickEnabled ? '关闭挂机' : '开启挂机' }}
           </button>
         </section>
+      </section>
+
+      <section
+          v-if="selectedBossDrop"
+          class="boss-drop-modal"
+          aria-label="掉落详情"
+      >
+        <div class="boss-drop-modal__backdrop" @click="closeBossDropDetail"></div>
+        <article class="boss-drop-modal__card">
+          <div class="boss-drop-modal__head">
+            <div>
+              <p class="vote-stage__eyebrow">{{ selectedBossDrop.label }}掉落</p>
+              <strong v-if="selectedBossDrop.type === 'equipment'">
+                <span v-if="equipmentNameParts(selectedBossDrop.item).prefix">{{ equipmentNameParts(selectedBossDrop.item).prefix }}</span>
+                <span :class="equipmentNameClass(selectedBossDrop.item)">{{ equipmentNameParts(selectedBossDrop.item).text }}</span>
+              </strong>
+              <strong v-else>{{ selectedBossDrop.item.heroName || selectedBossDrop.item.name || selectedBossDrop.item.heroId }}</strong>
+            </div>
+            <button class="nickname-form__ghost" type="button" @click="closeBossDropDetail">关闭</button>
+          </div>
+
+          <div v-if="selectedBossDrop.type === 'hero'" class="boss-drop-modal__hero">
+            <img
+                v-if="selectedBossDrop.item.imagePath"
+                class="inventory-item__avatar"
+                :src="selectedBossDrop.item.imagePath"
+                :alt="heroImageAlt(selectedBossDrop.item)"
+            />
+            <p>{{ formatHeroTrait(selectedBossDrop.item) }}</p>
+          </div>
+
+          <ul class="boss-drop-modal__stats">
+            <li>掉落概率：{{ formatDropRate(selectedBossDrop.item.dropRatePercent) }}</li>
+            <li v-if="selectedBossDrop.type === 'equipment'">稀有度：{{ formatRarityLabel(selectedBossDrop.item.rarity) }}</li>
+            <li v-if="selectedBossDrop.type === 'equipment'">部位：{{ selectedBossDrop.item.slot || '未分类' }}</li>
+            <li v-if="selectedBossDrop.type === 'equipment'">{{ formatEnhanceCap(selectedBossDrop.item.enhanceCap) }}</li>
+            <li v-if="selectedBossDrop.type === 'hero'">{{ formatAwakenCap(selectedBossDrop.item.awakenCap) }}</li>
+            <li>{{ formatItemStats(selectedBossDrop.item) }}</li>
+          </ul>
+        </article>
       </section>
 
 

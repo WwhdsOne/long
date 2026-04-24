@@ -57,4 +57,16 @@ describe('PublicPage 三页前台边界', () => {
       '.stage-layout--battle { grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);',
     )
   })
+
+  it('战斗页将世界 Boss 融入投票墙，并用弹窗查看合并掉落池详情', () => {
+    const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+
+    expect(battleSource).not.toContain('class="boss-stage social-card"')
+    expect(battleSource).toContain('现场投票墙 · 世界 Boss')
+    expect(battleSource).toContain('const bossDropPool = computed')
+    expect(battleSource).toContain('class="boss-drop-pool"')
+    expect(battleSource).toContain('@click="openBossDropDetail(drop)"')
+    expect(battleSource).toContain('class="boss-drop-modal"')
+    expect(battleSource).not.toContain('Boss 英雄池')
+  })
 })
