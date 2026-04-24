@@ -226,6 +226,7 @@ const {
   registerPublicPageLifecycle,
 } = usePublicPageState()
 
+const bossDropModalOpen = ref(false)
 const selectedBossDrop = ref(null)
 
 const bossDropPool = computed(() => [
@@ -248,6 +249,16 @@ function openBossDropDetail(drop) {
 }
 
 function closeBossDropDetail() {
+  selectedBossDrop.value = null
+}
+
+function openBossDropPool() {
+  selectedBossDrop.value = null
+  bossDropModalOpen.value = true
+}
+
+function closeBossDropPool() {
+  bossDropModalOpen.value = false
   selectedBossDrop.value = null
 }
 </script>
@@ -325,43 +336,12 @@ function closeBossDropDetail() {
           </p>
         </section>
 
-        <section v-if="boss" class="boss-drop-pool">
-          <div class="boss-drop-pool__head">
-            <div>
-              <p class="vote-stage__eyebrow">Boss 掉落池</p>
-              <strong>{{ bossDropPool.length }} 件</strong>
-            </div>
-            <p>点击掉落物查看详细属性。</p>
-          </div>
-
-          <div v-if="bossDropPool.length === 0" class="leaderboard-list leaderboard-list--empty">
-            <p>当前 Boss 还没配置掉落池。</p>
-          </div>
-
-          <div v-else class="boss-drop-pool__grid">
-            <button
-                v-for="drop in bossDropPool"
-                :key="drop.id"
-                class="boss-drop-card"
-                type="button"
-                @click="openBossDropDetail(drop)"
-            >
-              <span class="boss-drop-card__type">{{ drop.label }}</span>
-              <img
-                  v-if="drop.type === 'hero' && drop.item.imagePath"
-                  class="boss-drop-card__avatar"
-                  :src="drop.item.imagePath"
-                  :alt="heroImageAlt(drop.item)"
-              />
-              <strong v-if="drop.type === 'equipment'">
-                <span v-if="equipmentNameParts(drop.item).prefix">{{ equipmentNameParts(drop.item).prefix }}</span>
-                <span :class="equipmentNameClass(drop.item)">{{ equipmentNameParts(drop.item).text }}</span>
-              </strong>
-              <strong v-else>{{ drop.item.heroName || drop.item.name || drop.item.heroId }}</strong>
-              <span>{{ formatDropRate(drop.item.dropRatePercent) }}</span>
-            </button>
-          </div>
-        </section>
+        <p v-if="boss" class="boss-drop-link">
+          <button type="button" @click="openBossDropPool">
+            点击查看 Boss 掉落池
+          </button>
+          <span>{{ bossDropPool.length }} 件掉落物</span>
+        </p>
 
         <div v-if="loading" class="feedback-panel">
           <p>正在把现场按钮搬上来...</p>
@@ -534,25 +514,81 @@ function closeBossDropDetail() {
       </section>
 
       <section
-          v-if="selectedBossDrop"
+          v-if="bossDropModalOpen"
           class="boss-drop-modal"
-          aria-label="掉落详情"
+          aria-label="Boss 掉落池"
       >
-        <div class="boss-drop-modal__backdrop" @click="closeBossDropDetail"></div>
+        <div class="boss-drop-modal__backdrop" @click="closeBossDropPool"></div>
         <article class="boss-drop-modal__card">
           <div class="boss-drop-modal__head">
             <div>
-              <p class="vote-stage__eyebrow">{{ selectedBossDrop.label }}掉落</p>
-              <strong v-if="selectedBossDrop.type === 'equipment'">
+              <p class="vote-stage__eyebrow">Boss 掉落池</p>
+              <strong v-if="!selectedBossDrop">{{ boss?.name || '当前 Boss' }}</strong>
+              <strong v-else-if="selectedBossDrop.type === 'equipment'">
                 <span v-if="equipmentNameParts(selectedBossDrop.item).prefix">{{ equipmentNameParts(selectedBossDrop.item).prefix }}</span>
                 <span :class="equipmentNameClass(selectedBossDrop.item)">{{ equipmentNameParts(selectedBossDrop.item).text }}</span>
               </strong>
               <strong v-else>{{ selectedBossDrop.item.heroName || selectedBossDrop.item.name || selectedBossDrop.item.heroId }}</strong>
             </div>
-            <button class="nickname-form__ghost" type="button" @click="closeBossDropDetail">关闭</button>
+            <button class="nickname-form__ghost" type="button" @click="closeBossDropPool">关闭</button>
           </div>
 
-          <div v-if="selectedBossDrop.type === 'hero'" class="boss-drop-modal__hero">
+          <template v-if="!selectedBossDrop">
+            <div v-if="bossDropPool.length === 0" class="leaderboard-list leaderboard-list--empty">
+              <p>当前 Boss 还没配置掉落池。</p>
+            </div>
+
+            <section v-if="bossLoot.length > 0" class="boss-drop-modal__section">
+              <div class="boss-drop-modal__section-head">
+                <span>装备掉落</span>
+                <strong>{{ bossLoot.length }} 件</strong>
+              </div>
+              <div class="boss-drop-pool__grid">
+                <button
+                    v-for="item in bossLoot"
+                    :key="item.itemId"
+                    class="boss-drop-card"
+                    type="button"
+                    @click="openBossDropDetail({id: `equipment:${item.itemId}`, type: 'equipment', label: '装备', item})"
+                >
+                  <span class="boss-drop-card__type">装备</span>
+                  <strong>
+                    <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
+                    <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
+                  </strong>
+                  <span>{{ formatRarityLabel(item.rarity) }} · {{ formatDropRate(item.dropRatePercent) }}</span>
+                </button>
+              </div>
+            </section>
+
+            <section v-if="bossHeroLoot.length > 0" class="boss-drop-modal__section">
+              <div class="boss-drop-modal__section-head">
+                <span>英雄掉落</span>
+                <strong>{{ bossHeroLoot.length }} 位</strong>
+              </div>
+              <div class="boss-drop-pool__grid">
+                <button
+                    v-for="hero in bossHeroLoot"
+                    :key="hero.heroId"
+                    class="boss-drop-card"
+                    type="button"
+                    @click="openBossDropDetail({id: `hero:${hero.heroId}`, type: 'hero', label: '英雄', item: hero})"
+                >
+                  <span class="boss-drop-card__type">英雄</span>
+                  <img
+                      v-if="hero.imagePath"
+                      class="boss-drop-card__avatar"
+                      :src="hero.imagePath"
+                      :alt="heroImageAlt(hero)"
+                  />
+                  <strong>{{ hero.heroName || hero.name || hero.heroId }}</strong>
+                  <span>{{ formatDropRate(hero.dropRatePercent) }}</span>
+                </button>
+              </div>
+            </section>
+          </template>
+
+          <div v-else-if="selectedBossDrop.type === 'hero'" class="boss-drop-modal__hero">
             <img
                 v-if="selectedBossDrop.item.imagePath"
                 class="inventory-item__avatar"
@@ -562,7 +598,7 @@ function closeBossDropDetail() {
             <p>{{ formatHeroTrait(selectedBossDrop.item) }}</p>
           </div>
 
-          <ul class="boss-drop-modal__stats">
+          <ul v-if="selectedBossDrop" class="boss-drop-modal__stats">
             <li>掉落概率：{{ formatDropRate(selectedBossDrop.item.dropRatePercent) }}</li>
             <li v-if="selectedBossDrop.type === 'equipment'">稀有度：{{ formatRarityLabel(selectedBossDrop.item.rarity) }}</li>
             <li v-if="selectedBossDrop.type === 'equipment'">部位：{{ selectedBossDrop.item.slot || '未分类' }}</li>
@@ -570,6 +606,15 @@ function closeBossDropDetail() {
             <li v-if="selectedBossDrop.type === 'hero'">{{ formatAwakenCap(selectedBossDrop.item.awakenCap) }}</li>
             <li>{{ formatItemStats(selectedBossDrop.item) }}</li>
           </ul>
+
+          <button
+              v-if="selectedBossDrop"
+              class="nickname-form__ghost boss-drop-modal__back"
+              type="button"
+              @click="selectedBossDrop = null"
+          >
+            返回掉落池
+          </button>
         </article>
       </section>
 
