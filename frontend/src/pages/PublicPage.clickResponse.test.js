@@ -5,7 +5,15 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const pageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue'), 'utf8')
+const pageSource = [
+  './PublicPage.vue',
+  './BattlePage.vue',
+  './ProfilePage.vue',
+  './MessagesPage.vue',
+  './publicPageState.js',
+]
+  .map((file) => readFileSync(path.resolve(currentDir, file), 'utf8'))
+  .join('\n')
 
 describe('PublicPage 点击响应链路', () => {
   it('点击前会先申请一次性票据，并显式上报当前实时连接状态', () => {

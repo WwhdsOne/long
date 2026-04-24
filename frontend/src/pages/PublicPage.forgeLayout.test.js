@@ -5,7 +5,15 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const pageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue'), 'utf8')
+const pageSource = [
+  './PublicPage.vue',
+  './BattlePage.vue',
+  './ProfilePage.vue',
+  './MessagesPage.vue',
+  './publicPageState.js',
+]
+  .map((file) => readFileSync(path.resolve(currentDir, file), 'utf8'))
+  .join('\n')
 const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
 
 function compact(source) {

@@ -5,7 +5,15 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const pageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue'), 'utf8')
+const pageSource = [
+  './PublicPage.vue',
+  './BattlePage.vue',
+  './ProfilePage.vue',
+  './MessagesPage.vue',
+  './publicPageState.js',
+]
+  .map((file) => readFileSync(path.resolve(currentDir, file), 'utf8'))
+  .join('\n')
 
 describe('PublicPage 公共资源拆分', () => {
   it('页面挂载时会先走一次 HTTP 首屏加载，再连接实时链路', () => {
