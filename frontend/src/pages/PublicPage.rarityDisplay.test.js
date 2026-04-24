@@ -29,6 +29,18 @@ describe('PublicPage 稀有度展示', () => {
     expect(pageSource).toContain('formatRarityLabel')
   })
 
+  it('拆分后的页面从共享状态取得稀有度与掉落展示工具', () => {
+    const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+    const profileSource = readFileSync(path.resolve(currentDir, './ProfilePage.vue'), 'utf8')
+    const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
+
+    for (const helper of ['formatDropRate', 'formatRarityLabel', 'cosmeticStatusText']) {
+      expect(stateSource).toContain(`    ${helper},`)
+      expect(battleSource).toContain(`  ${helper},`)
+      expect(profileSource).toContain(`  ${helper},`)
+    }
+  })
+
   it('样式定义了六档稀有度与至臻动态文字效果', () => {
     expect(styleSource).toContain('.rarity-text--common')
     expect(styleSource).toContain('.rarity-text--supreme')
