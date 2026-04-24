@@ -320,6 +320,14 @@ select {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.stage-layout--battle {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+}
+
+.stage-layout--battle .vote-stage {
+  min-width: 0;
+}
+
 .player-hud--page {
   width: min(980px, 100%);
   margin: 0 auto;
