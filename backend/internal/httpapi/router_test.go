@@ -419,6 +419,69 @@ func (m *mockOSSSigner) CreatePolicy(_ context.Context) (ossupload.Policy, error
 	return m.policy, m.err
 }
 
+type mockManualClickController struct {
+	ticket       ClickTicket
+	clickResult  vote.ClickResult
+	issueErr     error
+	clickErr     error
+	lastIssueReq TicketIssueRequest
+	lastClickReq ManualClickRequest
+}
+
+func (m *mockManualClickController) IssueTicket(_ context.Context, request TicketIssueRequest) (ClickTicket, error) {
+	m.lastIssueReq = request
+	if m.issueErr != nil {
+		return ClickTicket{}, m.issueErr
+	}
+	return m.ticket, nil
+}
+
+func (m *mockManualClickController) Click(_ context.Context, request ManualClickRequest) (vote.ClickResult, error) {
+	m.lastClickReq = request
+	if m.clickErr != nil {
+		return vote.ClickResult{}, m.clickErr
+	}
+	return m.clickResult, nil
+}
+
+type mockAutoClickController struct {
+	status             AutoClickStatus
+	startErr           error
+	lastStartNickname  string
+	lastStartSlug      string
+	lastStopNickname   string
+	lastStatusNickname string
+}
+
+func (m *mockAutoClickController) Start(_ context.Context, nickname string, slug string) (AutoClickStatus, error) {
+	m.lastStartNickname = nickname
+	m.lastStartSlug = slug
+	if m.startErr != nil {
+		return AutoClickStatus{}, m.startErr
+	}
+	status := m.status
+	status.Active = true
+	status.ButtonKey = slug
+	return status, nil
+}
+
+func (m *mockAutoClickController) Stop(nickname string) AutoClickStatus {
+	m.lastStopNickname = nickname
+	status := m.status
+	status.Active = false
+	status.ButtonKey = ""
+	return status
+}
+
+func (m *mockAutoClickController) Status(nickname string) AutoClickStatus {
+	m.lastStatusNickname = nickname
+	return m.status
+}
+
+func (m *mockAutoClickController) Close() error {
+	return nil
+}
+
 type mockBroadcaster struct {
 	snapshots []vote.Snapshot
 }
@@ -1388,29 +1451,121 @@ func TestShopRoutesReturnCatalogAndLoadout(t *testing.T) {
 	if getResponse.Code != http.StatusOK {
 		t.Fatalf("expected 200 from shop list, got %d", getResponse.Code)
 	}
+}
 
-	purchaseRequest := httptest.NewRequest(http.MethodPost, "/api/shop/cosmetics/impact-firefly/purchase", strings.NewReader(`{"nickname":"阿明"}`))
-	purchaseRequest.Header.Set("Content-Type", "application/json")
-	purchaseResponse := httptest.NewRecorder()
-	handler.ServeHTTP(purchaseResponse, purchaseRequest)
-
-	if purchaseResponse.Code != http.StatusOK {
-		t.Fatalf("expected 200 from cosmetic purchase, got %d", purchaseResponse.Code)
+func TestClickTicketRouteUsesAuthenticatedNickname(t *testing.T) {
+	controller := &mockManualClickController{
+		ticket: ClickTicket{
+			Value:     "ticket-1",
+			IssuedAt:  1710000000,
+			ExpiresAt: 1710000002,
+		},
 	}
-	if store.lastPurchasedCosmetic != "impact-firefly" {
-		t.Fatalf("expected purchase payload to be forwarded, got %+v", store.lastPurchasedCosmetic)
+	handler := NewHandler(Options{
+		Store:               &mockStore{state: voteStateForPlayerTests()},
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{verifyNickname: "阿明"},
+		ManualClick:         controller,
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/click-tickets", strings.NewReader(`{"slug":"feel"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from click ticket route, got %d", response.Code)
+	}
+	if controller.lastIssueReq.Nickname != "阿明" || controller.lastIssueReq.Slug != "feel" {
+		t.Fatalf("expected ticket issue request to use authenticated nickname, got %+v", controller.lastIssueReq)
+	}
+}
+
+func TestClickButtonUsesManualClickControllerWhenConfigured(t *testing.T) {
+	controller := &mockManualClickController{
+		clickResult: vote.ClickResult{
+			Button: vote.Button{
+				Key:     "feel",
+				Label:   "有感觉吗",
+				Count:   5,
+				Enabled: true,
+			},
+			Delta: 1,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 5,
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:               &mockStore{state: voteStateForPlayerTests()},
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{verifyNickname: "阿明"},
+		ManualClick:         controller,
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"ticket":"ticket-1","realtimeConnected":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from click route, got %d", response.Code)
+	}
+	if controller.lastClickReq.Nickname != "阿明" || controller.lastClickReq.Ticket != "ticket-1" || controller.lastClickReq.EntryType != clickEntryHTTP {
+		t.Fatalf("expected click controller to receive ticket protocol, got %+v", controller.lastClickReq)
+	}
+}
+
+func TestAutoClickRoutesUseController(t *testing.T) {
+	controller := &mockAutoClickController{
+		status: AutoClickStatus{
+			Active:        true,
+			ButtonKey:     "feel",
+			IntervalMs:    333,
+			RatePerSecond: 3,
+		},
+	}
+	handler := NewHandler(Options{
+		Store:               &mockStore{state: voteStateForPlayerTests()},
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{verifyNickname: "阿明"},
+		AutoClick:           controller,
+	})
+
+	statusRequest := httptest.NewRequest(http.MethodGet, "/api/auto-click", nil)
+	statusRequest.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	statusResponse := httptest.NewRecorder()
+	handler.ServeHTTP(statusResponse, statusRequest)
+	if statusResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from auto-click status, got %d", statusResponse.Code)
 	}
 
-	equipRequest := httptest.NewRequest(http.MethodPost, "/api/shop/cosmetics/equip", strings.NewReader(`{"nickname":"阿明","trailId":"trail-ribbon","impactId":"impact-firefly"}`))
-	equipRequest.Header.Set("Content-Type", "application/json")
-	equipResponse := httptest.NewRecorder()
-	handler.ServeHTTP(equipResponse, equipRequest)
-
-	if equipResponse.Code != http.StatusOK {
-		t.Fatalf("expected 200 from cosmetic equip, got %d", equipResponse.Code)
+	startRequest := httptest.NewRequest(http.MethodPost, "/api/auto-click/start", strings.NewReader(`{"slug":"understand"}`))
+	startRequest.Header.Set("Content-Type", "application/json")
+	startRequest.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	startResponse := httptest.NewRecorder()
+	handler.ServeHTTP(startResponse, startRequest)
+	if startResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from auto-click start, got %d", startResponse.Code)
 	}
-	if store.lastCosmeticLoadout.TrailID != "trail-ribbon" || store.lastCosmeticLoadout.ImpactID != "impact-firefly" {
-		t.Fatalf("expected cosmetic loadout to be forwarded, got %+v", store.lastCosmeticLoadout)
+	if controller.lastStartNickname != "阿明" || controller.lastStartSlug != "understand" {
+		t.Fatalf("expected auto-click start to forward nickname and slug, got nickname=%q slug=%q", controller.lastStartNickname, controller.lastStartSlug)
+	}
+
+	stopRequest := httptest.NewRequest(http.MethodPost, "/api/auto-click/stop", nil)
+	stopRequest.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	stopResponse := httptest.NewRecorder()
+	handler.ServeHTTP(stopResponse, stopRequest)
+	if stopResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from auto-click stop, got %d", stopResponse.Code)
+	}
+	if controller.lastStopNickname != "阿明" {
+		t.Fatalf("expected auto-click stop to use 阿明, got %q", controller.lastStopNickname)
 	}
 }
 

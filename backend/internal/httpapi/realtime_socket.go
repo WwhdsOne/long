@@ -36,6 +36,7 @@ type realtimeClientMessage struct {
 	Type     string `json:"type"`
 	Nickname string `json:"nickname"`
 	Slug     string `json:"slug"`
+	Ticket   string `json:"ticket"`
 }
 
 type realtimeSnapshotMessage struct {
@@ -76,6 +77,7 @@ type realtimeSessionOptions struct {
 	hub                   RealtimeHub
 	changePublisher       ChangePublisher
 	clickGuard            ClickGuard
+	manualClick           ManualClickController
 	authenticatorEnabled  bool
 	authenticatedNickname string
 	clientID              string
@@ -87,6 +89,7 @@ type realtimeSession struct {
 	hub                   RealtimeHub
 	changePublisher       ChangePublisher
 	clickGuard            ClickGuard
+	manualClick           ManualClickController
 	authenticatorEnabled  bool
 	authenticatedNickname string
 	clientID              string
@@ -103,6 +106,7 @@ func newRealtimeSession(options realtimeSessionOptions) *realtimeSession {
 		hub:                   options.hub,
 		changePublisher:       options.changePublisher,
 		clickGuard:            options.clickGuard,
+		manualClick:           options.manualClick,
 		authenticatorEnabled:  options.authenticatorEnabled,
 		authenticatedNickname: strings.TrimSpace(options.authenticatedNickname),
 		clientID:              strings.TrimSpace(options.clientID),
@@ -122,6 +126,7 @@ func newRealtimeSocketHandler(options Options) app.HandlerFunc {
 			hub:                   options.RealtimeHub,
 			changePublisher:       options.ChangePublisher,
 			clickGuard:            options.ClickGuard,
+			manualClick:           options.ManualClick,
 			authenticatorEnabled:  options.PlayerAuthenticator != nil,
 			authenticatedNickname: authenticatedNickname,
 			clientID:              clientIdentifier(c),
@@ -213,12 +218,15 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 			Store:           s.store,
 			ClickGuard:      s.clickGuard,
 			ChangePublisher: s.changePublisher,
+			ManualClick:     s.manualClick,
 		}, clickRequestContext{
 			Slug:                  slug,
 			NicknameHint:          s.nickname,
 			AuthenticatedNickname: s.authenticatedNickname,
 			AuthenticatorEnabled:  s.authenticatorEnabled,
 			ClientID:              s.clientID,
+			Ticket:                message.Ticket,
+			EntryType:             clickEntryWS,
 		})
 		if apiErr != nil {
 			return send(s.protocolError(apiErr.Code, apiErr.Message))

@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { buildClickRequestBody, mergeClickFallbackState } from './clickResponse'
 
 describe('clickResponse', () => {
-  it('会把实时连接状态带进点击请求体', () => {
-    expect(buildClickRequestBody('阿明', true)).toEqual({
-      nickname: '阿明',
+  it('会把票据和实时连接状态带进点击请求体', () => {
+    expect(buildClickRequestBody('ticket-1', true)).toEqual({
+      ticket: 'ticket-1',
       realtimeConnected: true,
     })
 
-    expect(buildClickRequestBody('阿明', false)).toEqual({
-      nickname: '阿明',
+    expect(buildClickRequestBody('ticket-1', false)).toEqual({
+      ticket: 'ticket-1',
       realtimeConnected: false,
     })
   })

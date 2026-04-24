@@ -1,7 +1,6 @@
 <script setup>
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 
-import {AUTO_CLICK_INTERVAL_MS, createAutoClickLoop} from '../utils/autoClicker'
 import {mergeBossState} from '../utils/bossState'
 import {collectButtonTags, filterAndSortButtons, formatDropRate} from '../utils/buttonBoard'
 import {buildClickRequestBody, mergeClickFallbackState} from '../utils/clickResponse'
@@ -21,7 +20,7 @@ import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
-const AUTO_CLICK_RATE_LABEL = `每秒约 ${Math.round(1000 / AUTO_CLICK_INTERVAL_MS)} 次`
+const AUTO_CLICK_RATE_LABEL = '每秒固定 3 次'
 const EQUIPMENT_ENHANCE_COST = 10
 const HERO_AWAKEN_COST = 15
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
@@ -95,7 +94,6 @@ const lastForgeResult = ref(null)
 const cosmeticBursts = ref({})
 
 let realtimeTransport
-let autoClickLoop
 let starlightTimer = 0
 let lastExpiredStarlightEndsAt = 0
 let lastBossResourceVersion = ''
@@ -140,23 +138,20 @@ const criticalDamage = computed(() => combatStats.value?.criticalDamage ?? norma
 const autoClickTargetButton = computed(() =>
     buttons.value.find((button) => button.key === autoClickTargetKey.value) ?? null,
 )
-const autoClickTargetLabel = computed(() => autoClickTargetButton.value?.label ?? '未选择')
-const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetButton.value))
+const autoClickTargetLabel = computed(() => (autoClickTargetButton.value?.label ?? autoClickTargetKey.value) || '未选择')
+const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetKey.value))
 const autoClickStatus = computed(() => {
   if (!isLoggedIn.value) {
-    return '先登录账号，再手动点一次按钮，挂机就会跟随你最近一次手动点击。'
+    return '先登录账号，再选择按钮并开启官方挂机。'
   }
   if (!autoClickTargetKey.value) {
-    return '先手动点一次按钮选择目标，开启后会持续帮你点击。'
-  }
-  if (!autoClickTargetButton.value) {
-    return '刚才选中的按钮已经下线了，重新手动点一个按钮再开。'
+    return '先手动点一次按钮锁定目标，再开启官方挂机。'
   }
   if (autoClickEnabled.value) {
-    return `正在帮你持续点 ${autoClickTargetButton.value.label}；你手动点别的按钮后，挂机目标会立刻切过去。`
+    return `官方挂机正在服务端托管 ${autoClickTargetLabel.value}，你手动点别的按钮后会立刻切换目标。`
   }
 
-  return `已锁定 ${autoClickTargetButton.value.label}，开启后会按 ${AUTO_CLICK_RATE_LABEL} 持续点击。`
+  return `已锁定 ${autoClickTargetLabel.value}，开启后会按 ${AUTO_CLICK_RATE_LABEL} 在服务端持续结算。`
 })
 const bossStatusLabel = computed(() => {
   if (!boss.value) {
@@ -1036,6 +1031,12 @@ function ensureRealtimeTransport() {
       }
       const source = clearPendingClicks(key)
       if (key) {
+        autoClickTargetKey.value = key
+        if (autoClickEnabled.value) {
+          void syncAutoClickTargetOnServer(key).catch((error) => {
+            errorMessage.value = error.message || '挂机目标更新失败，请稍后重试。'
+          })
+        }
         triggerCosmeticBurst(key, {mode: source})
       }
       applyClickResult(payload)
@@ -1177,48 +1178,123 @@ async function loadButtonPage(page) {
   }
 }
 
-function stopAutoClick() {
-  autoClickEnabled.value = false
-  autoClickLoop?.stop()
+function syncAutoClickTarget() {
+  // 挂机目标允许不在当前页显示，保留服务端状态即可。
 }
 
-function syncAutoClickTarget() {
-  if (autoClickTargetKey.value && !autoClickTargetButton.value) {
-    stopAutoClick()
+function applyAutoClickStatus(payload, options = {}) {
+  autoClickEnabled.value = Boolean(payload?.active)
+  if (payload?.buttonKey) {
+    autoClickTargetKey.value = payload.buttonKey
+    return
+  }
+  if (options.clearTargetWhenMissing) {
+    autoClickTargetKey.value = ''
   }
 }
 
-function startAutoClick() {
+function clearAutoClickLocalState() {
+  autoClickEnabled.value = false
+  autoClickTargetKey.value = ''
+}
+
+async function loadAutoClickStatus() {
+  if (!nickname.value) {
+    clearAutoClickLocalState()
+    return
+  }
+
+  try {
+    const response = await fetch('/api/auto-click')
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '挂机状态加载失败'))
+    }
+    applyAutoClickStatus(await response.json(), {clearTargetWhenMissing: true})
+  } catch {
+    autoClickEnabled.value = false
+  }
+}
+
+async function syncAutoClickTargetOnServer(key) {
+  if (!nickname.value || !key) {
+    return
+  }
+
+  const response = await fetch('/api/auto-click/start', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({slug: key}),
+  })
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '挂机目标更新失败，请稍后重试。'))
+  }
+  applyAutoClickStatus(await response.json(), {clearTargetWhenMissing: false})
+}
+
+async function startAutoClick() {
   if (!canStartAutoClick.value) {
     return
   }
 
-  if (!autoClickLoop) {
-    autoClickLoop = createAutoClickLoop({
-      onTick: () => {
-        const target = autoClickTargetButton.value
-        if (!nickname.value || !target) {
-          stopAutoClick()
-          return
-        }
-
-        void clickButton(target.key, {source: 'auto'})
-      },
-    })
-  }
-
-  autoClickEnabled.value = true
   errorMessage.value = ''
-  autoClickLoop.start()
+
+  try {
+    await syncAutoClickTargetOnServer(autoClickTargetKey.value)
+  } catch (error) {
+    errorMessage.value = error.message || '挂机开启失败，请稍后重试。'
+  }
 }
 
-function toggleAutoClick() {
-  if (autoClickEnabled.value) {
-    stopAutoClick()
+async function stopAutoClick() {
+  if (!nickname.value) {
+    autoClickEnabled.value = false
     return
   }
 
-  startAutoClick()
+  errorMessage.value = ''
+  try {
+    const response = await fetch('/api/auto-click/stop', {
+      method: 'POST',
+    })
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response, '挂机关闭失败，请稍后重试。'))
+    }
+    autoClickEnabled.value = false
+  } catch (error) {
+    errorMessage.value = error.message || '挂机关闭失败，请稍后重试。'
+  }
+}
+
+async function toggleAutoClick() {
+  if (autoClickEnabled.value) {
+    await stopAutoClick()
+    return
+  }
+
+  await startAutoClick()
+}
+
+async function requestClickTicket(key) {
+  const response = await fetch('/api/click-tickets', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({slug: key}),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, '操作已过期，请重试。'))
+  }
+
+  const payload = await response.json()
+  const ticket = String(payload?.ticket || '').trim()
+  if (!ticket) {
+    throw new Error('操作已过期，请重试。')
+  }
+  return ticket
 }
 
 async function loadState() {
@@ -1242,10 +1318,6 @@ async function loadState() {
 }
 
 async function clickButton(key, options = {}) {
-  if (options.source !== 'auto') {
-    autoClickTargetKey.value = key
-  }
-
   if (!nickname.value || pendingKeys.value.has(key)) {
     return
   }
@@ -1257,7 +1329,9 @@ async function clickButton(key, options = {}) {
   errorMessage.value = ''
 
   try {
-    if (ensureRealtimeTransport().sendClick(key)) {
+    const ticket = await requestClickTicket(key)
+
+    if (ensureRealtimeTransport().sendClick(key, ticket)) {
       return
     }
 
@@ -1266,7 +1340,7 @@ async function clickButton(key, options = {}) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(buildClickRequestBody(nickname.value, liveConnected.value)),
+      body: JSON.stringify(buildClickRequestBody(ticket, liveConnected.value)),
     })
 
     if (!response.ok) {
@@ -1276,6 +1350,10 @@ async function clickButton(key, options = {}) {
     const data = await response.json()
     if (data.critical) {
       triggerCriticalBurst(key, data.delta)
+    }
+    autoClickTargetKey.value = key
+    if (autoClickEnabled.value) {
+      await syncAutoClickTargetOnServer(key)
     }
     triggerCosmeticBurst(key, {mode: clearPendingClicks(key)})
     applyClickResult(data)
@@ -1496,10 +1574,10 @@ async function submitNickname() {
     const payload = await response.json()
     const resolvedNickname = normalizeNickname(payload?.nickname || nextNickname)
 
-    stopAutoClick()
     nickname.value = resolvedNickname
     nicknameDraft.value = resolvedNickname
     passwordDraft.value = ''
+    await loadAutoClickStatus()
     connectRealtime(resolvedNickname)
   } catch (error) {
     errorMessage.value = error.message || '登录失败，请稍后重试。'
@@ -1515,7 +1593,6 @@ async function resetNickname() {
     // 忽略异常，继续清理本地状态。
   }
 
-  stopAutoClick()
   clearPlayerSessionState()
   connectRealtime('')
 }
@@ -1525,7 +1602,7 @@ function clearPlayerSessionState() {
   nicknameDraft.value = ''
   passwordDraft.value = ''
   clearUserRealtimeState()
-  autoClickTargetKey.value = ''
+  clearAutoClickLocalState()
   clearPendingClicks()
 }
 
@@ -1546,6 +1623,7 @@ async function loadPlayerSession() {
 
     nickname.value = resolvedNickname
     nicknameDraft.value = resolvedNickname
+    await loadAutoClickStatus()
   } catch {
     clearPlayerSessionState()
   }
@@ -1559,7 +1637,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  stopAutoClick()
   realtimeTransport?.close()
   clearStarlightTimer()
   burstTimers.forEach((timer) => window.clearTimeout(timer))

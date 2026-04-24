@@ -142,8 +142,8 @@ describe('realtimeTransport', () => {
     transport.connect({ nickname: '阿明' })
     sockets[0].emitOpen()
 
-    expect(transport.sendClick('feel')).toBe(true)
-    expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({ type: 'click', slug: 'feel' }))
+    expect(transport.sendClick('feel', 'ticket-1')).toBe(true)
+    expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({ type: 'click', slug: 'feel', ticket: 'ticket-1' }))
 
     sockets[0].emitMessage({
       type: 'click_ack',

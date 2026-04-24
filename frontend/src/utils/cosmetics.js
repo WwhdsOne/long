@@ -1,3 +1,7 @@
+function normalizeId(value) {
+  return String(value ?? '').trim()
+}
+
 export function createEmptyCosmeticLoadout() {
   return {
     trailId: '',
@@ -5,92 +9,95 @@ export function createEmptyCosmeticLoadout() {
   }
 }
 
-export function normalizeCosmeticLoadout(loadout) {
+export function normalizeCosmeticLoadout(loadout = {}) {
   return {
-    trailId: loadout?.trailId || '',
-    impactId: loadout?.impactId || '',
+    trailId: normalizeId(loadout?.trailId),
+    impactId: normalizeId(loadout?.impactId),
   }
 }
 
-export function buildCosmeticCollections(shopCatalog = []) {
+export function buildCosmeticCollections(items = []) {
+  const trails = []
+  const impacts = []
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (item?.type === 'trail') {
+      trails.push(item)
+      continue
+    }
+    if (item?.type === 'impact') {
+      impacts.push(item)
+    }
+  }
+
   return {
-    trails: shopCatalog.filter((item) => item?.type === 'trail'),
-    impacts: shopCatalog.filter((item) => item?.type === 'impact'),
+    trails,
+    impacts,
   }
 }
 
-export function findCosmeticItem(shopCatalog = [], cosmeticId = '') {
-  if (!cosmeticId) {
-    return null
-  }
-
-  return shopCatalog.find((item) => item?.cosmeticId === cosmeticId) ?? null
-}
-
-export function canEquipCosmeticSelection(shopCatalog = [], selection = {}) {
-  const normalized = normalizeCosmeticLoadout(selection)
-  const trail = findCosmeticItem(shopCatalog, normalized.trailId)
-  const impact = findCosmeticItem(shopCatalog, normalized.impactId)
-
-  if (normalized.trailId && (!trail || trail.type !== 'trail' || !trail.owned)) {
-    return false
-  }
-  if (normalized.impactId && (!impact || impact.type !== 'impact' || !impact.owned)) {
-    return false
-  }
-
-  return true
-}
-
-export function summarizeEquippedCosmetics(shopCatalog = [], loadout = {}) {
+export function canEquipCosmeticSelection(items = [], loadout = {}) {
   const normalized = normalizeCosmeticLoadout(loadout)
-  const trail = findCosmeticItem(shopCatalog, normalized.trailId)
-  const impact = findCosmeticItem(shopCatalog, normalized.impactId)
-
-  return {
-    trailName: trail?.name || '未装备轨迹',
-    impactName: impact?.name || '未装备点击特效',
+  if (!normalized.trailId && !normalized.impactId) {
+    return true
   }
+
+  const owned = new Set(
+    (Array.isArray(items) ? items : [])
+      .filter((item) => item?.owned)
+      .map((item) => normalizeId(item?.cosmeticId)),
+  )
+
+  return (!normalized.trailId || owned.has(normalized.trailId))
+    && (!normalized.impactId || owned.has(normalized.impactId))
 }
 
-export function resolveCosmeticEffectConfig(shopCatalog = [], loadout = {}, options = {}) {
+export function cosmeticStatusText(item, loadout = {}) {
   const normalized = normalizeCosmeticLoadout(loadout)
-  const trail = findCosmeticItem(shopCatalog, normalized.trailId)
-  const impact = findCosmeticItem(shopCatalog, normalized.impactId)
-  const mode = options.mode === 'auto' ? 'auto' : 'normal'
-  const suppressed = Boolean(options.starlight)
-
-  let particleCount = mode === 'auto' ? 3 : 6
-  let durationMs = mode === 'auto' ? 900 : 1200
-  if (suppressed) {
-    particleCount = Math.max(2, particleCount - 2)
-    durationMs = Math.max(520, durationMs - 380)
+  if (!item?.owned) {
+    return '未拥有'
   }
-
-  return {
-    trailTheme: trail?.preview?.theme || '',
-    impactTheme: impact?.preview?.theme || '',
-    trailClass: trail ? `cosmetic-theme--${trail.preview?.theme || 'default'}` : '',
-    impactClass: impact ? `cosmetic-theme--${impact.preview?.theme || 'default'}` : '',
-    particleCount,
-    durationMs,
-    mode,
-    suppressed,
-  }
-}
-
-export function cosmeticStatusText(item) {
-  if (item?.equipped) {
+  if (item?.type === 'trail' && normalizeId(item?.cosmeticId) === normalized.trailId) {
     return '已装备'
   }
-  if (item?.owned) {
-    return '已拥有'
+  if (item?.type === 'impact' && normalizeId(item?.cosmeticId) === normalized.impactId) {
+    return '已装备'
   }
-  return `${item?.price ?? 0} 原石`
+  return '可装备'
+}
+
+export function resolveCosmeticEffectConfig() {
+  return {
+    mode: 'normal',
+    suppressed: true,
+    trailTheme: '',
+    impactTheme: '',
+    trailClass: '',
+    impactClass: '',
+    durationMs: 900,
+    particleCount: 0,
+  }
 }
 
 export function salvageableCount(item, active = false) {
-  const quantity = Number(item?.quantity ?? 0)
-  const protectedCount = item?.equipped || active ? 1 : 0
-  return Math.max(0, quantity - protectedCount)
+  const quantity = Math.max(0, Number(item?.quantity || 0))
+  if (active) {
+    return Math.max(0, quantity - 1)
+  }
+  return quantity
+}
+
+export function summarizeEquippedCosmetics(items = [], loadout = {}) {
+  const normalized = normalizeCosmeticLoadout(loadout)
+  const index = new Map((Array.isArray(items) ? items : []).map((item) => [normalizeId(item?.cosmeticId), item]))
+
+  const parts = []
+  if (normalized.trailId) {
+    parts.push(index.get(normalized.trailId)?.name || normalized.trailId)
+  }
+  if (normalized.impactId) {
+    parts.push(index.get(normalized.impactId)?.name || normalized.impactId)
+  }
+
+  return parts.length > 0 ? parts.join(' / ') : '未装备'
 }

@@ -309,6 +309,46 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	}
 }
 
+func TestRealtimeSessionClickForwardsTicketToManualClickController(t *testing.T) {
+	controller := &mockManualClickController{
+		clickResult: vote.ClickResult{
+			Button: vote.Button{
+				Key:     "feel",
+				Label:   "有感觉吗",
+				Count:   5,
+				Enabled: true,
+			},
+			Delta: 1,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 5,
+			},
+		},
+	}
+	session := newRealtimeSession(realtimeSessionOptions{
+		store:                 &mockStore{state: voteStateForPlayerTests()},
+		manualClick:           controller,
+		authenticatorEnabled:  true,
+		authenticatedNickname: "阿明",
+		clientID:              "127.0.0.1",
+	})
+
+	messages := captureRealtimeMessages(t, func(send func(any) error) error {
+		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"feel","ticket":"ticket-1"}`), send)
+	})
+	if len(messages) != 1 {
+		t.Fatalf("expected one realtime message, got %d", len(messages))
+	}
+
+	response := decodeRealtimeMessage[realtimeClickAckMessage](t, messages[0])
+	if response.Type != realtimeMessageTypeClickAck {
+		t.Fatalf("expected click ack, got %+v", response)
+	}
+	if controller.lastClickReq.Ticket != "ticket-1" || controller.lastClickReq.EntryType != clickEntryWS {
+		t.Fatalf("expected websocket click to forward ticket, got %+v", controller.lastClickReq)
+	}
+}
+
 func TestRealtimeSessionReturnsProtocolErrors(t *testing.T) {
 	session := newRealtimeSession(realtimeSessionOptions{
 		stateView:            &mockStore{},

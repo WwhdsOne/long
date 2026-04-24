@@ -279,7 +279,7 @@ export function createRealtimeTransport(options = {}) {
       closeWebSocket()
       connectWebSocket()
     },
-    sendClick(slug) {
+    sendClick(slug, ticket) {
       if (!ws || !wsOpen) {
         return false
       }
@@ -288,6 +288,7 @@ export function createRealtimeTransport(options = {}) {
         ws.send(JSON.stringify({
           type: 'click',
           slug,
+          ticket,
         }))
         return true
       } catch {

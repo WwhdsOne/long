@@ -42,6 +42,15 @@ type RateLimitConfig struct {
 	BlacklistDuration time.Duration
 }
 
+// ManualClickConfig 控制票据有效期、节奏阈值与短时封禁。
+type ManualClickConfig struct {
+	TicketTTL             time.Duration
+	IssueLimitPerSecond   int
+	ConsumeLimitPerSecond int
+	RiskThreshold         int
+	BanDuration           time.Duration
+}
+
 // CriticalHitConfig 暴击机制配置
 type CriticalHitConfig struct {
 	ChancePercent int   // 暴击概率（百分比）
@@ -80,6 +89,7 @@ type Config struct {
 	CriticalHit        CriticalHitConfig
 	Admin              AdminConfig
 	PlayerAuth         PlayerAuthConfig
+	ManualClick        ManualClickConfig
 	OSS                OSSConfig
 	RedisPrefix        string
 	ButtonPollInterval time.Duration // 低频兜底按钮索引同步间隔
@@ -116,6 +126,13 @@ type fileConfig struct {
 		JWTSecret    string `yaml:"jwt_secret"`
 		JWTTTLSecond int    `yaml:"jwt_ttl_seconds"`
 	} `yaml:"player_auth"`
+	ManualClick struct {
+		TicketTTLMS           int `yaml:"ticket_ttl_ms"`
+		IssueLimitPerSecond   int `yaml:"issue_limit_per_second"`
+		ConsumeLimitPerSecond int `yaml:"consume_limit_per_second"`
+		RiskThreshold         int `yaml:"risk_threshold"`
+		BanMS                 int `yaml:"ban_ms"`
+	} `yaml:"manual_click"`
 	OSS struct {
 		AccessKeyID     string `yaml:"access_key_id"`
 		AccessKeySecret string `yaml:"access_key_secret"`
@@ -213,6 +230,13 @@ func loadFromConsul() (Config, consulSource, error) {
 		PlayerAuth: PlayerAuthConfig{
 			JWTSecret: parsed.PlayerAuth.JWTSecret,
 			JWTTTL:    time.Duration(parsed.PlayerAuth.JWTTTLSecond) * time.Second,
+		},
+		ManualClick: ManualClickConfig{
+			TicketTTL:             time.Duration(parsed.ManualClick.TicketTTLMS) * time.Millisecond,
+			IssueLimitPerSecond:   parsed.ManualClick.IssueLimitPerSecond,
+			ConsumeLimitPerSecond: parsed.ManualClick.ConsumeLimitPerSecond,
+			RiskThreshold:         parsed.ManualClick.RiskThreshold,
+			BanDuration:           time.Duration(parsed.ManualClick.BanMS) * time.Millisecond,
 		},
 		OSS: OSSConfig{
 			AccessKeyID:     parsed.OSS.AccessKeyID,

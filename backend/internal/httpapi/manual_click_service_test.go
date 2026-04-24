@@ -1,0 +1,203 @@
+package httpapi
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"long/internal/vote"
+)
+
+func TestManualClickServiceAcceptsFreshTicketOnce(t *testing.T) {
+	now := time.Unix(1710000000, 0)
+	store := &mockStore{
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+			},
+		},
+		result: vote.ClickResult{
+			Button: vote.Button{Key: "feel", Label: "有感觉吗", Count: 4, Enabled: true},
+			Delta:  1,
+			UserStats: vote.UserStats{
+				Nickname:   "阿明",
+				ClickCount: 4,
+			},
+		},
+	}
+	service := NewManualClickService(ManualClickServiceOptions{
+		Store: store,
+		Config: ManualClickConfig{
+			TicketTTL:             2 * time.Second,
+			IssueLimitPerSecond:   5,
+			ConsumeLimitPerSecond: 5,
+			RiskThreshold:         3,
+			BanDuration:           time.Minute,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname: "阿明",
+		Slug:     "feel",
+		ClientID: "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("issue ticket: %v", err)
+	}
+
+	result, err := service.Click(context.Background(), ManualClickRequest{
+		Nickname:  "阿明",
+		Slug:      "feel",
+		Ticket:    ticket.Value,
+		ClientID:  "127.0.0.1",
+		EntryType: clickEntryHTTP,
+	})
+	if err != nil {
+		t.Fatalf("consume ticket: %v", err)
+	}
+	if result.Button.Key != "feel" {
+		t.Fatalf("expected click result for feel, got %+v", result)
+	}
+	if store.lastClickNickname != "阿明" {
+		t.Fatalf("expected manual click to use 阿明, got %q", store.lastClickNickname)
+	}
+
+	_, err = service.Click(context.Background(), ManualClickRequest{
+		Nickname:  "阿明",
+		Slug:      "feel",
+		Ticket:    ticket.Value,
+		ClientID:  "127.0.0.1",
+		EntryType: clickEntryHTTP,
+	})
+	if !manualClickRequiresRetry(err) {
+		t.Fatalf("expected reused ticket to require retry, got %v", err)
+	}
+}
+
+func TestManualClickServiceRejectsExpiredOrMismatchedTicket(t *testing.T) {
+	now := time.Unix(1710000000, 0)
+	service := NewManualClickService(ManualClickServiceOptions{
+		Store: &mockStore{
+			state: vote.State{
+				Buttons: []vote.Button{
+					{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+				},
+			},
+		},
+		Config: ManualClickConfig{
+			TicketTTL:             time.Second,
+			IssueLimitPerSecond:   5,
+			ConsumeLimitPerSecond: 5,
+			RiskThreshold:         3,
+			BanDuration:           time.Minute,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	ticket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname: "阿明",
+		Slug:     "feel",
+		ClientID: "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("issue ticket: %v", err)
+	}
+
+	_, err = service.Click(context.Background(), ManualClickRequest{
+		Nickname:  "阿明",
+		Slug:      "other",
+		Ticket:    ticket.Value,
+		ClientID:  "127.0.0.1",
+		EntryType: clickEntryHTTP,
+	})
+	if !manualClickRequiresRetry(err) {
+		t.Fatalf("expected mismatched slug to require retry, got %v", err)
+	}
+
+	now = now.Add(3 * time.Second)
+	expiredTicket, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname: "阿明",
+		Slug:     "feel",
+		ClientID: "127.0.0.1",
+	})
+	if err != nil {
+		t.Fatalf("issue expired ticket: %v", err)
+	}
+
+	now = now.Add(2 * time.Second)
+	_, err = service.Click(context.Background(), ManualClickRequest{
+		Nickname:  "阿明",
+		Slug:      "feel",
+		Ticket:    expiredTicket.Value,
+		ClientID:  "127.0.0.1",
+		EntryType: clickEntryHTTP,
+	})
+	if !manualClickRequiresRetry(err) {
+		t.Fatalf("expected expired ticket to require retry, got %v", err)
+	}
+}
+
+func TestManualClickServiceBansRepeatedAbuseTemporarily(t *testing.T) {
+	now := time.Unix(1710000000, 0)
+	service := NewManualClickService(ManualClickServiceOptions{
+		Store: &mockStore{
+			state: vote.State{
+				Buttons: []vote.Button{
+					{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
+				},
+			},
+		},
+		Config: ManualClickConfig{
+			TicketTTL:             2 * time.Second,
+			IssueLimitPerSecond:   1,
+			ConsumeLimitPerSecond: 5,
+			RiskThreshold:         2,
+			BanDuration:           2 * time.Minute,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	if _, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname: "阿明",
+		Slug:     "feel",
+		ClientID: "127.0.0.1",
+	}); err != nil {
+		t.Fatalf("first issue ticket: %v", err)
+	}
+
+	if _, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname: "阿明",
+		Slug:     "feel",
+		ClientID: "127.0.0.1",
+	}); !manualClickTooFrequent(err) {
+		t.Fatalf("expected second issue to be throttled, got %v", err)
+	}
+
+	_, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname: "阿明",
+		Slug:     "feel",
+		ClientID: "127.0.0.1",
+	})
+	if !manualClickTooFrequent(err) {
+		t.Fatalf("expected third issue to be blocked, got %v", err)
+	}
+	if retryAfter := manualClickRetryAfter(err); retryAfter < time.Minute {
+		t.Fatalf("expected ban retry-after to be at least one minute, got %s", retryAfter)
+	}
+
+	now = now.Add(3 * time.Minute)
+	if _, err := service.IssueTicket(context.Background(), TicketIssueRequest{
+		Nickname: "阿明",
+		Slug:     "feel",
+		ClientID: "127.0.0.1",
+	}); err != nil {
+		t.Fatalf("expected issue to recover after ban window, got %v", err)
+	}
+}

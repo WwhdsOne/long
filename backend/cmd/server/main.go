@@ -87,6 +87,24 @@ func run() error {
 		Window:            cfg.RateLimit.Window,
 		BlacklistDuration: cfg.RateLimit.BlacklistDuration,
 	})
+	manualClickService := httpapi.NewManualClickService(httpapi.ManualClickServiceOptions{
+		Store:      store,
+		ClickGuard: clickLimiter,
+		Config: httpapi.ManualClickConfig{
+			TicketTTL:             cfg.ManualClick.TicketTTL,
+			IssueLimitPerSecond:   cfg.ManualClick.IssueLimitPerSecond,
+			ConsumeLimitPerSecond: cfg.ManualClick.ConsumeLimitPerSecond,
+			RiskThreshold:         cfg.ManualClick.RiskThreshold,
+			BanDuration:           cfg.ManualClick.BanDuration,
+		},
+	})
+	autoClickService := httpapi.NewAutoClickService(httpapi.AutoClickServiceOptions{
+		Store:           store,
+		ChangePublisher: changeBus,
+		Interval:        time.Second / 3,
+		AutoStart:       true,
+	})
+	defer autoClickService.Close()
 	var ossSigner *ossupload.Signer
 	if cfg.OSS.Enabled() {
 		ossSigner = ossupload.NewSigner(ossupload.Config{
@@ -104,6 +122,8 @@ func run() error {
 		StateView:           stateCache,
 		ChangePublisher:     changeBus,
 		ClickGuard:          clickLimiter,
+		ManualClick:         manualClickService,
+		AutoClick:           autoClickService,
 		PlayerAuthenticator: playerAuthenticator,
 		Events:              eventHandler,
 		RealtimeHub:         hub,
