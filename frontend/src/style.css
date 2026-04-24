@@ -1037,6 +1037,10 @@ select {
 }
 
 .vote-stage__boss-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
   margin: 0;
   color: var(--ink-soft);
   font-size: 0.9rem;
@@ -1047,7 +1051,8 @@ select {
   flex-wrap: wrap;
   gap: 8px 12px;
   align-items: center;
-  margin: -8px 0 20px;
+  justify-content: flex-end;
+  text-align: right;
   color: var(--ink-soft);
   font-size: 0.9rem;
 }
@@ -2350,10 +2355,20 @@ select {
 @media (max-width: 980px) {
   .hero,
   .vote-stage__head,
+  .vote-stage__boss-note,
   .stats-band,
   .button-grid,
   .stage-layout {
     grid-template-columns: 1fr;
+  }
+
+  .vote-stage__boss-note {
+    align-items: flex-start;
+  }
+
+  .boss-drop-link {
+    justify-content: flex-start;
+    text-align: left;
   }
 
   .hero {
