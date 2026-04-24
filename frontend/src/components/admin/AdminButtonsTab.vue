@@ -48,10 +48,6 @@ defineProps({
             <input v-model="buttonForm.enabled" type="checkbox" />
             启用按钮
           </label>
-          <label class="admin-check">
-            <input v-model="buttonForm.starlightEligible" type="checkbox" />
-            参与星光轮换
-          </label>
           <button class="nickname-form__submit" type="submit" :disabled="saving">
             保存按钮
           </button>
@@ -67,7 +63,7 @@ defineProps({
             <div>
               <strong>{{ button.label }}</strong>
               <p>{{ button.key }} · sort {{ button.sort }} · {{ button.enabled ? '启用' : '停用' }}</p>
-              <p>{{ Array.isArray(button.tags) && button.tags.length > 0 ? button.tags.join(' / ') : '未打标签' }} · {{ button.starlightEligible ? '参与星光' : '不参与星光' }}</p>
+              <p>{{ Array.isArray(button.tags) && button.tags.length > 0 ? button.tags.join(' / ') : '未打标签' }}</p>
             </div>
             <button class="inventory-item__action" type="button" @click="editButton(button)">编辑</button>
           </li>

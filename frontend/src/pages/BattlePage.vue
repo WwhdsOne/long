@@ -4,226 +4,47 @@ import {computed, ref} from 'vue'
 import {usePublicPageState} from './publicPageState'
 
 const {
-  ANNOUNCEMENT_READ_KEY,
-  ANNOUNCEMENT_CACHE_KEY,
   AUTO_CLICK_RATE_LABEL,
-  EQUIPMENT_ENHANCE_COST,
-  HERO_AWAKEN_COST,
-  GROWTH_FORMULA_TEXT,
-  HERO_GROWTH_FORMULA_TEXT,
-  publicPages,
   buttons,
-  firstPageButtons,
-  buttonPage,
-  buttonPageSize,
-  buttonTotalPages,
-  buttonTotalCount,
-  buttonTotalVotes,
-  leaderboard,
   boss,
   bossLeaderboard,
   bossLoot,
   bossHeroLoot,
-  starlight,
-  announcementVersion,
-  latestAnnouncement,
-  announcements,
-  myBossStats,
-  inventory,
-  heroes,
-  activeHero,
-  loadout,
-  combatStats,
-  recentRewards,
-  lastReward,
-  userStats,
   nickname,
-  nicknameDraft,
-  passwordDraft,
   loading,
-  syncing,
   errorMessage,
   pendingKeys,
-  actioningItemId,
-  activeHudTab,
-  lastUpdatedAt,
-  liveConnected,
   criticalBursts,
-  bossHistory,
-  bossHistoryQuery,
-  loadingBossHistory,
-  bossHistoryLoaded,
-  bossHistoryError,
-  selectedButtonTag,
-  buttonSearch,
-  loadingAnnouncements,
-  announcementsLoaded,
-  announcementError,
-  loadingBossResources,
-  latestAnnouncementLoaded,
-  announcementModalOpen,
-  messages,
-  messageNextCursor,
-  loadingMessages,
-  postingMessage,
-  messageDraft,
-  messageError,
   autoClickEnabled,
-  autoClickTargetKey,
-  gems,
-  ownedCosmetics,
-  equippedCosmetics,
-  cosmeticDraft,
-  shopCatalog,
-  lastForgeResult,
-  cosmeticBursts,
-  fingerprintHash,
-  currentPublicPage,
-  profileLoading,
-  profileLoaded,
-  profileNotice,
-  starlightTimer,
-  lastExpiredStarlightEndsAt,
-  lastBossResourceVersion,
-  burstTimers,
-  cosmeticTimers,
-  pendingClickSources,
-  clickBehaviorTracker,
   buttonCount,
   totalVotes,
-  buttonTags,
-  activeStarlightKeys,
   displayedButtons,
-  syncLabel,
   isLoggedIn,
   myClicks,
   myRank,
   myBossDamage,
   effectiveIncrement,
-  normalDamage,
-  criticalDamage,
-  autoClickTargetButton,
   autoClickTargetLabel,
   canStartAutoClick,
   autoClickStatus,
   bossStatusLabel,
   bossProgress,
-  equippedItems,
-  heroCount,
-  cosmeticCollections,
-  selectedCosmeticLoadout,
-  selectedCosmeticSummary,
-  equippedCosmeticSummary,
-  canApplyCosmeticSelection,
-  previewEffectConfig,
-  previewDots,
   displayedRecentRewards,
   recentRewardTitle,
-  recentRewardNote,
-  filteredBossHistory,
-  emptyLoadout,
-  defaultCombatStats,
   formatDropRate,
   formatRarityLabel,
-  cosmeticStatusText,
   formatItemStats,
-  formatItemStatLines,
   equipmentNameParts,
   equipmentNameClass,
   formatEnhanceCap,
   formatAwakenCap,
   formatHeroTrait,
   heroImageAlt,
-  normalizeNickname,
-  resolvePublicPage,
-  navigatePublicPage,
-  activatePublicPage,
-  handlePublicRouteChange,
-  isStarlightButton,
-  clearStarlightTimer,
-  scheduleStarlightRefresh,
-  formatBossTime,
-  topBossDamage,
-  formatTime,
-  formatNumber,
-  formatStatWithDelta,
-  formatPercentWithDelta,
-  formatHeroEffect,
-  salvageableEquipmentCount,
-  salvageableHeroCount,
-  equipmentEnhanceHint,
-  heroAwakenHint,
-  dotIndexes,
-  cosmeticModeClasses,
-  syncCosmeticDraft,
-  readErrorMessage,
-  normalizePageNumber,
-  updateCurrentPageButtons,
-  applyButtonPagePayload,
-  bossResourceVersion,
-  readCachedLatestAnnouncement,
-  writeCachedLatestAnnouncement,
-  restoreCachedLatestAnnouncement,
-  maybePromptAnnouncement,
-  closeAnnouncementModal,
-  loadBossResources,
-  loadLatestAnnouncement,
-  loadAnnouncements,
-  loadMessages,
-  submitMessage,
-  validateNicknameWithServer,
-  loadBossHistory,
-  markUpdated,
-  selectHudTab,
-  applyState,
-  applyPublicState,
-  applyUserState,
-  applyBattleUserState,
-  applyPlayerProfileState,
-  applyClickResult,
-  clearUserRealtimeState,
-  clearPendingClicks,
-  applyRealtimeSnapshot,
-  ensureRealtimeTransport,
-  connectRealtime,
-  clearCriticalBurst,
-  triggerCriticalBurst,
-  clearCosmeticBurst,
   handlePressStart,
   handlePressEnd,
   handlePressCancel,
-  ensureFingerprintHash,
-  consumeClickBehavior,
-  triggerCosmeticBurst,
-  currentNicknameQuery,
-  loadButtonPage,
-  syncAutoClickTarget,
-  applyAutoClickStatus,
-  clearAutoClickLocalState,
-  loadAutoClickStatus,
-  syncAutoClickTargetOnServer,
-  startAutoClick,
-  stopAutoClick,
   toggleAutoClick,
-  requestClickTicket,
-  loadState,
-  loadPlayerProfile,
-  refreshProfileAfterMutation,
   clickButton,
-  postEquipmentAction,
-  postHeroAction,
-  salvageEquipment,
-  enhanceEquipment,
-  salvageHero,
-  awakenHero,
-  purchaseCosmetic,
-  selectCosmeticItem,
-  equipSelectedCosmetics,
-  submitNickname,
-  resetNickname,
-  clearPlayerSessionState,
-  loadPlayerSession,
-  registerPublicPageLifecycle,
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
@@ -340,32 +161,8 @@ function closeBossDropPool() {
         </div>
 
         <div v-else>
-          <div class="vote-stage__filters">
-            <input
-                v-model="buttonSearch"
-                class="nickname-form__input vote-stage__search"
-                type="text"
-                placeholder="搜按钮名或标签"
-            />
-            <div class="vote-stage__tags">
-              <button
-                  v-for="tag in buttonTags"
-                  :key="tag"
-                  class="vote-stage__tag"
-                  :class="{ 'vote-stage__tag--active': selectedButtonTag === tag }"
-                  type="button"
-                  @click="selectedButtonTag = tag"
-              >
-                {{ tag }}
-              </button>
-            </div>
-            <p class="vote-stage__hint">
-              当前第 {{ buttonPage }} / {{ buttonTotalPages }} 页，搜索和标签只筛当前页。
-            </p>
-          </div>
-
           <div v-if="displayedButtons.length === 0" class="feedback-panel">
-            <p>当前筛选下没有匹配按钮，换个标签或关键词试试。</p>
+            <p>还没有可用按钮。</p>
           </div>
 
           <div v-else class="button-grid">
@@ -377,7 +174,6 @@ function closeBossDropPool() {
               'vote-card--image': button.imagePath,
               'vote-card--pending': pendingKeys.has(button.key),
               'vote-card--critical': Boolean(criticalBursts[button.key]),
-              'vote-card--starlight': isStarlightButton(button.key),
               'vote-card--locked': !isLoggedIn,
             }"
                 type="button"
@@ -389,26 +185,6 @@ function closeBossDropPool() {
                 @click="clickButton(button.key)"
             >
               <span class="vote-card__shine"></span>
-              <span
-                  v-if="cosmeticBursts[button.key]?.trailTheme"
-                  :key="`${cosmeticBursts[button.key].nonce}-trail`"
-                  class="vote-card__cosmetic vote-card__cosmetic--trail"
-                  :class="[cosmeticBursts[button.key].trailClass, cosmeticModeClasses(cosmeticBursts[button.key])]"
-                  :style="{ animationDuration: `${cosmeticBursts[button.key].durationMs}ms` }"
-              ></span>
-              <span
-                  v-if="cosmeticBursts[button.key]?.impactTheme"
-                  :key="`${cosmeticBursts[button.key].nonce}-impact`"
-                  class="vote-card__cosmetic vote-card__cosmetic--impact"
-                  :class="[cosmeticBursts[button.key].impactClass, cosmeticModeClasses(cosmeticBursts[button.key])]"
-                  :style="{ animationDuration: `${cosmeticBursts[button.key].durationMs}ms` }"
-              >
-                <span
-                    v-for="dot in cosmeticBursts[button.key].dots"
-                    :key="`${cosmeticBursts[button.key].nonce}-dot-${dot}`"
-                    class="vote-card__cosmetic-dot"
-                ></span>
-              </span>
               <span
                   v-if="criticalBursts[button.key]"
                   :key="criticalBursts[button.key].nonce"
@@ -429,13 +205,9 @@ function closeBossDropPool() {
                       ? '先登录'
                       : pendingKeys.has(button.key)
                           ? '正在记票'
-                          : isStarlightButton(button.key)
-                              ? boss?.status === 'active'
-                                  ? `星光双倍 · 拍一下 +${effectiveIncrement * 2}`
-                                  : `星光双倍 · 拍一下 +${effectiveIncrement * 2}`
-                              : boss?.status === 'active'
-                                  ? `拍一下 +${effectiveIncrement} 并打 Boss`
-                                  : `拍一下 +${effectiveIncrement}`
+                          : boss?.status === 'active'
+                              ? `拍一下 +${effectiveIncrement} 并打 Boss`
+                              : `拍一下 +${effectiveIncrement}`
                 }}
             </span>
 
@@ -448,26 +220,6 @@ function closeBossDropPool() {
               <strong v-else class="vote-card__label">{{ button.label }}</strong>
 
               <span class="vote-card__count">{{ button.count }}</span>
-            </button>
-          </div>
-
-          <div v-if="buttonTotalPages > 1" class="inventory-item__actions">
-            <button
-                class="nickname-form__ghost"
-                type="button"
-                :disabled="buttonPage <= 1"
-                @click="loadButtonPage(buttonPage - 1)"
-            >
-              上一页
-            </button>
-            <span>第 {{ buttonPage }} / {{ buttonTotalPages }} 页</span>
-            <button
-                class="nickname-form__ghost"
-                type="button"
-                :disabled="buttonPage >= buttonTotalPages"
-                @click="loadButtonPage(buttonPage + 1)"
-            >
-              下一页
             </button>
           </div>
         </div>

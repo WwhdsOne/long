@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -34,10 +33,6 @@ var ErrHeroNotFound = errors.New("hero not found")
 var ErrHeroNotOwned = errors.New("hero not owned")
 var ErrHeroMaxAwaken = errors.New("hero max awaken")
 var ErrGemsNotEnough = errors.New("gems not enough")
-var ErrCosmeticNotFound = errors.New("cosmetic not found")
-var ErrCosmeticAlreadyOwned = errors.New("cosmetic already owned")
-var ErrCosmeticNotOwned = errors.New("cosmetic not owned")
-var ErrInvalidCosmeticLoadout = errors.New("invalid cosmetic loadout")
 var ErrInvalidQuantity = errors.New("invalid quantity")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
@@ -51,16 +46,15 @@ const (
 
 // Button 按钮数据结构，返回给前端和 SSE 客户端
 type Button struct {
-	Key               string   `json:"key"`
-	RedisKey          string   `json:"redisKey"`
-	Label             string   `json:"label"`
-	Count             int64    `json:"count"`
-	Sort              int      `json:"sort"`
-	Enabled           bool     `json:"enabled"`
-	Tags              []string `json:"tags,omitempty"`
-	StarlightEligible bool     `json:"starlightEligible,omitempty"`
-	ImagePath         string   `json:"imagePath,omitempty"`
-	ImageAlt          string   `json:"imageAlt,omitempty"`
+	Key       string   `json:"key"`
+	RedisKey  string   `json:"redisKey"`
+	Label     string   `json:"label"`
+	Count     int64    `json:"count"`
+	Sort      int      `json:"sort"`
+	Enabled   bool     `json:"enabled"`
+	Tags      []string `json:"tags,omitempty"`
+	ImagePath string   `json:"imagePath,omitempty"`
+	ImageAlt  string   `json:"imageAlt,omitempty"`
 }
 
 // UserStats 用户统计信息
@@ -281,13 +275,6 @@ type BossHeroLootEntry struct {
 	TraitValue                 int64         `json:"traitValue,omitempty"`
 }
 
-// StarlightState 描述当前生效的星光卡片窗口。
-type StarlightState struct {
-	ActiveKeys []string `json:"activeKeys"`
-	StartedAt  int64    `json:"startedAt"`
-	EndsAt     int64    `json:"endsAt"`
-}
-
 // BossResources 描述当前 Boss 的低频公共资源。
 type BossResources struct {
 	BossID       string              `json:"bossId,omitempty"`
@@ -300,43 +287,31 @@ type BossResources struct {
 // Snapshot 公共实时状态，广播给所有连接的客户端
 type Snapshot struct {
 	Buttons             []Button               `json:"buttons"`
-	ButtonPage          int64                  `json:"buttonPage"`
-	ButtonPageSize      int64                  `json:"buttonPageSize"`
-	ButtonTotal         int64                  `json:"buttonTotal"`
-	ButtonTotalPages    int64                  `json:"buttonTotalPages"`
 	TotalVotes          int64                  `json:"totalVotes"`
 	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
 	Boss                *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard     []BossLeaderboardEntry `json:"bossLeaderboard"`
-	Starlight           StarlightState         `json:"starlight"`
 	AnnouncementVersion string                 `json:"announcementVersion,omitempty"`
 }
 
 // UserState 个人实时状态，只推送给对应昵称的连接
 type UserState struct {
-	UserStats         *UserStats            `json:"userStats,omitempty"`
-	MyBossStats       *BossUserStats        `json:"myBossStats,omitempty"`
-	Inventory         []InventoryItem       `json:"inventory"`
-	Heroes            []HeroInventoryItem   `json:"heroes"`
-	ActiveHero        *HeroInventoryItem    `json:"activeHero,omitempty"`
-	Loadout           Loadout               `json:"loadout"`
-	CombatStats       CombatStats           `json:"combatStats"`
-	Gems              int64                 `json:"gems"`
-	OwnedCosmetics    []string              `json:"ownedCosmetics"`
-	EquippedCosmetics CosmeticLoadout       `json:"equippedCosmetics"`
-	LastForgeResult   *ForgeResult          `json:"lastForgeResult,omitempty"`
-	ShopCatalog       []CosmeticCatalogItem `json:"shopCatalog"`
-	RecentRewards     []Reward              `json:"recentRewards,omitempty"`
-	LastReward        *Reward               `json:"lastReward,omitempty"`
+	UserStats       *UserStats          `json:"userStats,omitempty"`
+	MyBossStats     *BossUserStats      `json:"myBossStats,omitempty"`
+	Inventory       []InventoryItem     `json:"inventory"`
+	Heroes          []HeroInventoryItem `json:"heroes"`
+	ActiveHero      *HeroInventoryItem  `json:"activeHero,omitempty"`
+	Loadout         Loadout             `json:"loadout"`
+	CombatStats     CombatStats         `json:"combatStats"`
+	Gems            int64               `json:"gems"`
+	LastForgeResult *ForgeResult        `json:"lastForgeResult,omitempty"`
+	RecentRewards   []Reward            `json:"recentRewards,omitempty"`
+	LastReward      *Reward             `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
 type State struct {
 	Buttons             []Button               `json:"buttons"`
-	ButtonPage          int64                  `json:"buttonPage"`
-	ButtonPageSize      int64                  `json:"buttonPageSize"`
-	ButtonTotal         int64                  `json:"buttonTotal"`
-	ButtonTotalPages    int64                  `json:"buttonTotalPages"`
 	TotalVotes          int64                  `json:"totalVotes"`
 	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
 	UserStats           *UserStats             `json:"userStats,omitempty"`
@@ -344,7 +319,6 @@ type State struct {
 	BossLeaderboard     []BossLeaderboardEntry `json:"bossLeaderboard"`
 	BossLoot            []BossLootEntry        `json:"bossLoot,omitempty"`
 	BossHeroLoot        []BossHeroLootEntry    `json:"bossHeroLoot,omitempty"`
-	Starlight           StarlightState         `json:"starlight"`
 	AnnouncementVersion string                 `json:"announcementVersion,omitempty"`
 	LatestAnnouncement  *Announcement          `json:"latestAnnouncement,omitempty"`
 	MyBossStats         *BossUserStats         `json:"myBossStats,omitempty"`
@@ -354,10 +328,7 @@ type State struct {
 	Loadout             Loadout                `json:"loadout"`
 	CombatStats         CombatStats            `json:"combatStats"`
 	Gems                int64                  `json:"gems"`
-	OwnedCosmetics      []string               `json:"ownedCosmetics"`
-	EquippedCosmetics   CosmeticLoadout        `json:"equippedCosmetics"`
 	LastForgeResult     *ForgeResult           `json:"lastForgeResult,omitempty"`
-	ShopCatalog         []CosmeticCatalogItem  `json:"shopCatalog"`
 	RecentRewards       []Reward               `json:"recentRewards,omitempty"`
 	LastReward          *Reward                `json:"lastReward,omitempty"`
 }
@@ -417,7 +388,6 @@ type Store struct {
 	prefix               string
 	namespace            string
 	buttonIndexKey       string
-	buttonStarlightKey   string
 	equipmentIndexKey    string
 	heroIndexKey         string
 	playerIndexKey       string
@@ -460,15 +430,9 @@ var hashFields = []string{
 	"sort",
 	"enabled",
 	"tags",
-	"starlight_eligible",
 	"image_path",
 	"image_alt",
 }
-
-const (
-	starlightWindow = 5 * time.Minute
-	starlightLimit  = 6
-)
 
 // NewStore 创建 Redis 投票存储实例
 func NewStore(client redis.UniversalClient, prefix string, options StoreOptions, validator interface{ Validate(string) error }) *Store {
@@ -480,7 +444,6 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		prefix:               prefix,
 		namespace:            namespace,
 		buttonIndexKey:       namespace + "buttons:index",
-		buttonStarlightKey:   namespace + "buttons:starlight",
 		equipmentIndexKey:    namespace + "equipment:index",
 		heroIndexKey:         namespace + "heroes:index",
 		playerIndexKey:       namespace + "players:index",
@@ -538,8 +501,10 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	starlight := starlightStateForButtons(buttons, s.now())
-	page := buildButtonPage(buttons, starlight.ActiveKeys, 1, defaultPublicButtonPageSize)
+	totalVotes := int64(0)
+	for _, button := range buttons {
+		totalVotes += button.Count
+	}
 
 	leaderboard, err := s.ListLeaderboard(ctx, 10)
 	if err != nil {
@@ -565,16 +530,11 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	}
 
 	return Snapshot{
-		Buttons:             page.Items,
-		ButtonPage:          page.Page,
-		ButtonPageSize:      page.PageSize,
-		ButtonTotal:         page.Total,
-		ButtonTotalPages:    page.TotalPages,
-		TotalVotes:          page.TotalVotes,
+		Buttons:             buttons,
+		TotalVotes:          totalVotes,
 		Leaderboard:         leaderboard,
 		Boss:                boss,
 		BossLeaderboard:     bossLeaderboard,
-		Starlight:           starlight,
 		AnnouncementVersion: announcementVersion,
 	}, nil
 }
@@ -597,14 +557,11 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 // GetUserState 获取仅与指定用户相关的状态。
 func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, error) {
 	userState := UserState{
-		Inventory:         []InventoryItem{},
-		Heroes:            []HeroInventoryItem{},
-		Loadout:           Loadout{},
-		CombatStats:       s.baseCombatStats(),
-		OwnedCosmetics:    []string{},
-		EquippedCosmetics: CosmeticLoadout{},
-		ShopCatalog:       buildShopCatalog(nil, CosmeticLoadout{}),
-		RecentRewards:     []Reward{},
+		Inventory:     []InventoryItem{},
+		Heroes:        []HeroInventoryItem{},
+		Loadout:       Loadout{},
+		CombatStats:   s.baseCombatStats(),
+		RecentRewards: []Reward{},
 	}
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
@@ -622,19 +579,6 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		return UserState{}, err
 	}
 	userState.Gems = gems
-
-	ownedCosmetics, ownedCosmeticsSet, err := s.ownedCosmeticsForNickname(ctx, normalizedNickname)
-	if err != nil {
-		return UserState{}, err
-	}
-	userState.OwnedCosmetics = ownedCosmetics
-
-	equippedCosmetics, err := s.cosmeticLoadoutForNickname(ctx, normalizedNickname)
-	if err != nil {
-		return UserState{}, err
-	}
-	userState.EquippedCosmetics = equippedCosmetics
-	userState.ShopCatalog = buildShopCatalog(ownedCosmeticsSet, equippedCosmetics)
 
 	lastForgeResult, err := s.lastForgeResultForNickname(ctx, normalizedNickname)
 	if err != nil {
@@ -783,12 +727,6 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 	if err != nil {
 		return ClickResult{}, err
 	}
-	if active, err := s.buttonStarlightActive(ctx, slug, s.now()); err != nil {
-		return ClickResult{}, err
-	} else if active {
-		delta *= 2
-	}
-
 	boss, err := s.currentBoss(ctx)
 	if err != nil {
 		return ClickResult{}, err
@@ -1042,16 +980,11 @@ func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, e
 func ComposeState(snapshot Snapshot, userState UserState) State {
 	return State{
 		Buttons:             snapshot.Buttons,
-		ButtonPage:          snapshot.ButtonPage,
-		ButtonPageSize:      snapshot.ButtonPageSize,
-		ButtonTotal:         snapshot.ButtonTotal,
-		ButtonTotalPages:    snapshot.ButtonTotalPages,
 		TotalVotes:          snapshot.TotalVotes,
 		Leaderboard:         snapshot.Leaderboard,
 		UserStats:           userState.UserStats,
 		Boss:                snapshot.Boss,
 		BossLeaderboard:     snapshot.BossLeaderboard,
-		Starlight:           snapshot.Starlight,
 		AnnouncementVersion: snapshot.AnnouncementVersion,
 		MyBossStats:         userState.MyBossStats,
 		Inventory:           userState.Inventory,
@@ -1060,10 +993,7 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Loadout:             userState.Loadout,
 		CombatStats:         userState.CombatStats,
 		Gems:                userState.Gems,
-		OwnedCosmetics:      userState.OwnedCosmetics,
-		EquippedCosmetics:   userState.EquippedCosmetics,
 		LastForgeResult:     userState.LastForgeResult,
-		ShopCatalog:         userState.ShopCatalog,
 		RecentRewards:       userState.RecentRewards,
 		LastReward:          userState.LastReward,
 	}
@@ -1707,16 +1637,15 @@ func (s *Store) normalizeButton(redisKey string, values []any) Button {
 	}
 
 	return Button{
-		Key:               slug,
-		RedisKey:          redisKey,
-		Label:             label,
-		Count:             int64Value(values, 1),
-		Sort:              int(int64Value(values, 2)),
-		Enabled:           stringValue(values, 3) != "0",
-		Tags:              decodeStringList(stringValue(values, 4)),
-		StarlightEligible: stringValue(values, 5) == "1",
-		ImagePath:         imagePath,
-		ImageAlt:          imageAlt,
+		Key:       slug,
+		RedisKey:  redisKey,
+		Label:     label,
+		Count:     int64Value(values, 1),
+		Sort:      int(int64Value(values, 2)),
+		Enabled:   stringValue(values, 3) != "0",
+		Tags:      decodeStringList(stringValue(values, 4)),
+		ImagePath: imagePath,
+		ImageAlt:  imageAlt,
 	}
 }
 
@@ -1772,90 +1701,6 @@ func encodeStringList(items []string) string {
 		return "[]"
 	}
 	return string(encoded)
-}
-
-func starlightStateForButtons(buttons []Button, now time.Time) StarlightState {
-	startedAt := now.Unix() - (now.Unix() % int64(starlightWindow/time.Second))
-	eligible := make([]string, 0, len(buttons))
-	for _, button := range buttons {
-		if button.StarlightEligible {
-			eligible = append(eligible, button.Key)
-		}
-	}
-
-	return StarlightState{
-		ActiveKeys: activeStarlightKeys(eligible, startedAt),
-		StartedAt:  startedAt,
-		EndsAt:     startedAt + int64(starlightWindow/time.Second),
-	}
-}
-
-func activeStarlightKeys(keys []string, startedAt int64) []string {
-	normalized := make([]string, 0, len(keys))
-	seen := make(map[string]struct{}, len(keys))
-	for _, key := range keys {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		normalized = append(normalized, key)
-	}
-
-	if len(normalized) <= starlightLimit {
-		slices.Sort(normalized)
-		return normalized
-	}
-
-	type scoredKey struct {
-		key   string
-		score uint64
-	}
-
-	scored := make([]scoredKey, 0, len(normalized))
-	for _, key := range normalized {
-		hasher := fnv.New64a()
-		_, _ = hasher.Write([]byte(strconv.FormatInt(startedAt, 10)))
-		_, _ = hasher.Write([]byte(":"))
-		_, _ = hasher.Write([]byte(key))
-		scored = append(scored, scoredKey{
-			key:   key,
-			score: hasher.Sum64(),
-		})
-	}
-
-	slices.SortFunc(scored, func(left, right scoredKey) int {
-		if left.score == right.score {
-			return strings.Compare(left.key, right.key)
-		}
-		if left.score < right.score {
-			return -1
-		}
-		return 1
-	})
-
-	active := make([]string, 0, starlightLimit)
-	for _, item := range scored[:starlightLimit] {
-		active = append(active, item.key)
-	}
-	slices.Sort(active)
-	return active
-}
-
-func (s *Store) buttonStarlightActive(ctx context.Context, slug string, now time.Time) (bool, error) {
-	keys, err := s.client.SMembers(ctx, s.buttonStarlightKey).Result()
-	if err != nil {
-		return false, err
-	}
-
-	startedAt := now.Unix() - (now.Unix() % int64(starlightWindow/time.Second))
-	if slices.Contains(activeStarlightKeys(keys, startedAt), slug) {
-		return true, nil
-	}
-	return false, nil
 }
 
 func percentageFromWeight(weight int64, totalWeight int64) float64 {

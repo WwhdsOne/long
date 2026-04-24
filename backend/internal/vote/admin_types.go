@@ -33,14 +33,13 @@ type AdminPlayerPage struct {
 
 // ButtonUpsert 管理后台按钮保存载荷
 type ButtonUpsert struct {
-	Slug              string   `json:"slug"`
-	Label             string   `json:"label"`
-	Sort              int      `json:"sort"`
-	Enabled           bool     `json:"enabled"`
-	Tags              []string `json:"tags"`
-	StarlightEligible bool     `json:"starlightEligible"`
-	ImagePath         string   `json:"imagePath"`
-	ImageAlt          string   `json:"imageAlt"`
+	Slug      string   `json:"slug"`
+	Label     string   `json:"label"`
+	Sort      int      `json:"sort"`
+	Enabled   bool     `json:"enabled"`
+	Tags      []string `json:"tags"`
+	ImagePath string   `json:"imagePath"`
+	ImageAlt  string   `json:"imageAlt"`
 }
 
 // BossUpsert 管理后台 Boss 启动载荷

@@ -21,11 +21,10 @@ describe('PublicPage 公共资源拆分', () => {
     expect(pageSource).toContain('connectRealtime(nickname.value)')
   })
 
-  it('按钮列表改为维护当前页状态并通过分页接口加载', () => {
-    expect(pageSource).toContain('const buttonPage = ref(1)')
-    expect(pageSource).toContain('const buttonTotalPages = ref(1)')
-    expect(pageSource).toContain('async function loadButtonPage(page)')
-    expect(pageSource).toContain("/api/buttons/pages?page=")
+  it('按钮列表直接使用首屏完整列表，不再请求公共按钮分页接口', () => {
+    expect(pageSource).not.toContain('async function loadButtonPage(page)')
+    expect(pageSource).not.toContain('/api/buttons/pages')
+    expect(pageSource).not.toContain('buttonTotalPages')
   })
 
   it('Boss 掉落池改为通过独立资源接口按需拉取', () => {

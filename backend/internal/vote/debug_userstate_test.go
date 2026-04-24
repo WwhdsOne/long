@@ -29,12 +29,6 @@ func TestDebugWwhdsUserState(t *testing.T) {
 	if _, err := store.gemsForNickname(ctx, nickname); err != nil {
 		t.Fatalf("gemsForNickname: %v", err)
 	}
-	if _, _, err := store.ownedCosmeticsForNickname(ctx, nickname); err != nil {
-		t.Fatalf("ownedCosmeticsForNickname: %v", err)
-	}
-	if _, err := store.cosmeticLoadoutForNickname(ctx, nickname); err != nil {
-		t.Fatalf("cosmeticLoadoutForNickname: %v", err)
-	}
 	if _, err := store.lastForgeResultForNickname(ctx, nickname); err != nil {
 		t.Fatalf("lastForgeResultForNickname: %v", err)
 	}

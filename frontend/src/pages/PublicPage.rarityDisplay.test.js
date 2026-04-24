@@ -34,11 +34,11 @@ describe('PublicPage 稀有度展示', () => {
     const profileSource = readFileSync(path.resolve(currentDir, './ProfilePage.vue'), 'utf8')
     const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 
-    for (const helper of ['formatDropRate', 'formatRarityLabel', 'cosmeticStatusText']) {
-      expect(stateSource).toContain(`    ${helper},`)
-      expect(battleSource).toContain(`  ${helper},`)
-      expect(profileSource).toContain(`  ${helper},`)
-    }
+    expect(stateSource).toContain('    formatDropRate,')
+    expect(battleSource).toContain('  formatDropRate,')
+    expect(stateSource).toContain('    formatRarityLabel,')
+    expect(battleSource).toContain('  formatRarityLabel,')
+    expect(profileSource).toContain('  formatRarityLabel,')
   })
 
   it('样式定义了六档稀有度与至臻动态文字效果', () => {

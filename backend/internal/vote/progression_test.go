@@ -3,7 +3,6 @@ package vote
 import (
 	"context"
 	"errors"
-	"slices"
 	"testing"
 )
 
@@ -429,64 +428,4 @@ func TestProgressionActionsRejectInsufficientGems(t *testing.T) {
 	if _, err := store.AwakenHero(ctx, "阿明", "spark-cat"); !errors.Is(err, ErrGemsNotEnough) {
 		t.Fatalf("expected awaken to reject insufficient gems, got %v", err)
 	}
-	if _, err := store.PurchaseCosmetic(ctx, "阿明", "trail-ribbon"); !errors.Is(err, ErrGemsNotEnough) {
-		t.Fatalf("expected purchase to reject insufficient gems, got %v", err)
-	}
-}
-
-func TestPurchaseAndEquipCosmeticsUpdateOwnershipAndLoadout(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	if err := store.setGems(ctx, "阿明", 60); err != nil {
-		t.Fatalf("seed gems: %v", err)
-	}
-
-	state, err := store.PurchaseCosmetic(ctx, "阿明", "trail-ribbon")
-	if err != nil {
-		t.Fatalf("purchase trail cosmetic: %v", err)
-	}
-	if state.Gems != 30 {
-		t.Fatalf("expected 30 gems after first purchase, got %d", state.Gems)
-	}
-	if !containsString(state.OwnedCosmetics, "trail-ribbon") {
-		t.Fatalf("expected owned cosmetics to include trail-ribbon, got %+v", state.OwnedCosmetics)
-	}
-	if len(state.ShopCatalog) != 8 {
-		t.Fatalf("expected 8 shop items, got %+v", state.ShopCatalog)
-	}
-
-	state, err = store.PurchaseCosmetic(ctx, "阿明", "impact-firefly")
-	if err != nil {
-		t.Fatalf("purchase impact cosmetic: %v", err)
-	}
-	if state.Gems != 0 {
-		t.Fatalf("expected 0 gems after second purchase, got %d", state.Gems)
-	}
-	if _, err := store.PurchaseCosmetic(ctx, "阿明", "trail-ribbon"); !errors.Is(err, ErrCosmeticAlreadyOwned) {
-		t.Fatalf("expected duplicate purchase rejection, got %v", err)
-	}
-
-	state, err = store.EquipCosmetics(ctx, "阿明", "trail-ribbon", "impact-firefly")
-	if err != nil {
-		t.Fatalf("equip cosmetics: %v", err)
-	}
-	if state.EquippedCosmetics.TrailID != "trail-ribbon" || state.EquippedCosmetics.ImpactID != "impact-firefly" {
-		t.Fatalf("unexpected cosmetic loadout: %+v", state.EquippedCosmetics)
-	}
-
-	var equippedCount int
-	for _, item := range state.ShopCatalog {
-		if item.Equipped {
-			equippedCount++
-		}
-	}
-	if equippedCount != 2 {
-		t.Fatalf("expected 2 equipped shop items, got %+v", state.ShopCatalog)
-	}
-}
-
-func containsString(values []string, target string) bool {
-	return slices.Contains(values, target)
 }

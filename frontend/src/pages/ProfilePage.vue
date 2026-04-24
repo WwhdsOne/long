@@ -2,226 +2,57 @@
 import {usePublicPageState} from './publicPageState'
 
 const {
-  ANNOUNCEMENT_READ_KEY,
-  ANNOUNCEMENT_CACHE_KEY,
-  AUTO_CLICK_RATE_LABEL,
   EQUIPMENT_ENHANCE_COST,
   HERO_AWAKEN_COST,
   GROWTH_FORMULA_TEXT,
   HERO_GROWTH_FORMULA_TEXT,
-  publicPages,
-  buttons,
-  firstPageButtons,
-  buttonPage,
-  buttonPageSize,
-  buttonTotalPages,
-  buttonTotalCount,
-  buttonTotalVotes,
-  leaderboard,
-  boss,
-  bossLeaderboard,
-  bossLoot,
-  bossHeroLoot,
-  starlight,
-  announcementVersion,
-  latestAnnouncement,
-  announcements,
-  myBossStats,
   inventory,
   heroes,
   activeHero,
   loadout,
   combatStats,
-  recentRewards,
-  lastReward,
-  userStats,
   nickname,
   nicknameDraft,
   passwordDraft,
-  loading,
-  syncing,
   errorMessage,
-  pendingKeys,
   actioningItemId,
   activeHudTab,
-  lastUpdatedAt,
-  liveConnected,
-  criticalBursts,
-  bossHistory,
-  bossHistoryQuery,
-  loadingBossHistory,
-  bossHistoryLoaded,
-  bossHistoryError,
-  selectedButtonTag,
-  buttonSearch,
-  loadingAnnouncements,
-  announcementsLoaded,
-  announcementError,
-  loadingBossResources,
-  latestAnnouncementLoaded,
-  announcementModalOpen,
-  messages,
-  messageNextCursor,
-  loadingMessages,
-  postingMessage,
-  messageDraft,
-  messageError,
-  autoClickEnabled,
-  autoClickTargetKey,
   gems,
-  ownedCosmetics,
-  equippedCosmetics,
-  cosmeticDraft,
-  shopCatalog,
   lastForgeResult,
-  cosmeticBursts,
-  fingerprintHash,
-  currentPublicPage,
   profileLoading,
-  profileLoaded,
   profileNotice,
-  starlightTimer,
-  lastExpiredStarlightEndsAt,
-  lastBossResourceVersion,
-  burstTimers,
-  cosmeticTimers,
-  pendingClickSources,
-  clickBehaviorTracker,
-  buttonCount,
-  totalVotes,
-  buttonTags,
-  activeStarlightKeys,
-  displayedButtons,
-  syncLabel,
   isLoggedIn,
   myClicks,
   myRank,
   myBossDamage,
-  effectiveIncrement,
   normalDamage,
   criticalDamage,
-  autoClickTargetButton,
-  autoClickTargetLabel,
-  canStartAutoClick,
-  autoClickStatus,
-  bossStatusLabel,
-  bossProgress,
   equippedItems,
   heroCount,
-  cosmeticCollections,
-  selectedCosmeticLoadout,
-  selectedCosmeticSummary,
-  equippedCosmeticSummary,
-  canApplyCosmeticSelection,
-  previewEffectConfig,
-  previewDots,
-  displayedRecentRewards,
-  recentRewardTitle,
-  recentRewardNote,
-  filteredBossHistory,
-  emptyLoadout,
-  defaultCombatStats,
-  formatDropRate,
   formatRarityLabel,
-  cosmeticStatusText,
   formatItemStats,
   formatItemStatLines,
   equipmentNameParts,
   equipmentNameClass,
-  formatEnhanceCap,
-  formatAwakenCap,
   formatHeroTrait,
   heroImageAlt,
-  normalizeNickname,
-  resolvePublicPage,
-  navigatePublicPage,
-  activatePublicPage,
-  handlePublicRouteChange,
-  isStarlightButton,
-  clearStarlightTimer,
-  scheduleStarlightRefresh,
-  formatBossTime,
-  topBossDamage,
-  formatTime,
   formatNumber,
   formatStatWithDelta,
   formatPercentWithDelta,
-  formatHeroEffect,
   salvageableEquipmentCount,
   salvageableHeroCount,
   equipmentEnhanceHint,
   heroAwakenHint,
-  dotIndexes,
-  cosmeticModeClasses,
-  syncCosmeticDraft,
-  readErrorMessage,
-  normalizePageNumber,
-  updateCurrentPageButtons,
-  applyButtonPagePayload,
-  bossResourceVersion,
-  readCachedLatestAnnouncement,
-  writeCachedLatestAnnouncement,
-  restoreCachedLatestAnnouncement,
-  maybePromptAnnouncement,
-  closeAnnouncementModal,
-  loadBossResources,
-  loadLatestAnnouncement,
-  loadAnnouncements,
-  loadMessages,
   submitMessage,
-  validateNicknameWithServer,
-  loadBossHistory,
-  markUpdated,
   selectHudTab,
-  applyState,
-  applyPublicState,
-  applyUserState,
-  applyBattleUserState,
-  applyPlayerProfileState,
-  applyClickResult,
-  clearUserRealtimeState,
-  clearPendingClicks,
-  applyRealtimeSnapshot,
-  ensureRealtimeTransport,
-  connectRealtime,
-  clearCriticalBurst,
-  triggerCriticalBurst,
-  clearCosmeticBurst,
-  handlePressStart,
-  handlePressEnd,
-  handlePressCancel,
-  ensureFingerprintHash,
-  consumeClickBehavior,
-  triggerCosmeticBurst,
-  currentNicknameQuery,
-  loadButtonPage,
-  syncAutoClickTarget,
-  applyAutoClickStatus,
-  clearAutoClickLocalState,
-  loadAutoClickStatus,
-  syncAutoClickTargetOnServer,
-  startAutoClick,
-  stopAutoClick,
-  toggleAutoClick,
-  requestClickTicket,
-  loadState,
-  loadPlayerProfile,
-  refreshProfileAfterMutation,
-  clickButton,
   postEquipmentAction,
   postHeroAction,
   salvageEquipment,
   enhanceEquipment,
   salvageHero,
   awakenHero,
-  purchaseCosmetic,
-  selectCosmeticItem,
-  equipSelectedCosmetics,
   submitNickname,
   resetNickname,
-  clearPlayerSessionState,
-  loadPlayerSession,
-  registerPublicPageLifecycle,
 } = usePublicPageState()
 </script>
 
@@ -308,14 +139,6 @@ const {
                 @click="selectHudTab('forge')"
             >
               强化
-            </button>
-            <button
-                class="player-hud__tab"
-                :class="{ 'player-hud__tab--active': activeHudTab === 'shop' }"
-                type="button"
-                @click="selectHudTab('shop')"
-            >
-              商店
             </button>
           </div>
 
@@ -667,176 +490,6 @@ const {
                           @click="awakenHero(hero)"
                       >
                         觉醒
-                      </button>
-                    </div>
-                  </li>
-                </ul>
-              </section>
-            </section>
-
-            <section v-else-if="activeHudTab === 'shop'" class="player-hud__panel">
-              <div class="player-hud__section-head">
-                <p class="vote-stage__eyebrow">外观商店</p>
-                <strong>{{ gems }} 原石</strong>
-              </div>
-
-              <div class="forge-grid">
-                <article class="forge-summary">
-                  <span>已拥有外观</span>
-                  <strong>{{ ownedCosmetics.length }} 件</strong>
-                  <p>一期只卖轨迹和点击特效，全部拆件售卖，不碰任何数值。</p>
-                </article>
-                <article class="forge-summary">
-                  <span>当前装备</span>
-                  <strong>{{ equippedCosmeticSummary.trailName }} / {{ equippedCosmeticSummary.impactName }}</strong>
-                  <p>轨迹和点击特效可以自由混搭，星光按钮上会自动降透明度。</p>
-                </article>
-              </div>
-
-              <section class="cosmetic-preview">
-                <div class="player-hud__mini-head">
-                  <span>试衣预览</span>
-                  <strong>{{ selectedCosmeticSummary.trailName }} / {{ selectedCosmeticSummary.impactName }}</strong>
-                </div>
-                <div class="cosmetic-preview__stage">
-                  <div class="cosmetic-preview__copy">
-                    <span>仅自己可见</span>
-                    <strong>普通点击、挂机点击和星光按钮都会自动切换到对应表现。</strong>
-                    <p>星光态会压制外观亮度，避免和系统提示抢焦点。</p>
-                  </div>
-                  <span
-                      v-if="previewEffectConfig.trailTheme"
-                      class="cosmetic-preview__trail"
-                      :class="[previewEffectConfig.trailClass, cosmeticModeClasses(previewEffectConfig)]"
-                  ></span>
-                  <span
-                      v-if="previewEffectConfig.impactTheme"
-                      class="cosmetic-preview__impact"
-                      :class="[previewEffectConfig.impactClass, cosmeticModeClasses(previewEffectConfig)]"
-                  >
-                    <span
-                        v-for="dot in previewDots"
-                        :key="`preview-${dot}`"
-                        class="cosmetic-preview__dot"
-                    ></span>
-                  </span>
-                </div>
-                <div class="cosmetic-preview__actions">
-                  <button
-                      class="inventory-item__action"
-                      type="button"
-                      :disabled="!canApplyCosmeticSelection || actioningItemId === 'cosmetic-loadout'"
-                      @click="equipSelectedCosmetics"
-                  >
-                    应用当前搭配
-                  </button>
-                  <button
-                      class="nickname-form__ghost"
-                      type="button"
-                      :disabled="actioningItemId === 'cosmetic-loadout'"
-                      @click="syncCosmeticDraft(equippedCosmetics)"
-                  >
-                    恢复已装备
-                  </button>
-                  <button
-                      class="nickname-form__ghost"
-                      type="button"
-                      :disabled="actioningItemId === 'cosmetic-loadout'"
-                      @click="syncCosmeticDraft(createEmptyCosmeticLoadout())"
-                  >
-                    清空搭配
-                  </button>
-                </div>
-              </section>
-
-              <section class="player-hud__info-block">
-                <div class="player-hud__mini-head">
-                  <span>轨迹</span>
-                  <strong>{{ cosmeticCollections.trails.length }} 件</strong>
-                </div>
-                <ul class="shop-grid">
-                  <li
-                      v-for="item in cosmeticCollections.trails"
-                      :key="item.cosmeticId"
-                      class="shop-card"
-                      :class="{
-                        'shop-card--owned': item.owned,
-                        'shop-card--equipped': item.equipped,
-                        'shop-card--selected': selectedCosmeticLoadout.trailId === item.cosmeticId,
-                      }"
-                  >
-                    <div class="shop-card__preview" :class="`cosmetic-theme--${item.preview?.theme || 'ribbon'}`">
-                      <span class="shop-card__preview-mark"></span>
-                    </div>
-                    <div>
-                      <strong>{{ item.name }}</strong>
-                      <p>{{ formatRarityLabel(item.rarity) }} · 轨迹 · {{ cosmeticStatusText(item) }}</p>
-                    </div>
-                    <div class="inventory-item__actions">
-                      <button
-                          v-if="!item.owned"
-                          class="inventory-item__action"
-                          type="button"
-                          :disabled="!isLoggedIn || gems < item.price || actioningItemId === item.cosmeticId"
-                          @click="purchaseCosmetic(item)"
-                      >
-                        购买
-                      </button>
-                      <button
-                          v-else
-                          class="nickname-form__ghost"
-                          type="button"
-                          :disabled="!isLoggedIn"
-                          @click="selectCosmeticItem(item)"
-                      >
-                        {{ selectedCosmeticLoadout.trailId === item.cosmeticId ? '已选中' : '选这条轨迹' }}
-                      </button>
-                    </div>
-                  </li>
-                </ul>
-              </section>
-
-              <section class="player-hud__info-block">
-                <div class="player-hud__mini-head">
-                  <span>点击特效</span>
-                  <strong>{{ cosmeticCollections.impacts.length }} 件</strong>
-                </div>
-                <ul class="shop-grid">
-                  <li
-                      v-for="item in cosmeticCollections.impacts"
-                      :key="item.cosmeticId"
-                      class="shop-card"
-                      :class="{
-                        'shop-card--owned': item.owned,
-                        'shop-card--equipped': item.equipped,
-                        'shop-card--selected': selectedCosmeticLoadout.impactId === item.cosmeticId,
-                      }"
-                  >
-                    <div class="shop-card__preview" :class="`cosmetic-theme--${item.preview?.theme || 'ribbon'}`">
-                      <span class="shop-card__preview-mark"></span>
-                    </div>
-                    <div>
-                      <strong>{{ item.name }}</strong>
-                      <p>{{ formatRarityLabel(item.rarity) }} · 点击特效 · {{ cosmeticStatusText(item) }}</p>
-                    </div>
-                    <div class="inventory-item__actions">
-                      <button
-                          v-if="!item.owned"
-                          class="inventory-item__action"
-                          type="button"
-                          :disabled="!isLoggedIn || gems < item.price || actioningItemId === item.cosmeticId"
-                          @click="purchaseCosmetic(item)"
-                      >
-                        购买
-                      </button>
-                      <button
-                          v-else
-                          class="nickname-form__ghost"
-                          type="button"
-                          :disabled="!isLoggedIn"
-                          @click="selectCosmeticItem(item)"
-                      >
-                        {{ selectedCosmeticLoadout.impactId === item.cosmeticId ? '已选中' : '选这个特效' }}
                       </button>
                     </div>
                   </li>

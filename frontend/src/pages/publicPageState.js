@@ -1,21 +1,10 @@
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 
 import {mergeBossState} from '../utils/bossState'
-import {collectButtonTags, filterAndSortButtons, formatDropRate} from '../utils/buttonBoard'
+import {formatDropRate} from '../utils/buttonBoard'
 import {buildClickRequestBody, mergeClickFallbackState} from '../utils/clickResponse'
-import {
-  buildCosmeticCollections,
-  canEquipCosmeticSelection,
-  cosmeticStatusText,
-  createEmptyCosmeticLoadout,
-  normalizeCosmeticLoadout,
-  resolveCosmeticEffectConfig,
-  salvageableCount,
-  summarizeEquippedCosmetics,
-} from '../utils/cosmetics'
 import { formatRarityLabel, getRarityClassName, splitEquipmentName } from '../utils/rarity'
 import {createRealtimeTransport} from '../utils/realtimeTransport'
-import {resolveStarlightRefreshPlan} from '../utils/starlightRefresh'
 import { buildFingerprintProof, collectFingerprintHash, createClickBehaviorTracker } from '../utils/manualClickSignals'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
@@ -33,10 +22,6 @@ const publicPages = [
 ]
 
 const buttons = ref([])
-const firstPageButtons = ref([])
-const buttonPage = ref(1)
-const buttonPageSize = ref(9)
-const buttonTotalPages = ref(1)
 const buttonTotalCount = ref(0)
 const buttonTotalVotes = ref(0)
 const leaderboard = ref([])
@@ -44,7 +29,6 @@ const boss = ref(null)
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
 const bossHeroLoot = ref([])
-const starlight = ref({activeKeys: [], startedAt: 0, endsAt: 0})
 const announcementVersion = ref('')
 const latestAnnouncement = ref(null)
 const announcements = ref([])
@@ -74,8 +58,6 @@ const bossHistoryQuery = ref('')
 const loadingBossHistory = ref(false)
 const bossHistoryLoaded = ref(false)
 const bossHistoryError = ref('')
-const selectedButtonTag = ref('全部')
-const buttonSearch = ref('')
 const loadingAnnouncements = ref(false)
 const announcementsLoaded = ref(false)
 const announcementError = ref('')
@@ -91,12 +73,7 @@ const messageError = ref('')
 const autoClickEnabled = ref(false)
 const autoClickTargetKey = ref('')
 const gems = ref(0)
-const ownedCosmetics = ref([])
-const equippedCosmetics = ref(createEmptyCosmeticLoadout())
-const cosmeticDraft = ref(createEmptyCosmeticLoadout())
-const shopCatalog = ref([])
 const lastForgeResult = ref(null)
-const cosmeticBursts = ref({})
 const fingerprintHash = ref('')
 const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
 const profileLoading = ref(false)
@@ -104,11 +81,8 @@ const profileLoaded = ref(false)
 const profileNotice = ref('')
 
 let realtimeTransport
-let starlightTimer = 0
-let lastExpiredStarlightEndsAt = 0
 let lastBossResourceVersion = ''
 const burstTimers = new Map()
-const cosmeticTimers = new Map()
 const pendingClickSources = new Map()
 const clickBehaviorTracker = createClickBehaviorTracker()
 let fingerprintPromise
@@ -117,15 +91,7 @@ const buttonCount = computed(() => buttonTotalCount.value || buttons.value.lengt
 const totalVotes = computed(() =>
     buttonTotalVotes.value || buttons.value.reduce((total, button) => total + button.count, 0),
 )
-const buttonTags = computed(() => ['全部', ...collectButtonTags(buttons.value)])
-const activeStarlightKeys = computed(() => starlight.value?.activeKeys ?? [])
-const displayedButtons = computed(() =>
-    filterAndSortButtons(buttons.value, {
-      selectedTag: selectedButtonTag.value,
-      query: buttonSearch.value,
-      activeStarlightKeys: activeStarlightKeys.value,
-    }),
-)
+const displayedButtons = computed(() => buttons.value)
 const syncLabel = computed(() => {
   if (syncing.value) {
     return '同步中'
@@ -186,24 +152,6 @@ const bossProgress = computed(() => {
 })
 const equippedItems = computed(() => [loadout.value.weapon, loadout.value.armor, loadout.value.accessory].filter(Boolean))
 const heroCount = computed(() => heroes.value.length)
-const cosmeticCollections = computed(() => buildCosmeticCollections(shopCatalog.value))
-const selectedCosmeticLoadout = computed(() => normalizeCosmeticLoadout(cosmeticDraft.value))
-const selectedCosmeticSummary = computed(() =>
-  summarizeEquippedCosmetics(shopCatalog.value, selectedCosmeticLoadout.value),
-)
-const equippedCosmeticSummary = computed(() =>
-  summarizeEquippedCosmetics(shopCatalog.value, equippedCosmetics.value),
-)
-const canApplyCosmeticSelection = computed(() =>
-  isLoggedIn.value && canEquipCosmeticSelection(shopCatalog.value, selectedCosmeticLoadout.value),
-)
-const previewEffectConfig = computed(() =>
-  resolveCosmeticEffectConfig(shopCatalog.value, selectedCosmeticLoadout.value, {
-    mode: 'normal',
-    starlight: false,
-  }),
-)
-const previewDots = computed(() => dotIndexes(previewEffectConfig.value.particleCount || 6))
 const displayedRecentRewards = computed(() => {
   if (Array.isArray(recentRewards.value) && recentRewards.value.length > 0) {
     return recentRewards.value
@@ -361,35 +309,6 @@ function handlePublicRouteChange() {
   void activatePublicPage(currentPublicPage.value)
 }
 
-function isStarlightButton(key) {
-  return activeStarlightKeys.value.includes(key)
-}
-
-function clearStarlightTimer() {
-  if (starlightTimer) {
-    window.clearTimeout(starlightTimer)
-    starlightTimer = 0
-  }
-}
-
-function scheduleStarlightRefresh() {
-  clearStarlightTimer()
-  const plan = resolveStarlightRefreshPlan({
-    endsAtSeconds: starlight.value?.endsAt,
-    lastExpiredEndsAtSeconds: lastExpiredStarlightEndsAt,
-  })
-  lastExpiredStarlightEndsAt = plan.expiredRetryEndsAtSeconds
-  if (plan.delayMs === null) {
-    return
-  }
-
-  starlightTimer = window.setTimeout(() => {
-    if (!realtimeTransport?.requestSync?.()) {
-      void loadState()
-    }
-  }, plan.delayMs)
-}
-
 function formatBossTime(timestamp) {
   if (!timestamp) {
     return '未记录'
@@ -456,6 +375,11 @@ function salvageableHeroCount(hero) {
   return salvageableCount(hero, hero?.active)
 }
 
+function salvageableCount(item, active = false) {
+  const quantity = Math.max(0, Number(item?.quantity || 0))
+  return active ? Math.max(0, quantity - 1) : quantity
+}
+
 function equipmentEnhanceHint(item) {
   const currentLevel = Number(item?.enhanceLevel || 0)
   const cap = Number(item?.enhanceCap || 0)
@@ -495,17 +419,6 @@ function dotIndexes(count) {
   return Array.from({length: normalized}, (_, index) => index)
 }
 
-function cosmeticModeClasses(effect) {
-  return {
-    'cosmetic-mode--auto': effect?.mode === 'auto',
-    'cosmetic-mode--suppressed': Boolean(effect?.suppressed),
-  }
-}
-
-function syncCosmeticDraft(loadout) {
-  cosmeticDraft.value = normalizeCosmeticLoadout(loadout)
-}
-
 async function readErrorMessage(response, fallback) {
   try {
     const payload = await response.json()
@@ -517,55 +430,6 @@ async function readErrorMessage(response, fallback) {
   }
 
   return fallback
-}
-
-function normalizePageNumber(value, fallback = 1) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback
-  }
-  return Math.floor(parsed)
-}
-
-function updateCurrentPageButtons(nextButtons) {
-  buttons.value = Array.isArray(nextButtons) ? nextButtons : []
-  if (!buttonTags.value.includes(selectedButtonTag.value)) {
-    selectedButtonTag.value = '全部'
-  }
-  syncAutoClickTarget()
-}
-
-function applyButtonPagePayload(payload, options = {}) {
-  if (!payload || typeof payload !== 'object') {
-    return
-  }
-
-  const nextButtons = Array.isArray(payload.buttons)
-      ? payload.buttons
-      : Array.isArray(payload.items)
-          ? payload.items
-          : []
-  const nextPage = normalizePageNumber(payload.buttonPage ?? payload.page, options.defaultPage ?? 1)
-  const nextPageSize = normalizePageNumber(payload.buttonPageSize ?? payload.pageSize, buttonPageSize.value || 9)
-  const nextTotalPages = normalizePageNumber(payload.buttonTotalPages ?? payload.totalPages, buttonTotalPages.value || 1)
-  const nextTotal = Number(payload.buttonTotal ?? payload.total ?? nextButtons.length)
-  const nextTotalVotes = Number(payload.totalVotes ?? buttonTotalVotes.value)
-
-  buttonPageSize.value = nextPageSize
-  buttonTotalPages.value = Math.max(1, nextTotalPages)
-  buttonTotalCount.value = Number.isFinite(nextTotal) ? nextTotal : nextButtons.length
-  buttonTotalVotes.value = Number.isFinite(nextTotalVotes) ? nextTotalVotes : buttonTotalVotes.value
-
-  if (nextPage === 1) {
-    firstPageButtons.value = nextButtons
-  }
-
-  if (options.preserveCurrentPage && buttonPage.value !== nextPage) {
-    return
-  }
-
-  buttonPage.value = nextPage
-  updateCurrentPageButtons(nextButtons)
 }
 
 function bossResourceVersion(value = boss.value) {
@@ -860,26 +724,15 @@ function applyPublicState(payload) {
   }
 
   if ('buttons' in payload) {
-    applyButtonPagePayload(payload, { defaultPage: 1, preserveCurrentPage: true })
-    if (buttonPage.value > buttonTotalPages.value) {
-      void loadButtonPage(buttonTotalPages.value)
-    }
-  } else {
-    if ('buttonPage' in payload) {
-      buttonPage.value = normalizePageNumber(payload.buttonPage, buttonPage.value)
-    }
-    if ('buttonPageSize' in payload) {
-      buttonPageSize.value = normalizePageNumber(payload.buttonPageSize, buttonPageSize.value || 9)
-    }
-    if ('buttonTotalPages' in payload) {
-      buttonTotalPages.value = normalizePageNumber(payload.buttonTotalPages, buttonTotalPages.value || 1)
-    }
-    if ('buttonTotal' in payload) {
-      buttonTotalCount.value = Number(payload.buttonTotal ?? buttonTotalCount.value)
-    }
-    if ('totalVotes' in payload) {
-      buttonTotalVotes.value = Number(payload.totalVotes ?? buttonTotalVotes.value)
-    }
+    buttons.value = Array.isArray(payload.buttons) ? payload.buttons : []
+    buttonTotalCount.value = buttons.value.length
+    syncAutoClickTarget()
+  }
+  if ('buttonTotal' in payload) {
+    buttonTotalCount.value = Number(payload.buttonTotal ?? buttonTotalCount.value)
+  }
+  if ('totalVotes' in payload) {
+    buttonTotalVotes.value = Number(payload.totalVotes ?? buttonTotalVotes.value)
   }
   if ('leaderboard' in payload) {
     leaderboard.value = Array.isArray(payload.leaderboard) ? payload.leaderboard : []
@@ -890,10 +743,6 @@ function applyPublicState(payload) {
   }
   if ('bossLeaderboard' in payload) {
     bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
-  }
-  if ('starlight' in payload) {
-    starlight.value = payload.starlight ?? {activeKeys: [], startedAt: 0, endsAt: 0}
-    scheduleStarlightRefresh()
   }
   if ('announcementVersion' in payload) {
     const nextVersion = String(payload.announcementVersion || '').trim()
@@ -978,18 +827,8 @@ function applyPlayerProfileState(payload) {
   if ('gems' in payload) {
     gems.value = Number(payload.gems ?? 0)
   }
-  if ('ownedCosmetics' in payload) {
-    ownedCosmetics.value = Array.isArray(payload.ownedCosmetics) ? payload.ownedCosmetics : []
-  }
-  if ('equippedCosmetics' in payload) {
-    equippedCosmetics.value = normalizeCosmeticLoadout(payload.equippedCosmetics)
-    syncCosmeticDraft(payload.equippedCosmetics)
-  }
   if ('lastForgeResult' in payload) {
     lastForgeResult.value = payload.lastForgeResult ?? null
-  }
-  if ('shopCatalog' in payload) {
-    shopCatalog.value = Array.isArray(payload.shopCatalog) ? payload.shopCatalog : []
   }
 }
 
@@ -1000,11 +839,6 @@ function applyClickResult(payload) {
 
   if (payload.button?.key) {
     buttons.value = buttons.value.map((button) =>
-        button.key === payload.button.key
-            ? {...button, ...payload.button}
-            : button,
-    )
-    firstPageButtons.value = firstPageButtons.value.map((button) =>
         button.key === payload.button.key
             ? {...button, ...payload.button}
             : button,
@@ -1041,10 +875,6 @@ function clearUserRealtimeState() {
   loadout.value = emptyLoadout()
   combatStats.value = defaultCombatStats()
   gems.value = 0
-  ownedCosmetics.value = []
-  equippedCosmetics.value = createEmptyCosmeticLoadout()
-  syncCosmeticDraft(createEmptyCosmeticLoadout())
-  shopCatalog.value = []
   lastForgeResult.value = null
   myBossStats.value = null
   recentRewards.value = []
@@ -1114,7 +944,6 @@ function ensureRealtimeTransport() {
             errorMessage.value = error.message || '挂机目标更新失败，请稍后重试。'
           })
         }
-        triggerCosmeticBurst(key, {mode: source})
       }
       applyClickResult(payload)
       errorMessage.value = ''
@@ -1185,22 +1014,6 @@ function triggerCriticalBurst(key, delta) {
   )
 }
 
-function clearCosmeticBurst(key) {
-  const timer = cosmeticTimers.get(key)
-  if (timer) {
-    window.clearTimeout(timer)
-    cosmeticTimers.delete(key)
-  }
-
-  if (!cosmeticBursts.value[key]) {
-    return
-  }
-
-  const nextBursts = {...cosmeticBursts.value}
-  delete nextBursts[key]
-  cosmeticBursts.value = nextBursts
-}
-
 function handlePressStart(key, event) {
   clickBehaviorTracker.handlePressStart(key, event)
 }
@@ -1232,62 +1045,12 @@ function consumeClickBehavior(key) {
   return behavior
 }
 
-function triggerCosmeticBurst(key, options = {}) {
-  const effect = resolveCosmeticEffectConfig(shopCatalog.value, equippedCosmetics.value, {
-    mode: options.mode === 'auto' ? 'auto' : 'normal',
-    starlight: isStarlightButton(key),
-  })
-  if (!effect.trailTheme && !effect.impactTheme) {
-    return
-  }
-
-  clearCosmeticBurst(key)
-  cosmeticBursts.value = {
-    ...cosmeticBursts.value,
-    [key]: {
-      ...effect,
-      nonce: `${key}-${Date.now()}`,
-      dots: dotIndexes(effect.particleCount),
-    },
-  }
-
-  cosmeticTimers.set(
-    key,
-    window.setTimeout(() => {
-      clearCosmeticBurst(key)
-    }, Number(effect.durationMs || 900) + 240),
-  )
-}
-
 function currentNicknameQuery() {
   return ''
 }
 
-async function loadButtonPage(page) {
-  const nextPage = normalizePageNumber(page, 1)
-  if (nextPage === 1 && firstPageButtons.value.length > 0) {
-    buttonPage.value = 1
-    updateCurrentPageButtons(firstPageButtons.value)
-    return
-  }
-
-  syncing.value = true
-  try {
-    const response = await fetch(`/api/buttons/pages?page=${nextPage}&pageSize=${buttonPageSize.value || 9}`)
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '按钮分页加载失败'))
-    }
-    const payload = await response.json()
-    applyButtonPagePayload(payload, { defaultPage: nextPage })
-  } catch (error) {
-    errorMessage.value = error.message || '按钮分页加载失败'
-  } finally {
-    syncing.value = false
-  }
-}
-
 function syncAutoClickTarget() {
-  // 挂机目标允许不在当前页显示，保留服务端状态即可。
+  // 挂机目标来自完整按钮列表，保持服务端状态即可。
 }
 
 function applyAutoClickStatus(payload, options = {}) {
@@ -1531,7 +1294,7 @@ async function clickButton(key, options = {}) {
     if (autoClickEnabled.value) {
       await syncAutoClickTargetOnServer(key)
     }
-    triggerCosmeticBurst(key, {mode: clearPendingClicks(key)})
+    clearPendingClicks(key)
     applyClickResult(data)
     errorMessage.value = ''
   } catch (error) {
@@ -1630,93 +1393,6 @@ async function salvageHero(hero) {
 
 async function awakenHero(hero) {
   await postHeroAction(hero.heroId, 'awaken')
-}
-
-async function purchaseCosmetic(item) {
-  if (!nickname.value || !item?.cosmeticId) {
-    return
-  }
-
-  actioningItemId.value = item.cosmeticId
-  errorMessage.value = ''
-
-  try {
-    const response = await fetch(`/api/shop/cosmetics/${encodeURIComponent(item.cosmeticId)}/purchase`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nickname: nickname.value,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '外观购买失败，请稍后重试。'))
-    }
-
-    const data = await response.json()
-    await refreshProfileAfterMutation(data)
-  } catch (error) {
-    errorMessage.value = error.message || '外观购买失败，请稍后重试。'
-  } finally {
-    actioningItemId.value = ''
-  }
-}
-
-function selectCosmeticItem(item) {
-  if (!item?.owned) {
-    return
-  }
-
-  if (item.type === 'trail') {
-    cosmeticDraft.value = {
-      ...selectedCosmeticLoadout.value,
-      trailId: item.cosmeticId,
-    }
-    return
-  }
-
-  if (item.type === 'impact') {
-    cosmeticDraft.value = {
-      ...selectedCosmeticLoadout.value,
-      impactId: item.cosmeticId,
-    }
-  }
-}
-
-async function equipSelectedCosmetics() {
-  if (!nickname.value || !canApplyCosmeticSelection.value) {
-    return
-  }
-
-  actioningItemId.value = 'cosmetic-loadout'
-  errorMessage.value = ''
-
-  try {
-    const response = await fetch('/api/shop/cosmetics/equip', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nickname: nickname.value,
-        trailId: selectedCosmeticLoadout.value.trailId,
-        impactId: selectedCosmeticLoadout.value.impactId,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '外观装备失败，请稍后重试。'))
-    }
-
-    const data = await response.json()
-    await refreshProfileAfterMutation(data)
-  } catch (error) {
-    errorMessage.value = error.message || '外观装备失败，请稍后重试。'
-  } finally {
-    actioningItemId.value = ''
-  }
 }
 
 async function submitNickname() {
@@ -1824,11 +1500,8 @@ function registerPublicPageLifecycle() {
     window.removeEventListener('popstate', handlePublicRouteChange)
     clickBehaviorTracker.clear()
     realtimeTransport?.close()
-    clearStarlightTimer()
     burstTimers.forEach((timer) => window.clearTimeout(timer))
     burstTimers.clear()
-    cosmeticTimers.forEach((timer) => window.clearTimeout(timer))
-    cosmeticTimers.clear()
   })
 }
 
@@ -1843,10 +1516,6 @@ export function usePublicPageState() {
     HERO_GROWTH_FORMULA_TEXT,
     publicPages,
     buttons,
-    firstPageButtons,
-    buttonPage,
-    buttonPageSize,
-    buttonTotalPages,
     buttonTotalCount,
     buttonTotalVotes,
     leaderboard,
@@ -1854,7 +1523,6 @@ export function usePublicPageState() {
     bossLeaderboard,
     bossLoot,
     bossHeroLoot,
-    starlight,
     announcementVersion,
     latestAnnouncement,
     announcements,
@@ -1884,8 +1552,6 @@ export function usePublicPageState() {
     loadingBossHistory,
     bossHistoryLoaded,
     bossHistoryError,
-    selectedButtonTag,
-    buttonSearch,
     loadingAnnouncements,
     announcementsLoaded,
     announcementError,
@@ -1901,28 +1567,18 @@ export function usePublicPageState() {
     autoClickEnabled,
     autoClickTargetKey,
     gems,
-    ownedCosmetics,
-    equippedCosmetics,
-    cosmeticDraft,
-    shopCatalog,
     lastForgeResult,
-    cosmeticBursts,
     fingerprintHash,
     currentPublicPage,
     profileLoading,
     profileLoaded,
     profileNotice,
-    starlightTimer,
-    lastExpiredStarlightEndsAt,
     lastBossResourceVersion,
     burstTimers,
-    cosmeticTimers,
     pendingClickSources,
     clickBehaviorTracker,
     buttonCount,
     totalVotes,
-    buttonTags,
-    activeStarlightKeys,
     displayedButtons,
     syncLabel,
     isLoggedIn,
@@ -1940,13 +1596,6 @@ export function usePublicPageState() {
     bossProgress,
     equippedItems,
     heroCount,
-    cosmeticCollections,
-    selectedCosmeticLoadout,
-    selectedCosmeticSummary,
-    equippedCosmeticSummary,
-    canApplyCosmeticSelection,
-    previewEffectConfig,
-    previewDots,
     displayedRecentRewards,
     recentRewardTitle,
     recentRewardNote,
@@ -1955,7 +1604,6 @@ export function usePublicPageState() {
     defaultCombatStats,
     formatDropRate,
     formatRarityLabel,
-    cosmeticStatusText,
     formatItemStats,
     formatItemStatLines,
     equipmentNameParts,
@@ -1969,9 +1617,6 @@ export function usePublicPageState() {
     navigatePublicPage,
     activatePublicPage,
     handlePublicRouteChange,
-    isStarlightButton,
-    clearStarlightTimer,
-    scheduleStarlightRefresh,
     formatBossTime,
     topBossDamage,
     formatTime,
@@ -1984,12 +1629,7 @@ export function usePublicPageState() {
     equipmentEnhanceHint,
     heroAwakenHint,
     dotIndexes,
-    cosmeticModeClasses,
-    syncCosmeticDraft,
     readErrorMessage,
-    normalizePageNumber,
-    updateCurrentPageButtons,
-    applyButtonPagePayload,
     bossResourceVersion,
     readCachedLatestAnnouncement,
     writeCachedLatestAnnouncement,
@@ -2018,15 +1658,12 @@ export function usePublicPageState() {
     connectRealtime,
     clearCriticalBurst,
     triggerCriticalBurst,
-    clearCosmeticBurst,
     handlePressStart,
     handlePressEnd,
     handlePressCancel,
     ensureFingerprintHash,
     consumeClickBehavior,
-    triggerCosmeticBurst,
     currentNicknameQuery,
-    loadButtonPage,
     syncAutoClickTarget,
     applyAutoClickStatus,
     clearAutoClickLocalState,
@@ -2046,9 +1683,6 @@ export function usePublicPageState() {
     enhanceEquipment,
     salvageHero,
     awakenHero,
-    purchaseCosmetic,
-    selectCosmeticItem,
-    equipSelectedCosmetics,
     submitNickname,
     resetNickname,
     clearPlayerSessionState,

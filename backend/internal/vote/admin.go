@@ -146,12 +146,11 @@ func (s *Store) SaveButton(ctx context.Context, button ButtonUpsert) error {
 	}
 
 	values := map[string]any{
-		"label":              firstNonEmpty(strings.TrimSpace(button.Label), slug),
-		"count":              "0",
-		"sort":               strconv.Itoa(button.Sort),
-		"enabled":            boolToRedis(button.Enabled),
-		"tags":               encodeStringList(button.Tags),
-		"starlight_eligible": boolToRedis(button.StarlightEligible),
+		"label":   firstNonEmpty(strings.TrimSpace(button.Label), slug),
+		"count":   "0",
+		"sort":    strconv.Itoa(button.Sort),
+		"enabled": boolToRedis(button.Enabled),
+		"tags":    encodeStringList(button.Tags),
 	}
 
 	existing, err := s.client.HGetAll(ctx, s.prefix+slug).Result()
@@ -175,11 +174,6 @@ func (s *Store) SaveButton(ctx context.Context, button ButtonUpsert) error {
 		Score:  float64(button.Sort),
 		Member: slug,
 	})
-	if button.StarlightEligible {
-		pipe.SAdd(ctx, s.buttonStarlightKey, slug)
-	} else {
-		pipe.SRem(ctx, s.buttonStarlightKey, slug)
-	}
 	_, err = pipe.Exec(ctx)
 	return err
 }
