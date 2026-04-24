@@ -154,16 +154,16 @@ const autoClickTargetLabel = computed(() => (autoClickTargetButton.value?.label 
 const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetKey.value))
 const autoClickStatus = computed(() => {
   if (!isLoggedIn.value) {
-    return '先登录账号，再选择按钮并开启官方挂机。'
+    return '请先登录账号，再选择按钮并开启官方挂机。'
   }
   if (!autoClickTargetKey.value) {
-    return '先手动点一次按钮锁定目标，再开启官方挂机。'
+    return '请先手动点击一次按钮锁定目标，再开启官方挂机。'
   }
   if (autoClickEnabled.value) {
-    return `官方挂机正在服务端托管 ${autoClickTargetLabel.value}，你手动点别的按钮后会立刻切换目标。`
+    return `✅ 官方挂机已开启：正在服务端托管【${autoClickTargetLabel.value}】，关闭页面、退出浏览器仍会持续自动挂机；手动点击其他按钮会立即切换挂机目标。`
   }
 
-  return `已锁定 ${autoClickTargetLabel.value}，开启后会按 ${AUTO_CLICK_RATE_LABEL} 在服务端持续结算。`
+  return `已锁定目标：【${autoClickTargetLabel.value}】，开启后将按 ${AUTO_CLICK_RATE_LABEL} 在服务端持续自动结算，关闭页面也不会停止挂机。`
 })
 const bossStatusLabel = computed(() => {
   if (!boss.value) {
