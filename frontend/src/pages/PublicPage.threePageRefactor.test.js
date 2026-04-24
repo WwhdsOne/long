@@ -58,15 +58,19 @@ describe('PublicPage 三页前台边界', () => {
     )
   })
 
-  it('战斗页将世界 Boss 融入投票墙，并用弹窗查看合并掉落池详情', () => {
+  it('战斗页将世界 Boss 融入投票墙，并只用小字入口打开掉落池弹窗', () => {
     const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
 
     expect(battleSource).not.toContain('class="boss-stage social-card"')
     expect(battleSource).toContain('现场投票墙 · 世界 Boss')
     expect(battleSource).toContain('const bossDropPool = computed')
-    expect(battleSource).toContain('class="boss-drop-pool"')
-    expect(battleSource).toContain('@click="openBossDropDetail(drop)"')
+    expect(battleSource).toContain('class="boss-drop-link"')
+    expect(battleSource).toContain('@click="openBossDropPool"')
+    expect(battleSource).not.toContain('class="boss-drop-pool"')
     expect(battleSource).toContain('class="boss-drop-modal"')
+    expect(battleSource).toContain('装备掉落')
+    expect(battleSource).toContain('英雄掉落')
+    expect(battleSource).toContain('@click="openBossDropDetail')
     expect(battleSource).not.toContain('Boss 英雄池')
   })
 })

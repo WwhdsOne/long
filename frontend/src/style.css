@@ -1042,35 +1042,25 @@ select {
   font-size: 0.9rem;
 }
 
-.boss-drop-pool {
-  display: grid;
-  gap: 14px;
-  margin-top: 18px;
-  margin-bottom: 22px;
-  padding: 18px;
-  border-radius: 24px;
-  background: rgba(255, 251, 252, 0.82);
-  border: 1px solid rgba(183, 53, 97, 0.14);
-}
-
-.boss-drop-pool__head {
+.boss-drop-link {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: end;
-}
-
-.boss-drop-pool__head strong {
-  display: block;
-  margin-top: 4px;
-  font-family: var(--display);
-  font-size: 1.35rem;
-}
-
-.boss-drop-pool__head p {
-  margin: 0;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: -8px 0 20px;
   color: var(--ink-soft);
   font-size: 0.9rem;
+}
+
+.boss-drop-link button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary-deep);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
 }
 
 .boss-drop-pool__grid {
@@ -1145,7 +1135,9 @@ select {
   z-index: 1;
   display: grid;
   gap: 18px;
-  width: min(520px, 100%);
+  width: min(720px, 100%);
+  max-height: min(82vh, 760px);
+  overflow: auto;
   padding: 24px;
   border-radius: 28px;
   background: rgba(255, 251, 252, 0.96);
@@ -1178,6 +1170,33 @@ select {
   color: var(--ink-soft);
 }
 
+.boss-drop-modal__section {
+  display: grid;
+  gap: 12px;
+}
+
+.boss-drop-modal__section + .boss-drop-modal__section {
+  padding-top: 16px;
+  border-top: 1px solid rgba(183, 53, 97, 0.14);
+}
+
+.boss-drop-modal__section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.boss-drop-modal__section-head span {
+  color: var(--primary-deep);
+  font-weight: 800;
+}
+
+.boss-drop-modal__section-head strong {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
 .boss-drop-modal__stats {
   display: grid;
   gap: 8px;
@@ -1191,6 +1210,10 @@ select {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.7);
   color: var(--ink-soft);
+}
+
+.boss-drop-modal__back {
+  justify-self: start;
 }
 
 .loadout-grid {
