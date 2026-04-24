@@ -34,8 +34,8 @@ describe('rarity utils', () => {
     expect(getRarityClassName('至臻')).toContain('rarity-text--animated')
   })
 
-  it('会输出带字段名的稀有度标签文案', () => {
-    expect(formatRarityLabel('传说')).toBe('稀有度：传说')
-    expect(formatRarityLabel('神话')).toBe('稀有度：普通')
+  it('只输出稀有度档位名，字段名由调用处负责', () => {
+    expect(formatRarityLabel('传说')).toBe('传说')
+    expect(formatRarityLabel('神话')).toBe('普通')
   })
 })
