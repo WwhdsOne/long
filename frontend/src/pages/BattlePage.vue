@@ -331,17 +331,16 @@ function closeBossDropPool() {
             <span>掉落池 {{ bossDropPool.length }} 件</span>
             <span v-if="displayedRecentRewards.length > 0">最近掉落 {{ recentRewardTitle }}</span>
           </div>
-          <p class="vote-stage__boss-note">
-            只有对 Boss 造成超过 1% 生命值的伤害，才有资格掉落装备。
-          </p>
+          <div class="vote-stage__boss-note">
+            <span>只有对 Boss 造成超过 1% 生命值的伤害，才有资格掉落装备。</span>
+            <span v-if="boss" class="boss-drop-link">
+              <button type="button" @click="openBossDropPool">
+                点击查看 Boss 掉落池
+              </button>
+              <span>{{ bossDropPool.length }} 件掉落物</span>
+            </span>
+          </div>
         </section>
-
-        <p v-if="boss" class="boss-drop-link">
-          <button type="button" @click="openBossDropPool">
-            点击查看 Boss 掉落池
-          </button>
-          <span>{{ bossDropPool.length }} 件掉落物</span>
-        </p>
 
         <div v-if="loading" class="feedback-panel">
           <p>正在把现场按钮搬上来...</p>
