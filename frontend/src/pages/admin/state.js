@@ -44,7 +44,6 @@ export function emptyButtonForm() {
     sort: '',
     enabled: true,
     tagsText: '',
-    starlightEligible: false,
     imagePath: '',
     imageAlt: '',
   }

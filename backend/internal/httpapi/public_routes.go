@@ -33,39 +33,6 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 		writeJSON(c, consts.StatusOK, state)
 	})
 
-	router.GET("/api/buttons/pages", func(ctx context.Context, c *app.RequestContext) {
-		page, pageSize, ok := parsePublicPageParams(c)
-		if !ok {
-			return
-		}
-
-		result, err := options.Store.ListButtonsPage(ctx, page, pageSize)
-		if err != nil {
-			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BUTTON_PAGE_FETCH_FAILED"})
-			return
-		}
-
-		writeJSON(c, consts.StatusOK, result)
-	})
-
-	router.GET("/api/shop", func(ctx context.Context, c *app.RequestContext) {
-		state, err := stateView.GetState(ctx, resolvedPlayerNicknameForRead(ctx, c, options.PlayerAuthenticator))
-		if err != nil {
-			if writeNicknameError(c, err) {
-				return
-			}
-			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "SHOP_FETCH_FAILED"})
-			return
-		}
-
-		writeJSON(c, consts.StatusOK, map[string]any{
-			"gems":              state.Gems,
-			"ownedCosmetics":    state.OwnedCosmetics,
-			"equippedCosmetics": state.EquippedCosmetics,
-			"shopCatalog":       state.ShopCatalog,
-		})
-	})
-
 	router.GET("/api/boss/history", func(ctx context.Context, c *app.RequestContext) {
 		history, err := options.Store.ListBossHistory(ctx)
 		if err != nil {

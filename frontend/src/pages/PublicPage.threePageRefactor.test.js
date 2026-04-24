@@ -34,7 +34,7 @@ describe('PublicPage 三页前台边界', () => {
     expect(pageSource).toContain('await loadPlayerProfile(true)')
   })
 
-  it('实时个人增量只消费战斗字段，不刷新背包和商店资料', () => {
+  it('实时个人增量只消费战斗字段，不刷新背包资料', () => {
     const realtimeSegment = pageSource.slice(
       pageSource.indexOf('onUserDelta(payload)'),
       pageSource.indexOf('onClickAck(payload)'),

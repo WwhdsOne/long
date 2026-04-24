@@ -147,15 +147,8 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 			Loadout: vote.Loadout{
 				Weapon: &vote.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
 			},
-			CombatStats: vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
-			Gems:        11,
-			OwnedCosmetics: []string{
-				"trail-red",
-			},
-			EquippedCosmetics: vote.CosmeticLoadout{TrailID: "trail-red"},
-			ShopCatalog: []vote.CosmeticCatalogItem{
-				{CosmeticID: "trail-red", Name: "红色轨迹", Type: "trail", Owned: true, Equipped: true},
-			},
+			CombatStats:     vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
+			Gems:            11,
 			LastForgeResult: &vote.ForgeResult{Kind: "equipment_enhance", RemainingGems: 11},
 		},
 	}
@@ -183,21 +176,18 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 	}
 
 	var payload struct {
-		UserStats         *vote.UserStats            `json:"userStats"`
-		Inventory         []vote.InventoryItem       `json:"inventory"`
-		Heroes            []vote.HeroInventoryItem   `json:"heroes"`
-		ActiveHero        *vote.HeroInventoryItem    `json:"activeHero"`
-		Loadout           vote.Loadout               `json:"loadout"`
-		CombatStats       vote.CombatStats           `json:"combatStats"`
-		Gems              int64                      `json:"gems"`
-		OwnedCosmetics    []string                   `json:"ownedCosmetics"`
-		EquippedCosmetics vote.CosmeticLoadout       `json:"equippedCosmetics"`
-		ShopCatalog       []vote.CosmeticCatalogItem `json:"shopCatalog"`
-		LastForgeResult   *vote.ForgeResult          `json:"lastForgeResult"`
-		RecentRewards     []vote.Reward              `json:"recentRewards"`
-		LastReward        *vote.Reward               `json:"lastReward"`
-		Buttons           []vote.Button              `json:"buttons"`
-		Leaderboard       []vote.LeaderboardEntry    `json:"leaderboard"`
+		UserStats       *vote.UserStats          `json:"userStats"`
+		Inventory       []vote.InventoryItem     `json:"inventory"`
+		Heroes          []vote.HeroInventoryItem `json:"heroes"`
+		ActiveHero      *vote.HeroInventoryItem  `json:"activeHero"`
+		Loadout         vote.Loadout             `json:"loadout"`
+		CombatStats     vote.CombatStats         `json:"combatStats"`
+		Gems            int64                    `json:"gems"`
+		LastForgeResult *vote.ForgeResult        `json:"lastForgeResult"`
+		RecentRewards   []vote.Reward            `json:"recentRewards"`
+		LastReward      *vote.Reward             `json:"lastReward"`
+		Buttons         []vote.Button            `json:"buttons"`
+		Leaderboard     []vote.LeaderboardEntry  `json:"leaderboard"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode profile response: %v", err)
@@ -208,8 +198,8 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 	if len(payload.Inventory) != 1 || len(payload.Heroes) != 1 || payload.ActiveHero == nil {
 		t.Fatalf("expected inventory, heroes and active hero in profile, got %+v", payload)
 	}
-	if payload.Gems != 11 || len(payload.ShopCatalog) != 1 || payload.LastForgeResult == nil {
-		t.Fatalf("expected shop and forge fields in profile, got %+v", payload)
+	if payload.Gems != 11 || payload.LastForgeResult == nil {
+		t.Fatalf("expected forge fields in profile, got %+v", payload)
 	}
 	if len(payload.Buttons) != 0 || len(payload.Leaderboard) != 0 {
 		t.Fatalf("profile endpoint should not include public battle fields, got buttons=%d leaderboard=%d", len(payload.Buttons), len(payload.Leaderboard))

@@ -201,7 +201,6 @@ export function createAdminPageActions(state) {
           sort: Number(buttonForm.sort),
           enabled: Boolean(buttonForm.enabled),
           tags: buttonForm.tagsText.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean),
-          starlightEligible: Boolean(buttonForm.starlightEligible),
         }),
       })
       if (!response.ok) {
@@ -368,7 +367,6 @@ export function createAdminPageActions(state) {
       sort: entry.sort,
       enabled: entry.enabled,
       tagsText: Array.isArray(entry.tags) ? entry.tags.join(', ') : '',
-      starlightEligible: Boolean(entry.starlightEligible),
       imagePath: entry.imagePath || '',
       imageAlt: entry.imageAlt || '',
     })

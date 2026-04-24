@@ -3,7 +3,6 @@ package vote
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1071,18 +1070,17 @@ func TestListPlayerOverviewsPrefersExplicitIndexWhenPresent(t *testing.T) {
 	}
 }
 
-func TestSaveButtonPersistsTagsAndStarlightEligibility(t *testing.T) {
+func TestSaveButtonPersistsTags(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:              "feel",
-		Label:             "有感觉吗",
-		Sort:              10,
-		Enabled:           true,
-		Tags:              []string{"日常", "互动"},
-		StarlightEligible: true,
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    10,
+		Enabled: true,
+		Tags:    []string{"日常", "互动"},
 	}); err != nil {
 		t.Fatalf("save button: %v", err)
 	}
@@ -1098,83 +1096,9 @@ func TestSaveButtonPersistsTagsAndStarlightEligibility(t *testing.T) {
 	if len(buttons[0].Tags) != 2 || buttons[0].Tags[0] != "日常" || buttons[0].Tags[1] != "互动" {
 		t.Fatalf("expected tags to round-trip, got %+v", buttons[0])
 	}
-	if !buttons[0].StarlightEligible {
-		t.Fatalf("expected starlight flag to round-trip, got %+v", buttons[0])
-	}
 }
 
-func TestListButtonsPageReturnsFeaturedFirstPageAndPaginatesNormalButtons(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	store.now = func() time.Time {
-		return time.Unix(1713744000, 0)
-	}
-
-	ctx := context.Background()
-	featured := []ButtonUpsert{
-		{Slug: "spark-a", Label: "星光 A", Sort: 10, Enabled: true, StarlightEligible: true},
-		{Slug: "spark-b", Label: "星光 B", Sort: 20, Enabled: true, StarlightEligible: true},
-		{Slug: "spark-c", Label: "星光 C", Sort: 30, Enabled: true, StarlightEligible: true},
-		{Slug: "spark-d", Label: "星光 D", Sort: 40, Enabled: true, StarlightEligible: true},
-		{Slug: "spark-e", Label: "星光 E", Sort: 50, Enabled: true, StarlightEligible: true},
-		{Slug: "spark-f", Label: "星光 F", Sort: 60, Enabled: true, StarlightEligible: true},
-	}
-	normal := []ButtonUpsert{
-		{Slug: "normal-a", Label: "普通 A", Sort: 70, Enabled: true},
-		{Slug: "normal-b", Label: "普通 B", Sort: 80, Enabled: true},
-		{Slug: "normal-c", Label: "普通 C", Sort: 90, Enabled: true},
-		{Slug: "normal-d", Label: "普通 D", Sort: 100, Enabled: true},
-		{Slug: "normal-e", Label: "普通 E", Sort: 110, Enabled: true},
-	}
-
-	for _, item := range append(featured, normal...) {
-		if err := store.SaveButton(ctx, item); err != nil {
-			t.Fatalf("save button %s: %v", item.Slug, err)
-		}
-	}
-
-	firstPage, err := store.ListButtonsPage(ctx, 1, 9)
-	if err != nil {
-		t.Fatalf("list first page: %v", err)
-	}
-	if firstPage.Page != 1 || firstPage.PageSize != 9 || firstPage.Total != 11 || firstPage.TotalPages != 2 {
-		t.Fatalf("unexpected first page meta: %+v", firstPage)
-	}
-	if len(firstPage.Items) != 9 {
-		t.Fatalf("expected 9 first-page buttons, got %+v", firstPage.Items)
-	}
-
-	firstPageKeys := make([]string, 0, len(firstPage.Items))
-	for _, item := range firstPage.Items {
-		firstPageKeys = append(firstPageKeys, item.Key)
-	}
-	expectedFirstPage := []string{
-		"spark-a", "spark-b", "spark-c", "spark-d", "spark-e", "spark-f",
-		"normal-a", "normal-b", "normal-c",
-	}
-	if !slices.Equal(firstPageKeys, expectedFirstPage) {
-		t.Fatalf("unexpected first page order: %+v", firstPageKeys)
-	}
-
-	secondPage, err := store.ListButtonsPage(ctx, 2, 9)
-	if err != nil {
-		t.Fatalf("list second page: %v", err)
-	}
-	if secondPage.Page != 2 || secondPage.PageSize != 9 || secondPage.Total != 11 || secondPage.TotalPages != 2 {
-		t.Fatalf("unexpected second page meta: %+v", secondPage)
-	}
-	if len(secondPage.Items) != 2 {
-		t.Fatalf("expected 2 second-page buttons, got %+v", secondPage.Items)
-	}
-
-	secondPageKeys := []string{secondPage.Items[0].Key, secondPage.Items[1].Key}
-	if !slices.Equal(secondPageKeys, []string{"normal-d", "normal-e"}) {
-		t.Fatalf("unexpected second page order: %+v", secondPageKeys)
-	}
-}
-
-func TestGetSnapshotIncludesStarlightAndDropRates(t *testing.T) {
+func TestGetSnapshotIncludesAllButtonsAndDropRates(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 	store.roll = func(int) int { return 99 }
@@ -1185,20 +1109,18 @@ func TestGetSnapshotIncludesStarlightAndDropRates(t *testing.T) {
 
 	ctx := context.Background()
 	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:              "feel",
-		Label:             "有感觉吗",
-		Sort:              20,
-		Enabled:           true,
-		StarlightEligible: true,
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    20,
+		Enabled: true,
 	}); err != nil {
 		t.Fatalf("save feel button: %v", err)
 	}
 	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:              "understand",
-		Label:             "有没有懂的",
-		Sort:              30,
-		Enabled:           true,
-		StarlightEligible: true,
+		Slug:    "understand",
+		Label:   "有没有懂的",
+		Sort:    30,
+		Enabled: true,
 	}); err != nil {
 		t.Fatalf("save understand button: %v", err)
 	}
@@ -1237,11 +1159,8 @@ func TestGetSnapshotIncludesStarlightAndDropRates(t *testing.T) {
 		t.Fatalf("get snapshot: %v", err)
 	}
 
-	if len(snapshot.Starlight.ActiveKeys) != 2 {
-		t.Fatalf("expected both eligible buttons to be active when total below limit, got %+v", snapshot.Starlight)
-	}
-	if snapshot.Starlight.EndsAt <= snapshot.Starlight.StartedAt {
-		t.Fatalf("expected starlight window timestamps, got %+v", snapshot.Starlight)
+	if len(snapshot.Buttons) != 2 {
+		t.Fatalf("expected full button list in snapshot, got %+v", snapshot.Buttons)
 	}
 
 	resources, err := store.GetBossResources(ctx)
@@ -1272,11 +1191,10 @@ func TestGetSnapshotReturnsSlimPayloadAndAnnouncementVersion(t *testing.T) {
 
 	ctx := context.Background()
 	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:              "feel",
-		Label:             "有感觉吗",
-		Sort:              20,
-		Enabled:           true,
-		StarlightEligible: true,
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    20,
+		Enabled: true,
 	}); err != nil {
 		t.Fatalf("save button: %v", err)
 	}
@@ -1346,11 +1264,11 @@ func TestGetBossResourcesReturnsCurrentBossLootAndHeroLoot(t *testing.T) {
 		t.Fatalf("seed equipment definition: %v", err)
 	}
 	if err := store.SaveHeroDefinition(ctx, HeroDefinition{
-		HeroID:     "slime",
-		Name:       "史莱姆勇者",
-		AwakenCap:  5,
-		ImagePath:  "/hero/slime.png",
-		ImageAlt:   "史莱姆勇者",
+		HeroID:      "slime",
+		Name:        "史莱姆勇者",
+		AwakenCap:   5,
+		ImagePath:   "/hero/slime.png",
+		ImageAlt:    "史莱姆勇者",
 		BonusClicks: 2,
 	}); err != nil {
 		t.Fatalf("save hero definition: %v", err)
@@ -1611,7 +1529,7 @@ func TestFinalizeBossKillAwardsQualifiedHeroLoot(t *testing.T) {
 	}
 }
 
-func TestClickButtonDoublesDeltaWhenStarlightActive(t *testing.T) {
+func TestClickButtonDoesNotDoubleDeltaForFormerStarlightButton(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -1621,11 +1539,10 @@ func TestClickButtonDoublesDeltaWhenStarlightActive(t *testing.T) {
 
 	ctx := context.Background()
 	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:              "feel",
-		Label:             "有感觉吗",
-		Sort:              10,
-		Enabled:           true,
-		StarlightEligible: true,
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    10,
+		Enabled: true,
 	}); err != nil {
 		t.Fatalf("save button: %v", err)
 	}
@@ -1635,10 +1552,10 @@ func TestClickButtonDoublesDeltaWhenStarlightActive(t *testing.T) {
 		t.Fatalf("click button: %v", err)
 	}
 
-	if result.Delta != 2 {
-		t.Fatalf("expected starlight button to double delta to 2, got %+v", result)
+	if result.Delta != 1 {
+		t.Fatalf("expected click delta to stay 1 after removing starlight, got %+v", result)
 	}
-	if result.Button.Count != 2 || result.UserStats.ClickCount != 2 {
-		t.Fatalf("expected doubled delta to apply to counts, got %+v", result)
+	if result.Button.Count != 1 || result.UserStats.ClickCount != 1 {
+		t.Fatalf("expected single delta to apply to counts, got %+v", result)
 	}
 }

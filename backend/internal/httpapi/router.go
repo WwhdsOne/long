@@ -18,7 +18,6 @@ type ButtonStore interface {
 	GetState(context.Context, string) (vote.State, error)
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	GetUserState(context.Context, string) (vote.UserState, error)
-	ListButtonsPage(context.Context, int64, int64) (vote.ButtonPage, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
@@ -29,8 +28,6 @@ type ButtonStore interface {
 	UnequipHero(context.Context, string, string) (vote.State, error)
 	SalvageHero(context.Context, string, string, int64) (vote.State, error)
 	AwakenHero(context.Context, string, string) (vote.State, error)
-	PurchaseCosmetic(context.Context, string, string) (vote.State, error)
-	EquipCosmetics(context.Context, string, string, string) (vote.State, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	ListAdminButtonsPage(context.Context, int64, int64) (vote.AdminButtonPage, error)
 	ListAdminEquipmentPage(context.Context, int64, int64) (vote.AdminEquipmentPage, error)

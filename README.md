@@ -7,19 +7,16 @@
 - 页面会展示所有符合规则的 Redis 按钮键。
 - 访问者先输入昵称，之后点击都会记到这个昵称名下。
 - 任意访问者点击按钮后，总数会按当前装备与暴击结算出的实际增量上涨。
-- 按钮支持标签分组；前台可按标签和关键字搜索，后台可配置哪些按钮参与星光轮换。
+- 按钮支持标签分组，前台会按后台排序一次展示全部启用按钮。
 - 玩家可以穿戴装备，装备会让平时点击直接获得额外次数增量。
 - 玩家可以对同装备类型做 `3 合 1` 升星；升星不会生成新装备，而是强化该账号下这个装备类型的属性。
 - 玩家可以通过 Boss 掉落招募小小英雄；每次只允许 1 位英雄出战，英雄属性和被动会同时影响平时点击与 Boss 战。
 - 玩家可以把多余装备和重复英雄分解成 `原石`；穿戴中的最后 1 件装备、出战中的最后 1 位英雄不会被分解掉。
-- 玩家可以消耗 `20` 原石对已有装备做强化，按 `52% / 22% / 12% / 13% / 1%` 提升点击、暴击、暴击率、随机两项或大奖全加；连续 `30` 次未出大奖后第 `31` 次保底。
-- 玩家可以消耗 `25` 原石对已有英雄做觉醒，按 `36% / 22% / 15% / 14% / 12% / 1%` 提升点击、暴击、暴击率、被动、随机两项或大奖全加；同样采用 `30` 次未中后第 `31` 次保底。
-- 前台新增外观商店，一期上架 `流星彩带 / 纸片庆典 / 印章敲击 / 流萤追光` 四套外观的轨迹与点击特效拆件，全部按单件 `30` 原石售卖。
-- 外观只影响当前玩家自己的前台视觉表现，不改变按钮可点击性、Boss 伤害、掉率或任何数值结算。
+- 玩家可以消耗 `10` 原石对已有装备做强化，按模板上限提升点击、暴击或暴击率。
+- 玩家可以消耗 `15` 原石对已有英雄做觉醒，按模板上限提升点击、暴击、暴击率或被动效果。
 - 所有在线用户都会通过 SSE 实时收到公共态更新；已登录用户还会收到仅属于自己的个人状态更新。
 - 页面会实时展示个人累计点击和排行榜。
 - 支持单个全服世界 Boss：Boss 活动期间，同一次点击会同时记票并造成 Boss 伤害。
-- 星光卡片每 5 分钟轮换一次；每轮随机挑 6 个可参与按钮排到前面，点击按双倍增量结算。
 - Boss 击杀后只有伤害达到该 Boss 最大生命值 `1%` 的玩家才有掉落资格；装备和英雄掉落各自独立抽取。
 - 玩家 HUD 的“最近掉落”会展示同一次 Boss 结算拿到的全部奖励，不会再被后一条奖励覆盖。
 - 前台会展示当前 Boss 的装备/英雄掉落池，以及后端计算好的实际掉落概率。
@@ -54,7 +51,6 @@ vote:button:<slug>
 - `sort`: 排序值，越小越靠前
 - `enabled`: `1` 为展示，`0` 为隐藏
 - `tags`: JSON 数组字符串，按钮标签
-- `starlight_eligible`: `1` 表示可以参与星光轮换
 - `image_path`: 可选，任意可访问图片地址，推荐填 OSS/CDN 公共 URL
 - `image_alt`: 可选，图片说明文本
 
@@ -102,7 +98,6 @@ vote:boss:<bossId>:damage
 vote:boss:<bossId>:loot
 vote:boss:<bossId>:hero-loot
 vote:buttons:index
-vote:buttons:starlight
 vote:equipment:index
 vote:heroes:index
 vote:players:index
@@ -117,8 +112,6 @@ vote:user-last-forge-result:<nickname>
 vote:user-gems:<nickname>
 vote:user-equip-upgrade:<nickname>:<itemId>
 vote:user-hero-upgrade:<nickname>:<heroId>
-vote:user-cosmetics:<nickname>
-vote:user-cosmetic-loadout:<nickname>
 vote:announcements
 vote:announcement:<id>
 vote:messages
@@ -159,8 +152,6 @@ vote:message:<id>
 - `vote:buttons:index` 是 `Sorted Set`
   - member = 按钮 `slug`
   - score = 按钮排序值 `sort`
-- `vote:buttons:starlight` 是 `Set`
-  - member = 可参与星光轮换的按钮 `slug`
 - `vote:equipment:index` 是 `Set`
   - member = 装备 `itemId`
 - `vote:heroes:index` 是 `Set`
@@ -219,11 +210,6 @@ vote:message:<id>
   - `bonus_critical_count`
   - `trait_value`
   - `pity_counter`
-- `vote:user-cosmetics:<nickname>` 是 `Set`
-  - member = 已拥有外观 `cosmeticId`
-- `vote:user-cosmetic-loadout:<nickname>` 是 `Hash`
-  - `trail`
-  - `impact`
 - `vote:announcements` 是 `Sorted Set`
   - member = 公告 `id`
   - score = 公告顺序 ID（越大越新）
@@ -305,12 +291,6 @@ oss:
   - 请求体：`{ "nickname": "阿明", "quantity": 1 }`
 - `POST /api/heroes/{heroId}/awaken`
   - 请求体：`{ "nickname": "阿明" }`
-- `GET /api/shop`
-  - 支持可选查询参数 `nickname`
-- `POST /api/shop/cosmetics/{cosmeticId}/purchase`
-  - 请求体：`{ "nickname": "阿明" }`
-- `POST /api/shop/cosmetics/equip`
-  - 请求体：`{ "nickname": "阿明", "trailId": "trail-ribbon", "impactId": "impact-firefly" }`
 
 说明：
 

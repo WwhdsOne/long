@@ -20,7 +20,6 @@ type mockStore struct {
 	snapshot               vote.Snapshot
 	equipState             vote.State
 	adminState             vote.AdminState
-	buttonPage             vote.ButtonPage
 	bossResources          vote.BossResources
 	adminButtonPage        vote.AdminButtonPage
 	adminEquipmentPage     vote.AdminEquipmentPage
@@ -46,8 +45,6 @@ type mockStore struct {
 	lastSalvageQuantity    int64
 	lastEnhanceItemID      string
 	lastAwakenHeroID       string
-	lastPurchasedCosmetic  string
-	lastCosmeticLoadout    vote.CosmeticLoadout
 	lastClickNickname      string
 	lastGetStateNickname   string
 	getStateErr            error
@@ -58,8 +55,6 @@ type mockStore struct {
 	salvageErr             error
 	enhanceErr             error
 	awakenErr              error
-	purchaseErr            error
-	cosmeticEquipErr       error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -85,10 +80,6 @@ func (m *mockStore) GetSnapshot(_ context.Context) (vote.Snapshot, error) {
 		Buttons:     m.state.Buttons,
 		Leaderboard: m.state.Leaderboard,
 	}, nil
-}
-
-func (m *mockStore) ListButtonsPage(_ context.Context, _ int64, _ int64) (vote.ButtonPage, error) {
-	return m.buttonPage, nil
 }
 
 func (m *mockStore) GetBossResources(_ context.Context) (vote.BossResources, error) {
@@ -120,9 +111,6 @@ func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	userState.Loadout = m.state.Loadout
 	userState.CombatStats = m.state.CombatStats
 	userState.Gems = m.state.Gems
-	userState.OwnedCosmetics = m.state.OwnedCosmetics
-	userState.EquippedCosmetics = m.state.EquippedCosmetics
-	userState.ShopCatalog = m.state.ShopCatalog
 	userState.LastForgeResult = m.state.LastForgeResult
 	userState.RecentRewards = m.state.RecentRewards
 	userState.LastReward = m.state.LastReward
@@ -386,31 +374,6 @@ func (m *mockStore) SalvageHero(_ context.Context, _ string, heroID string, quan
 	return m.equipState, nil
 }
 
-func (m *mockStore) PurchaseCosmetic(_ context.Context, _ string, cosmeticID string) (vote.State, error) {
-	if m.purchaseErr != nil {
-		return vote.State{}, m.purchaseErr
-	}
-	m.lastPurchasedCosmetic = cosmeticID
-	if len(m.equipState.ShopCatalog) == 0 && m.equipState.Gems == 0 {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
-func (m *mockStore) EquipCosmetics(_ context.Context, _ string, trailID string, impactID string) (vote.State, error) {
-	if m.cosmeticEquipErr != nil {
-		return vote.State{}, m.cosmeticEquipErr
-	}
-	m.lastCosmeticLoadout = vote.CosmeticLoadout{
-		TrailID:  trailID,
-		ImpactID: impactID,
-	}
-	if len(m.equipState.ShopCatalog) == 0 && m.equipState.EquippedCosmetics == (vote.CosmeticLoadout{}) {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
 func (m *mockStore) UnequipHero(_ context.Context, _ string, _ string) (vote.State, error) {
 	if len(m.equipState.Buttons) == 0 && len(m.equipState.Heroes) == 0 && m.equipState.ActiveHero == nil {
 		return m.state, nil
@@ -619,19 +582,8 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 	}
 }
 
-func TestGetButtonPagesReturnsRequestedPage(t *testing.T) {
-	store := &mockStore{
-		buttonPage: vote.ButtonPage{
-			Items: []vote.Button{
-				{Key: "normal-d", Label: "普通 D", Count: 4, Enabled: true},
-				{Key: "normal-e", Label: "普通 E", Count: 5, Enabled: true},
-			},
-			Page:       2,
-			PageSize:   9,
-			Total:      11,
-			TotalPages: 2,
-		},
-	}
+func TestButtonPagesRouteIsRemoved(t *testing.T) {
+	store := &mockStore{}
 	handler := NewHandler(Options{
 		Store:       store,
 		Broadcaster: &mockBroadcaster{},
@@ -642,19 +594,8 @@ func TestGetButtonPagesReturnsRequestedPage(t *testing.T) {
 
 	handler.ServeHTTP(response, request)
 
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
-	}
-
-	var payload vote.ButtonPage
-	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if payload.Page != 2 || payload.PageSize != 9 || payload.Total != 11 || payload.TotalPages != 2 {
-		t.Fatalf("unexpected button page payload: %+v", payload)
-	}
-	if len(payload.Items) != 2 || payload.Items[0].Key != "normal-d" {
-		t.Fatalf("unexpected button page items: %+v", payload.Items)
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("expected removed route to return 404, got %d", response.Code)
 	}
 }
 
@@ -1393,71 +1334,6 @@ func TestAwakenHeroReturnsUpdatedState(t *testing.T) {
 	}
 	if store.lastAwakenHeroID != "spark-cat" {
 		t.Fatalf("expected awaken payload to be forwarded, got %+v", store.lastAwakenHeroID)
-	}
-}
-
-func TestShopRoutesReturnCatalogAndLoadout(t *testing.T) {
-	store := &mockStore{
-		state: vote.State{
-			Gems: 30,
-			ShopCatalog: []vote.CosmeticCatalogItem{
-				{
-					CosmeticID: "trail-ribbon",
-					Name:       "流星彩带轨迹",
-					Type:       vote.CosmeticTypeTrail,
-					Price:      30,
-					Owned:      true,
-					Equipped:   true,
-				},
-				{
-					CosmeticID: "impact-firefly",
-					Name:       "流萤追光点击特效",
-					Type:       vote.CosmeticTypeImpact,
-					Price:      30,
-				},
-			},
-			EquippedCosmetics: vote.CosmeticLoadout{
-				TrailID: "trail-ribbon",
-			},
-		},
-		equipState: vote.State{
-			Gems: 0,
-			ShopCatalog: []vote.CosmeticCatalogItem{
-				{
-					CosmeticID: "trail-ribbon",
-					Name:       "流星彩带轨迹",
-					Type:       vote.CosmeticTypeTrail,
-					Price:      30,
-					Owned:      true,
-					Equipped:   true,
-				},
-				{
-					CosmeticID: "impact-firefly",
-					Name:       "流萤追光点击特效",
-					Type:       vote.CosmeticTypeImpact,
-					Price:      30,
-					Owned:      true,
-					Equipped:   true,
-				},
-			},
-			EquippedCosmetics: vote.CosmeticLoadout{
-				TrailID:  "trail-ribbon",
-				ImpactID: "impact-firefly",
-			},
-		},
-	}
-
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-	})
-
-	getRequest := httptest.NewRequest(http.MethodGet, "/api/shop?nickname=%E9%98%BF%E6%98%8E", nil)
-	getResponse := httptest.NewRecorder()
-	handler.ServeHTTP(getResponse, getRequest)
-
-	if getResponse.Code != http.StatusOK {
-		t.Fatalf("expected 200 from shop list, got %d", getResponse.Code)
 	}
 }
 
