@@ -5,10 +5,21 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const pageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue'), 'utf8')
+const pageSource = [
+  './PublicPage.vue',
+  './BattlePage.vue',
+  './ProfilePage.vue',
+  './MessagesPage.vue',
+  './publicPageState.js',
+]
+  .map((file) => readFileSync(path.resolve(currentDir, file), 'utf8'))
+  .join('\n')
 
 describe('PublicPage 三页前台边界', () => {
   it('提供战斗、资料、消息三页导航，并默认进入战斗页', () => {
+    expect(pageSource).toContain("import BattlePage from './BattlePage.vue'")
+    expect(pageSource).toContain("import ProfilePage from './ProfilePage.vue'")
+    expect(pageSource).toContain("import MessagesPage from './MessagesPage.vue'")
     expect(pageSource).toContain("const publicPages = [")
     expect(pageSource).toContain("id: 'battle'")
     expect(pageSource).toContain("id: 'profile'")
