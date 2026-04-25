@@ -158,27 +158,6 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 
-	router.PUT("/api/admin/boss/pool/:templateId/hero-loot", func(ctx context.Context, c *app.RequestContext) {
-		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
-			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
-			return
-		}
-
-		var body struct {
-			Loot []vote.BossHeroLootEntry `json:"loot"`
-		}
-		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
-			return
-		}
-
-		if err := options.Store.SetBossTemplateHeroLoot(ctx, c.Param("templateId"), body.Loot); err != nil {
-			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_HERO_LOOT_FAILED"})
-			return
-		}
-
-		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
-	})
-
 	router.POST("/api/admin/boss/cycle/enable", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})

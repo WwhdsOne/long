@@ -52,8 +52,7 @@ func (c *Cache) RefreshSnapshot(ctx context.Context) (vote.Snapshot, error) {
 	c.snapshotReady = true
 	if snapshot.Boss == nil {
 		c.bossResources = vote.BossResources{
-			BossLoot:     []vote.BossLootEntry{},
-			BossHeroLoot: []vote.BossHeroLootEntry{},
+			BossLoot: []vote.BossLootEntry{},
 		}
 		c.bossResourcesReady = true
 	} else if c.bossResources.BossID != snapshot.Boss.ID {

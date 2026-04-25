@@ -69,7 +69,6 @@ describe('PublicPage 三页前台边界', () => {
     expect(battleSource).not.toContain('class="boss-drop-pool"')
     expect(battleSource).toContain('class="boss-drop-modal"')
     expect(battleSource).toContain('装备掉落')
-    expect(battleSource).toContain('英雄掉落')
     expect(battleSource).toContain('class="boss-drop-card boss-drop-card--detail"')
     expect(battleSource).toContain('class="boss-drop-card__details"')
     expect(battleSource).not.toContain('@click="openBossDropDetail')

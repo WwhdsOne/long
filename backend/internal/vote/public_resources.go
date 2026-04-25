@@ -13,8 +13,7 @@ func (s *Store) GetBossResources(ctx context.Context) (BossResources, error) {
 	}
 	if boss == nil {
 		return BossResources{
-			BossLoot:     []BossLootEntry{},
-			BossHeroLoot: []BossHeroLootEntry{},
+			BossLoot: []BossLootEntry{},
 		}, nil
 	}
 
@@ -22,17 +21,12 @@ func (s *Store) GetBossResources(ctx context.Context) (BossResources, error) {
 	if err != nil {
 		return BossResources{}, err
 	}
-	heroLoot, err := s.loadBossHeroLoot(ctx, boss.ID)
-	if err != nil {
-		return BossResources{}, err
-	}
 
 	return BossResources{
-		BossID:       boss.ID,
-		TemplateID:   boss.TemplateID,
-		Status:       boss.Status,
-		BossLoot:     loot,
-		BossHeroLoot: heroLoot,
+		BossID:     boss.ID,
+		TemplateID: boss.TemplateID,
+		Status:     boss.Status,
+		BossLoot:   loot,
 	}, nil
 }
 

@@ -22,12 +22,6 @@ type ButtonStore interface {
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
-	SalvageEquipment(context.Context, string, string, int64) (vote.State, error)
-	EnhanceEquipment(context.Context, string, string) (vote.State, error)
-	EquipHero(context.Context, string, string) (vote.State, error)
-	UnequipHero(context.Context, string, string) (vote.State, error)
-	SalvageHero(context.Context, string, string, int64) (vote.State, error)
-	AwakenHero(context.Context, string, string) (vote.State, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	ListAdminButtonsPage(context.Context, int64, int64) (vote.AdminButtonPage, error)
 	ListAdminEquipmentPage(context.Context, int64, int64) (vote.AdminEquipmentPage, error)
@@ -36,16 +30,13 @@ type ButtonStore interface {
 	GetAdminPlayer(context.Context, string) (*vote.AdminPlayerOverview, error)
 	SaveButton(context.Context, vote.ButtonUpsert) error
 	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
-	SaveHeroDefinition(context.Context, vote.HeroDefinition) error
 	DeleteEquipmentDefinition(context.Context, string) error
-	DeleteHeroDefinition(context.Context, string) error
 	ActivateBoss(context.Context, vote.BossUpsert) (*vote.Boss, error)
 	DeactivateBoss(context.Context) error
 	SetBossLoot(context.Context, string, []vote.BossLootEntry) error
 	SaveBossTemplate(context.Context, vote.BossTemplateUpsert) error
 	DeleteBossTemplate(context.Context, string) error
 	SetBossTemplateLoot(context.Context, string, []vote.BossLootEntry) error
-	SetBossTemplateHeroLoot(context.Context, string, []vote.BossHeroLootEntry) error
 	SetBossCycleEnabled(context.Context, bool) (*vote.Boss, error)
 	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
 	GetBossResources(context.Context) (vote.BossResources, error)

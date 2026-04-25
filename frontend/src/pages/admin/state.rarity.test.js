@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { emptyEquipmentForm, normalizeEquipmentPage, normalizeLootEntry, normalizeHeroLootEntry } from './state'
+import { emptyEquipmentForm, normalizeEquipmentPage, normalizeLootEntry } from './state'
 
 describe('admin state rarity normalization', () => {
   it('空装备表单默认使用普通稀有度', () => {
@@ -15,8 +15,9 @@ describe('admin state rarity normalization', () => {
     expect(page.items[0].rarity).toBe('普通')
   })
 
-  it('boss 掉落规范化会保留强化与觉醒上限字段', () => {
-    expect(normalizeLootEntry({ itemId: 'fire-ring', enhanceCap: 7 }).enhanceCap).toBe(7)
-    expect(normalizeHeroLootEntry({ heroId: 'spark-cat', awakenCap: 5 }).awakenCap).toBe(5)
+  it('boss 掉落规范化会保留新装备属性字段', () => {
+    const entry = normalizeLootEntry({ itemId: 'fire-ring', attackPower: 10, bossDamagePercent: 0.5 })
+    expect(entry.attackPower).toBe(10)
+    expect(entry.bossDamagePercent).toBe(0.5)
   })
 })

@@ -17,9 +17,9 @@ const pageSource = [
 const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
 
 describe('PublicPage 稀有度展示', () => {
-  it('boss 装备和英雄掉落区补充成长上限文案', () => {
-    expect(pageSource).toContain('可强化')
-    expect(pageSource).toContain('可觉醒')
+  it('boss 装备掉落区使用新属性格式', () => {
+    expect(pageSource).toContain('formatDropRate')
+    expect(pageSource).toContain('formatRarityLabel')
   })
 
   it('页面通过统一稀有度工具渲染装备名称', () => {

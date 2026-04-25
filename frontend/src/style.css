@@ -1515,6 +1515,37 @@ select {
   gap: 10px;
 }
 
+.admin-fieldset {
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-fieldset__legend {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  padding: 0 0.5rem;
+}
+
+.boss-part-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.boss-part-editor__row {
+  display: grid;
+  grid-template-columns: 80px 50px 50px 80px 70px auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.nickname-form__input--sm {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.8rem;
+}
+
 .admin-inline-row,
 .admin-inline-actions {
   display: grid;

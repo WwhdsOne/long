@@ -34,17 +34,12 @@ type mockStore struct {
 	lastButton             vote.ButtonUpsert
 	lastBoss               vote.BossUpsert
 	lastBossTemplate       vote.BossTemplateUpsert
-	lastHero               vote.HeroDefinition
 	lastEquipment          vote.EquipmentDefinition
 	lastTemplateLootID     string
 	lastTemplateLoot       []vote.BossLootEntry
-	lastTemplateHeroLootID string
-	lastTemplateHeroLoot   []vote.BossHeroLootEntry
 	lastCycleEnabled       bool
 	lastSalvageItemID      string
 	lastSalvageQuantity    int64
-	lastEnhanceItemID      string
-	lastAwakenHeroID       string
 	lastClickNickname      string
 	lastGetStateNickname   string
 	getStateErr            error
@@ -53,8 +48,6 @@ type mockStore struct {
 	validateErr            error
 	messageErr             error
 	salvageErr             error
-	enhanceErr             error
-	awakenErr              error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -106,12 +99,9 @@ func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	userState.UserStats = m.state.UserStats
 	userState.MyBossStats = m.state.MyBossStats
 	userState.Inventory = m.state.Inventory
-	userState.Heroes = m.state.Heroes
-	userState.ActiveHero = m.state.ActiveHero
 	userState.Loadout = m.state.Loadout
 	userState.CombatStats = m.state.CombatStats
 	userState.Gems = m.state.Gems
-	userState.LastForgeResult = m.state.LastForgeResult
 	userState.RecentRewards = m.state.RecentRewards
 	userState.LastReward = m.state.LastReward
 	return userState
@@ -207,14 +197,7 @@ func (m *mockStore) SaveEquipmentDefinition(_ context.Context, definition vote.E
 	return nil
 }
 
-func (m *mockStore) SaveHeroDefinition(_ context.Context, hero vote.HeroDefinition) error {
-	m.lastHero = hero
-	return nil
-}
 
-func (m *mockStore) DeleteHeroDefinition(_ context.Context, _ string) error {
-	return nil
-}
 
 func (m *mockStore) DeleteEquipmentDefinition(_ context.Context, _ string) error {
 	return nil
@@ -254,11 +237,6 @@ func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, lo
 	return nil
 }
 
-func (m *mockStore) SetBossTemplateHeroLoot(_ context.Context, templateID string, loot []vote.BossHeroLootEntry) error {
-	m.lastTemplateHeroLootID = templateID
-	m.lastTemplateHeroLoot = loot
-	return nil
-}
 
 func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.Boss, error) {
 	m.lastCycleEnabled = enabled
@@ -321,65 +299,6 @@ func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockStore) SalvageEquipment(_ context.Context, _ string, itemID string, quantity int64) (vote.State, error) {
-	if m.salvageErr != nil {
-		return vote.State{}, m.salvageErr
-	}
-	m.lastSalvageItemID = itemID
-	m.lastSalvageQuantity = quantity
-	if len(m.equipState.Inventory) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
-func (m *mockStore) EnhanceEquipment(_ context.Context, _ string, itemID string) (vote.State, error) {
-	if m.enhanceErr != nil {
-		return vote.State{}, m.enhanceErr
-	}
-	m.lastEnhanceItemID = itemID
-	if len(m.equipState.Inventory) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
-func (m *mockStore) EquipHero(_ context.Context, _ string, _ string) (vote.State, error) {
-	if len(m.equipState.Buttons) == 0 && len(m.equipState.Heroes) == 0 && m.equipState.ActiveHero == nil {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
-func (m *mockStore) AwakenHero(_ context.Context, _ string, heroID string) (vote.State, error) {
-	if m.awakenErr != nil {
-		return vote.State{}, m.awakenErr
-	}
-	m.lastAwakenHeroID = heroID
-	if len(m.equipState.Heroes) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
-func (m *mockStore) SalvageHero(_ context.Context, _ string, heroID string, quantity int64) (vote.State, error) {
-	if m.salvageErr != nil {
-		return vote.State{}, m.salvageErr
-	}
-	m.lastAwakenHeroID = heroID
-	m.lastSalvageQuantity = quantity
-	if len(m.equipState.Heroes) == 0 && m.equipState.Gems == 0 && m.equipState.LastForgeResult == nil {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
-
-func (m *mockStore) UnequipHero(_ context.Context, _ string, _ string) (vote.State, error) {
-	if len(m.equipState.Buttons) == 0 && len(m.equipState.Heroes) == 0 && m.equipState.ActiveHero == nil {
-		return m.state, nil
-	}
-	return m.equipState, nil
-}
 
 func (m *mockStore) SelectTalentTree(_ context.Context, _ string, _ vote.TalentTree, _ vote.TalentTree) error {
 	return nil
@@ -520,8 +439,7 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 					ItemName:                   "布甲",
 					Slot:                       "armor",
 					Weight:                     3,
-					BonusClicks:                1,
-					BonusCriticalChancePercent: 2,
+					
 				},
 			},
 			LatestAnnouncement: &vote.Announcement{
@@ -700,58 +618,6 @@ func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 		t.Fatalf("unexpected latest announcement payload: %+v", payload)
 	}
 }
-
-func TestGetBossResourcesReturnsPayload(t *testing.T) {
-	store := &mockStore{
-		bossResources: vote.BossResources{
-			BossID:     "dragon-1",
-			TemplateID: "dragon",
-			Status:     "active",
-			BossLoot: []vote.BossLootEntry{
-				{
-					ItemID:          "cloth-armor",
-					ItemName:        "布甲",
-					DropRatePercent: 75,
-				},
-			},
-			BossHeroLoot: []vote.BossHeroLootEntry{
-				{
-					HeroID:          "slime",
-					HeroName:        "史莱姆勇者",
-					DropRatePercent: 25,
-				},
-			},
-		},
-	}
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-	})
-
-	request := httptest.NewRequest(http.MethodGet, "/api/boss/resources", nil)
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
-	}
-
-	var payload vote.BossResources
-	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if payload.BossID != "dragon-1" || payload.TemplateID != "dragon" || payload.Status != "active" {
-		t.Fatalf("unexpected boss resource meta: %+v", payload)
-	}
-	if len(payload.BossLoot) != 1 || payload.BossLoot[0].ItemID != "cloth-armor" {
-		t.Fatalf("unexpected boss loot payload: %+v", payload.BossLoot)
-	}
-	if len(payload.BossHeroLoot) != 1 || payload.BossHeroLoot[0].HeroID != "slime" {
-		t.Fatalf("unexpected boss hero loot payload: %+v", payload.BossHeroLoot)
-	}
-}
-
 func TestClickButtonDoesNotUseLegacySnapshotBroadcast(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
@@ -1097,13 +963,10 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 					Name:        "木剑",
 					Slot:        "weapon",
 					Quantity:    1,
-					BonusClicks: 2,
 					Equipped:    true,
 				},
 			},
 			CombatStats: vote.CombatStats{
-				BaseIncrement:      1,
-				BonusClicks:        2,
 				EffectiveIncrement: 3,
 				NormalDamage:       3,
 				CriticalDamage:     7,
@@ -1169,221 +1032,6 @@ func TestSynthesizeItemReturnsDeprecatedError(t *testing.T) {
 	}
 	if payload["error"] == "" {
 		t.Fatalf("expected deprecated error payload, got %+v", payload)
-	}
-}
-
-func TestSalvageEquipmentReturnsUpdatedState(t *testing.T) {
-	store := &mockStore{
-		equipState: vote.State{
-			Gems: 2,
-			Inventory: []vote.InventoryItem{
-				{
-					ItemID:   "wood-sword",
-					Name:     "木剑",
-					Quantity: 1,
-				},
-			},
-			LastForgeResult: &vote.ForgeResult{
-				Kind:          "equipment_salvage",
-				TargetID:      "wood-sword",
-				RemainingGems: 2,
-			},
-		},
-	}
-
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-	})
-
-	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/salvage", strings.NewReader(`{"nickname":"阿明","quantity":2}`))
-	request.Header.Set("Content-Type", "application/json")
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
-	}
-	if store.lastSalvageItemID != "wood-sword" || store.lastSalvageQuantity != 2 {
-		t.Fatalf("expected salvage payload to be forwarded, got id=%s quantity=%d", store.lastSalvageItemID, store.lastSalvageQuantity)
-	}
-
-	var payload struct {
-		Gems            int64             `json:"gems"`
-		LastForgeResult *vote.ForgeResult `json:"lastForgeResult"`
-	}
-	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if payload.Gems != 2 || payload.LastForgeResult == nil || payload.LastForgeResult.Kind != "equipment_salvage" {
-		t.Fatalf("unexpected salvage payload: %+v", payload)
-	}
-}
-
-func TestEnhanceEquipmentReturnsUpdatedState(t *testing.T) {
-	store := &mockStore{
-		equipState: vote.State{
-			Gems: 0,
-			Inventory: []vote.InventoryItem{
-				{
-					ItemID:           "wood-sword",
-					Name:             "木剑 +1",
-					Quantity:         1,
-					EnhanceLevel:     1,
-					BonusClicks:      3,
-					BonusClicksDelta: 1,
-				},
-			},
-			LastForgeResult: &vote.ForgeResult{
-				Kind:          "equipment_enhance",
-				TargetID:      "wood-sword",
-				RemainingGems: 0,
-			},
-		},
-	}
-
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-	})
-
-	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/enhance", strings.NewReader(`{"nickname":"阿明"}`))
-	request.Header.Set("Content-Type", "application/json")
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
-	}
-	if store.lastEnhanceItemID != "wood-sword" {
-		t.Fatalf("expected enhance payload to be forwarded, got %+v", store.lastEnhanceItemID)
-	}
-}
-
-func TestEquipHeroReturnsUpdatedState(t *testing.T) {
-	store := &mockStore{
-		equipState: vote.State{
-			Heroes: []vote.HeroInventoryItem{
-				{
-					HeroID:      "spark-cat",
-					Name:        "星火猫",
-					Quantity:    1,
-					Active:      true,
-					BonusClicks: 2,
-				},
-			},
-			ActiveHero: &vote.HeroInventoryItem{
-				HeroID:      "spark-cat",
-				Name:        "星火猫",
-				Quantity:    1,
-				Active:      true,
-				BonusClicks: 2,
-			},
-			CombatStats: vote.CombatStats{
-				BaseIncrement:      1,
-				BonusClicks:        2,
-				EffectiveIncrement: 3,
-				NormalDamage:       3,
-				CriticalDamage:     7,
-			},
-		},
-	}
-
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-	})
-
-	request := httptest.NewRequest(http.MethodPost, "/api/heroes/spark-cat/equip", strings.NewReader(`{"nickname":"阿明"}`))
-	request.Header.Set("Content-Type", "application/json")
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
-	}
-
-	var payload struct {
-		ActiveHero *vote.HeroInventoryItem `json:"activeHero"`
-	}
-	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if payload.ActiveHero == nil || payload.ActiveHero.HeroID != "spark-cat" {
-		t.Fatalf("unexpected hero equip payload: %+v", payload.ActiveHero)
-	}
-}
-
-func TestAwakenHeroReturnsUpdatedState(t *testing.T) {
-	store := &mockStore{
-		equipState: vote.State{
-			Gems: 0,
-			Heroes: []vote.HeroInventoryItem{
-				{
-					HeroID:           "spark-cat",
-					Name:             "星火猫",
-					AwakenLevel:      1,
-					BonusClicks:      3,
-					BonusClicksDelta: 1,
-				},
-			},
-			LastForgeResult: &vote.ForgeResult{
-				Kind:       "hero_awaken",
-				TargetID:   "spark-cat",
-				TargetName: "星火猫",
-			},
-		},
-	}
-
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-	})
-
-	request := httptest.NewRequest(http.MethodPost, "/api/heroes/spark-cat/awaken", strings.NewReader(`{"nickname":"阿明"}`))
-	request.Header.Set("Content-Type", "application/json")
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
-	}
-	if store.lastAwakenHeroID != "spark-cat" {
-		t.Fatalf("expected awaken payload to be forwarded, got %+v", store.lastAwakenHeroID)
-	}
-}
-
-func TestClickTicketRouteUsesAuthenticatedNickname(t *testing.T) {
-	controller := &mockManualClickController{
-		ticket: ClickTicket{
-			Value:     "ticket-1",
-			IssuedAt:  1710000000,
-			ExpiresAt: 1710000002,
-		},
-	}
-	handler := NewHandler(Options{
-		Store:               &mockStore{state: voteStateForPlayerTests()},
-		Broadcaster:         &mockBroadcaster{},
-		PlayerAuthenticator: &mockPlayerAuthenticator{verifyNickname: "阿明"},
-		ManualClick:         controller,
-	})
-
-	request := httptest.NewRequest(http.MethodPost, "/api/click-tickets", strings.NewReader(`{"slug":"feel"}`))
-	request.Header.Set("Content-Type", "application/json")
-	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200 from click ticket route, got %d", response.Code)
-	}
-	if controller.lastIssueReq.Nickname != "阿明" || controller.lastIssueReq.Slug != "feel" {
-		t.Fatalf("expected ticket issue request to use authenticated nickname, got %+v", controller.lastIssueReq)
 	}
 }
 
@@ -1670,112 +1318,6 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	}
 	if !store.lastCycleEnabled {
 		t.Fatal("expected cycle enable to be forwarded to store")
-	}
-}
-
-func TestAdminHeroRoutesForwardPayloads(t *testing.T) {
-	store := &mockStore{}
-
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
-			Username:      "admin",
-			Password:      "secret",
-			SessionSecret: "session-secret",
-		}),
-	})
-
-	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
-	loginRequest.Header.Set("Content-Type", "application/json")
-	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, loginRequest)
-
-	cookies := loginResponse.Result().Cookies()
-	if len(cookies) == 0 {
-		t.Fatal("expected session cookie from login")
-	}
-
-	saveHeroRequest := httptest.NewRequest(http.MethodPost, "/api/admin/heroes", strings.NewReader(`{"heroId":"spark-cat","name":"星火猫","bonusClicks":2,"effects":[{"type":"final_damage_percent","value":50,"displayName":"终幕打击","description":"最终伤害 +50%"}]}`))
-	saveHeroRequest.Header.Set("Content-Type", "application/json")
-	saveHeroRequest.AddCookie(cookies[0])
-	saveHeroResponse := httptest.NewRecorder()
-	handler.ServeHTTP(saveHeroResponse, saveHeroRequest)
-
-	if saveHeroResponse.Code != http.StatusOK {
-		t.Fatalf("expected 200 from hero save, got %d", saveHeroResponse.Code)
-	}
-	if store.lastHero.HeroID != "spark-cat" || len(store.lastHero.Effects) != 1 || store.lastHero.Effects[0].Value != 50 {
-		t.Fatalf("expected hero payload to be forwarded, got %+v", store.lastHero)
-	}
-
-	saveHeroLootRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/pool/dragon/hero-loot", strings.NewReader(`{"loot":[{"heroId":"spark-cat","weight":2}]}`))
-	saveHeroLootRequest.Header.Set("Content-Type", "application/json")
-	saveHeroLootRequest.AddCookie(cookies[0])
-	saveHeroLootResponse := httptest.NewRecorder()
-	handler.ServeHTTP(saveHeroLootResponse, saveHeroLootRequest)
-
-	if saveHeroLootResponse.Code != http.StatusOK {
-		t.Fatalf("expected 200 from hero loot save, got %d", saveHeroLootResponse.Code)
-	}
-	if store.lastTemplateHeroLootID != "dragon" || len(store.lastTemplateHeroLoot) != 1 || store.lastTemplateHeroLoot[0].HeroID != "spark-cat" {
-		t.Fatalf("expected hero loot payload to be forwarded, got id=%s loot=%+v", store.lastTemplateHeroLootID, store.lastTemplateHeroLoot)
-	}
-}
-
-func TestAdminPlayersPageRequiresAuthAndReturnsPayload(t *testing.T) {
-	store := &mockStore{
-		adminPlayerPage: vote.AdminPlayerPage{
-			Items: []vote.AdminPlayerOverview{
-				{Nickname: "阿明", ClickCount: 12},
-			},
-			NextCursor: "1",
-			Total:      3,
-		},
-	}
-
-	handler := NewHandler(Options{
-		Store:       store,
-		Broadcaster: &mockBroadcaster{},
-		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
-			Username:      "admin",
-			Password:      "secret",
-			SessionSecret: "session-secret",
-		}),
-	})
-
-	unauthorizedRequest := httptest.NewRequest(http.MethodGet, "/api/admin/players", nil)
-	unauthorizedResponse := httptest.NewRecorder()
-	handler.ServeHTTP(unauthorizedResponse, unauthorizedRequest)
-	if unauthorizedResponse.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 without session, got %d", unauthorizedResponse.Code)
-	}
-
-	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
-	loginRequest.Header.Set("Content-Type", "application/json")
-	loginResponse := httptest.NewRecorder()
-	handler.ServeHTTP(loginResponse, loginRequest)
-
-	cookies := loginResponse.Result().Cookies()
-	if len(cookies) == 0 {
-		t.Fatal("expected session cookie from login")
-	}
-
-	request := httptest.NewRequest(http.MethodGet, "/api/admin/players?cursor=0&limit=1", nil)
-	request.AddCookie(cookies[0])
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", response.Code)
-	}
-
-	var payload vote.AdminPlayerPage
-	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if payload.Total != 3 || payload.NextCursor != "1" || len(payload.Items) != 1 || payload.Items[0].Nickname != "阿明" {
-		t.Fatalf("unexpected admin player page payload: %+v", payload)
 	}
 }
 

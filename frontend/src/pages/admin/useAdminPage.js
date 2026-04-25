@@ -8,15 +8,11 @@ import {
   emptyButtonPage,
   emptyEquipmentForm,
   emptyEquipmentPage,
-  emptyHeroForm,
-  emptyHeroLootRows,
   emptyLootRows,
   emptyMessagePage,
   emptyPlayerPage,
-  formatHeroTrait,
   formatItemStats,
   formatTime,
-  heroImageAlt,
   normalizeAdminState,
   normalizeAnnouncements,
   normalizeBossHistoryPage,
@@ -40,13 +36,11 @@ export function useAdminPage() {
   const uploadingImage = ref(false)
 
   const loginForm = ref({ username: 'admin', password: '' })
-  const bossForm = ref({ id: '', name: '', maxHp: '' })
+  const bossForm = ref({ id: '', name: '', maxHp: '', layout: [] })
   const equipmentForm = ref(emptyEquipmentForm())
-  const heroForm = ref(emptyHeroForm())
   const buttonForm = reactive(emptyButtonForm())
   const announcementForm = ref(emptyAnnouncementForm())
   const lootRows = ref(emptyLootRows())
-  const heroLootRows = ref(emptyHeroLootRows())
   const selectedBossTemplateId = ref('')
 
   const adminState = ref(emptyAdminState())
@@ -71,10 +65,7 @@ export function useAdminPage() {
     bossTemplates.value.find((entry) => entry.id === selectedBossTemplateId.value) ?? null,
   )
   const equipmentOptions = computed(() => equipmentPage.value.items ?? [])
-  const heroOptions = computed(() => adminState.value.heroes ?? [])
   const hasEquipmentTemplates = computed(() => equipmentPage.value.total > 0)
-  const hasHeroTemplates = computed(() => heroOptions.value.length > 0)
-
   function setSuccess(message) {
     successMessage.value = message
     errorMessage.value = ''
@@ -94,12 +85,7 @@ export function useAdminPage() {
     return bossTemplates.value.find((entry) => entry.id === templateId) ?? null
   }
 
-  function findHeroTemplate(heroId) {
-    if (!heroId) {
-      return null
-    }
-    return heroOptions.value.find((entry) => entry.heroId === heroId) ?? null
-  }
+
 
   function applyLootRows(loot) {
     lootRows.value = Array.isArray(loot) && loot.length > 0
@@ -107,11 +93,7 @@ export function useAdminPage() {
       : emptyLootRows()
   }
 
-  function applyHeroLootRows(loot) {
-    heroLootRows.value = Array.isArray(loot) && loot.length > 0
-      ? loot.map((entry) => ({ heroId: entry.heroId, weight: entry.weight }))
-      : emptyHeroLootRows()
-  }
+
 
   function syncBossTemplateEditor(preferredTemplateId = '') {
     const nextTemplateId = [
@@ -123,7 +105,6 @@ export function useAdminPage() {
 
     selectedBossTemplateId.value = nextTemplateId
     applyLootRows(findBossTemplate(nextTemplateId)?.loot ?? [])
-    applyHeroLootRows(findBossTemplate(nextTemplateId)?.heroLoot ?? [])
   }
 
   async function uploadImageToOSS(event, file, applyImage, successTip) {
@@ -151,9 +132,7 @@ export function useAdminPage() {
     lootRows.value.push({ itemId: '', weight: '' })
   }
 
-  function addHeroLootRow() {
-    heroLootRows.value.push({ heroId: '', weight: '' })
-  }
+
 
   async function fetchAdminState() {
     loading.value = true
@@ -354,7 +333,7 @@ export function useAdminPage() {
     announcements.value = []
     checkingSession.value = false
     successMessage.value = ''
-    bossForm.value = { id: '', name: '', maxHp: '' }
+    bossForm.value = { id: '', name: '', maxHp: '', layout: [] }
   }
 
   async function resetPlayerPassword(nickname) {
@@ -384,12 +363,10 @@ export function useAdminPage() {
 
   const shared = {
     activeTab,
-    addHeroLootRow,
     addLootRow,
     adminState,
     announcementForm,
     announcements,
-    applyHeroLootRows,
     applyLootRows,
     authenticated,
     bossCycleEnabled,
@@ -406,7 +383,6 @@ export function useAdminPage() {
     emptyButtonPage,
     emptyEquipmentForm,
     emptyEquipmentPage,
-    emptyHeroForm,
     emptyMessagePage,
     emptyPlayerPage,
     equipmentForm,
@@ -418,8 +394,6 @@ export function useAdminPage() {
     fetchEquipmentPage,
     fetchMessages,
     findBossTemplate,
-    heroForm,
-    heroLootRows,
     loading,
     loadingAnnouncements,
     loadingButtons,
@@ -455,7 +429,6 @@ export function useAdminPage() {
   return {
     ...actions,
     activeTab,
-    addHeroLootRow,
     addLootRow,
     adminState,
     announcementForm,
@@ -471,23 +444,15 @@ export function useAdminPage() {
     editBossTemplate: actions.editBossTemplate,
     editButton: actions.editButton,
     editEquipment: actions.editEquipment,
-    editHero: actions.editHero,
     equipmentForm,
     equipmentOptions,
     equipmentPage,
     errorMessage,
     findEquipmentTemplate,
-    findHeroTemplate,
-    formatHeroTrait,
     formatItemStats,
     formatTime,
     hasBoss,
     hasEquipmentTemplates,
-    hasHeroTemplates,
-    heroForm,
-    heroImageAlt,
-    heroLootRows,
-    heroOptions,
     loading,
     loadingAnnouncements,
     loadingButtons,

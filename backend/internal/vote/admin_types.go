@@ -6,9 +6,7 @@ type AdminState struct {
 	Boss              *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard"`
 	Equipment         []EquipmentDefinition  `json:"equipment,omitempty"`
-	Heroes            []HeroDefinition       `json:"heroes"`
 	Loot              []BossLootEntry        `json:"loot"`
-	HeroLoot          []BossHeroLootEntry    `json:"heroLoot"`
 	BossCycleEnabled  bool                   `json:"bossCycleEnabled"`
 	BossPool          []BossTemplate         `json:"bossPool"`
 	PlayerCount       int64                  `json:"playerCount"`
@@ -52,12 +50,11 @@ type BossUpsert struct {
 
 // BossTemplate Boss 池模板。
 type BossTemplate struct {
-	ID       string              `json:"id"`
-	Name     string              `json:"name"`
-	MaxHP    int64               `json:"maxHp"`
-	Loot     []BossLootEntry     `json:"loot"`
-	HeroLoot []BossHeroLootEntry `json:"heroLoot"`
-	Layout   []BossPart          `json:"layout,omitempty"` // 部位布局
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
+	MaxHP  int64           `json:"maxHp"`
+	Loot   []BossLootEntry `json:"loot"`
+	Layout []BossPart      `json:"layout,omitempty"` // 部位布局
 }
 
 // BossTemplateUpsert 后台 Boss 模板保存载荷。

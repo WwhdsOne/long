@@ -28,10 +28,6 @@ var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
 var ErrEquipmentNotEnough = errors.New("equipment not enough")
 var ErrEquipmentMaxEnhance = errors.New("equipment max enhance")
-var ErrHeroNotEnough = errors.New("hero not enough")
-var ErrHeroNotFound = errors.New("hero not found")
-var ErrHeroNotOwned = errors.New("hero not owned")
-var ErrHeroMaxAwaken = errors.New("hero max awaken")
 var ErrGemsNotEnough = errors.New("gems not enough")
 var ErrInvalidQuantity = errors.New("invalid quantity")
 var ErrMessageEmpty = errors.New("message empty")
@@ -139,17 +135,14 @@ type BossUserStats struct {
 	Damage   int64  `json:"damage"`
 }
 
-// EquipmentDefinition 装备模板
+// EquipmentDefinition 武器模板
 type EquipmentDefinition struct {
-	ItemID                     string  `json:"itemId"`
-	Name                       string  `json:"name"`
-	Slot                       string  `json:"slot"`
-	Rarity                     string  `json:"rarity"`
-	BonusClicks                int64   `json:"bonusClicks"`
-	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
-	EnhanceCap                 int     `json:"enhanceCap"`
-	// 多部位战斗新增属性
+	ItemID              string  `json:"itemId"`
+	Name                string  `json:"name"`
+	Slot                string  `json:"slot"`
+	Rarity              string  `json:"rarity"`
+	ImagePath           string  `json:"imagePath,omitempty"`
+	ImageAlt            string  `json:"imageAlt,omitempty"`
 	AttackPower         int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent     float64 `json:"armorPenPercent,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
@@ -157,66 +150,7 @@ type EquipmentDefinition struct {
 	PartTypeDamageSoft  float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
 	PartTypeDamageHeavy float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
 	PartTypeDamageWeak  float64 `json:"partTypeDamageWeak,omitempty"`  // 弱点增伤
-}
-
-type HeroEffectType string
-
-const (
-	HeroEffectBonusClicks           HeroEffectType = "bonus_clicks"
-	HeroEffectCriticalChancePercent HeroEffectType = "critical_chance_percent"
-	HeroEffectCriticalCountBonus    HeroEffectType = "critical_count_bonus"
-	HeroEffectFinalDamagePercent    HeroEffectType = "final_damage_percent"
-)
-
-type HeroTraitType = HeroEffectType
-
-const (
-	HeroTraitFinalDamagePercent = HeroEffectFinalDamagePercent
-)
-
-type HeroEffect struct {
-	Type        HeroEffectType `json:"type"`
-	Value       int64          `json:"value"`
-	Params      map[string]any `json:"params,omitempty"`
-	DisplayName string         `json:"displayName,omitempty"`
-	Description string         `json:"description,omitempty"`
-}
-
-// HeroDefinition 小小英雄模板。
-type HeroDefinition struct {
-	HeroID                     string        `json:"heroId"`
-	Name                       string        `json:"name"`
-	ImagePath                  string        `json:"imagePath,omitempty"`
-	ImageAlt                   string        `json:"imageAlt,omitempty"`
-	BonusClicks                int64         `json:"bonusClicks"`
-	BonusCriticalChancePercent float64       `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
-	Effects                    []HeroEffect  `json:"effects,omitempty"`
-	AwakenCap                  int           `json:"awakenCap"`
-	TraitType                  HeroTraitType `json:"traitType,omitempty"`
-	TraitValue                 int64         `json:"traitValue,omitempty"`
-}
-
-// HeroInventoryItem 玩家持有的小小英雄。
-type HeroInventoryItem struct {
-	HeroID                          string        `json:"heroId"`
-	Name                            string        `json:"name"`
-	ImagePath                       string        `json:"imagePath,omitempty"`
-	ImageAlt                        string        `json:"imageAlt,omitempty"`
-	Quantity                        int64         `json:"quantity"`
-	Active                          bool          `json:"active"`
-	AwakenLevel                     int           `json:"awakenLevel"`
-	AwakenCap                       int           `json:"awakenCap"`
-	BonusClicks                     int64         `json:"bonusClicks"`
-	BonusClicksDelta                int64         `json:"bonusClicksDelta"`
-	BonusCriticalChancePercent      float64       `json:"bonusCriticalChancePercent"`
-	BonusCriticalChancePercentDelta float64       `json:"bonusCriticalChancePercentDelta"`
-	BonusCriticalCount              int64         `json:"bonusCriticalCount"`
-	BonusCriticalCountDelta         int64         `json:"bonusCriticalCountDelta"`
-	Effects                         []HeroEffect  `json:"effects,omitempty"`
-	PityCounter                     int           `json:"-"` // deprecated: hidden from API
-	TraitType                       HeroTraitType `json:"traitType,omitempty"`
-	TraitValue                      int64         `json:"traitValue,omitempty"`
+	TalentAffinity      string  `json:"talentAffinity,omitempty"`      // 天赋系绑定
 }
 
 // Announcement 更新公告
@@ -250,35 +184,23 @@ type MessagePage struct {
 }
 
 // InventoryItem 背包道具
+// InventoryItem 背包道具（武器/装备）
 type InventoryItem struct {
-	ItemID                          string  `json:"itemId"`
-	Name                            string  `json:"name"`
-	Slot                            string  `json:"slot"`
-	Rarity                          string  `json:"rarity"`
-	Quantity                        int64   `json:"quantity"`
-	EnhanceLevel                    int     `json:"enhanceLevel"`
-	EnhanceCap                      int     `json:"enhanceCap"`
-	BonusClicks                     int64   `json:"bonusClicks"`
-	BonusClicksDelta                int64   `json:"bonusClicksDelta"`
-	BonusCriticalChancePercent      float64 `json:"bonusCriticalChancePercent"`
-	BonusCriticalChancePercentDelta float64 `json:"bonusCriticalChancePercentDelta"`
-	BonusCriticalCount              int64   `json:"bonusCriticalCount"`
-	BonusCriticalCountDelta         int64   `json:"bonusCriticalCountDelta"`
-	Equipped                        bool    `json:"equipped"`
-	StarLevel                       int     `json:"-"` // deprecated: hidden from API
-	ReforgePityCounter              int     `json:"-"` // deprecated: hidden from API
-	// 多部位战斗新增属性
-	AttackPower                 int64   `json:"attackPower,omitempty"`
-	AttackPowerDelta            int64   `json:"attackPowerDelta,omitempty"`
-	ArmorPenPercent             float64 `json:"armorPenPercent,omitempty"`
-	ArmorPenPercentDelta        float64 `json:"armorPenPercentDelta,omitempty"`
-	CritDamageMultiplier        float64 `json:"critDamageMultiplier,omitempty"`
-	CritDamageMultiplierDelta   float64 `json:"critDamageMultiplierDelta,omitempty"`
-	BossDamagePercent           float64 `json:"bossDamagePercent,omitempty"`
-	BossDamagePercentDelta      float64 `json:"bossDamagePercentDelta,omitempty"`
-	PartTypeDamageSoft          float64 `json:"partTypeDamageSoft,omitempty"`
-	PartTypeDamageHeavy         float64 `json:"partTypeDamageHeavy,omitempty"`
-	PartTypeDamageWeak          float64 `json:"partTypeDamageWeak,omitempty"`
+	ItemID              string  `json:"itemId"`
+	Name                string  `json:"name"`
+	Slot                string  `json:"slot"`
+	Rarity              string  `json:"rarity"`
+	ImagePath           string  `json:"imagePath,omitempty"`
+	ImageAlt            string  `json:"imageAlt,omitempty"`
+	Quantity            int64   `json:"quantity"`
+	Equipped            bool    `json:"equipped"`
+	AttackPower         int64   `json:"attackPower,omitempty"`
+	ArmorPenPercent     float64 `json:"armorPenPercent,omitempty"`
+	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
+	BossDamagePercent   float64 `json:"bossDamagePercent,omitempty"`
+	PartTypeDamageSoft  float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak  float64 `json:"partTypeDamageWeak,omitempty"`
 }
 
 // Loadout 已穿戴装备
@@ -290,19 +212,19 @@ type Loadout struct {
 
 // CombatStats 当前生效的点击战斗属性
 type CombatStats struct {
-	BaseIncrement         int64   `json:"baseIncrement"`
-	BonusClicks           int64   `json:"bonusClicks"`
-	EffectiveIncrement    int64   `json:"effectiveIncrement"`
-	NormalDamage          int64   `json:"normalDamage"`
-	CriticalDamage        int64   `json:"criticalDamage"`
-	CriticalChancePercent float64 `json:"criticalChancePercent"`
-	CriticalCount         int64   `json:"criticalCount"`
-	// 多部位战斗新增属性
-	AttackPower          int64   `json:"attackPower"`
-	ArmorPenPercent      float64 `json:"armorPenPercent"`      // 破甲率
-	CritDamageMultiplier float64 `json:"critDamageMultiplier"` // 暴击伤害倍率乘区
-	BossDamagePercent    float64 `json:"bossDamagePercent"`
-	AllDamageAmplify     float64 `json:"allDamageAmplify"` // 全伤害增幅
+	EffectiveIncrement     int64   `json:"effectiveIncrement"`
+	NormalDamage           int64   `json:"normalDamage"`
+	CriticalChancePercent  float64 `json:"criticalChancePercent"`
+	CriticalCount          int64   `json:"criticalCount"`
+	CriticalDamage         int64   `json:"criticalDamage"`
+	AttackPower           int64   `json:"attackPower"`
+	ArmorPenPercent       float64 `json:"armorPenPercent"`
+	CritDamageMultiplier  float64 `json:"critDamageMultiplier"`
+	BossDamagePercent     float64 `json:"bossDamagePercent"`
+	AllDamageAmplify      float64 `json:"allDamageAmplify"`
+	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
 }
 
 // Reward 最近一次掉落
@@ -316,40 +238,20 @@ type Reward struct {
 
 // BossLootEntry Boss 掉落池条目
 type BossLootEntry struct {
-	ItemID                     string  `json:"itemId"`
-	ItemName                   string  `json:"itemName"`
-	Slot                       string  `json:"slot"`
-	Rarity                     string  `json:"rarity"`
-	Weight                     int64   `json:"weight"`
-	DropRatePercent            float64 `json:"dropRatePercent"`
-	EnhanceCap                 int     `json:"enhanceCap"`
-	BonusClicks                int64   `json:"bonusClicks"`
-	BonusCriticalChancePercent float64 `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64   `json:"bonusCriticalCount"`
-	AttackPower                int64   `json:"attackPower,omitempty"`
-	ArmorPenPercent            float64 `json:"armorPenPercent,omitempty"`
-	CritDamageMultiplier       float64 `json:"critDamageMultiplier,omitempty"`
-	BossDamagePercent          float64 `json:"bossDamagePercent,omitempty"`
-	PartTypeDamageSoft         float64 `json:"partTypeDamageSoft,omitempty"`
-	PartTypeDamageHeavy        float64 `json:"partTypeDamageHeavy,omitempty"`
-	PartTypeDamageWeak         float64 `json:"partTypeDamageWeak,omitempty"`
-}
-
-// BossHeroLootEntry Boss 英雄掉落池条目。
-type BossHeroLootEntry struct {
-	HeroID                     string        `json:"heroId"`
-	HeroName                   string        `json:"heroName"`
-	ImagePath                  string        `json:"imagePath,omitempty"`
-	ImageAlt                   string        `json:"imageAlt,omitempty"`
-	Weight                     int64         `json:"weight"`
-	DropRatePercent            float64       `json:"dropRatePercent"`
-	AwakenCap                  int           `json:"awakenCap"`
-	BonusClicks                int64         `json:"bonusClicks"`
-	BonusCriticalChancePercent float64       `json:"bonusCriticalChancePercent"`
-	BonusCriticalCount         int64         `json:"bonusCriticalCount"`
-	Effects                    []HeroEffect  `json:"effects,omitempty"`
-	TraitType                  HeroTraitType `json:"traitType,omitempty"`
-	TraitValue                 int64         `json:"traitValue,omitempty"`
+	ItemID              string  `json:"itemId"`
+	ItemName            string  `json:"itemName"`
+	Slot                string  `json:"slot"`
+	Rarity              string  `json:"rarity"`
+	Weight              int64   `json:"weight"`
+	DropRatePercent     float64 `json:"dropRatePercent"`
+	AttackPower         int64   `json:"attackPower,omitempty"`
+	ArmorPenPercent     float64 `json:"armorPenPercent,omitempty"`
+	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
+	BossDamagePercent   float64 `json:"bossDamagePercent,omitempty"`
+	PartTypeDamageSoft  float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak  float64 `json:"partTypeDamageWeak,omitempty"`
+	TalentAffinity      string  `json:"talentAffinity,omitempty"`
 }
 
 // BossResources 描述当前 Boss 的低频公共资源。
@@ -358,7 +260,6 @@ type BossResources struct {
 	TemplateID   string              `json:"templateId,omitempty"`
 	Status       string              `json:"status,omitempty"`
 	BossLoot     []BossLootEntry     `json:"bossLoot"`
-	BossHeroLoot []BossHeroLootEntry `json:"bossHeroLoot"`
 }
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
@@ -376,12 +277,9 @@ type UserState struct {
 	UserStats       *UserStats          `json:"userStats,omitempty"`
 	MyBossStats     *BossUserStats      `json:"myBossStats,omitempty"`
 	Inventory       []InventoryItem     `json:"inventory"`
-	Heroes          []HeroInventoryItem `json:"heroes"`
-	ActiveHero      *HeroInventoryItem  `json:"activeHero,omitempty"`
 	Loadout         Loadout             `json:"loadout"`
 	CombatStats     CombatStats         `json:"combatStats"`
 	Gems            int64               `json:"gems"`
-	LastForgeResult *ForgeResult        `json:"lastForgeResult,omitempty"`
 	RecentRewards   []Reward            `json:"recentRewards,omitempty"`
 	LastReward      *Reward             `json:"lastReward,omitempty"`
 }
@@ -395,17 +293,13 @@ type State struct {
 	Boss                *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard     []BossLeaderboardEntry `json:"bossLeaderboard"`
 	BossLoot            []BossLootEntry        `json:"bossLoot,omitempty"`
-	BossHeroLoot        []BossHeroLootEntry    `json:"bossHeroLoot,omitempty"`
 	AnnouncementVersion string                 `json:"announcementVersion,omitempty"`
 	LatestAnnouncement  *Announcement          `json:"latestAnnouncement,omitempty"`
 	MyBossStats         *BossUserStats         `json:"myBossStats,omitempty"`
 	Inventory           []InventoryItem        `json:"inventory"`
-	Heroes              []HeroInventoryItem    `json:"heroes"`
-	ActiveHero          *HeroInventoryItem     `json:"activeHero,omitempty"`
 	Loadout             Loadout                `json:"loadout"`
 	CombatStats         CombatStats            `json:"combatStats"`
 	Gems                int64                  `json:"gems"`
-	LastForgeResult     *ForgeResult           `json:"lastForgeResult,omitempty"`
 	RecentRewards       []Reward               `json:"recentRewards,omitempty"`
 	LastReward          *Reward                `json:"lastReward,omitempty"`
 }
@@ -466,7 +360,6 @@ type Store struct {
 	namespace            string
 	buttonIndexKey       string
 	equipmentIndexKey    string
-	heroIndexKey         string
 	playerIndexKey       string
 	userPrefix           string
 	leaderboardKey       string
@@ -484,13 +377,9 @@ type Store struct {
 	messageKey           string
 	messagePrefix        string
 	equipmentDefPrefix   string
-	heroDefPrefix        string
 	inventoryPrefix      string
-	heroInventoryPrefix  string
 	loadoutPrefix        string
-	activeHeroPrefix     string
 	lastRewardPrefix     string
-	upgradePrefix        string
 	fallbacks            map[string]buttonFallback
 	critical             StoreOptions
 	luaRunner            luaScriptRunner
@@ -522,7 +411,6 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		namespace:            namespace,
 		buttonIndexKey:       namespace + "buttons:index",
 		equipmentIndexKey:    namespace + "equipment:index",
-		heroIndexKey:         namespace + "heroes:index",
 		playerIndexKey:       namespace + "players:index",
 		userPrefix:           namespace + "user:",
 		leaderboardKey:       namespace + "leaderboard",
@@ -540,13 +428,9 @@ func NewStore(client redis.UniversalClient, prefix string, options StoreOptions,
 		messageKey:           namespace + "messages",
 		messagePrefix:        namespace + "message:",
 		equipmentDefPrefix:   namespace + "equip:def:",
-		heroDefPrefix:        namespace + "hero:def:",
 		inventoryPrefix:      namespace + "user-inventory:",
-		heroInventoryPrefix:  namespace + "user-hero-inventory:",
 		loadoutPrefix:        namespace + "user-loadout:",
-		activeHeroPrefix:     namespace + "user-active-hero:",
 		lastRewardPrefix:     namespace + "user-last-reward:",
-		upgradePrefix:        namespace + "user-equip-upgrade:",
 		fallbacks: map[string]buttonFallback{
 			"wechat-pity": {
 				ImagePath: "/images/emojipedia-wechat-whimper.png",
@@ -635,7 +519,6 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, error) {
 	userState := UserState{
 		Inventory:     []InventoryItem{},
-		Heroes:        []HeroInventoryItem{},
 		Loadout:       Loadout{},
 		CombatStats:   s.baseCombatStats(),
 		RecentRewards: []Reward{},
@@ -656,12 +539,6 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		return UserState{}, err
 	}
 	userState.Gems = gems
-
-	lastForgeResult, err := s.lastForgeResultForNickname(ctx, normalizedNickname)
-	if err != nil {
-		return UserState{}, err
-	}
-	userState.LastForgeResult = lastForgeResult
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
 	if err != nil {
@@ -686,22 +563,8 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	}
 	userState.Inventory = inventory
 
-	heroQuantities, err := s.heroInventoryQuantities(ctx, normalizedNickname)
-	if err != nil {
-		return UserState{}, err
-	}
-	activeHero, err := s.activeHeroForNickname(ctx, normalizedNickname, heroQuantities)
-	if err != nil {
-		return UserState{}, err
-	}
-	heroes, err := s.heroInventoryForNickname(ctx, normalizedNickname, heroQuantities, activeHero)
-	if err != nil {
-		return UserState{}, err
-	}
-	userState.Heroes = heroes
-	userState.ActiveHero = activeHero
 
-	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout, activeHero)
+	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
 	if err != nil {
 		return UserState{}, err
 	}
@@ -1065,12 +928,9 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		AnnouncementVersion: snapshot.AnnouncementVersion,
 		MyBossStats:         userState.MyBossStats,
 		Inventory:           userState.Inventory,
-		Heroes:              userState.Heroes,
-		ActiveHero:          userState.ActiveHero,
 		Loadout:             userState.Loadout,
 		CombatStats:         userState.CombatStats,
 		Gems:                userState.Gems,
-		LastForgeResult:     userState.LastForgeResult,
 		RecentRewards:       userState.RecentRewards,
 		LastReward:          userState.LastReward,
 	}
@@ -1193,15 +1053,8 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 	if err != nil {
 		return result, nil
 	}
-	heroQuantities, err := s.heroInventoryQuantities(ctx, nickname)
-	if err != nil {
-		return result, nil
-	}
-	activeHero, err := s.activeHeroForNickname(ctx, nickname, heroQuantities)
-	if err != nil {
-		return result, nil
-	}
-	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout, activeHero)
+
+	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout)
 	if err != nil {
 		return result, nil
 	}
@@ -1314,12 +1167,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 	if err != nil {
 		return nil, err
 	}
-	heroLootEntries, err := s.loadBossHeroLoot(ctx, bossID)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(lootEntries) > 0 || len(heroLootEntries) > 0 {
+	if len(lootEntries) > 0 {
 		participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
 		if err != nil {
 			return nil, err
@@ -1342,16 +1190,6 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 					BossName:  bossName,
 					ItemID:    reward.ItemID,
 					ItemName:  reward.ItemName,
-					GrantedAt: now,
-				})
-			}
-			if heroReward := s.chooseHeroLoot(heroLootEntries); heroReward != nil {
-				pipe.HIncrBy(ctx, s.heroInventoryKey(nickname), heroReward.HeroID, 1)
-				rewards = append(rewards, Reward{
-					BossID:    bossID,
-					BossName:  bossName,
-					ItemID:    heroReward.HeroID,
-					ItemName:  heroReward.HeroName,
 					GrantedAt: now,
 				})
 			}
@@ -1425,15 +1263,8 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 	if err != nil {
 		return 0, false, err
 	}
-	heroQuantities, err := s.heroInventoryQuantities(ctx, nickname)
-	if err != nil {
-		return 0, false, err
-	}
-	activeHero, err := s.activeHeroForNickname(ctx, nickname, heroQuantities)
-	if err != nil {
-		return 0, false, err
-	}
-	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout, activeHero)
+
+	combatStats, err := s.combatStatsForNickname(ctx, nickname, loadout)
 	if err != nil {
 		return 0, false, err
 	}
@@ -1455,31 +1286,21 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 	return delta, false, nil
 }
 
-func (s *Store) combatStatsForNickname(_ context.Context, _ string, loadout Loadout, activeHero *HeroInventoryItem) (CombatStats, error) {
+func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loadout Loadout) (CombatStats, error) {
 	stats := s.baseCombatStats()
 
-	bonusClicks, bonusChance, bonusCount, attackPower, armorPen, critDmgMult, bossDmg := loadoutBonuses(loadout)
-	stats.BonusClicks = bonusClicks
-	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+bonusChance, 0, 100)
-	stats.CriticalCount += bonusCount
+	attackPower, armorPen, critDmgMult, bossDmg := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 0.80)
 	stats.CritDamageMultiplier += critDmgMult
 	stats.BossDamagePercent += bossDmg
 
-	heroBonusClicks, heroBonusChance, heroBonusCount, heroFinalDamagePercent := heroBonuses(activeHero)
-	stats.BonusClicks += heroBonusClicks
-	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+heroBonusChance, 0, 100)
-	stats.CriticalCount += heroBonusCount
-
-	result := applyFinalDamagePercent(deriveCombatStats(stats), heroFinalDamagePercent)
+	result := deriveCombatStats(stats)
 	return result, nil
 }
 
 func (s *Store) baseCombatStats() CombatStats {
 	return deriveCombatStats(CombatStats{
-		BaseIncrement:         1,
-		BonusClicks:           0,
 		CriticalChancePercent: clampFloat(float64(s.critical.CriticalChancePercent), 0, 100),
 		CriticalCount:         s.critical.CriticalCount,
 		AttackPower:           0,
@@ -1490,15 +1311,12 @@ func (s *Store) baseCombatStats() CombatStats {
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (bonusClicks int64, bonusChance float64, bonusCount int64, attackPower int64, armorPen float64, critDmgMult float64, bossDmg float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critDmgMult float64, bossDmg float64) {
 	items := []*InventoryItem{loadout.Weapon, loadout.Armor, loadout.Accessory}
 	for _, item := range items {
 		if item == nil {
 			continue
 		}
-		bonusClicks += item.BonusClicks
-		bonusChance += item.BonusCriticalChancePercent
-		bonusCount += item.BonusCriticalCount
 		attackPower += item.AttackPower
 		armorPen += item.ArmorPenPercent
 		critDmgMult += item.CritDamageMultiplier
@@ -1508,16 +1326,9 @@ func loadoutBonuses(loadout Loadout) (bonusClicks int64, bonusChance float64, bo
 }
 
 func deriveCombatStats(stats CombatStats) CombatStats {
-	if stats.BaseIncrement <= 0 {
-		stats.BaseIncrement = 1
-	}
-
-	stats.EffectiveIncrement = stats.BaseIncrement + stats.BonusClicks
-	if stats.EffectiveIncrement <= 0 {
-		stats.EffectiveIncrement = 1
-	}
-
+	stats.EffectiveIncrement = max(1, stats.AttackPower)
 	stats.NormalDamage = stats.EffectiveIncrement
+
 	if stats.CriticalCount <= 1 {
 		stats.CriticalCount = 1
 	}
@@ -1676,10 +1487,7 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		Name:                       firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
 		Slot:                       strings.TrimSpace(values["slot"]),
 		Rarity:                     normalizeEquipmentRarity(values["rarity"]),
-		BonusClicks:                int64FromString(values["bonus_clicks"]),
-		BonusCriticalChancePercent: float64FromString(values["bonus_critical_chance_percent"]),
-		BonusCriticalCount:         int64FromString(values["bonus_critical_count"]),
-		EnhanceCap:                 int(int64FromString(values["enhance_cap"])),
+
 		AttackPower:                int64FromString(values["attack_power"]),
 		ArmorPenPercent:            float64FromString(values["armor_pen_percent"]),
 		CritDamageMultiplier:       float64FromString(values["crit_damage_multiplier"]),
@@ -1726,12 +1534,8 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantit
 		if defErr != nil {
 			continue
 		}
-		upgrade, upgradeErr := s.getEquipmentUpgrade(ctx, nickname, itemID)
-		if upgradeErr != nil {
-			return Loadout{}, nil, upgradeErr
-		}
 
-		item := s.buildInventoryItem(definition, upgrade, quantities[itemID], true)
+		item := buildInventoryItem(definition, quantities[itemID], true)
 
 		equipped[itemID] = slot
 		switch slot {
@@ -1754,17 +1558,18 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, quant
 
 	items := make([]InventoryItem, 0, len(quantities))
 	for itemID, quantity := range quantities {
-		upgrade, upgradeErr := s.getEquipmentUpgrade(ctx, nickname, itemID)
-		if upgradeErr != nil {
-			return nil, upgradeErr
-		}
 		definition, err := s.getEquipmentDefinition(ctx, itemID)
 		if err != nil {
-			items = append(items, unknownInventoryItem(itemID, upgrade, quantity, equipped[itemID] != ""))
+			items = append(items, InventoryItem{
+				ItemID:   itemID,
+				Name:     itemID,
+				Quantity: quantity,
+				Equipped: equipped[itemID] != "",
+			})
 			continue
 		}
 
-		items = append(items, s.buildInventoryItem(definition, upgrade, quantity, equipped[itemID] != ""))
+		items = append(items, buildInventoryItem(definition, quantity, equipped[itemID] != ""))
 	}
 
 	slices.SortFunc(items, func(left, right InventoryItem) int {
@@ -1897,10 +1702,7 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			Rarity:                     normalizeEquipmentRarity(definition.Rarity),
 			Weight:                     int64(entry.Score),
 			DropRatePercent:            dropRatePercent,
-			EnhanceCap:                 definition.EnhanceCap,
-			BonusClicks:                definition.BonusClicks,
-			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
-			BonusCriticalCount:         definition.BonusCriticalCount,
+
 		})
 	}
 
@@ -2248,16 +2050,24 @@ func (s *Store) inventoryKey(nickname string) string {
 	return s.inventoryPrefix + nickname
 }
 
-func (s *Store) heroInventoryKey(nickname string) string {
-	return s.heroInventoryPrefix + nickname
-}
-
 func (s *Store) loadoutKey(nickname string) string {
 	return s.loadoutPrefix + nickname
 }
 
-func (s *Store) activeHeroKey(nickname string) string {
-	return s.activeHeroPrefix + nickname
+
+func (s *Store) gemKey(nickname string) string {
+	return s.namespace + "gem:" + nickname
+}
+
+func (s *Store) gemsForNickname(ctx context.Context, nickname string) (int64, error) {
+	val, err := s.client.HGet(ctx, s.gemKey(nickname), "gems").Result()
+	if errors.Is(err, redis.Nil) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	return int64FromString(val), nil
 }
 
 func (s *Store) lastRewardKey(nickname string) string {
@@ -2272,16 +2082,9 @@ func (s *Store) messageItemKey(id string) string {
 	return s.messagePrefix + strings.TrimSpace(id)
 }
 
-func (s *Store) upgradeKey(nickname string, itemID string) string {
-	return s.upgradePrefix + nickname + ":" + itemID
-}
 
 func (s *Store) equipmentKey(itemID string) string {
 	return s.equipmentDefPrefix + itemID
-}
-
-func (s *Store) heroKey(heroID string) string {
-	return s.heroDefPrefix + heroID
 }
 
 func (s *Store) bossDamageKey(bossID string) string {
@@ -2298,14 +2101,6 @@ func (s *Store) bossTemplateKey(templateID string) string {
 
 func (s *Store) bossTemplateLootKey(templateID string) string {
 	return s.bossTemplateKey(templateID) + ":loot"
-}
-
-func (s *Store) bossTemplateHeroLootKey(templateID string) string {
-	return s.bossTemplateKey(templateID) + ":hero-loot"
-}
-
-func (s *Store) bossHeroLootKey(bossID string) string {
-	return s.namespace + "boss:" + bossID + ":hero-loot"
 }
 
 func (s *Store) bossRewardLockKey(bossID string) string {
@@ -2377,6 +2172,27 @@ func int64FromString(raw string) int64 {
 
 	return value
 }
+
+func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool) InventoryItem {
+	return InventoryItem{
+		ItemID:              definition.ItemID,
+		Name:                definition.Name,
+		Slot:                definition.Slot,
+		Rarity:              normalizeEquipmentRarity(definition.Rarity),
+		ImagePath:           definition.ImagePath,
+		ImageAlt:            definition.ImageAlt,
+		Quantity:            quantity,
+		Equipped:            equipped,
+		AttackPower:         definition.AttackPower,
+		ArmorPenPercent:     definition.ArmorPenPercent,
+		CritDamageMultiplier: definition.CritDamageMultiplier,
+		BossDamagePercent:   definition.BossDamagePercent,
+		PartTypeDamageSoft:  definition.PartTypeDamageSoft,
+		PartTypeDamageHeavy: definition.PartTypeDamageHeavy,
+		PartTypeDamageWeak:  definition.PartTypeDamageWeak,
+	}
+}
+
 
 func isRedisWrongTypeError(err error) bool {
 	if err == nil {

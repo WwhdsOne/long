@@ -11,9 +11,7 @@ const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
 const AUTO_CLICK_RATE_LABEL = '每秒固定 3 次'
 const EQUIPMENT_ENHANCE_COST = 10
-const HERO_AWAKEN_COST = 15
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
-const HERO_GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率 + 最终伤害提升百分比) / 4)，至少 +1'
 
 const publicPages = [
   {id: 'battle', label: '战斗', path: '/'},
@@ -29,14 +27,11 @@ const leaderboard = ref([])
 const boss = ref(null)
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
-const bossHeroLoot = ref([])
 const announcementVersion = ref('')
 const latestAnnouncement = ref(null)
 const announcements = ref([])
 const myBossStats = ref(null)
 const inventory = ref([])
-const heroes = ref([])
-const activeHero = ref(null)
 const loadout = ref(emptyLoadout())
 const combatStats = ref(defaultCombatStats())
 const recentRewards = ref([])
@@ -74,7 +69,6 @@ const messageError = ref('')
 const autoClickEnabled = ref(false)
 const autoClickTargetKey = ref('')
 const gems = ref(0)
-const lastForgeResult = ref(null)
 const fingerprintHash = ref('')
 const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
 const profileLoading = ref(false)
@@ -152,7 +146,6 @@ const bossProgress = computed(() => {
   return Math.max(0, Math.min(100, (boss.value.currentHp / boss.value.maxHp) * 100))
 })
 const equippedItems = computed(() => [loadout.value.weapon, loadout.value.armor, loadout.value.accessory].filter(Boolean))
-const heroCount = computed(() => heroes.value.length)
 const displayedRecentRewards = computed(() => {
   if (Array.isArray(recentRewards.value) && recentRewards.value.length > 0) {
     return recentRewards.value
@@ -165,9 +158,8 @@ const recentRewardTitle = computed(() => {
   }
   return displayedRecentRewards.value
       .map((reward, index) => {
-        // 第一个：装备，第二个：小小英雄
-        if (index === 0) return `${reward.itemName}（装备）`
-        if (index === 1) return `${reward.itemName}（小小英雄）`
+        // 第一个装备掉落
+        if (index === 0) return `${reward.itemName}`
         return reward.itemName
       })
       .join('、')
@@ -207,30 +199,35 @@ function emptyLoadout() {
 
 function defaultCombatStats() {
   return {
-    baseIncrement: 1,
-    bonusClicks: 0,
     effectiveIncrement: 1,
     normalDamage: 1,
     criticalDamage: 1,
     criticalChancePercent: 0,
     criticalCount: 1,
+    attackPower: 0,
+    armorPenPercent: 0,
+    critDamageMultiplier: 0,
+    bossDamagePercent: 0,
+    allDamageAmplify: 0,
   }
 }
 
 function formatItemStats(item) {
-  return [
-    formatStatWithDelta('点击', item?.bonusClicks, item?.bonusClicksDelta),
-    formatPercentWithDelta('暴击率', item?.bonusCriticalChancePercent, item?.bonusCriticalChancePercentDelta),
-    formatStatWithDelta('暴击', item?.bonusCriticalCount, item?.bonusCriticalCountDelta),
-  ].join(' ')
+  const parts = []
+  if (item?.attackPower) parts.push(`攻击 ${item.attackPower}`)
+  if (item?.armorPenPercent) parts.push(`穿透 ${item.armorPenPercent}%`)
+  if (item?.critDamageMultiplier) parts.push(`暴伤 ${item.critDamageMultiplier}`)
+  if (item?.bossDamagePercent) parts.push(`首领伤 ${item.bossDamagePercent}%`)
+  return parts.join(' ') || '无属性'
 }
 
 function formatItemStatLines(item) {
-  return [
-    formatStatWithDelta('点击', item?.bonusClicks, item?.bonusClicksDelta),
-    formatPercentWithDelta('暴击率', item?.bonusCriticalChancePercent, item?.bonusCriticalChancePercentDelta),
-    formatStatWithDelta('暴击', item?.bonusCriticalCount, item?.bonusCriticalCountDelta),
-  ]
+  const lines = []
+  if (item?.attackPower) lines.push(`攻击力 ${item.attackPower}`)
+  if (item?.armorPenPercent) lines.push(`护甲穿透 ${item.armorPenPercent}%`)
+  if (item?.critDamageMultiplier) lines.push(`暴击伤害倍率 ${item.critDamageMultiplier}`)
+  if (item?.bossDamagePercent) lines.push(`首领伤害 ${item.bossDamagePercent}%`)
+  return lines
 }
 
 function equipmentNameParts(item) {
@@ -239,27 +236,6 @@ function equipmentNameParts(item) {
 
 function equipmentNameClass(item) {
   return getRarityClassName(item?.rarity)
-}
-
-function formatEnhanceCap(cap) {
-  return Number(cap) > 0 ? `可强化 ${Number(cap)} 次` : '可强化∞次'
-}
-
-function formatAwakenCap(cap) {
-  return Number(cap) > 0 ? `可觉醒 ${Number(cap)} 次` : '可觉醒∞次'
-}
-
-function formatHeroTrait(hero) {
-  const effects = Array.isArray(hero?.effects) ? hero.effects : []
-  if (effects.length === 0) {
-    return '被动：暂无'
-  }
-
-  return `被动：${effects.map((effect) => formatHeroEffect(effect)).join(' / ')}`
-}
-
-function heroImageAlt(hero) {
-  return hero?.imageAlt || hero?.heroName || hero?.name || hero?.heroId || '英雄头像'
 }
 
 function normalizeNickname(value) {
@@ -353,68 +329,6 @@ function formatPercentWithDelta(label, total, delta) {
   return `${label} ${formatNumber(total, 2)}%（+${formatNumber(delta, 2)}%）`
 }
 
-function formatHeroEffect(effect) {
-  switch (effect?.type) {
-    case 'bonus_clicks':
-      return `额外点击 +${formatNumber(effect?.value)}`
-    case 'critical_chance_percent':
-      return `暴击率 +${formatNumber(effect?.value)}%`
-    case 'critical_count_bonus':
-      return `暴击额外 +${formatNumber(effect?.value)}`
-    case 'final_damage_percent':
-      return `最终伤害 +${formatNumber(effect?.value)}%`
-    default:
-      return effect?.displayName || effect?.type || '未知效果'
-  }
-}
-
-function salvageableEquipmentCount(item) {
-  return salvageableCount(item)
-}
-
-function salvageableHeroCount(hero) {
-  return salvageableCount(hero, hero?.active)
-}
-
-function salvageableCount(item, active = false) {
-  const quantity = Math.max(0, Number(item?.quantity || 0))
-  return active ? Math.max(0, quantity - 1) : quantity
-}
-
-function equipmentEnhanceHint(item) {
-  const currentLevel = Number(item?.enhanceLevel || 0)
-  const cap = Number(item?.enhanceCap || 0)
-
-  if (!isLoggedIn.value) {
-    return '登录后才能消耗原石强化。'
-  }
-  if (cap > 0 && currentLevel >= cap) {
-    return '已达模板上限，本件装备不能继续强化。'
-  }
-  if (gems.value < EQUIPMENT_ENHANCE_COST) {
-    return `原石不足，还差 ${EQUIPMENT_ENHANCE_COST - gems.value}。`
-  }
-
-  return ``
-}
-
-function heroAwakenHint(hero) {
-  const currentLevel = Number(hero?.awakenLevel || 0)
-  const cap = Number(hero?.awakenCap || 0)
-
-  if (!isLoggedIn.value) {
-    return '登录后才能消耗原石觉醒。'
-  }
-  if (cap > 0 && currentLevel >= cap) {
-    return '已达模板上限，本位英雄不能继续觉醒。'
-  }
-  if (gems.value < HERO_AWAKEN_COST) {
-    return `原石不足，还差 ${HERO_AWAKEN_COST - gems.value}。`
-  }
-
-  return ``
-}
-
 function dotIndexes(count) {
   const normalized = Math.max(0, Math.min(Number(count) || 0, 6))
   return Array.from({length: normalized}, (_, index) => index)
@@ -493,7 +407,6 @@ async function loadBossResources(force = false) {
   const currentVersion = bossResourceVersion()
   if (!currentVersion) {
     bossLoot.value = []
-    bossHeroLoot.value = []
     lastBossResourceVersion = ''
     return
   }
@@ -512,12 +425,10 @@ async function loadBossResources(force = false) {
     }
     const payload = await response.json()
     bossLoot.value = Array.isArray(payload?.bossLoot) ? payload.bossLoot : []
-    bossHeroLoot.value = Array.isArray(payload?.bossHeroLoot) ? payload.bossHeroLoot : []
     lastBossResourceVersion = currentVersion
   } catch {
     if (force) {
       bossLoot.value = []
-      bossHeroLoot.value = []
     }
   } finally {
     loadingBossResources.value = false
@@ -813,12 +724,6 @@ function applyPlayerProfileState(payload) {
   if ('inventory' in payload) {
     inventory.value = Array.isArray(payload.inventory) ? payload.inventory : []
   }
-  if ('heroes' in payload) {
-    heroes.value = Array.isArray(payload.heroes) ? payload.heroes : []
-  }
-  if ('activeHero' in payload) {
-    activeHero.value = payload.activeHero ?? null
-  }
   if ('loadout' in payload) {
     loadout.value = payload.loadout ?? emptyLoadout()
   }
@@ -827,9 +732,6 @@ function applyPlayerProfileState(payload) {
   }
   if ('gems' in payload) {
     gems.value = Number(payload.gems ?? 0)
-  }
-  if ('lastForgeResult' in payload) {
-    lastForgeResult.value = payload.lastForgeResult ?? null
   }
 }
 
@@ -871,12 +773,9 @@ function applyClickResult(payload) {
 function clearUserRealtimeState() {
   userStats.value = null
   inventory.value = []
-  heroes.value = []
-  activeHero.value = null
   loadout.value = emptyLoadout()
   combatStats.value = defaultCombatStats()
   gems.value = 0
-  lastForgeResult.value = null
   myBossStats.value = null
   recentRewards.value = []
   lastReward.value = null
@@ -1304,11 +1203,12 @@ async function clickButton(key, options = {}) {
   }
 }
 
-async function postEquipmentAction(itemId, action, extraBody = {}) {
+async function toggleItemEquip(itemId, equipped) {
   if (!nickname.value || !itemId) {
     return
   }
 
+  const action = equipped ? 'unequip' : 'equip'
   actioningItemId.value = itemId
   errorMessage.value = ''
 
@@ -1318,10 +1218,7 @@ async function postEquipmentAction(itemId, action, extraBody = {}) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        nickname: nickname.value,
-        ...extraBody,
-      }),
+      body: JSON.stringify({nickname: nickname.value}),
     })
 
     if (!response.ok) {
@@ -1335,65 +1232,6 @@ async function postEquipmentAction(itemId, action, extraBody = {}) {
   } finally {
     actioningItemId.value = ''
   }
-}
-
-async function postHeroAction(heroId, action, extraBody = {}) {
-  if (!nickname.value || !heroId) {
-    return
-  }
-
-  actioningItemId.value = heroId
-  errorMessage.value = ''
-
-  try {
-    const response = await fetch(`/api/heroes/${encodeURIComponent(heroId)}/${action}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nickname: nickname.value,
-        ...extraBody,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '英雄操作失败，请稍后重试。'))
-    }
-
-    const data = await response.json()
-    await refreshProfileAfterMutation(data)
-  } catch (error) {
-    errorMessage.value = error.message || '英雄操作失败，请稍后重试。'
-  } finally {
-    actioningItemId.value = ''
-  }
-}
-
-async function salvageEquipment(item) {
-  const quantity = salvageableEquipmentCount(item)
-  if (!quantity) {
-    return
-  }
-
-  await postEquipmentAction(item.itemId, 'salvage', {quantity})
-}
-
-async function enhanceEquipment(item) {
-  await postEquipmentAction(item.itemId, 'enhance')
-}
-
-async function salvageHero(hero) {
-  const quantity = salvageableHeroCount(hero)
-  if (!quantity) {
-    return
-  }
-
-  await postHeroAction(hero.heroId, 'salvage', {quantity})
-}
-
-async function awakenHero(hero) {
-  await postHeroAction(hero.heroId, 'awaken')
 }
 
 async function submitNickname() {
@@ -1512,9 +1350,7 @@ export function usePublicPageState() {
     ANNOUNCEMENT_CACHE_KEY,
     AUTO_CLICK_RATE_LABEL,
     EQUIPMENT_ENHANCE_COST,
-    HERO_AWAKEN_COST,
     GROWTH_FORMULA_TEXT,
-    HERO_GROWTH_FORMULA_TEXT,
     publicPages,
     buttons,
     buttonTotalCount,
@@ -1523,14 +1359,11 @@ export function usePublicPageState() {
     boss,
     bossLeaderboard,
     bossLoot,
-    bossHeroLoot,
     announcementVersion,
     latestAnnouncement,
     announcements,
     myBossStats,
     inventory,
-    heroes,
-    activeHero,
     loadout,
     combatStats,
     recentRewards,
@@ -1568,7 +1401,6 @@ export function usePublicPageState() {
     autoClickEnabled,
     autoClickTargetKey,
     gems,
-    lastForgeResult,
     fingerprintHash,
     currentPublicPage,
     profileLoading,
@@ -1596,7 +1428,6 @@ export function usePublicPageState() {
     bossStatusLabel,
     bossProgress,
     equippedItems,
-    heroCount,
     displayedRecentRewards,
     recentRewardTitle,
     recentRewardNote,
@@ -1609,10 +1440,6 @@ export function usePublicPageState() {
     formatItemStatLines,
     equipmentNameParts,
     equipmentNameClass,
-    formatEnhanceCap,
-    formatAwakenCap,
-    formatHeroTrait,
-    heroImageAlt,
     normalizeNickname,
     resolvePublicPage,
     navigatePublicPage,
@@ -1624,11 +1451,6 @@ export function usePublicPageState() {
     formatNumber,
     formatStatWithDelta,
     formatPercentWithDelta,
-    formatHeroEffect,
-    salvageableEquipmentCount,
-    salvageableHeroCount,
-    equipmentEnhanceHint,
-    heroAwakenHint,
     dotIndexes,
     readErrorMessage,
     bossResourceVersion,
@@ -1678,12 +1500,7 @@ export function usePublicPageState() {
     loadPlayerProfile,
     refreshProfileAfterMutation,
     clickButton,
-    postEquipmentAction,
-    postHeroAction,
-    salvageEquipment,
-    enhanceEquipment,
-    salvageHero,
-    awakenHero,
+    toggleItemEquip,
     submitNickname,
     resetNickname,
     clearPlayerSessionState,

@@ -9,7 +9,7 @@ const {
   boss,
   bossLeaderboard,
   bossLoot,
-  bossHeroLoot,
+  leaderboard,
   nickname,
   loading,
   errorMessage,
@@ -36,10 +36,6 @@ const {
   formatItemStats,
   equipmentNameParts,
   equipmentNameClass,
-  formatEnhanceCap,
-  formatAwakenCap,
-  formatHeroTrait,
-  heroImageAlt,
   handlePressStart,
   handlePressEnd,
   handlePressCancel,
@@ -72,20 +68,14 @@ const partTypeColors = {
   weak: '#f472b6',
 }
 
-const bossDropPool = computed(() => [
-  ...bossLoot.value.map((item) => ({
+const bossDropPool = computed(() =>
+  bossLoot.value.map((item) => ({
     id: `equipment:${item.itemId}`,
     type: 'equipment',
     label: '装备',
     item,
   })),
-  ...bossHeroLoot.value.map((hero) => ({
-    id: `hero:${hero.heroId}`,
-    type: 'hero',
-    label: '英雄',
-    item: hero,
-  })),
-])
+)
 
 function openBossDropPool() {
   bossDropModalOpen.value = true
@@ -338,42 +328,11 @@ function closeBossDropPool() {
                   <li>掉落概率：{{ formatDropRate(item.dropRatePercent) }}</li>
                   <li>稀有度：{{ formatRarityLabel(item.rarity) }}</li>
                   <li>部位：{{ item.slot || '未分类' }}</li>
-                  <li>{{ formatEnhanceCap(item.enhanceCap) }}</li>
                   <li>{{ formatItemStats(item) }}</li>
                 </ul>
               </article>
             </div>
-          </section>
-
-          <section v-if="bossHeroLoot.length > 0" class="boss-drop-modal__section">
-            <div class="boss-drop-modal__section-head">
-              <span>英雄掉落</span>
-              <strong>{{ bossHeroLoot.length }} 位</strong>
-            </div>
-            <div class="boss-drop-pool__grid">
-              <article
-                  v-for="hero in bossHeroLoot"
-                  :key="hero.heroId"
-                  class="boss-drop-card boss-drop-card--detail"
-              >
-                  <span class="boss-drop-card__type">英雄</span>
-                  <img
-                      v-if="hero.imagePath"
-                      class="boss-drop-card__avatar"
-                      :src="hero.imagePath"
-                      :alt="heroImageAlt(hero)"
-                  />
-                  <strong>{{ hero.heroName || hero.name || hero.heroId }}</strong>
-                <ul class="boss-drop-card__details">
-                  <li>掉落概率：{{ formatDropRate(hero.dropRatePercent) }}</li>
-                  <li>{{ formatAwakenCap(hero.awakenCap) }}</li>
-                  <li>{{ formatItemStats(hero) }}</li>
-                  <li>{{ formatHeroTrait(hero) }}</li>
-                </ul>
-              </article>
-            </div>
-          </section>
-        </article>
+          </section>        </article>
       </section>
 
 
