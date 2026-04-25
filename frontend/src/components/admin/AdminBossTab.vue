@@ -43,6 +43,15 @@ const gridParts = computed(() => {
   return grid
 })
 
+const bossPartTotalHp = computed(() => sumBossPartMaxHp(props.bossForm.layout))
+
+function sumBossPartMaxHp(layout) {
+  if (!Array.isArray(layout) || layout.length === 0) {
+    return 0
+  }
+  return layout.reduce((total, part) => total + Math.max(1, Number(part?.maxHp ?? 0)), 0)
+}
+
 function selectCell(x, y) {
   const existing = findPart(x, y)
   if (existing) {
@@ -151,7 +160,16 @@ function cancelCell() {
         <form class="admin-form" @submit.prevent="saveBossTemplate">
           <input v-model="bossForm.id" class="nickname-form__input" type="text" placeholder="模板 ID，如 dragon" />
           <input v-model="bossForm.name" class="nickname-form__input" type="text" placeholder="Boss 显示名称" />
-          <input v-model="bossForm.maxHp" class="nickname-form__input" type="number" min="1" placeholder="总血量，玩家点击消耗" />
+          <input
+            class="nickname-form__input"
+            type="number"
+            min="0"
+            :value="bossPartTotalHp"
+            readonly
+            placeholder="总血量"
+            aria-label="Boss 总血量"
+          />
+          <p class="feedback">总血量由部位总血量决定。</p>
           <fieldset class="admin-fieldset">
             <legend class="admin-fieldset__legend">部位布局（点击网格格子编辑部位）</legend>
             <div class="boss-editor-grid">
