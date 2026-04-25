@@ -156,7 +156,7 @@ function cancelCell() {
             <li v-for="item in adminState.loot" :key="item.itemId" class="inventory-item">
               <div>
                 <strong>{{ item.itemName || item.itemId }}</strong>
-                <p>{{ item.itemId }} · {{ item.slot }} · 权重 {{ item.weight }}</p>
+                <p>{{ item.itemId }} · {{ item.slot }} · 掉落几率 {{ item.dropRatePercent }}%</p>
                 <p>{{ formatItemStats(item) }}</p>
               </div>
             </li>
@@ -295,7 +295,7 @@ function cancelCell() {
               {{ formatItemStats(findEquipmentTemplate(entry.itemId)) }}
             </p>
           </div>
-          <input v-model="entry.weight" class="nickname-form__input" type="number" min="1" placeholder="掉率权重，越大越容易掉落" />
+          <input v-model="entry.dropRatePercent" class="nickname-form__input" type="number" min="0" max="100" step="0.01" placeholder="掉落几率 %" />
           <button class="nickname-form__ghost" type="button" @click="removeLootRow(index)">删</button>
         </div>
         <div class="admin-inline-actions">

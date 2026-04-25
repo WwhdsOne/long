@@ -92,7 +92,7 @@ export function useAdminPage() {
 
   function applyLootRows(loot) {
     lootRows.value = Array.isArray(loot) && loot.length > 0
-      ? loot.map((entry) => ({ itemId: entry.itemId, weight: entry.weight }))
+      ? loot.map((entry) => ({ itemId: entry.itemId, dropRatePercent: entry.dropRatePercent }))
       : emptyLootRows()
   }
 
@@ -132,7 +132,7 @@ export function useAdminPage() {
   }
 
   function addLootRow() {
-    lootRows.value.push({ itemId: '', weight: '' })
+    lootRows.value.push({ itemId: '', dropRatePercent: '' })
   }
 
 

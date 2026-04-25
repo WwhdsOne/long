@@ -247,7 +247,6 @@ func (s *Store) ResetTalents(ctx context.Context, nickname string) error {
 type TalentModifiers struct {
 	AttackPowerPercent     float64 `json:"attackPowerPercent"`
 	AllDamageAmplify       float64 `json:"allDamageAmplify"`
-	BossDamagePercent      float64 `json:"bossDamagePercent"`
 	ArmorPenExtra          float64 `json:"armorPenExtra"`
 	CritDamagePercentBonus float64 `json:"critDamagePercentBonus"`
 	PerPartDamagePercent   float64 `json:"perPartDamagePercent"`
@@ -299,10 +298,6 @@ func (s *Store) ComputeTalentModifiers(ctx context.Context, nickname string) (*T
 		case "armor_pen_extra":
 			if p, ok := val["extraPen"].(float64); ok {
 				mods.ArmorPenExtra += p
-			}
-		case "boss_damage":
-			if p, ok := val["percent"].(float64); ok {
-				mods.BossDamagePercent += p
 			}
 		case "crit_damage_bonus":
 			if p, ok := val["percent"].(float64); ok {
@@ -360,7 +355,6 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 	stats.AllDamageAmplify += mods.AllDamageAmplify
 
 	// Boss 增伤
-	stats.BossDamagePercent += mods.BossDamagePercent
 
 	// 破甲率额外
 	stats.ArmorPenPercent = min(0.80, stats.ArmorPenPercent+mods.ArmorPenExtra)

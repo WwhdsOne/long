@@ -105,7 +105,6 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 		"attack_power":           strconv.FormatInt(definition.AttackPower, 10),
 		"armor_pen_percent":      strconv.FormatFloat(definition.ArmorPenPercent, 'f', -1, 64),
 		"crit_damage_multiplier": strconv.FormatFloat(definition.CritDamageMultiplier, 'f', -1, 64),
-		"boss_damage_percent":    strconv.FormatFloat(definition.BossDamagePercent, 'f', -1, 64),
 		"part_type_damage_soft":  strconv.FormatFloat(definition.PartTypeDamageSoft, 'f', -1, 64),
 		"part_type_damage_heavy": strconv.FormatFloat(definition.PartTypeDamageHeavy, 'f', -1, 64),
 		"part_type_damage_weak":  strconv.FormatFloat(definition.PartTypeDamageWeak, 'f', -1, 64),

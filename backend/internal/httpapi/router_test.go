@@ -1296,7 +1296,7 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 		t.Fatalf("expected template payload to be forwarded, got %+v", store.lastBossTemplate)
 	}
 
-	saveLootRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/pool/dragon/loot", strings.NewReader(`{"loot":[{"itemId":"fire-ring","weight":3}]}`))
+	saveLootRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/pool/dragon/loot", strings.NewReader(`{"loot":[{"itemId":"fire-ring","dropRatePercent":35}]}`))
 	saveLootRequest.Header.Set("Content-Type", "application/json")
 	saveLootRequest.AddCookie(cookies[0])
 	saveLootResponse := httptest.NewRecorder()
@@ -1305,7 +1305,7 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	if saveLootResponse.Code != http.StatusOK {
 		t.Fatalf("expected 200 from boss template loot save, got %d", saveLootResponse.Code)
 	}
-	if store.lastTemplateLootID != "dragon" || len(store.lastTemplateLoot) != 1 || store.lastTemplateLoot[0].ItemID != "fire-ring" {
+	if store.lastTemplateLootID != "dragon" || len(store.lastTemplateLoot) != 1 || store.lastTemplateLoot[0].ItemID != "fire-ring" || store.lastTemplateLoot[0].DropRatePercent != 35 {
 		t.Fatalf("expected template loot payload to be forwarded, got id=%s loot=%+v", store.lastTemplateLootID, store.lastTemplateLoot)
 	}
 

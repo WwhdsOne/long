@@ -22,7 +22,7 @@ func TestDebugWwhdsUserState(t *testing.T) {
 		_ = client.Close()
 	}()
 
-	store := NewStore(client, "vote:button:", StoreOptions{}, nil)
+	store := NewStore(client, "vote:", StoreOptions{}, nil)
 	ctx := context.Background()
 	nickname := "Wwhds"
 

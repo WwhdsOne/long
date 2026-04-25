@@ -144,13 +144,13 @@ type EquipmentDefinition struct {
 	ItemID               string  `json:"itemId"`
 	Name                 string  `json:"name"`
 	Slot                 string  `json:"slot"`
+	Description          string  `json:"description"`
 	Rarity               string  `json:"rarity"`
 	ImagePath            string  `json:"imagePath,omitempty"`
 	ImageAlt             string  `json:"imageAlt,omitempty"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
-	BossDamagePercent    float64 `json:"bossDamagePercent,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`  // 弱点增伤
@@ -200,7 +200,6 @@ type InventoryItem struct {
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
-	BossDamagePercent    float64 `json:"bossDamagePercent,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
@@ -226,7 +225,6 @@ type CombatStats struct {
 	AttackPower           int64   `json:"attackPower"`
 	ArmorPenPercent       float64 `json:"armorPenPercent"`
 	CritDamageMultiplier  float64 `json:"critDamageMultiplier"`
-	BossDamagePercent     float64 `json:"bossDamagePercent"`
 	AllDamageAmplify      float64 `json:"allDamageAmplify"`
 	PartTypeDamageSoft    float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy   float64 `json:"partTypeDamageHeavy,omitempty"`
@@ -253,7 +251,6 @@ type BossLootEntry struct {
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
-	BossDamagePercent    float64 `json:"bossDamagePercent,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
@@ -408,13 +405,12 @@ var hashFields = []string{
 }
 
 // NewStore 创建 Redis 投票存储实例
-func NewStore(client redis.UniversalClient, prefix string, options StoreOptions, validator interface{ Validate(string) error }) *Store {
-	namespace := deriveNamespace(prefix)
+func NewStore(client redis.UniversalClient, namespace string, options StoreOptions, validator interface{ Validate(string) error }) *Store {
 	luaCache := newLuaScriptCache()
 
 	return &Store{
 		client:               client,
-		prefix:               prefix,
+		prefix:               namespace + "button:",
 		namespace:            namespace,
 		buttonIndexKey:       namespace + "buttons:index",
 		equipmentIndexKey:    namespace + "equipment:index",
@@ -1207,7 +1203,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		}
 	}
 
-	damageStats := CalcBossPartDamage(combatStats, part.Type, part.Armor, true, aliveCount)
+	damageStats := CalcBossPartDamage(combatStats, part.Type, part.Armor, aliveCount)
 	partDamage := damageStats.NormalDamage
 	if critical {
 		partDamage = damageStats.CriticalDamage
@@ -1381,8 +1377,8 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 				continue
 			}
 
-			rewards := make([]Reward, 0, 2)
-			if reward := s.chooseLoot(lootEntries); reward != nil {
+			rewards := make([]Reward, 0, len(lootEntries))
+			for _, reward := range s.rollLootDrops(lootEntries) {
 				pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
 				rewards = append(rewards, Reward{
 					BossID:    bossID,
@@ -1423,34 +1419,23 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 	return s.currentBoss(ctx)
 }
 
-func (s *Store) chooseLoot(entries []BossLootEntry) *BossLootEntry {
+func (s *Store) rollLootDrops(entries []BossLootEntry) []BossLootEntry {
 	if len(entries) == 0 {
 		return nil
 	}
 
-	totalWeight := 0
+	drops := make([]BossLootEntry, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Weight > 0 {
-			totalWeight += int(entry.Weight)
-		}
-	}
-	if totalWeight <= 0 {
-		return nil
-	}
-
-	cursor := s.roll(totalWeight)
-	running := 0
-	for _, entry := range entries {
-		if entry.Weight <= 0 {
+		threshold := dropRateThreshold(entry.DropRatePercent)
+		if threshold <= 0 {
 			continue
 		}
-		running += int(entry.Weight)
-		if cursor < running {
-			return new(entry)
+		if threshold >= dropRateRollLimit || s.roll(dropRateRollLimit) < threshold {
+			drops = append(drops, entry)
 		}
 	}
 
-	return new(entries[len(entries)-1])
+	return drops
 }
 
 func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool, error) {
@@ -1488,11 +1473,10 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loadout Loadout) (CombatStats, error) {
 	stats := s.baseCombatStats()
 
-	attackPower, armorPen, critDmgMult, bossDmg := loadoutBonuses(loadout)
+	attackPower, armorPen, critDmgMult := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 0.80)
 	stats.CritDamageMultiplier += critDmgMult
-	stats.BossDamagePercent += bossDmg
 
 	result := deriveCombatStats(stats)
 	return result, nil
@@ -1505,12 +1489,11 @@ func (s *Store) baseCombatStats() CombatStats {
 		AttackPower:           0,
 		ArmorPenPercent:       0,
 		CritDamageMultiplier:  1.0,
-		BossDamagePercent:     0,
 		AllDamageAmplify:      0,
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critDmgMult float64, bossDmg float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critDmgMult float64) {
 	items := []*InventoryItem{
 		loadout.Weapon,
 		loadout.Helmet,
@@ -1526,7 +1509,6 @@ func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critD
 		attackPower += item.AttackPower
 		armorPen += item.ArmorPenPercent
 		critDmgMult += item.CritDamageMultiplier
-		bossDmg += item.BossDamagePercent
 	}
 	return
 }
@@ -1552,9 +1534,8 @@ func deriveCombatStats(stats CombatStats) CombatStats {
 //
 //	partType: 部位类型
 //	partArmor: 部位护甲值
-//	isBoss: 是否 Boss 目标（影响 Boss 增伤）
 //	alivePartCount: 存活的部位数量（围剿技能用）
-func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, isBoss bool, alivePartCount int) CombatStats {
+func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, alivePartCount int) CombatStats {
 	// 基础攻击力
 	atk := max(1, stats.AttackPower)
 
@@ -1570,11 +1551,8 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, i
 	// 基础伤害 = max(攻击力 * 系数 - 护甲, 1)
 	baseDamage := max(atk*int64(coeff*100)/100-effectiveArmor, 1)
 
-	// 增伤乘区 = (1 + 全伤害增幅 + Boss 增伤)
+	// 增伤乘区 = (1 + 全伤害增幅)
 	amplify := 1.0 + stats.AllDamageAmplify
-	if isBoss {
-		amplify += stats.BossDamagePercent
-	}
 
 	// 暴击乘区
 	critMult := 1.0
@@ -1608,7 +1586,6 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, i
 		ArmorPenPercent:       stats.ArmorPenPercent,
 		CritDamageMultiplier:  critMult,
 		AllDamageAmplify:      amplify - 1.0,
-		BossDamagePercent:     stats.BossDamagePercent,
 	}
 }
 
@@ -1699,7 +1676,6 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		AttackPower:          int64FromString(values["attack_power"]),
 		ArmorPenPercent:      float64FromString(values["armor_pen_percent"]),
 		CritDamageMultiplier: float64FromString(values["crit_damage_multiplier"]),
-		BossDamagePercent:    float64FromString(values["boss_damage_percent"]),
 		PartTypeDamageSoft:   float64FromString(values["part_type_damage_soft"]),
 		PartTypeDamageHeavy:  float64FromString(values["part_type_damage_heavy"]),
 		PartTypeDamageWeak:   float64FromString(values["part_type_damage_weak"]),
@@ -1887,25 +1863,18 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 	}
 
 	loot := make([]BossLootEntry, 0, len(entries))
-	totalWeight := int64(0)
-	for _, entry := range entries {
-		if entry.Score > 0 {
-			totalWeight += int64(entry.Score)
-		}
-	}
 	for _, entry := range entries {
 		itemID, ok := entry.Member.(string)
 		if !ok || strings.TrimSpace(itemID) == "" {
 			continue
 		}
 
-		dropRatePercent := percentageFromWeight(int64(entry.Score), totalWeight)
+		dropRatePercent := clampFloat(entry.Score, 0, 100)
 
 		definition, defErr := s.getEquipmentDefinition(ctx, itemID)
 		if defErr != nil {
 			loot = append(loot, BossLootEntry{
 				ItemID:          itemID,
-				Weight:          int64(entry.Score),
 				DropRatePercent: dropRatePercent,
 			})
 			continue
@@ -1916,7 +1885,6 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			ItemName:        definition.Name,
 			Slot:            definition.Slot,
 			Rarity:          normalizeEquipmentRarity(definition.Rarity),
-			Weight:          int64(entry.Score),
 			DropRatePercent: dropRatePercent,
 		})
 	}
@@ -2015,12 +1983,17 @@ func encodeStringList(items []string) string {
 	return string(encoded)
 }
 
-func percentageFromWeight(weight int64, totalWeight int64) float64 {
-	if weight <= 0 || totalWeight <= 0 {
-		return 0
-	}
+const dropRateRollLimit = 10000
 
-	return float64(weight) * 100 / float64(totalWeight)
+func normalizeLootDropRate(item BossLootEntry) float64 {
+	if item.DropRatePercent > 0 {
+		return clampFloat(item.DropRatePercent, 0, 100)
+	}
+	return clampFloat(float64(item.Weight), 0, 100)
+}
+
+func dropRateThreshold(dropRatePercent float64) int {
+	return int(math.Round(clampFloat(dropRatePercent, 0, 100) * 100))
 }
 
 // scanKeys 扫描 Redis 中匹配前缀的所有键
@@ -2320,18 +2293,9 @@ func (s *Store) bossRewardLockKey(bossID string) string {
 	return s.namespace + "boss:" + bossID + ":reward-lock"
 }
 
-// deriveNamespace 从按钮前缀推导命名空间
-func deriveNamespace(prefix string) string {
-	if before, ok := strings.CutSuffix(prefix, "button:"); ok {
-		return before
-	}
-
-	return prefix
-}
-
 // RealtimeEventChannel 返回当前命名空间对应的 Redis 实时事件通道名。
-func RealtimeEventChannel(prefix string) string {
-	return deriveNamespace(prefix) + "events"
+func RealtimeEventChannel(namespace string) string {
+	return namespace + "events"
 }
 
 // normalizeNickname 规范化昵称（去除首尾空格）
@@ -2399,7 +2363,6 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 		AttackPower:          definition.AttackPower,
 		ArmorPenPercent:      definition.ArmorPenPercent,
 		CritDamageMultiplier: definition.CritDamageMultiplier,
-		BossDamagePercent:    definition.BossDamagePercent,
 		PartTypeDamageSoft:   definition.PartTypeDamageSoft,
 		PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
 		PartTypeDamageWeak:   definition.PartTypeDamageWeak,

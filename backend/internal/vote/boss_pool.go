@@ -253,11 +253,12 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 
 	entries := make([]redis.Z, 0, len(loot))
 	for _, item := range loot {
-		if strings.TrimSpace(item.ItemID) == "" || item.Weight <= 0 {
+		dropRatePercent := normalizeLootDropRate(item)
+		if strings.TrimSpace(item.ItemID) == "" || dropRatePercent <= 0 {
 			continue
 		}
 		entries = append(entries, redis.Z{
-			Score:  float64(item.Weight),
+			Score:  dropRatePercent,
 			Member: strings.TrimSpace(item.ItemID),
 		})
 	}
@@ -290,8 +291,8 @@ func (s *Store) loadBossTemplateLoot(ctx context.Context, templateID string) ([]
 		definition, defErr := s.getEquipmentDefinition(ctx, itemID)
 		if defErr != nil {
 			loot = append(loot, BossLootEntry{
-				ItemID: itemID,
-				Weight: int64(entry.Score),
+				ItemID:          itemID,
+				DropRatePercent: clampFloat(entry.Score, 0, 100),
 			})
 			continue
 		}
@@ -301,11 +302,10 @@ func (s *Store) loadBossTemplateLoot(ctx context.Context, templateID string) ([]
 			ItemName:             definition.Name,
 			Slot:                 definition.Slot,
 			Rarity:               normalizeEquipmentRarity(definition.Rarity),
-			Weight:               int64(entry.Score),
+			DropRatePercent:      clampFloat(entry.Score, 0, 100),
 			AttackPower:          definition.AttackPower,
 			ArmorPenPercent:      definition.ArmorPenPercent,
 			CritDamageMultiplier: definition.CritDamageMultiplier,
-			BossDamagePercent:    definition.BossDamagePercent,
 			PartTypeDamageSoft:   definition.PartTypeDamageSoft,
 			PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
 			PartTypeDamageWeak:   definition.PartTypeDamageWeak,
@@ -330,11 +330,12 @@ func (s *Store) setLootEntries(ctx context.Context, key string, loot []BossLootE
 
 	entries := make([]redis.Z, 0, len(loot))
 	for _, item := range loot {
-		if strings.TrimSpace(item.ItemID) == "" || item.Weight <= 0 {
+		dropRatePercent := normalizeLootDropRate(item)
+		if strings.TrimSpace(item.ItemID) == "" || dropRatePercent <= 0 {
 			continue
 		}
 		entries = append(entries, redis.Z{
-			Score:  float64(item.Weight),
+			Score:  dropRatePercent,
 			Member: strings.TrimSpace(item.ItemID),
 		})
 	}

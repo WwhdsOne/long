@@ -103,7 +103,6 @@ func TestListAdminEquipmentPageReadsMediaAndTalentFields(t *testing.T) {
 		AttackPower:          12,
 		ArmorPenPercent:      0.2,
 		CritDamageMultiplier: 1.5,
-		BossDamagePercent:    0.1,
 		PartTypeDamageSoft:   0.35,
 		PartTypeDamageHeavy:  0.05,
 		PartTypeDamageWeak:   0.15,

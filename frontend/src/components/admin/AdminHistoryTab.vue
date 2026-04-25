@@ -31,7 +31,7 @@ defineProps({
             <li v-for="item in entry.loot" :key="item.itemId" class="inventory-item">
               <div>
                 <strong>{{ item.itemName || item.itemId }}</strong>
-                <p>{{ item.itemId }} · {{ item.slot }} · 权重 {{ item.weight }}</p>
+              <p>{{ item.itemId }} · {{ item.slot }} · 掉落几率 {{ item.dropRatePercent }}%</p>
                 <p>{{ formatItemStats(item) }}</p>
               </div>
             </li>

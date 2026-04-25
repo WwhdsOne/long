@@ -43,11 +43,8 @@ registerPublicPageLifecycle()
 
     <section class="hero">
       <div class="hero__copy">
-        <p class="hero__eyebrow">Long Vote Wall</p>
-        <h1>登录账号，再狠狠干一票。</h1>
-        <p class="hero__lede">
-          平时点按钮照样冲榜；有活动 Boss 时，同一点击会把装备增量一起结算成伤害。
-        </p>
+        <p class="hero__eyebrow">Hai-World</p>
+        <h1>狠狠干一票。</h1>
       </div>
 
       <div class="hero__status">
