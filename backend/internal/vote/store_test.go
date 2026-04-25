@@ -198,3 +198,96 @@ func TestBossTemplateActivationUsesPartHealthAsTotalHealth(t *testing.T) {
 		}
 	}
 }
+
+func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    10,
+		Enabled: true,
+	}); err != nil {
+		t.Fatalf("save button: %v", err)
+	}
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "part-boss",
+		Name:  "分区 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+	if result.Boss == nil {
+		t.Fatal("expected click result to include boss state")
+	}
+	if result.Boss.CurrentHP != 99 || len(result.Boss.Parts) != 1 || result.Boss.Parts[0].CurrentHP != 99 {
+		t.Fatalf("expected click result to reduce boss and part health, got %+v", result.Boss)
+	}
+
+	stored, err := store.currentBoss(ctx)
+	if err != nil {
+		t.Fatalf("load current boss: %v", err)
+	}
+	if stored.CurrentHP != 99 || len(stored.Parts) != 1 || stored.Parts[0].CurrentHP != 99 {
+		t.Fatalf("expected stored boss and part health to be reduced, got %+v", stored)
+	}
+}
+
+func TestClickButtonWithBossPartsPersistsDefeatedStatus(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    10,
+		Enabled: true,
+	}); err != nil {
+		t.Fatalf("save button: %v", err)
+	}
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "fragile-boss",
+		Name:  "脆弱 Boss",
+		MaxHP: 1,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1, CurrentHP: 1, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+	if result.Boss == nil || result.Boss.Status != bossStatusDefeated || result.Boss.CurrentHP != 0 {
+		t.Fatalf("expected click result to defeat boss, got %+v", result.Boss)
+	}
+
+	stored, err := store.currentBoss(ctx)
+	if err != nil {
+		t.Fatalf("load current boss: %v", err)
+	}
+	if stored.Status != bossStatusDefeated || stored.CurrentHP != 0 || stored.DefeatedAt == 0 {
+		t.Fatalf("expected stored boss to be defeated, got %+v", stored)
+	}
+}
