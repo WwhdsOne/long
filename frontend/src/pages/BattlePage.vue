@@ -4,7 +4,6 @@ import {computed, ref} from 'vue'
 import {usePublicPageState} from './publicPageState'
 
 const {
-  AUTO_CLICK_RATE_LABEL,
   boss,
   bossLeaderboard,
   bossLoot,
@@ -14,7 +13,6 @@ const {
   errorMessage,
   pendingKeys,
   criticalBursts,
-  autoClickEnabled,
   buttonCount,
   totalVotes,
   displayedButtons,
@@ -23,9 +21,6 @@ const {
   myRank,
   myBossDamage,
   effectiveIncrement,
-  autoClickTargetLabel,
-  canStartAutoClick,
-  autoClickStatus,
   bossStatusLabel,
   bossProgress,
   displayedRecentRewards,
@@ -38,7 +33,6 @@ const {
   handlePressStart,
   handlePressEnd,
   handlePressCancel,
-  toggleAutoClick,
   clickButton,
 } = usePublicPageState()
 
@@ -291,33 +285,6 @@ function bossZoneAriaLabel(zone) {
           </div>
         </section>
 
-        <section class="player-hud__auto battle-auto-panel">
-          <div class="player-hud__section-head">
-            <div>
-              <p class="vote-stage__eyebrow">挂机</p>
-              <strong>官方挂机托管</strong>
-            </div>
-            <span class="player-hud__pill" :class="{ 'player-hud__pill--active': autoClickEnabled }">
-              {{ autoClickEnabled ? '运行中' : '未开启' }}
-            </span>
-          </div>
-
-          <p class="player-hud__note">{{ autoClickStatus }}</p>
-
-          <div class="player-hud__auto-meta">
-            <span class="player-hud__auto-chip">目标：{{ autoClickTargetLabel }}</span>
-            <span class="player-hud__auto-chip">{{ AUTO_CLICK_RATE_LABEL }}</span>
-          </div>
-
-          <button
-              class="nickname-form__submit player-hud__auto-button"
-              type="button"
-              :disabled="!autoClickEnabled && !canStartAutoClick"
-              @click="toggleAutoClick"
-          >
-            {{ autoClickEnabled ? '关闭挂机' : '开启挂机' }}
-          </button>
-        </section>
       </section>
 
       <section

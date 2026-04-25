@@ -46,7 +46,7 @@ const syncing = ref(false)
 const errorMessage = ref('')
 const pendingKeys = ref(new Set())
 const actioningItemId = ref('')
-const activeHudTab = ref('inventory')
+const activeHudTab = ref('account')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
 const criticalBursts = ref({})
@@ -262,7 +262,7 @@ async function navigatePublicPage(page) {
 async function activatePublicPage(page) {
   if (page === 'profile') {
     if (activeHudTab.value === 'messages' || activeHudTab.value === 'info') {
-      activeHudTab.value = 'inventory'
+      activeHudTab.value = 'account'
     }
     await loadPlayerProfile(true)
     return
@@ -610,6 +610,9 @@ function markUpdated() {
 
 function selectHudTab(tab) {
   activeHudTab.value = tab
+  if (tab === 'auto') {
+    loadAutoClickStatus()
+  }
   if (tab === 'info') {
     loadBossHistory()
     loadAnnouncements()
