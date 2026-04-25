@@ -22,3 +22,13 @@ func sumBossPartMaxHP(parts []BossPart) int64 {
 	}
 	return maxInt64(1, total)
 }
+
+func sumBossPartCurrentHP(parts []BossPart) int64 {
+	var total int64
+	for _, part := range parts {
+		if part.CurrentHP > 0 {
+			total += part.CurrentHP
+		}
+	}
+	return total
+}

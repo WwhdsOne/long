@@ -1079,6 +1079,13 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 		partDamage = damageStats.CriticalDamage
 	}
 
+	actualDamage := partDamage
+	if actualDamage > part.CurrentHP {
+		actualDamage = part.CurrentHP
+	}
+	if actualDamage < 0 {
+		actualDamage = 0
+	}
 	part.CurrentHP -= partDamage
 	if part.CurrentHP < 0 {
 		part.CurrentHP = 0
@@ -1087,24 +1094,9 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 		part.Alive = false
 	}
 
-	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
-	if marshalErr != nil {
-		return result, nil
-	}
-
-	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.bossCurrentKey, "parts", string(partsRaw))
-	pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(partDamage), nickname)
-	pipe.Exec(ctx)
-
-	result.Delta = partDamage
+	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+	result.Delta = actualDamage
 	result.Critical = critical
-
-	boss.CurrentHP -= partDamage
-	if boss.CurrentHP < 0 {
-		boss.CurrentHP = 0
-	}
-	result.Boss = boss
 
 	allDead := true
 	for _, p := range boss.Parts {
@@ -1116,6 +1108,35 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 
 	if allDead {
 		boss.Status = bossStatusDefeated
+		boss.DefeatedAt = s.now().Unix()
+	}
+
+	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
+	if marshalErr != nil {
+		return result, nil
+	}
+
+	bossValues := map[string]any{
+		"parts":      string(partsRaw),
+		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
+		"status":     boss.Status,
+	}
+	if boss.DefeatedAt != 0 {
+		bossValues["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
+	if actualDamage > 0 {
+		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(actualDamage), nickname)
+	}
+	if _, execErr := pipe.Exec(ctx); execErr != nil {
+		return result, nil
+	}
+
+	result.Boss = boss
+
+	if allDead {
 		result.BroadcastUserAll = true
 		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss)
 		if finalizeErr != nil {
