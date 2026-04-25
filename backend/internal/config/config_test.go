@@ -40,14 +40,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
             player_auth:
               jwt_secret: "player-secret"
               jwt_ttl_seconds: 604800
-            manual_click:
-              ticket_ttl_ms: 2000
-              issue_limit_per_second: 6
-              consume_limit_per_second: 6
-              risk_threshold: 4
-              ban_ms: 600000
-              min_press_duration_ms: 20
-              max_press_duration_ms: 2000
             oss:
               access_key_id: "test-ak"
               access_key_secret: "test-secret"
@@ -95,9 +87,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.PlayerAuth.JWTSecret != "player-secret" {
 		t.Fatalf("expected player jwt secret player-secret, got %q", cfg.PlayerAuth.JWTSecret)
-	}
-	if cfg.ManualClick.TicketTTL != 2*time.Second {
-		t.Fatalf("expected manual click ticket ttl 2s, got %s", cfg.ManualClick.TicketTTL)
 	}
 	if cfg.OSS.AccessKeyID != "test-ak" {
 		t.Fatalf("expected oss access key id test-ak, got %q", cfg.OSS.AccessKeyID)
@@ -229,15 +218,6 @@ func validConfigForTest() Config {
 		PlayerAuth: PlayerAuthConfig{
 			JWTSecret: "player-secret",
 			JWTTTL:    7 * 24 * time.Hour,
-		},
-		ManualClick: ManualClickConfig{
-			TicketTTL:             2 * time.Second,
-			IssueLimitPerSecond:   6,
-			ConsumeLimitPerSecond: 6,
-			RiskThreshold:         4,
-			BanDuration:           10 * time.Minute,
-			MinPressDuration:      20 * time.Millisecond,
-			MaxPressDuration:      2 * time.Second,
 		},
 	}
 }

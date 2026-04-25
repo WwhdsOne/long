@@ -42,17 +42,6 @@ type RateLimitConfig struct {
 	BlacklistDuration time.Duration
 }
 
-// ManualClickConfig 控制票据有效期、节奏阈值与短时封禁。
-type ManualClickConfig struct {
-	TicketTTL             time.Duration
-	IssueLimitPerSecond   int
-	ConsumeLimitPerSecond int
-	RiskThreshold         int
-	BanDuration           time.Duration
-	MinPressDuration      time.Duration
-	MaxPressDuration      time.Duration
-}
-
 // AdminConfig 管理后台鉴权配置
 type AdminConfig struct {
 	Username      string
@@ -93,7 +82,6 @@ type Config struct {
 	RateLimit          RateLimitConfig
 	Admin              AdminConfig
 	PlayerAuth         PlayerAuthConfig
-	ManualClick        ManualClickConfig
 	OSS                OSSConfig
 	LLM                LLMConfig
 	RedisPrefix        string
@@ -127,15 +115,6 @@ type fileConfig struct {
 		JWTSecret    string `yaml:"jwt_secret"`
 		JWTTTLSecond int    `yaml:"jwt_ttl_seconds"`
 	} `yaml:"player_auth"`
-	ManualClick struct {
-		TicketTTLMS           int `yaml:"ticket_ttl_ms"`
-		IssueLimitPerSecond   int `yaml:"issue_limit_per_second"`
-		ConsumeLimitPerSecond int `yaml:"consume_limit_per_second"`
-		RiskThreshold         int `yaml:"risk_threshold"`
-		BanMS                 int `yaml:"ban_ms"`
-		MinPressDurationMS    int `yaml:"min_press_duration_ms"`
-		MaxPressDurationMS    int `yaml:"max_press_duration_ms"`
-	} `yaml:"manual_click"`
 	OSS struct {
 		AccessKeyID     string `yaml:"access_key_id"`
 		AccessKeySecret string `yaml:"access_key_secret"`
@@ -237,15 +216,6 @@ func loadFromConsul() (Config, consulSource, error) {
 			JWTSecret: parsed.PlayerAuth.JWTSecret,
 			JWTTTL:    time.Duration(parsed.PlayerAuth.JWTTTLSecond) * time.Second,
 		},
-		ManualClick: ManualClickConfig{
-			TicketTTL:             time.Duration(parsed.ManualClick.TicketTTLMS) * time.Millisecond,
-			IssueLimitPerSecond:   parsed.ManualClick.IssueLimitPerSecond,
-			ConsumeLimitPerSecond: parsed.ManualClick.ConsumeLimitPerSecond,
-			RiskThreshold:         parsed.ManualClick.RiskThreshold,
-			BanDuration:           time.Duration(parsed.ManualClick.BanMS) * time.Millisecond,
-			MinPressDuration:      time.Duration(parsed.ManualClick.MinPressDurationMS) * time.Millisecond,
-			MaxPressDuration:      time.Duration(parsed.ManualClick.MaxPressDurationMS) * time.Millisecond,
-		},
 		OSS: OSSConfig{
 			AccessKeyID:     parsed.OSS.AccessKeyID,
 			AccessKeySecret: parsed.OSS.AccessKeySecret,
@@ -296,6 +266,7 @@ func validate(config Config) error {
 		return errors.New("rate_limit.window_ms must be greater than 0")
 	case config.RateLimit.BlacklistDuration <= 0:
 		return errors.New("rate_limit.blacklist_ms must be greater than 0")
+	case strings.TrimSpace(config.Admin.Username) == "":
 		return errors.New("admin.username is required")
 	case strings.TrimSpace(config.Admin.Password) == "":
 		return errors.New("admin.password is required")
@@ -305,20 +276,6 @@ func validate(config Config) error {
 		return errors.New("player_auth.jwt_secret is required")
 	case config.PlayerAuth.JWTTTL <= 0:
 		return errors.New("player_auth.jwt_ttl_seconds must be greater than 0")
-	case config.ManualClick.TicketTTL <= 0:
-		return errors.New("manual_click.ticket_ttl_ms must be greater than 0")
-	case config.ManualClick.IssueLimitPerSecond <= 0:
-		return errors.New("manual_click.issue_limit_per_second must be greater than 0")
-	case config.ManualClick.ConsumeLimitPerSecond <= 0:
-		return errors.New("manual_click.consume_limit_per_second must be greater than 0")
-	case config.ManualClick.RiskThreshold <= 0:
-		return errors.New("manual_click.risk_threshold must be greater than 0")
-	case config.ManualClick.BanDuration <= 0:
-		return errors.New("manual_click.ban_ms must be greater than 0")
-	case config.ManualClick.MinPressDuration <= 0:
-		return errors.New("manual_click.min_press_duration_ms must be greater than 0")
-	case config.ManualClick.MaxPressDuration <= config.ManualClick.MinPressDuration:
-		return errors.New("manual_click.max_press_duration_ms must be greater than min_press_duration_ms")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeyID) == "":
 		return errors.New("oss.access_key_id is required when oss is configured")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeySecret) == "":

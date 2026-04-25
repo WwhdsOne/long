@@ -29,9 +29,6 @@ const {
   formatItemStats,
   equipmentNameParts,
   equipmentNameClass,
-  handlePressStart,
-  handlePressEnd,
-  handlePressCancel,
   clickButton,
 } = usePublicPageState()
 
@@ -96,22 +93,9 @@ function getBossZoneButtonKey(zone) {
   return `boss-part:${zone.x}-${zone.y}`
 }
 
-function handleBossZonePressStart(zone, event) {
   const key = getBossZoneButtonKey(zone)
-  if (key) handlePressStart(key, event)
 }
 
-function handleBossZonePressEnd(zone, event) {
-  const key = getBossZoneButtonKey(zone)
-  if (key) handlePressEnd(key, event)
-}
-
-function handleBossZonePressCancel(zone) {
-  const key = getBossZoneButtonKey(zone)
-  if (key) handlePressCancel(key)
-}
-
-function clickBossZone(zone) {
   const key = getBossZoneButtonKey(zone)
   if (key) clickButton(key)
 }
@@ -154,20 +138,19 @@ function bossZoneAriaLabel(zone) {
 
     <section class="stage-layout stage-layout--battle">
       <section class="vote-stage">
-        <div class="vote-stage__head">
-          <div>
-            <p class="vote-stage__eyebrow">世界 Boss 战场</p>
-            <h2>{{ boss?.name || '等待 Boss 登场' }}</h2>
-          </div>
-        </div>
 
         <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
 
         <section class="vote-stage__boss-hud vote-stage__boss-hud--merged">
           <div class="vote-stage__boss-hud-head">
             <div>
-              <p class="vote-stage__eyebrow">当前 Boss</p>
-              <strong>{{ boss?.name || '休战中' }}</strong>
+              <div class="vote-stage__head">
+                <div>
+                  <h1 class="vote-stage__worldBoss">世界 Boss 战场</h1>
+                  <p class="vote-stage__eyebrow">当前 Boss</p>
+                  <h2>{{ boss?.name || '等待 Boss 登场' }}</h2>
+                </div>
+              </div>
             </div>
             <div class="boss-stage__meta">
               <span class="boss-stage__pill">{{ bossStatusLabel }}</span>
@@ -208,9 +191,6 @@ function bossZoneAriaLabel(zone) {
                 type="button"
                 :disabled="isBossZoneDisabled(zone)"
                 :aria-label="bossZoneAriaLabel(zone)"
-                @pointerdown="handleBossZonePressStart(zone, $event)"
-                @pointerup="handleBossZonePressEnd(zone, $event)"
-                @pointercancel="handleBossZonePressCancel(zone)"
                 @click="clickBossZone(zone)"
               >
                 <template v-if="zone">

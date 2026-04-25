@@ -87,19 +87,6 @@ func run() error {
 		Window:            cfg.RateLimit.Window,
 		BlacklistDuration: cfg.RateLimit.BlacklistDuration,
 	})
-	manualClickService := httpapi.NewManualClickService(httpapi.ManualClickServiceOptions{
-		Store:      store,
-		ClickGuard: clickLimiter,
-		Config: httpapi.ManualClickConfig{
-			TicketTTL:             cfg.ManualClick.TicketTTL,
-			IssueLimitPerSecond:   cfg.ManualClick.IssueLimitPerSecond,
-			ConsumeLimitPerSecond: cfg.ManualClick.ConsumeLimitPerSecond,
-			RiskThreshold:         cfg.ManualClick.RiskThreshold,
-			BanDuration:           cfg.ManualClick.BanDuration,
-			MinPressDuration:      cfg.ManualClick.MinPressDuration,
-			MaxPressDuration:      cfg.ManualClick.MaxPressDuration,
-		},
-	})
 	autoClickService := httpapi.NewAutoClickService(httpapi.AutoClickServiceOptions{
 		Store:           store,
 		ChangePublisher: changeBus,
@@ -133,7 +120,6 @@ func run() error {
 		StateView:               stateCache,
 		ChangePublisher:         changeBus,
 		ClickGuard:              clickLimiter,
-		ManualClick:             manualClickService,
 		AutoClick:               autoClickService,
 		PlayerAuthenticator:     playerAuthenticator,
 		Events:                  eventHandler,

@@ -3,33 +3,13 @@ import { describe, expect, it } from 'vitest'
 import { buildClickRequestBody, mergeClickFallbackState } from './clickResponse'
 
 describe('clickResponse', () => {
-  it('会把票据和实时连接状态带进点击请求体', () => {
-    expect(buildClickRequestBody('ticket-1', true, {
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
-    })).toEqual({
-      ticket: 'ticket-1',
+  it('会携带实时连接状态', () => {
+    expect(buildClickRequestBody(true)).toEqual({
       realtimeConnected: true,
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
     })
 
-    expect(buildClickRequestBody('ticket-1', false, {
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
-    })).toEqual({
-      ticket: 'ticket-1',
+    expect(buildClickRequestBody(false)).toEqual({
       realtimeConnected: false,
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
     })
   })
 

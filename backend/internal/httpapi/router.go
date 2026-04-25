@@ -89,12 +89,6 @@ type ClickGuard interface {
 	Allow(string) (time.Duration, error)
 }
 
-// ManualClickController 负责签发一次性票据并校验手动点击请求。
-type ManualClickController interface {
-	IssueTicket(context.Context, TicketIssueRequest) (ClickTicket, error)
-	Click(context.Context, ManualClickRequest) (vote.ClickResult, error)
-}
-
 // AutoClickController 负责服务端托管挂机任务的生命周期。
 type AutoClickController interface {
 	Start(context.Context, string, string) (AutoClickStatus, error)
@@ -122,7 +116,6 @@ type Options struct {
 	Broadcaster             Broadcaster
 	ChangePublisher         ChangePublisher
 	ClickGuard              ClickGuard
-	ManualClick             ManualClickController
 	AutoClick               AutoClickController
 	PlayerAuthenticator     PlayerAuthenticator
 	Events                  app.HandlerFunc

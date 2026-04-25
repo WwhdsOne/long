@@ -16,17 +16,6 @@ const pageSource = [
   .join('\n')
 
 describe('PublicPage 点击响应链路', () => {
-  it('点击前会先申请一次性票据，并显式上报当前实时连接状态', () => {
-    expect(pageSource).toContain("ensureRealtimeTransport().requestClickTicket(key, nextFingerprintHash)")
-    expect(pageSource).toContain('buildClickRequestBody(ticketInfo.ticket, liveConnected.value, behavior)')
-    expect(pageSource).toContain('consumeClickBehavior(key)')
-    expect(pageSource).toContain('buildFingerprintProof({')
-    expect(pageSource).toContain('fingerprintHash')
-    expect(pageSource).toContain('fingerprintProof')
-    expect(pageSource).toContain('@pointerdown="handleBossZonePressStart(zone, $event)"')
-    expect(pageSource).toContain('@pointerup="handleBossZonePressEnd(zone, $event)"')
-  })
-
   it('点击成功后不会把断连状态直接改成已连接', () => {
     const clickSegment = pageSource.slice(
       pageSource.indexOf('async function clickButton'),

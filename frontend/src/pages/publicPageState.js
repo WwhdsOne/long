@@ -2,11 +2,10 @@ import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 
 import {mergeBossState} from '../utils/bossState'
 import {formatDropRate} from '../utils/buttonBoard'
-import {buildClickRequestBody, mergeClickFallbackState} from '../utils/clickResponse'
+import {mergeClickFallbackState} from '../utils/clickResponse'
 import { formatRarityLabel, getRarityClassName, splitEquipmentName } from '../utils/rarity'
 import { EQUIPMENT_SLOTS, normalizeLoadout } from '../utils/equipmentSlots'
 import {createRealtimeTransport} from '../utils/realtimeTransport'
-import { buildFingerprintProof, collectFingerprintHash, createClickBehaviorTracker } from '../utils/manualClickSignals'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
@@ -71,7 +70,6 @@ const messageError = ref('')
 const autoClickEnabled = ref(false)
 const autoClickTargetKey = ref('')
 const gems = ref(0)
-const fingerprintHash = ref('')
 const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
 const profileLoading = ref(false)
 const profileLoaded = ref(false)
@@ -81,8 +79,6 @@ let realtimeTransport
 let lastBossResourceVersion = ''
 const burstTimers = new Map()
 const pendingClickSources = new Map()
-const clickBehaviorTracker = createClickBehaviorTracker()
-let fingerprintPromise
 
 const buttonCount = computed(() => buttonTotalCount.value || buttons.value.length)
 const totalVotes = computed(() =>
@@ -878,664 +874,587 @@ function ensureRealtimeTransport() {
 
 function connectRealtime(nextNickname = nickname.value) {
   if (buttons.value.length === 0) {
-    loading.value = true
-  }
-  syncing.value = true
+    async function loadState() {
+      loading.value = true
+    }
 
-  if (!realtimeTransport) {
-    ensureRealtimeTransport().connect({nickname: nextNickname})
-    return
-  }
+    syncing.value = true
 
-  realtimeTransport.reconnect({nickname: nextNickname})
-}
+    if (!realtimeTransport) {
+      ensureRealtimeTransport().connect({nickname: nextNickname})
+      return
+    }
 
-function clearCriticalBurst(key) {
-  const timer = burstTimers.get(key)
-  if (timer) {
-    window.clearTimeout(timer)
-    burstTimers.delete(key)
+    realtimeTransport.reconnect({nickname: nextNickname})
   }
 
-  if (!criticalBursts.value[key]) {
-    return
+  function clearCriticalBurst(key) {
+    const timer = burstTimers.get(key)
+    if (timer) {
+      window.clearTimeout(timer)
+      burstTimers.delete(key)
+    }
+
+    if (!criticalBursts.value[key]) {
+      return
+    }
+
+    const nextBursts = {...criticalBursts.value}
+    delete nextBursts[key]
+    criticalBursts.value = nextBursts
   }
 
-  const nextBursts = {...criticalBursts.value}
-  delete nextBursts[key]
-  criticalBursts.value = nextBursts
-}
+  function triggerCriticalBurst(key, delta) {
+    clearCriticalBurst(key)
 
-function triggerCriticalBurst(key, delta) {
-  clearCriticalBurst(key)
+    criticalBursts.value = {
+      ...criticalBursts.value,
+      [key]: {
+        label: `暴击伤害 ${delta}`,
+        nonce: `${key}-${Date.now()}`,
+      },
+    }
 
-  criticalBursts.value = {
-    ...criticalBursts.value,
-    [key]: {
-      label: `暴击伤害 ${delta}`,
-      nonce: `${key}-${Date.now()}`,
-    },
+    burstTimers.set(
+        key,
+        window.setTimeout(() => {
+          clearCriticalBurst(key)
+        }, 1600),
+    )
   }
 
-  burstTimers.set(
-    key,
-    window.setTimeout(() => {
-      clearCriticalBurst(key)
-    }, 1600),
-  )
-}
 
-function handlePressStart(key, event) {
-  clickBehaviorTracker.handlePressStart(key, event)
-}
-
-function handlePressEnd(key, event) {
-  clickBehaviorTracker.handlePressEnd(key, event)
-}
-
-function handlePressCancel(key) {
-  clickBehaviorTracker.handlePressCancel(key)
-}
-
-async function ensureFingerprintHash() {
-  if (fingerprintHash.value) {
-    return fingerprintHash.value
+  function currentNicknameQuery() {
+    return ''
   }
-  if (!fingerprintPromise) {
-    fingerprintPromise = collectFingerprintHash()
+
+  function syncAutoClickTarget() {
+    // 挂机目标来自完整按钮列表，保持服务端状态即可。
   }
-  fingerprintHash.value = await fingerprintPromise
-  return fingerprintHash.value
-}
 
-function consumeClickBehavior(key) {
-  const behavior = clickBehaviorTracker.consume(key)
-  if (!behavior) {
-    throw new Error('操作采样失败，请重试。')
+  function applyAutoClickStatus(payload, options = {}) {
+    autoClickEnabled.value = Boolean(payload?.active)
+    if (payload?.buttonKey) {
+      autoClickTargetKey.value = payload.buttonKey
+      return
+    }
+    if (options.clearTargetWhenMissing) {
+      autoClickTargetKey.value = ''
+    }
   }
-  return behavior
-}
 
-function currentNicknameQuery() {
-  return ''
-}
-
-function syncAutoClickTarget() {
-  // 挂机目标来自完整按钮列表，保持服务端状态即可。
-}
-
-function applyAutoClickStatus(payload, options = {}) {
-  autoClickEnabled.value = Boolean(payload?.active)
-  if (payload?.buttonKey) {
-    autoClickTargetKey.value = payload.buttonKey
-    return
-  }
-  if (options.clearTargetWhenMissing) {
+  function clearAutoClickLocalState() {
+    autoClickEnabled.value = false
     autoClickTargetKey.value = ''
   }
-}
 
-function clearAutoClickLocalState() {
-  autoClickEnabled.value = false
-  autoClickTargetKey.value = ''
-}
-
-async function loadAutoClickStatus() {
-  if (!nickname.value) {
-    clearAutoClickLocalState()
-    return
-  }
-
-  try {
-    const response = await fetch('/api/auto-click')
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '挂机状态加载失败'))
-    }
-    applyAutoClickStatus(await response.json(), {clearTargetWhenMissing: true})
-  } catch {
-    autoClickEnabled.value = false
-  }
-}
-
-async function syncAutoClickTargetOnServer(key) {
-  if (!nickname.value || !key) {
-    return
-  }
-
-  const response = await fetch('/api/auto-click/start', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({slug: key}),
-  })
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response, '挂机目标更新失败，请稍后重试。'))
-  }
-  applyAutoClickStatus(await response.json(), {clearTargetWhenMissing: false})
-}
-
-async function startAutoClick() {
-  if (!canStartAutoClick.value) {
-    return
-  }
-
-  errorMessage.value = ''
-
-  try {
-    await syncAutoClickTargetOnServer(autoClickTargetKey.value)
-  } catch (error) {
-    errorMessage.value = error.message || '挂机开启失败，请稍后重试。'
-  }
-}
-
-async function stopAutoClick() {
-  if (!nickname.value) {
-    autoClickEnabled.value = false
-    return
-  }
-
-  errorMessage.value = ''
-  try {
-    const response = await fetch('/api/auto-click/stop', {
-      method: 'POST',
-    })
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '挂机关闭失败，请稍后重试。'))
-    }
-    autoClickEnabled.value = false
-  } catch (error) {
-    errorMessage.value = error.message || '挂机关闭失败，请稍后重试。'
-  }
-}
-
-async function toggleAutoClick() {
-  if (autoClickEnabled.value) {
-    await stopAutoClick()
-    return
-  }
-
-  await startAutoClick()
-}
-
-async function requestClickTicket(key) {
-  const nextFingerprintHash = await ensureFingerprintHash()
-  try {
-    const realtimeTicket = await ensureRealtimeTransport().requestClickTicket(key, nextFingerprintHash)
-    if (realtimeTicket?.ticket && realtimeTicket?.challengeNonce) {
-      return {
-        ticket: realtimeTicket.ticket,
-        challengeNonce: realtimeTicket.challengeNonce,
-        fingerprintHash: nextFingerprintHash,
-      }
-    }
-  } catch {
-    // ws 票据申请失败时退回 HTTP 兜底，避免点击体验被主链路抖动放大。
-  }
-
-  const response = await fetch('/api/click-tickets', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      slug: key,
-      fingerprintHash: nextFingerprintHash,
-    }),
-  })
-
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response, '操作已过期，请重试。'))
-  }
-
-  const payload = await response.json()
-  const ticket = String(payload?.ticket || '').trim()
-  const challengeNonce = String(payload?.challengeNonce || '').trim()
-  if (!ticket || !challengeNonce) {
-    throw new Error('操作已过期，请重试。')
-  }
-  return {
-    ticket,
-    challengeNonce,
-    fingerprintHash: nextFingerprintHash,
-  }
-}
-
-async function loadState() {
-  loading.value = true
-  syncing.value = true
-
-  try {
-    const response = await fetch(`/api/buttons${currentNicknameQuery()}`)
-    if (!response.ok) {
-      throw new Error('按钮列表加载失败')
-    }
-
-    const data = await response.json()
-    applyState(data)
-  } catch (error) {
-    errorMessage.value = error.message || '加载失败，请稍后重试。'
-  } finally {
-    loading.value = false
-    syncing.value = false
-  }
-}
-
-async function loadPlayerProfile(force = false) {
-  if (!nickname.value) {
-    profileLoaded.value = false
-    profileNotice.value = '登录后进入资料页会刷新角色资料。'
-    return
-  }
-  if (profileLoading.value || (profileLoaded.value && !force)) {
-    return
-  }
-
-  profileLoading.value = true
-  errorMessage.value = ''
-  try {
-    const response = await fetch('/api/player/profile')
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '资料加载失败，请稍后重试。'))
-    }
-
-    const data = await response.json()
-    applyBattleUserState(data)
-    applyPlayerProfileState(data)
-    profileLoaded.value = true
-    profileNotice.value = '进入本页已刷新资料。'
-  } catch (error) {
-    errorMessage.value = error.message || '资料加载失败，请稍后重试。'
-  } finally {
-    profileLoading.value = false
-  }
-}
-
-async function refreshProfileAfterMutation(data) {
-  applyBattleUserState(data)
-  if (currentPublicPage.value === 'profile') {
-    await loadPlayerProfile(true)
-    return
-  }
-  profileLoaded.value = false
-}
-
-async function clickButton(key, options = {}) {
-  if (!nickname.value || pendingKeys.value.has(key)) {
-    return
-  }
-
-  const nextPending = new Set(pendingKeys.value)
-  nextPending.add(key)
-  pendingKeys.value = nextPending
-  pendingClickSources.set(key, options.source || 'normal')
-  errorMessage.value = ''
-
-  try {
-    const ticketInfo = await requestClickTicket(key)
-    const behavior = consumeClickBehavior(key)
-    behavior.fingerprintHash = ticketInfo.fingerprintHash
-    behavior.fingerprintProof = await buildFingerprintProof({
-      fingerprintHash: ticketInfo.fingerprintHash,
-      ticket: ticketInfo.ticket,
-      challengeNonce: ticketInfo.challengeNonce,
-    })
-
-    if (ensureRealtimeTransport().sendClick(key, ticketInfo.ticket, behavior)) {
+  async function loadAutoClickStatus() {
+    if (!nickname.value) {
+      clearAutoClickLocalState()
       return
     }
 
-    const response = await fetch(`/api/buttons/${encodeURIComponent(key)}/click`, {
+    try {
+      const response = await fetch('/api/auto-click')
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '挂机状态加载失败'))
+      }
+      applyAutoClickStatus(await response.json(), {clearTargetWhenMissing: true})
+    } catch {
+      autoClickEnabled.value = false
+    }
+  }
+
+  async function syncAutoClickTargetOnServer(key) {
+    if (!nickname.value || !key) {
+      return
+    }
+
+    const response = await fetch('/api/auto-click/start', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(buildClickRequestBody(ticketInfo.ticket, liveConnected.value, behavior)),
+      body: JSON.stringify({slug: key}),
     })
-
     if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '点击失败，请稍后重试。'))
+      throw new Error(await readErrorMessage(response, '挂机目标更新失败，请稍后重试。'))
+    }
+    applyAutoClickStatus(await response.json(), {clearTargetWhenMissing: false})
+  }
+
+  async function startAutoClick() {
+    if (!canStartAutoClick.value) {
+      return
     }
 
-    const data = await response.json()
-    if (data.critical) {
-      triggerCriticalBurst(key, data.delta)
-    }
-    autoClickTargetKey.value = key
-    if (autoClickEnabled.value) {
-      await syncAutoClickTargetOnServer(key)
-    }
-    clearPendingClicks(key)
-    applyClickResult(data)
     errorMessage.value = ''
-  } catch (error) {
-    clearPendingClicks(key)
-    errorMessage.value = error.message || '点击失败，请稍后重试。'
-  }
-}
 
-async function toggleItemEquip(itemId, equipped) {
-  if (!nickname.value || !itemId) {
-    return
+    try {
+      await syncAutoClickTargetOnServer(autoClickTargetKey.value)
+    } catch (error) {
+      errorMessage.value = error.message || '挂机开启失败，请稍后重试。'
+    }
   }
 
-  const action = equipped ? 'unequip' : 'equip'
-  actioningItemId.value = itemId
-  errorMessage.value = ''
-
-  try {
-    const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/${action}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({nickname: nickname.value}),
-    })
-
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '装备操作失败，请稍后重试。'))
+  async function stopAutoClick() {
+    if (!nickname.value) {
+      autoClickEnabled.value = false
+      return
     }
 
-    const data = await response.json()
-    await refreshProfileAfterMutation(data)
-  } catch (error) {
-    errorMessage.value = error.message || '装备操作失败，请稍后重试。'
-  } finally {
-    actioningItemId.value = ''
-  }
-}
-
-async function submitNickname() {
-  const nextNickname = normalizeNickname(nicknameDraft.value)
-  if (!nextNickname) {
-    errorMessage.value = '先填一个昵称。'
-    return
-  }
-  if (!passwordDraft.value.trim()) {
-    errorMessage.value = '再设一个密码。'
-    return
+    errorMessage.value = ''
+    try {
+      const response = await fetch('/api/auto-click/stop', {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '挂机关闭失败，请稍后重试。'))
+      }
+      autoClickEnabled.value = false
+    } catch (error) {
+      errorMessage.value = error.message || '挂机关闭失败，请稍后重试。'
+    }
   }
 
-  errorMessage.value = ''
-
-  try {
-    const response = await fetch('/api/player/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        nickname: nextNickname,
-        password: passwordDraft.value,
-      }),
-    })
-    if (!response.ok) {
-      throw new Error(await readErrorMessage(response, '登录失败，请稍后重试。'))
+  async function toggleAutoClick() {
+    if (autoClickEnabled.value) {
+      await stopAutoClick()
+      return
     }
 
-    const payload = await response.json()
-    const resolvedNickname = normalizeNickname(payload?.nickname || nextNickname)
+    await startAutoClick()
+  }
 
-    nickname.value = resolvedNickname
-    nicknameDraft.value = resolvedNickname
-    passwordDraft.value = ''
-    await loadAutoClickStatus()
+  async function loadState() {
+    loading.value = true
+    syncing.value = true
+
+    try {
+      const response = await fetch(`/api/buttons${currentNicknameQuery()}`)
+      if (!response.ok) {
+        throw new Error('按钮列表加载失败')
+      }
+
+      const data = await response.json()
+      applyState(data)
+    } catch (error) {
+      errorMessage.value = error.message || '加载失败，请稍后重试。'
+    } finally {
+      loading.value = false
+      syncing.value = false
+    }
+  }
+
+  async function loadPlayerProfile(force = false) {
+    if (!nickname.value) {
+      profileLoaded.value = false
+      profileNotice.value = '登录后进入资料页会刷新角色资料。'
+      return
+    }
+    if (profileLoading.value || (profileLoaded.value && !force)) {
+      return
+    }
+
+    profileLoading.value = true
+    errorMessage.value = ''
+    try {
+      const response = await fetch('/api/player/profile')
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '资料加载失败，请稍后重试。'))
+      }
+
+      const data = await response.json()
+      applyBattleUserState(data)
+      applyPlayerProfileState(data)
+      profileLoaded.value = true
+      profileNotice.value = '进入本页已刷新资料。'
+    } catch (error) {
+      errorMessage.value = error.message || '资料加载失败，请稍后重试。'
+    } finally {
+      profileLoading.value = false
+    }
+  }
+
+  async function refreshProfileAfterMutation(data) {
+    applyBattleUserState(data)
     if (currentPublicPage.value === 'profile') {
       await loadPlayerProfile(true)
+      return
     }
-    connectRealtime(resolvedNickname)
-  } catch (error) {
-    errorMessage.value = error.message || '登录失败，请稍后重试。'
-  }
-}
-
-async function resetNickname() {
-  try {
-    await fetch('/api/player/auth/logout', {
-      method: 'POST',
-    })
-  } catch {
-    // 忽略异常，继续清理本地状态。
+    profileLoaded.value = false
   }
 
-  clearPlayerSessionState()
-  connectRealtime('')
-}
-
-function clearPlayerSessionState() {
-  nickname.value = ''
-  nicknameDraft.value = ''
-  passwordDraft.value = ''
-  clearUserRealtimeState()
-  clearAutoClickLocalState()
-  clearPendingClicks()
-  profileLoaded.value = false
-  profileNotice.value = ''
-}
-
-async function loadPlayerSession() {
-  try {
-    const response = await fetch('/api/player/auth/session')
-    if (!response.ok) {
-      clearPlayerSessionState()
+  async function clickButton(key, options = {}) {
+    if (!nickname.value || pendingKeys.value.has(key)) {
       return
     }
 
-    const payload = await response.json()
-    const resolvedNickname = normalizeNickname(payload?.nickname || '')
-    if (!resolvedNickname) {
-      clearPlayerSessionState()
-      return
-    }
+    const nextPending = new Set(pendingKeys.value)
+    nextPending.add(key)
+    pendingKeys.value = nextPending
+    pendingClickSources.set(key, options.source || 'normal')
+    errorMessage.value = ''
 
-    nickname.value = resolvedNickname
-    nicknameDraft.value = resolvedNickname
-    await loadAutoClickStatus()
-  } catch {
-    clearPlayerSessionState()
-  }
-}
-
-function registerPublicPageLifecycle() {
-  let onlineCountTimer
-
-  async function fetchOnlineCount() {
     try {
-      const response = await fetch('/api/online-count')
-      if (response.ok) {
-        const data = await response.json()
-        onlineCount.value = data.count
+      if (ensureRealtimeTransport().sendClick(key)) {
+        return
       }
-    } catch {
-      // 静默失败，下次轮询重试
+
+      const response = await fetch(`/api/buttons/${encodeURIComponent(key)}/click`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({realtimeConnected: liveConnected.value}),
+      })
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '点击失败，请稍后重试。'))
+      }
+
+      const data = await response.json()
+      if (data.critical) {
+        triggerCriticalBurst(key, data.delta)
+      }
+      autoClickTargetKey.value = key
+      if (autoClickEnabled.value) {
+        await syncAutoClickTargetOnServer(key)
+      }
+      clearPendingClicks(key)
+      applyClickResult(data)
+      errorMessage.value = ''
+    } catch (error) {
+      clearPendingClicks(key)
+      errorMessage.value = error.message || '点击失败，请稍后重试。'
     }
   }
 
-  onMounted(async () => {
-    restoreCachedLatestAnnouncement()
-    window.addEventListener('popstate', handlePublicRouteChange)
-    await loadPlayerSession()
-    await loadState()
-    await activatePublicPage(currentPublicPage.value)
-    connectRealtime(nickname.value)
-    fetchOnlineCount()
-    onlineCountTimer = setInterval(fetchOnlineCount, 30000)
-  })
+  async function toggleItemEquip(itemId, equipped) {
+    if (!nickname.value || !itemId) {
+      return
+    }
 
-  onBeforeUnmount(() => {
-    window.removeEventListener('popstate', handlePublicRouteChange)
-    clickBehaviorTracker.clear()
-    realtimeTransport?.close()
-    burstTimers.forEach((timer) => window.clearTimeout(timer))
-    burstTimers.clear()
-    if (onlineCountTimer) clearInterval(onlineCountTimer)
-  })
-}
+    const action = equipped ? 'unequip' : 'equip'
+    actioningItemId.value = itemId
+    errorMessage.value = ''
 
-export function usePublicPageState() {
-  return {
-    ANNOUNCEMENT_READ_KEY,
-    ANNOUNCEMENT_CACHE_KEY,
-    AUTO_CLICK_RATE_LABEL,
-    EQUIPMENT_ENHANCE_COST,
-    GROWTH_FORMULA_TEXT,
-    publicPages,
-    buttons,
-    buttonTotalCount,
-    buttonTotalVotes,
-    leaderboard,
-    boss,
-    bossLeaderboard,
-    bossLoot,
-    announcementVersion,
-    latestAnnouncement,
-    announcements,
-    myBossStats,
-    inventory,
-  loadout,
-  loadoutSlots,
-    combatStats,
-    recentRewards,
-    lastReward,
-    userStats,
-    nickname,
-    nicknameDraft,
-    passwordDraft,
-    loading,
-    syncing,
-    errorMessage,
-    pendingKeys,
-    actioningItemId,
-    activeHudTab,
-    lastUpdatedAt,
-    liveConnected,
-    criticalBursts,
-    bossHistory,
-    bossHistoryQuery,
-    loadingBossHistory,
-    bossHistoryLoaded,
-    bossHistoryError,
-    loadingAnnouncements,
-    announcementsLoaded,
-    announcementError,
-    loadingBossResources,
-    latestAnnouncementLoaded,
-    announcementModalOpen,
-    messages,
-    messageNextCursor,
-    loadingMessages,
-    postingMessage,
-    messageDraft,
-    messageError,
-    autoClickEnabled,
-    autoClickTargetKey,
-    gems,
-    fingerprintHash,
-    currentPublicPage,
-    profileLoading,
-    profileLoaded,
-    profileNotice,
-    lastBossResourceVersion,
-    burstTimers,
-    pendingClickSources,
-    clickBehaviorTracker,
-    buttonCount,
-    totalVotes,
-    displayedButtons,
-    syncLabel,
-    onlineCount,
-    isLoggedIn,
-    myClicks,
-    myRank,
-    myBossDamage,
-    myBossRank,
-    effectiveIncrement,
-    normalDamage,
-    criticalDamage,
-    autoClickTargetButton,
-    autoClickTargetLabel,
-    canStartAutoClick,
-    autoClickStatus,
-    bossStatusLabel,
-    bossProgress,
-    equippedItems,
-    displayedRecentRewards,
-    recentRewardTitle,
-    recentRewardNote,
-    filteredBossHistory,
-    emptyLoadout,
-    defaultCombatStats,
-    formatDropRate,
-    formatRarityLabel,
-    formatItemStats,
-    formatItemStatLines,
-    equipmentNameParts,
-    equipmentNameClass,
-    normalizeNickname,
-    resolvePublicPage,
-    navigatePublicPage,
-    activatePublicPage,
-    handlePublicRouteChange,
-    formatBossTime,
-    topBossDamage,
-    formatTime,
-    formatNumber,
-    formatStatWithDelta,
-    formatPercentWithDelta,
-    dotIndexes,
-    readErrorMessage,
-    bossResourceVersion,
-    readCachedLatestAnnouncement,
-    writeCachedLatestAnnouncement,
-    restoreCachedLatestAnnouncement,
-    maybePromptAnnouncement,
-    closeAnnouncementModal,
-    loadBossResources,
-    loadLatestAnnouncement,
-    loadAnnouncements,
-    loadMessages,
-    submitMessage,
-    validateNicknameWithServer,
-    loadBossHistory,
-    markUpdated,
-    selectHudTab,
-    applyState,
-    applyPublicState,
-    applyUserState,
-    applyBattleUserState,
-    applyPlayerProfileState,
-    applyClickResult,
-    clearUserRealtimeState,
-    clearPendingClicks,
-    applyRealtimeSnapshot,
-    ensureRealtimeTransport,
-    connectRealtime,
-    clearCriticalBurst,
-    triggerCriticalBurst,
-    handlePressStart,
-    handlePressEnd,
-    handlePressCancel,
-    ensureFingerprintHash,
-    consumeClickBehavior,
-    currentNicknameQuery,
-    syncAutoClickTarget,
-    applyAutoClickStatus,
-    clearAutoClickLocalState,
-    loadAutoClickStatus,
-    syncAutoClickTargetOnServer,
-    startAutoClick,
-    stopAutoClick,
-    toggleAutoClick,
-    requestClickTicket,
-    loadState,
-    loadPlayerProfile,
-    refreshProfileAfterMutation,
-    clickButton,
-    toggleItemEquip,
-    submitNickname,
-    resetNickname,
-    clearPlayerSessionState,
-    loadPlayerSession,
-    registerPublicPageLifecycle,
+    try {
+      const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({nickname: nickname.value}),
+      })
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '装备操作失败，请稍后重试。'))
+      }
+
+      const data = await response.json()
+      await refreshProfileAfterMutation(data)
+    } catch (error) {
+      errorMessage.value = error.message || '装备操作失败，请稍后重试。'
+    } finally {
+      actioningItemId.value = ''
+    }
+  }
+
+  async function submitNickname() {
+    const nextNickname = normalizeNickname(nicknameDraft.value)
+    if (!nextNickname) {
+      errorMessage.value = '先填一个昵称。'
+      return
+    }
+    if (!passwordDraft.value.trim()) {
+      errorMessage.value = '再设一个密码。'
+      return
+    }
+
+    errorMessage.value = ''
+
+    try {
+      const response = await fetch('/api/player/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nickname: nextNickname,
+          password: passwordDraft.value,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '登录失败，请稍后重试。'))
+      }
+
+      const payload = await response.json()
+      const resolvedNickname = normalizeNickname(payload?.nickname || nextNickname)
+
+      nickname.value = resolvedNickname
+      nicknameDraft.value = resolvedNickname
+      passwordDraft.value = ''
+      await loadAutoClickStatus()
+      if (currentPublicPage.value === 'profile') {
+        await loadPlayerProfile(true)
+      }
+      connectRealtime(resolvedNickname)
+    } catch (error) {
+      errorMessage.value = error.message || '登录失败，请稍后重试。'
+    }
+  }
+
+  async function resetNickname() {
+    try {
+      await fetch('/api/player/auth/logout', {
+        method: 'POST',
+      })
+    } catch {
+      // 忽略异常，继续清理本地状态。
+    }
+
+    clearPlayerSessionState()
+    connectRealtime('')
+  }
+
+  function clearPlayerSessionState() {
+    nickname.value = ''
+    nicknameDraft.value = ''
+    passwordDraft.value = ''
+    clearUserRealtimeState()
+    clearAutoClickLocalState()
+    clearPendingClicks()
+    profileLoaded.value = false
+    profileNotice.value = ''
+  }
+
+  async function loadPlayerSession() {
+    try {
+      const response = await fetch('/api/player/auth/session')
+      if (!response.ok) {
+        clearPlayerSessionState()
+        return
+      }
+
+      const payload = await response.json()
+      const resolvedNickname = normalizeNickname(payload?.nickname || '')
+      if (!resolvedNickname) {
+        clearPlayerSessionState()
+        return
+      }
+
+      nickname.value = resolvedNickname
+      nicknameDraft.value = resolvedNickname
+      await loadAutoClickStatus()
+    } catch {
+      clearPlayerSessionState()
+    }
+  }
+
+  function registerPublicPageLifecycle() {
+    let onlineCountTimer
+
+    async function fetchOnlineCount() {
+      try {
+        const response = await fetch('/api/online-count')
+        if (response.ok) {
+          const data = await response.json()
+          // 接口返回后，用真实数据（已经包含当前用户）
+          onlineCount.value = data.count
+        }
+      } catch {
+        // 接口失败时，保持本地+1的显示，不回退
+      }
+    }
+
+    onMounted(async () => {
+      restoreCachedLatestAnnouncement()
+      window.addEventListener('popstate', handlePublicRouteChange)
+      await loadPlayerSession()
+      await loadState()
+      await activatePublicPage(currentPublicPage.value)
+      connectRealtime(nickname.value)
+
+      // ✅ 先直接显示 1
+      onlineCount.value = 1
+
+      // ✅ 延迟一点再拉真实数据（避免瞬间覆盖）
+      setTimeout(fetchOnlineCount, 300)
+
+      // 5 秒轮询
+      onlineCountTimer = setInterval(fetchOnlineCount, 5000)
+    })
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('popstate', handlePublicRouteChange)
+      realtimeTransport?.close()
+      burstTimers.forEach((timer) => window.clearTimeout(timer))
+      burstTimers.clear()
+      if (onlineCountTimer) clearInterval(onlineCountTimer)
+    })
+  }
+
+  export function usePublicPageState() {
+    return {
+      ANNOUNCEMENT_READ_KEY,
+      ANNOUNCEMENT_CACHE_KEY,
+      AUTO_CLICK_RATE_LABEL,
+      EQUIPMENT_ENHANCE_COST,
+      GROWTH_FORMULA_TEXT,
+      publicPages,
+      buttons,
+      buttonTotalCount,
+      buttonTotalVotes,
+      leaderboard,
+      boss,
+      bossLeaderboard,
+      bossLoot,
+      announcementVersion,
+      latestAnnouncement,
+      announcements,
+      myBossStats,
+      inventory,
+      loadout,
+      loadoutSlots,
+      combatStats,
+      recentRewards,
+      lastReward,
+      userStats,
+      nickname,
+      nicknameDraft,
+      passwordDraft,
+      loading,
+      syncing,
+      errorMessage,
+      pendingKeys,
+      actioningItemId,
+      activeHudTab,
+      lastUpdatedAt,
+      liveConnected,
+      criticalBursts,
+      bossHistory,
+      bossHistoryQuery,
+      loadingBossHistory,
+      bossHistoryLoaded,
+      bossHistoryError,
+      loadingAnnouncements,
+      announcementsLoaded,
+      announcementError,
+      loadingBossResources,
+      latestAnnouncementLoaded,
+      announcementModalOpen,
+      messages,
+      messageNextCursor,
+      loadingMessages,
+      postingMessage,
+      messageDraft,
+      messageError,
+      autoClickEnabled,
+      autoClickTargetKey,
+      gems,
+      currentPublicPage,
+      profileLoading,
+      profileLoaded,
+      profileNotice,
+      lastBossResourceVersion,
+      burstTimers,
+      pendingClickSources,
+      buttonCount,
+      totalVotes,
+      displayedButtons,
+      syncLabel,
+      onlineCount,
+      isLoggedIn,
+      myClicks,
+      myRank,
+      myBossDamage,
+      myBossRank,
+      effectiveIncrement,
+      normalDamage,
+      criticalDamage,
+      autoClickTargetButton,
+      autoClickTargetLabel,
+      canStartAutoClick,
+      autoClickStatus,
+      bossStatusLabel,
+      bossProgress,
+      equippedItems,
+      displayedRecentRewards,
+      recentRewardTitle,
+      recentRewardNote,
+      filteredBossHistory,
+      emptyLoadout,
+      defaultCombatStats,
+      formatDropRate,
+      formatRarityLabel,
+      formatItemStats,
+      formatItemStatLines,
+      equipmentNameParts,
+      equipmentNameClass,
+      normalizeNickname,
+      resolvePublicPage,
+      navigatePublicPage,
+      activatePublicPage,
+      handlePublicRouteChange,
+      formatBossTime,
+      topBossDamage,
+      formatTime,
+      formatNumber,
+      formatStatWithDelta,
+      formatPercentWithDelta,
+      dotIndexes,
+      readErrorMessage,
+      bossResourceVersion,
+      readCachedLatestAnnouncement,
+      writeCachedLatestAnnouncement,
+      restoreCachedLatestAnnouncement,
+      maybePromptAnnouncement,
+      closeAnnouncementModal,
+      loadBossResources,
+      loadLatestAnnouncement,
+      loadAnnouncements,
+      loadMessages,
+      submitMessage,
+      validateNicknameWithServer,
+      loadBossHistory,
+      markUpdated,
+      selectHudTab,
+      applyState,
+      applyPublicState,
+      applyUserState,
+      applyBattleUserState,
+      applyPlayerProfileState,
+      applyClickResult,
+      clearUserRealtimeState,
+      clearPendingClicks,
+      applyRealtimeSnapshot,
+      ensureRealtimeTransport,
+      connectRealtime,
+      clearCriticalBurst,
+      triggerCriticalBurst,
+      handlePressStart,
+      handlePressEnd,
+      handlePressCancel,
+      currentNicknameQuery,
+      syncAutoClickTarget,
+      applyAutoClickStatus,
+      clearAutoClickLocalState,
+      loadAutoClickStatus,
+      syncAutoClickTargetOnServer,
+      startAutoClick,
+      stopAutoClick,
+      toggleAutoClick,
+      loadState,
+      loadPlayerProfile,
+      refreshProfileAfterMutation,
+      clickButton,
+      toggleItemEquip,
+      submitNickname,
+      resetNickname,
+      clearPlayerSessionState,
+      loadPlayerSession,
+      registerPublicPageLifecycle,
+    }
   }
 }
