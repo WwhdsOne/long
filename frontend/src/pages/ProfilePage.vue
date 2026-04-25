@@ -2,6 +2,7 @@
 import {usePublicPageState} from './publicPageState'
 
 const {
+  AUTO_CLICK_RATE_LABEL,
   inventory,
   loadout,
   loadoutSlots,
@@ -12,6 +13,10 @@ const {
   errorMessage,
   actioningItemId,
   activeHudTab,
+  autoClickEnabled,
+  autoClickTargetLabel,
+  canStartAutoClick,
+  autoClickStatus,
   gems,
   profileLoading,
   profileNotice,
@@ -33,6 +38,7 @@ const {
   formatPercentWithDelta,
   submitMessage,
   selectHudTab,
+  toggleAutoClick,
   submitNickname,
   resetNickname,
 } = usePublicPageState()
@@ -50,38 +56,23 @@ const {
             <span class="player-hud__pill">{{ isLoggedIn ? '已上墙' : '访客' }}</span>
           </div>
 
-          <p class="player-hud__copy">{{ profileNotice || (isLoggedIn ? `你现在登录的是 ${nickname}。进入本页会刷新背包、属性和装备。` : '先输入昵称和密码登录；第一次使用该昵称时会直接为它设置密码。') }}
-          </p>
-
-          <form class="nickname-form player-hud__form" @submit.prevent="submitNickname">
-            <input
-                v-model="nicknameDraft"
-                class="nickname-form__input"
-                type="text"
-                maxlength="20"
-                placeholder="比如：阿明"
-            />
-            <input
-                v-model="passwordDraft"
-                class="nickname-form__input"
-                type="password"
-                placeholder="输入密码"
-            />
-            <button class="nickname-form__submit" type="submit">
-              {{ isLoggedIn ? '切换账号' : '登录 / 首次认领' }}
-            </button>
-          </form>
-
-          <button
-              v-if="isLoggedIn"
-              class="nickname-form__ghost player-hud__reset"
-              type="button"
-              @click="resetNickname"
-          >
-            退出登录
-          </button>
-
           <div class="player-hud__tabs">
+            <button
+                class="player-hud__tab"
+                :class="{ 'player-hud__tab--active': activeHudTab === 'account' }"
+                type="button"
+                @click="selectHudTab('account')"
+            >
+              账号
+            </button>
+            <button
+                class="player-hud__tab"
+                :class="{ 'player-hud__tab--active': activeHudTab === 'auto' }"
+                type="button"
+                @click="selectHudTab('auto')"
+            >
+              挂机
+            </button>
             <button
                 class="player-hud__tab"
                 :class="{ 'player-hud__tab--active': activeHudTab === 'inventory' }"
@@ -110,7 +101,72 @@ const {
 
           <p v-if="profileLoading" class="feedback">资料刷新中...</p>
           <div class="player-hud__content">
-            <section v-if="activeHudTab === 'inventory'" class="player-hud__panel">
+            <section v-if="activeHudTab === 'account'" class="player-hud__panel">
+              <div class="player-hud__section-head">
+                <p class="vote-stage__eyebrow">账号</p>
+                <strong>{{ isLoggedIn ? nickname : '未登录' }}</strong>
+              </div>
+
+              <p class="player-hud__note">{{ profileNotice || (isLoggedIn ? `当前角色：${nickname}` : '登录后可查看背包、属性、装备栏和官方挂机状态。') }}</p>
+
+              <form class="nickname-form player-hud__form" @submit.prevent="submitNickname">
+                <input
+                    v-model="nicknameDraft"
+                    class="nickname-form__input"
+                    type="text"
+                    maxlength="20"
+                    placeholder="比如：阿明"
+                />
+                <input
+                    v-model="passwordDraft"
+                    class="nickname-form__input"
+                    type="password"
+                    placeholder="输入密码"
+                />
+                <button class="nickname-form__submit" type="submit">
+                  {{ isLoggedIn ? '切换账号' : '登录 / 首次认领' }}
+                </button>
+              </form>
+
+              <button
+                  v-if="isLoggedIn"
+                  class="nickname-form__ghost player-hud__reset"
+                  type="button"
+                  @click="resetNickname"
+              >
+                退出登录
+              </button>
+            </section>
+
+            <section v-else-if="activeHudTab === 'auto'" class="player-hud__panel player-hud__auto">
+              <div class="player-hud__section-head">
+                <div>
+                  <p class="vote-stage__eyebrow">挂机</p>
+                  <strong>官方挂机托管</strong>
+                </div>
+                <span class="player-hud__pill" :class="{ 'player-hud__pill--active': autoClickEnabled }">
+                  {{ autoClickEnabled ? '运行中' : '未开启' }}
+                </span>
+              </div>
+
+              <p class="player-hud__note">{{ autoClickStatus }}</p>
+
+              <div class="player-hud__auto-meta">
+                <span class="player-hud__auto-chip">目标：{{ autoClickTargetLabel }}</span>
+                <span class="player-hud__auto-chip">{{ AUTO_CLICK_RATE_LABEL }}</span>
+              </div>
+
+              <button
+                  class="nickname-form__submit player-hud__auto-button"
+                  type="button"
+                  :disabled="!autoClickEnabled && !canStartAutoClick"
+                  @click="toggleAutoClick"
+              >
+                {{ autoClickEnabled ? '关闭挂机' : '开启挂机' }}
+              </button>
+            </section>
+
+            <section v-else-if="activeHudTab === 'inventory'" class="player-hud__panel">
               <div class="player-hud__section-head">
                 <p class="vote-stage__eyebrow">背包</p>
                 <strong>{{ inventory.length }} 件</strong>

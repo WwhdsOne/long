@@ -91,6 +91,21 @@ describe('PublicPage 三页前台边界', () => {
     expect(battleSource).not.toContain('v-for="button in displayedButtons"')
   })
 
+  it('战斗主页不再承载挂机控制，资料页顶部标签承载账号和官方挂机', () => {
+    const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+    const profileSource = readFileSync(path.resolve(currentDir, './ProfilePage.vue'), 'utf8')
+
+    expect(battleSource).not.toContain('battle-auto-panel')
+    expect(battleSource).not.toContain('官方挂机托管')
+    expect(profileSource).toContain("activeHudTab === 'account'")
+    expect(profileSource).toContain("selectHudTab('account')")
+    expect(profileSource).toContain("activeHudTab === 'auto'")
+    expect(profileSource).toContain("selectHudTab('auto')")
+    expect(profileSource).toContain('官方挂机托管')
+    expect(pageSource).toContain("fetch('/api/auto-click/start'")
+    expect(pageSource).toContain("fetch('/api/auto-click/stop'")
+  })
+
   it('战斗页 Boss 面板不吸顶浮动，并收紧部件网格尺寸', () => {
     const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
     const compactStyleSource = styleSource.replace(/\s+/g, ' ')
