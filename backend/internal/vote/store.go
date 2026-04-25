@@ -312,6 +312,7 @@ type State struct {
 type ClickResult struct {
 	Button           Button                 `json:"button"`
 	Delta            int64                  `json:"delta"`
+	BossDamage       int64                  `json:"bossDamage,omitempty"`
 	Critical         bool                   `json:"critical"`
 	UserStats        UserStats              `json:"userStats"`
 	Boss             *Boss                  `json:"boss,omitempty"`
@@ -1043,7 +1044,7 @@ func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, 
 }
 
 func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
-	result, err := s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
+	result, err := s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, 1, critical)
 	if err != nil {
 		return ClickResult{}, err
 	}
@@ -1097,7 +1098,7 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 	}
 
 	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
-	result.Delta = actualDamage
+	result.BossDamage = actualDamage
 	result.Critical = critical
 
 	allDead := true
