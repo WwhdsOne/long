@@ -62,7 +62,7 @@ describe('PublicPage 三页前台边界', () => {
     const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
 
     expect(battleSource).not.toContain('class="boss-stage social-card"')
-    expect(battleSource).toContain('现场投票墙 · 世界 Boss')
+    expect(battleSource).toContain('世界 Boss 战场')
     expect(battleSource).toContain('const bossDropPool = computed')
     expect(battleSource).toContain('class="boss-drop-link"')
     expect(battleSource).toContain('@click="openBossDropPool"')
@@ -76,6 +76,21 @@ describe('PublicPage 三页前台边界', () => {
     expect(battleSource).not.toContain('Boss 英雄池')
   })
 
+  it('战斗页只呈现 Boss 分区，不再显示常规按钮墙', () => {
+    const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+
+    expect(battleSource).toContain('const bossZones = computed')
+    expect(battleSource).toContain('pickButtonForBossPart')
+    expect(battleSource).toContain('class="boss-part-cell boss-zone-button"')
+    expect(battleSource).toContain('boss-zone-button__label')
+    expect(battleSource).toContain('zone.assignedButton.label')
+    expect(battleSource).toContain('zone.assignedButton.count')
+    expect(battleSource).toContain('@click="clickBossZone(zone)"')
+    expect(battleSource).not.toContain('class="button-grid"')
+    expect(battleSource).not.toContain('class="vote-card"')
+    expect(battleSource).not.toContain('v-for="button in displayedButtons"')
+  })
+
   it('战斗页 Boss 面板不吸顶浮动，并收紧部件网格尺寸', () => {
     const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
     const compactStyleSource = styleSource.replace(/\s+/g, ' ')
@@ -86,7 +101,7 @@ describe('PublicPage 三页前台边界', () => {
 
     expect(bossHudStyle).not.toContain('position: sticky')
     expect(bossHudStyle).not.toContain('top: 14px')
-    expect(compactStyleSource).toContain('max-width: min(100%, 420px);')
-    expect(compactStyleSource).toContain('padding: 6px;')
+    expect(compactStyleSource).toContain('max-width: min(100%, 560px);')
+    expect(compactStyleSource).toContain('padding: 10px;')
   })
 })

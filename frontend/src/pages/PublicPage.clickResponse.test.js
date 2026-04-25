@@ -23,8 +23,8 @@ describe('PublicPage 点击响应链路', () => {
     expect(pageSource).toContain('buildFingerprintProof({')
     expect(pageSource).toContain('fingerprintHash')
     expect(pageSource).toContain('fingerprintProof')
-    expect(pageSource).toContain("@pointerdown=\"handlePressStart(button.key, $event)\"")
-    expect(pageSource).toContain("@pointerup=\"handlePressEnd(button.key, $event)\"")
+    expect(pageSource).toContain('@pointerdown="handleBossZonePressStart(zone, $event)"')
+    expect(pageSource).toContain('@pointerup="handleBossZonePressEnd(zone, $event)"')
   })
 
   it('点击成功后不会把断连状态直接改成已连接', () => {

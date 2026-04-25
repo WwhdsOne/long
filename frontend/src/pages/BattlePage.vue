@@ -5,7 +5,6 @@ import {usePublicPageState} from './publicPageState'
 
 const {
   AUTO_CLICK_RATE_LABEL,
-  buttons,
   boss,
   bossLeaderboard,
   bossLoot,
@@ -45,14 +44,28 @@ const {
 
 const bossDropModalOpen = ref(false)
 
-const bossPartGrid = computed(() => {
+const bossZoneButtonPool = computed(() => {
+  const bossSeed = boss.value?.id || boss.value?.name || 'boss'
+  return [...displayedButtons.value].sort((left, right) => {
+    const leftRank = hashString(`${bossSeed}:${left.key}:${left.label}`)
+    const rightRank = hashString(`${bossSeed}:${right.key}:${right.label}`)
+    return leftRank - rightRank
+  })
+})
+
+const bossZones = computed(() => {
   if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return []
   const grid = Array.from({length: 5}, () => Array(5).fill(null))
-  for (const part of boss.value.parts) {
+  boss.value.parts.forEach((part, index) => {
     if (part.x >= 0 && part.x < 5 && part.y >= 0 && part.y < 5) {
-      grid[part.y][part.x] = part
+      grid[part.y][part.x] = {
+        ...part,
+        assignedButton: pickButtonForBossPart(part, index, bossZoneButtonPool.value),
+        healthPercent: getPartHealthPercent(part),
+        zoneKey: `${part.x}-${part.y}-${part.type}-${index}`,
+      }
     }
-  }
+  })
   return grid
 })
 
@@ -84,6 +97,59 @@ function openBossDropPool() {
 function closeBossDropPool() {
   bossDropModalOpen.value = false
 }
+
+function hashString(value) {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
+  }
+  return hash
+}
+
+function pickButtonForBossPart(part, index, sourceButtons) {
+  if (!sourceButtons.length) return null
+  return sourceButtons[index % sourceButtons.length]
+}
+
+function getPartHealthPercent(part) {
+  if (!part?.maxHp) return 0
+  return Math.max(0, Math.min(100, (part.currentHp / part.maxHp) * 100))
+}
+
+function getBossZoneButtonKey(zone) {
+  return zone?.assignedButton?.key || ''
+}
+
+function handleBossZonePressStart(zone, event) {
+  const key = getBossZoneButtonKey(zone)
+  if (key) handlePressStart(key, event)
+}
+
+function handleBossZonePressEnd(zone, event) {
+  const key = getBossZoneButtonKey(zone)
+  if (key) handlePressEnd(key, event)
+}
+
+function handleBossZonePressCancel(zone) {
+  const key = getBossZoneButtonKey(zone)
+  if (key) handlePressCancel(key)
+}
+
+function clickBossZone(zone) {
+  const key = getBossZoneButtonKey(zone)
+  if (key) clickButton(key)
+}
+
+function isBossZoneDisabled(zone) {
+  const key = getBossZoneButtonKey(zone)
+  return !key || !isLoggedIn.value || pendingKeys.value.has(key)
+}
+
+function bossZoneAriaLabel(zone) {
+  const button = zone?.assignedButton
+  if (!button) return 'Boss 分区暂无可用按钮'
+  return `${button.label} 分区，当前 ${button.count} 票，部位血量 ${zone.currentHp}/${zone.maxHp}`
+}
 </script>
 
 <template>
@@ -114,14 +180,14 @@ function closeBossDropPool() {
       <section class="vote-stage">
         <div class="vote-stage__head">
           <div>
-            <p class="vote-stage__eyebrow">现场投票墙 · 世界 Boss</p>
-            <h2>{{ boss?.name || '看见哪个想按，就直接拍下去。' }}</h2>
+            <p class="vote-stage__eyebrow">世界 Boss 战场</p>
+            <h2>{{ boss?.name || '等待 Boss 登场' }}</h2>
             <p class="vote-stage__hint vote-stage__hint--wide">
               {{
                 !boss
-                    ? '当前休战中，按钮依然正常计票。'
+                    ? '当前休战中，等后台开启下一只 Boss。'
                     : boss.status === 'active'
-                        ? '全服正在集火当前 Boss，每次点击都会把装备加成一起折算成伤害。'
+                        ? '每个分区都会从已有按钮抽取名称，点击分区即可结算伤害。'
                         : '这只 Boss 已经倒下，等待后台开启下一只。'
               }}
             </p>
@@ -148,27 +214,64 @@ function closeBossDropPool() {
           <div v-if="boss" class="boss-stage__bar boss-stage__bar--compact">
             <span class="boss-stage__bar-fill" :style="{ width: `${bossProgress}%` }"></span>
           </div>
-          <div v-if="boss?.parts?.length > 0" class="boss-part-grid">
-            <div v-for="(row, yi) in bossPartGrid" :key="yi" class="boss-part-grid__row">
-              <div
-                v-for="(part, xi) in row"
+          <div v-if="loading" class="feedback-panel feedback-panel--compact">
+            <p>正在加载 Boss 战场...</p>
+          </div>
+          <div v-else-if="!boss" class="feedback-panel feedback-panel--compact">
+            <p>当前没有活动 Boss。</p>
+          </div>
+          <div v-else-if="displayedButtons.length === 0" class="feedback-panel feedback-panel--compact">
+            <p>还没有可用按钮名，Boss 分区暂时无法开战。</p>
+          </div>
+          <div v-else-if="bossZones.length === 0" class="feedback-panel feedback-panel--compact">
+            <p>当前 Boss 尚未配置可攻击分区。</p>
+          </div>
+          <div v-else class="boss-part-grid">
+            <div v-for="(row, yi) in bossZones" :key="yi" class="boss-part-grid__row">
+              <button
+                v-for="(zone, xi) in row"
                 :key="yi + '-' + xi"
-                class="boss-part-cell"
-                :class="{ 'boss-part-cell--alive': part?.alive, 'boss-part-cell--dead': part && !part.alive }"
-                :style="part ? { '--part-color': partTypeColors[part.type] || '#64748b' } : {}"
+                class="boss-part-cell boss-zone-button"
+                :class="{
+                  'boss-part-cell--alive': zone?.alive,
+                  'boss-part-cell--dead': zone && !zone.alive,
+                  'boss-zone-button--empty': !zone,
+                  'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
+                  'boss-zone-button--critical': Boolean(criticalBursts[getBossZoneButtonKey(zone)]),
+                }"
+                :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
+                type="button"
+                :disabled="isBossZoneDisabled(zone)"
+                :aria-label="bossZoneAriaLabel(zone)"
+                @pointerdown="handleBossZonePressStart(zone, $event)"
+                @pointerup="handleBossZonePressEnd(zone, $event)"
+                @pointercancel="handleBossZonePressCancel(zone)"
+                @click="clickBossZone(zone)"
               >
-                <template v-if="part">
-                  <div class="boss-part-cell__type">{{ partTypeLabels[part.type] || part.type }}</div>
+                <template v-if="zone">
+                  <span
+                    v-if="criticalBursts[getBossZoneButtonKey(zone)]"
+                    :key="criticalBursts[getBossZoneButtonKey(zone)].nonce"
+                    class="boss-zone-button__critical-text"
+                    aria-hidden="true"
+                  >
+                    {{ criticalBursts[getBossZoneButtonKey(zone)].label }}
+                  </span>
+                  <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
+                  <strong class="boss-zone-button__label">{{ zone.assignedButton.label }}</strong>
                   <div class="boss-part-cell__bar">
                     <span
                       class="boss-part-cell__fill"
-                      :style="{ width: (part.currentHp / part.maxHp * 100) + '%' }"
+                      :style="{ width: `${zone.healthPercent}%` }"
                     ></span>
                   </div>
-                  <div class="boss-part-cell__hp">{{ part.currentHp }}/{{ part.maxHp }}</div>
+                  <div class="boss-zone-button__meta">
+                    <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
+                    <span>{{ zone.assignedButton.count }} 票</span>
+                  </div>
                 </template>
-                <div v-else class="boss-part-cell__empty"></div>
-              </div>
+                <span v-else class="boss-part-cell__empty"></span>
+              </button>
             </div>
           </div>
           <div class="vote-stage__boss-hud-stats">
@@ -187,78 +290,6 @@ function closeBossDropPool() {
             </span>
           </div>
         </section>
-
-        <div v-if="loading" class="feedback-panel">
-          <p>正在把现场按钮搬上来...</p>
-        </div>
-
-        <div v-else-if="buttons.length === 0" class="feedback-panel">
-          <p>还没有按钮上墙，先加一个再回来看看。</p>
-        </div>
-
-        <div v-else>
-          <div v-if="displayedButtons.length === 0" class="feedback-panel">
-            <p>还没有可用按钮。</p>
-          </div>
-
-          <div v-else class="button-grid">
-            <button
-                v-for="button in displayedButtons"
-                :key="button.key"
-                class="vote-card"
-                :class="{
-              'vote-card--image': button.imagePath,
-              'vote-card--pending': pendingKeys.has(button.key),
-              'vote-card--critical': Boolean(criticalBursts[button.key]),
-              'vote-card--locked': !isLoggedIn,
-            }"
-                type="button"
-                :disabled="pendingKeys.has(button.key) || !isLoggedIn"
-                :aria-label="`${button.label}，当前 ${button.count} 票`"
-                @pointerdown="handlePressStart(button.key, $event)"
-                @pointerup="handlePressEnd(button.key, $event)"
-                @pointercancel="handlePressCancel(button.key)"
-                @click="clickButton(button.key)"
-            >
-              <span class="vote-card__shine"></span>
-              <span
-                  v-if="criticalBursts[button.key]"
-                  :key="criticalBursts[button.key].nonce"
-                  class="vote-card__burst"
-                  aria-hidden="true"
-              ></span>
-              <span
-                  v-if="criticalBursts[button.key]"
-                  :key="`${criticalBursts[button.key].nonce}-label`"
-                  class="vote-card__critical-text"
-                  aria-hidden="true"
-              >
-              {{ criticalBursts[button.key].label }}
-            </span>
-              <span class="vote-card__badge">
-              {{
-                  !isLoggedIn
-                      ? '先登录'
-                      : pendingKeys.has(button.key)
-                          ? '正在记票'
-                          : boss?.status === 'active'
-                              ? `拍一下 +${effectiveIncrement} 并打 Boss`
-                              : `拍一下 +${effectiveIncrement}`
-                }}
-            </span>
-
-              <img
-                  v-if="button.imagePath"
-                  class="vote-card__image"
-                  :src="button.imagePath"
-                  :alt="button.imageAlt || button.label"
-              />
-              <strong v-else class="vote-card__label">{{ button.label }}</strong>
-
-              <span class="vote-card__count">{{ button.count }}</span>
-            </button>
-          </div>
-        </div>
 
         <section class="player-hud__auto battle-auto-panel">
           <div class="player-hud__section-head">
