@@ -49,6 +49,9 @@ type mockStore struct {
 	validateErr           error
 	messageErr            error
 	salvageErr            error
+	activateBossErr       error
+	saveBossTemplateErr   error
+	setBossCycleErr       error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -208,6 +211,9 @@ func (m *mockStore) DeleteEquipmentDefinition(_ context.Context, _ string) error
 }
 
 func (m *mockStore) ActivateBoss(_ context.Context, boss vote.BossUpsert) (*vote.Boss, error) {
+	if m.activateBossErr != nil {
+		return nil, m.activateBossErr
+	}
 	m.lastBoss = boss
 	return &vote.Boss{
 		ID:        boss.ID,
@@ -227,6 +233,9 @@ func (m *mockStore) SetBossLoot(_ context.Context, _ string, _ []vote.BossLootEn
 }
 
 func (m *mockStore) SaveBossTemplate(_ context.Context, template vote.BossTemplateUpsert) error {
+	if m.saveBossTemplateErr != nil {
+		return m.saveBossTemplateErr
+	}
 	m.lastBossTemplate = template
 	return nil
 }
@@ -242,6 +251,9 @@ func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, lo
 }
 
 func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.Boss, error) {
+	if m.setBossCycleErr != nil {
+		return nil, m.setBossCycleErr
+	}
 	m.lastCycleEnabled = enabled
 	if !enabled {
 		return nil, nil
@@ -1233,7 +1245,7 @@ func TestAdminActivateBossAndSaveButton(t *testing.T) {
 		t.Fatal("expected session cookie from login")
 	}
 
-	activateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/activate", strings.NewReader(`{"id":"slime-king","name":"史莱姆王","maxHp":50}`))
+	activateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/activate", strings.NewReader(`{"id":"slime-king","name":"史莱姆王","maxHp":50,"parts":[{"x":0,"y":0,"type":"soft","maxHp":50}]}`))
 	activateRequest.Header.Set("Content-Type", "application/json")
 	activateRequest.AddCookie(cookies[0])
 	activateResponse := httptest.NewRecorder()
@@ -1283,7 +1295,7 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 		t.Fatal("expected session cookie from login")
 	}
 
-	saveTemplateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":80}`))
+	saveTemplateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":80,"layout":[{"x":0,"y":0,"type":"soft","maxHp":80}]}`))
 	saveTemplateRequest.Header.Set("Content-Type", "application/json")
 	saveTemplateRequest.AddCookie(cookies[0])
 	saveTemplateResponse := httptest.NewRecorder()
@@ -1319,6 +1331,51 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	}
 	if !store.lastCycleEnabled {
 		t.Fatal("expected cycle enable to be forwarded to store")
+	}
+}
+
+func TestAdminBossPartsRequiredReturnsBadRequest(t *testing.T) {
+	store := &mockStore{
+		activateBossErr:     vote.ErrBossPartsRequired,
+		saveBossTemplateErr: vote.ErrBossPartsRequired,
+	}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie from login")
+	}
+
+	activateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/activate", strings.NewReader(`{"id":"slime-king","name":"史莱姆王","maxHp":50}`))
+	activateRequest.Header.Set("Content-Type", "application/json")
+	activateRequest.AddCookie(cookies[0])
+	activateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(activateResponse, activateRequest)
+	if activateResponse.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 from boss activate with no parts, got %d", activateResponse.Code)
+	}
+
+	saveTemplateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":80}`))
+	saveTemplateRequest.Header.Set("Content-Type", "application/json")
+	saveTemplateRequest.AddCookie(cookies[0])
+	saveTemplateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveTemplateResponse, saveTemplateRequest)
+	if saveTemplateResponse.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 from boss pool save with no layout, got %d", saveTemplateResponse.Code)
 	}
 }
 

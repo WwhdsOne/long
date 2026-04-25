@@ -73,10 +73,11 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 		return ErrBossTemplateNotFound
 	}
 	layout := normalizeBossPartLayout(template.Layout)
-	maxHP := maxInt64(1, template.MaxHP)
-	if len(layout) > 0 {
-		maxHP = sumBossPartMaxHP(layout)
+	if len(layout) == 0 {
+		return ErrBossPartsRequired
 	}
+	maxHP := maxInt64(1, template.MaxHP)
+	maxHP = sumBossPartMaxHP(layout)
 
 	values := map[string]any{
 		"name":   firstNonEmpty(strings.TrimSpace(template.Name), templateID),
@@ -185,10 +186,11 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 		return nil, err
 	}
 	parts := normalizeBossPartLayout(template.Layout)
-	maxHP := maxInt64(1, template.MaxHP)
-	if len(parts) > 0 {
-		maxHP = sumBossPartMaxHP(parts)
+	if len(parts) == 0 {
+		return nil, ErrBossPartsRequired
 	}
+	maxHP := maxInt64(1, template.MaxHP)
+	maxHP = sumBossPartMaxHP(parts)
 
 	current := &Boss{
 		ID:         instanceID,
@@ -226,6 +228,9 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil
 	}
+	if len(boss.Parts) == 0 {
+		return ErrBossPartsRequired
+	}
 
 	values := map[string]any{
 		"id":         boss.ID,
@@ -241,10 +246,8 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	if boss.DefeatedAt != 0 {
 		values["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
 	}
-	if len(boss.Parts) > 0 {
-		partsRaw, _ := sonic.Marshal(boss.Parts)
-		values["parts"] = string(partsRaw)
-	}
+	partsRaw, _ := sonic.Marshal(boss.Parts)
+	values["parts"] = string(partsRaw)
 
 	pipe := s.client.TxPipeline()
 	pipe.Del(ctx, s.bossCurrentKey)

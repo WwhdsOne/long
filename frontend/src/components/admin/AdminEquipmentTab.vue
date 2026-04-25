@@ -1,24 +1,24 @@
 <script setup>
-import { formatRarityLabel, RARITY_OPTIONS } from '../../utils/rarity'
-import { EQUIPMENT_SLOTS } from '../../utils/equipmentSlots'
+import {formatRarityLabel, RARITY_OPTIONS} from '../../utils/rarity'
+import {EQUIPMENT_SLOTS} from '../../utils/equipmentSlots'
 
 defineProps({
-  equipmentPage: { type: Object, required: true },
-  equipmentForm: { type: Object, required: true },
-  equipmentPrompt: { type: String, required: true },
-  showEquipmentEditor: { type: Boolean, required: true },
-  loadingEquipment: { type: Boolean, required: true },
-  generatingEquipmentDraft: { type: Boolean, required: true },
-  saving: { type: Boolean, required: true },
-  formatItemStats: { type: Function, required: true },
-  openNewEquipment: { type: Function, required: true },
-  updateEquipmentPrompt: { type: Function, required: true },
-  generateEquipmentDraft: { type: Function, required: true },
-  saveEquipment: { type: Function, required: true },
-  editEquipment: { type: Function, required: true },
-  deleteEquipment: { type: Function, required: true },
-  fetchEquipmentPage: { type: Function, required: true },
-  uploadEquipmentImage: { type: Function, required: true },
+  equipmentPage: {type: Object, required: true},
+  equipmentForm: {type: Object, required: true},
+  equipmentPrompt: {type: String, required: true},
+  showEquipmentEditor: {type: Boolean, required: true},
+  loadingEquipment: {type: Boolean, required: true},
+  generatingEquipmentDraft: {type: Boolean, required: true},
+  saving: {type: Boolean, required: true},
+  formatItemStats: {type: Function, required: true},
+  openNewEquipment: {type: Function, required: true},
+  updateEquipmentPrompt: {type: Function, required: true},
+  generateEquipmentDraft: {type: Function, required: true},
+  saveEquipment: {type: Function, required: true},
+  editEquipment: {type: Function, required: true},
+  deleteEquipment: {type: Function, required: true},
+  fetchEquipmentPage: {type: Function, required: true},
+  uploadEquipmentImage: {type: Function, required: true},
 })
 </script>
 
@@ -38,17 +38,17 @@ defineProps({
       <div v-if="showEquipmentEditor" class="equipment-editor">
         <div class="equipment-generator">
           <textarea
-            :value="equipmentPrompt"
-            class="nickname-form__input equipment-generator__textarea"
-            rows="4"
-            placeholder="描述装备定位、部位、稀有度和属性倾向，例如：做一把史诗武器，偏普攻流，强化软组织伤害。"
-            @input="updateEquipmentPrompt($event.target.value)"
+              :value="equipmentPrompt"
+              class="nickname-form__input equipment-generator__textarea"
+              rows="4"
+              placeholder="描述装备定位、部位、稀有度和属性倾向，例如：做一把史诗武器，偏普攻流，强化软组织伤害。"
+              @input="updateEquipmentPrompt($event.target.value)"
           ></textarea>
           <button
-            class="nickname-form__ghost equipment-generator__button"
-            type="button"
-            :disabled="generatingEquipmentDraft"
-            @click="generateEquipmentDraft"
+              class="nickname-form__ghost equipment-generator__button"
+              type="button"
+              :disabled="generatingEquipmentDraft"
+              @click="generateEquipmentDraft"
           >
             生成草稿
           </button>
@@ -57,19 +57,19 @@ defineProps({
         <form class="admin-form equipment-form" @submit.prevent="saveEquipment">
           <label class="admin-labeled-field">
             <span>标识:</span>
-            <input v-model="equipmentForm.itemId" class="nickname-form__input" type="text" placeholder="wood-sword" />
+            <input v-model="equipmentForm.itemId" class="nickname-form__input" type="text" placeholder="wood-sword"/>
           </label>
           <label class="admin-labeled-field">
             <span>名称:</span>
-            <input v-model="equipmentForm.name" class="nickname-form__input" type="text" placeholder="前台显示名称" />
+            <input v-model="equipmentForm.name" class="nickname-form__input" type="text" placeholder="前台显示名称"/>
           </label>
           <label class="admin-labeled-field">
             <span>装备描述:</span>
             <textarea
-              v-model="equipmentForm.description"
-              class="nickname-form__input"
-              rows="4"
-              placeholder="描述装备背景故事"
+                v-model="equipmentForm.description"
+                class="nickname-form__input"
+                rows="4"
+                placeholder="描述装备背景故事"
             ></textarea>
           </label>
           <label class="admin-labeled-field">
@@ -91,21 +91,21 @@ defineProps({
             <legend class="admin-fieldset__legend">图片</legend>
             <label class="admin-labeled-field">
               <span>地址:</span>
-              <input v-model="equipmentForm.imagePath" class="nickname-form__input" type="text" placeholder="图片 URL" />
+              <input v-model="equipmentForm.imagePath" class="nickname-form__input" type="text" placeholder="图片 URL"/>
             </label>
             <label class="admin-labeled-field">
               <span>说明:</span>
-              <input v-model="equipmentForm.imageAlt" class="nickname-form__input" type="text" placeholder="图片说明" />
+              <input v-model="equipmentForm.imageAlt" class="nickname-form__input" type="text" placeholder="图片说明"/>
             </label>
             <label class="admin-upload">
               <span>上传到 OSS</span>
-              <input type="file" accept="image/*" @change="uploadEquipmentImage" />
+              <input type="file" accept="image/*" @change="uploadEquipmentImage"/>
             </label>
             <img
-              v-if="equipmentForm.imagePath"
-              class="admin-upload__preview"
-              :src="equipmentForm.imagePath"
-              :alt="equipmentForm.imageAlt || equipmentForm.name || '装备预览图'"
+                v-if="equipmentForm.imagePath"
+                class="admin-upload__preview"
+                :src="equipmentForm.imagePath"
+                :alt="equipmentForm.imageAlt || equipmentForm.name || '装备预览图'"
             />
           </fieldset>
 
@@ -113,27 +113,40 @@ defineProps({
             <legend class="admin-fieldset__legend">属性</legend>
             <label class="admin-labeled-field">
               <span>攻击力:</span>
-              <input v-model="equipmentForm.attackPower" class="nickname-form__input" type="number" min="0" step="1" />
+              <input v-model="equipmentForm.attackPower" class="nickname-form__input" type="number" min="0" step="1"/>
             </label>
             <label class="admin-labeled-field">
               <span>破甲:</span>
-              <input v-model="equipmentForm.armorPenPercent" class="nickname-form__input" type="number" min="0" max="0.8" step="0.01" />
+              <input v-model="equipmentForm.armorPenPercent" class="nickname-form__input" type="number" min="0"
+                     max="0.8" step="0.01"/>
+            </label>
+            <label class="admin-labeled-field">
+              <span>暴击率:</span>
+              <label class="admin-labeled-field">
+                <span>暴击率:</span>
+                <input v-model="equipmentForm.critRate" class="nickname-form__input" type="number" min="0" max="0.35"
+                       step="0.01"/>
+              </label>
             </label>
             <label class="admin-labeled-field">
               <span>暴伤:</span>
-              <input v-model="equipmentForm.critDamageMultiplier" class="nickname-form__input" type="number" min="0" step="0.1" />
+              <input v-model="equipmentForm.critDamageMultiplier" class="nickname-form__input" type="number" min="0"
+                     step="0.1"/>
             </label>
             <label class="admin-labeled-field">
               <span>软组织:</span>
-              <input v-model="equipmentForm.partTypeDamageSoft" class="nickname-form__input" type="number" min="0" step="0.01" />
+              <input v-model="equipmentForm.partTypeDamageSoft" class="nickname-form__input" type="number" min="0"
+                     step="0.01"/>
             </label>
             <label class="admin-labeled-field">
               <span>重甲:</span>
-              <input v-model="equipmentForm.partTypeDamageHeavy" class="nickname-form__input" type="number" min="0" step="0.01" />
+              <input v-model="equipmentForm.partTypeDamageHeavy" class="nickname-form__input" type="number" min="0"
+                     step="0.01"/>
             </label>
             <label class="admin-labeled-field">
               <span>弱点:</span>
-              <input v-model="equipmentForm.partTypeDamageWeak" class="nickname-form__input" type="number" min="0" step="0.01" />
+              <input v-model="equipmentForm.partTypeDamageWeak" class="nickname-form__input" type="number" min="0"
+                     step="0.01"/>
             </label>
             <label class="admin-labeled-field">
               <span>天赋:</span>
@@ -183,19 +196,19 @@ defineProps({
       </ul>
       <div class="admin-inline-actions equipment-admin__pager">
         <button
-          class="nickname-form__ghost"
-          type="button"
-          :disabled="loadingEquipment || equipmentPage.page <= 1"
-          @click="fetchEquipmentPage(equipmentPage.page - 1)"
+            class="nickname-form__ghost"
+            type="button"
+            :disabled="loadingEquipment || equipmentPage.page <= 1"
+            @click="fetchEquipmentPage(equipmentPage.page - 1)"
         >
           上一页
         </button>
         <span class="feedback">第 {{ equipmentPage.page }} / {{ Math.max(equipmentPage.totalPages, 1) }} 页</span>
         <button
-          class="nickname-form__ghost"
-          type="button"
-          :disabled="loadingEquipment || equipmentPage.page >= equipmentPage.totalPages"
-          @click="fetchEquipmentPage(equipmentPage.page + 1)"
+            class="nickname-form__ghost"
+            type="button"
+            :disabled="loadingEquipment || equipmentPage.page >= equipmentPage.totalPages"
+            @click="fetchEquipmentPage(equipmentPage.page + 1)"
         >
           下一页
         </button>

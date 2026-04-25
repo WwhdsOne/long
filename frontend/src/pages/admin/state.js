@@ -35,6 +35,7 @@ export function emptyEquipmentForm() {
     imageAlt: '',
     attackPower: '',
     armorPenPercent: '',
+    critRate: '',
     critDamageMultiplier: '',
     bossDamagePercent: '',
     partTypeDamageSoft: '',

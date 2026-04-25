@@ -155,6 +155,7 @@ func parseEquipmentDraftJSON(raw []byte) (vote.EquipmentDefinition, error) {
 		"partTypeDamageHeavy":  {},
 		"partTypeDamageWeak":   {},
 		"talentAffinity":       {},
+		"critRate":             {},
 	}
 
 	numericFields := []string{
@@ -164,6 +165,7 @@ func parseEquipmentDraftJSON(raw []byte) (vote.EquipmentDefinition, error) {
 		"partTypeDamageSoft",
 		"partTypeDamageHeavy",
 		"partTypeDamageWeak",
+		"critRate",
 	}
 	for _, key := range numericFields {
 		if _, ok := fields[key]; !ok {
@@ -209,35 +211,37 @@ func parseEquipmentDraftJSON(raw []byte) (vote.EquipmentDefinition, error) {
 type rarityBounds struct {
 	attackMin      int64
 	attackMax      int64
+	critRateMax    float64
 	critMax        float64
 	armorPenMax    float64
 	partTypeDmgMax float64
 }
 
 var rarityBaseBounds = map[string]rarityBounds{
-	"普通": {attackMin: 5, attackMax: 30, critMax: 0, armorPenMax: 0, partTypeDmgMax: 0},
-	"优秀": {attackMin: 20, attackMax: 60, critMax: 0.3, armorPenMax: 0.1, partTypeDmgMax: 0.05},
-	"稀有": {attackMin: 50, attackMax: 120, critMax: 0.6, armorPenMax: 0.25, partTypeDmgMax: 0.1},
-	"史诗": {attackMin: 100, attackMax: 250, critMax: 1.0, armorPenMax: 0.4, partTypeDmgMax: 0.2},
-	"传说": {attackMin: 200, attackMax: 500, critMax: 1.5, armorPenMax: 0.6, partTypeDmgMax: 0.35},
-	"至臻": {attackMin: 400, attackMax: 1000, critMax: 2.0, armorPenMax: 0.8, partTypeDmgMax: 0.5},
+	"普通": {attackMin: 5, attackMax: 30, critRateMax: 0, critMax: 0, armorPenMax: 0, partTypeDmgMax: 0},
+	"优秀": {attackMin: 20, attackMax: 60, critRateMax: 0.05, critMax: 0.3, armorPenMax: 0.1, partTypeDmgMax: 0.05},
+	"稀有": {attackMin: 50, attackMax: 120, critRateMax: 0.08, critMax: 0.6, armorPenMax: 0.25, partTypeDmgMax: 0.1},
+	"史诗": {attackMin: 100, attackMax: 250, critRateMax: 0.12, critMax: 1.0, armorPenMax: 0.4, partTypeDmgMax: 0.2},
+	"传说": {attackMin: 200, attackMax: 500, critRateMax: 0.18, critMax: 1.5, armorPenMax: 0.6, partTypeDmgMax: 0.35},
+	"至臻": {attackMin: 400, attackMax: 1000, critRateMax: 0.35, critMax: 2.0, armorPenMax: 0.8, partTypeDmgMax: 0.5},
 }
 
 type slotModifiers struct {
 	attackMinRatio float64
 	attackMaxRatio float64
+	critRateRatio  float64 // 新增
 	critRatio      float64
 	armorPenRatio  float64
 	partDmgRatio   float64
 }
 
 var slotModifierMap = map[string]slotModifiers{
-	"weapon":    {attackMinRatio: 1.0, attackMaxRatio: 1.0, critRatio: 1.0, armorPenRatio: 1.0, partDmgRatio: 1.0},
-	"gloves":    {attackMinRatio: 0.55, attackMaxRatio: 0.70, critRatio: 1.0, armorPenRatio: 1.0, partDmgRatio: 1.0},
-	"helmet":    {attackMinRatio: 0.30, attackMaxRatio: 0.45, critRatio: 0.3, armorPenRatio: 0.3, partDmgRatio: 0.4},
-	"chest":     {attackMinRatio: 0.20, attackMaxRatio: 0.35, critRatio: 0.3, armorPenRatio: 0.3, partDmgRatio: 0.4},
-	"legs":      {attackMinRatio: 0.30, attackMaxRatio: 0.45, critRatio: 0.3, armorPenRatio: 0.3, partDmgRatio: 0.4},
-	"accessory": {attackMinRatio: 0.10, attackMaxRatio: 0.25, critRatio: 1.0, armorPenRatio: 1.0, partDmgRatio: 0.4},
+	"weapon":    {attackMinRatio: 1.0, attackMaxRatio: 1.0, critRateRatio: 1.0, critRatio: 1.0, armorPenRatio: 1.0, partDmgRatio: 1.0},
+	"gloves":    {attackMinRatio: 0.55, attackMaxRatio: 0.70, critRateRatio: 1.0, critRatio: 1.0, armorPenRatio: 1.0, partDmgRatio: 1.0},
+	"helmet":    {attackMinRatio: 0.30, attackMaxRatio: 0.45, critRateRatio: 0.3, critRatio: 0.3, armorPenRatio: 0.3, partDmgRatio: 0.4},
+	"chest":     {attackMinRatio: 0.20, attackMaxRatio: 0.35, critRateRatio: 0.3, critRatio: 0.3, armorPenRatio: 0.3, partDmgRatio: 0.4},
+	"legs":      {attackMinRatio: 0.30, attackMaxRatio: 0.45, critRateRatio: 0.3, critRatio: 0.3, armorPenRatio: 0.3, partDmgRatio: 0.4},
+	"accessory": {attackMinRatio: 0.10, attackMaxRatio: 0.25, critRateRatio: 1.0, critRatio: 1.0, armorPenRatio: 1.0, partDmgRatio: 0.4},
 }
 
 func getSlotBounds(rarity string, slot string) (rarityBounds, error) {
@@ -259,6 +263,7 @@ func getSlotBounds(rarity string, slot string) (rarityBounds, error) {
 	return rarityBounds{
 		attackMin:      int64(attackMin),
 		attackMax:      int64(attackMax),
+		critRateMax:    base.critRateMax * mod.critRateRatio, // 新增
 		critMax:        base.critMax * mod.critRatio,
 		armorPenMax:    base.armorPenMax * mod.armorPenRatio,
 		partTypeDmgMax: base.partTypeDmgMax * mod.partDmgRatio,
@@ -303,6 +308,11 @@ func validateEquipmentDraft(draft vote.EquipmentDefinition) error {
 			ErrInvalidEquipmentDraft, draft.ArmorPenPercent, bounds.armorPenMax, draft.Rarity, draft.Slot)
 	}
 
+	if draft.CritRate < 0 || draft.CritRate > bounds.critRateMax {
+		return fmt.Errorf("%w: critRate %.2f out of range [0, %.2f] for %s %s",
+			ErrInvalidEquipmentDraft, draft.CritRate, bounds.critRateMax, draft.Rarity, draft.Slot)
+	}
+
 	partFields := map[string]float64{
 		"partTypeDamageSoft":  draft.PartTypeDamageSoft,
 		"partTypeDamageHeavy": draft.PartTypeDamageHeavy,
@@ -325,6 +335,9 @@ func validateEquipmentDraft(draft vote.EquipmentDefinition) error {
 		if draft.PartTypeDamageSoft != 0 || draft.PartTypeDamageHeavy != 0 || draft.PartTypeDamageWeak != 0 {
 			return fmt.Errorf("%w: 普通装备 partTypeDamage 三项必须为 0", ErrInvalidEquipmentDraft)
 		}
+		if draft.CritRate != 0 {
+			return fmt.Errorf("%w: 普通装备 critRate 必须为 0", ErrInvalidEquipmentDraft)
+		}
 	}
 
 	// 通用装备：attackPower 应接近中位值
@@ -341,6 +354,9 @@ func validateEquipmentDraft(draft vote.EquipmentDefinition) error {
 		}
 		if draft.ArmorPenPercent > bounds.armorPenMax*0.5 {
 			return fmt.Errorf("%w: 通用装备 armorPenPercent 不应超过上限的 50%%", ErrInvalidEquipmentDraft)
+		}
+		if draft.CritRate > bounds.critRateMax*0.5 {
+			return fmt.Errorf("%w: 通用装备 critRate 不应超过上限的 50%%", ErrInvalidEquipmentDraft)
 		}
 	}
 
@@ -370,12 +386,12 @@ func equipmentDraftSystemPrompt() string {
 		"",
 		"【稀有度数值规则 必须遵守】",
 		"以下为基础范围，具体数值还需根据部位乘以修正系数：",
-		"普通：attackPower 5~30，无 critDamageMultiplier，无 armorPenPercent，partTypeDamage 三项均为 0",
-		"优秀：attackPower 20~60，critDamageMultiplier 0~0.3，armorPenPercent 0~0.1，partTypeDamage 三项 0~0.05",
-		"稀有：attackPower 50~120，critDamageMultiplier 0~0.6，armorPenPercent 0~0.25，partTypeDamage 三项 0~0.1",
-		"史诗：attackPower 100~250，critDamageMultiplier 0~1.0，armorPenPercent 0~0.4，partTypeDamage 三项 0~0.2",
-		"传说：attackPower 200~500，critDamageMultiplier 0~1.5，armorPenPercent 0~0.6，partTypeDamage 三项 0~0.35",
-		"至臻：attackPower 400~1000，critDamageMultiplier 0~2.0，armorPenPercent 0~0.8，partTypeDamage 三项 0~0.5",
+		"普通：attackPower 5~30，critRate 0，无 critDamageMultiplier，无 armorPenPercent，partTypeDamage 三项均为 0",
+		"优秀：attackPower 20~60，critRate 0~0.05，critDamageMultiplier 0~0.3，armorPenPercent 0~0.1，partTypeDamage 三项 0~0.05",
+		"稀有：attackPower 50~120，critRate 0~0.08，critDamageMultiplier 0~0.6，armorPenPercent 0~0.25，partTypeDamage 三项 0~0.1",
+		"史诗：attackPower 100~250，critRate 0~0.12，critDamageMultiplier 0~1.0，armorPenPercent 0~0.4，partTypeDamage 三项 0~0.2",
+		"传说：attackPower 200~500，critRate 0~0.18，critDamageMultiplier 0~1.5，armorPenPercent 0~0.6，partTypeDamage 三项 0~0.35",
+		"至臻：attackPower 400~1000，critRate 0~0.35，critDamageMultiplier 0~2.0，armorPenPercent 0~0.8，partTypeDamage 三项 0~0.5",
 		"",
 		"【部位修正系数 必须遵守】",
 		"不同部位对 attackPower 的修正：",
@@ -398,10 +414,14 @@ func equipmentDraftSystemPrompt() string {
 		"weapon、gloves：可达到稀有度上限的 100%",
 		"helmet、chest、legs、accessory：不得超过稀有度上限的 40%",
 		"",
+		"不同部位对 critRate 的修正：",
+		"weapon、gloves、accessory：可达到稀有度上限的 100%",
+		"helmet、chest、legs：不得超过稀有度上限的 30%",
+		"",
 		"talentAffinity 为空字符串表示通用装备，否则必须是 normal/armor/crit 之一。",
 		"通用装备各项数值取该稀有度中位值附近（attackPower 取基础范围中间值，critDamageMultiplier 和 armorPenPercent 取基础范围中间值）。",
 		"description 是用中文描述装备外观和特点的文本。",
 		"返回必须是完整 JSON 对象，不要 Markdown，不要解释。",
-		"输出的 JSON 要求：itemId 必须是字符串（如 \"wood_sword_001\"），其余字段为 name, slot, rarity, description, attackPower, armorPenPercent, critDamageMultiplier, partTypeDamageSoft, partTypeDamageHeavy, partTypeDamageWeak, talentAffinity。",
+		"输出的 JSON 要求：itemId 必须是字符串（如 \"wood_sword_001\"），其余字段为 name, slot, rarity, description, attackPower, armorPenPercent, critRate, critDamageMultiplier, partTypeDamageSoft, partTypeDamageHeavy, partTypeDamageWeak, talentAffinity。",
 	}, "\n")
 }

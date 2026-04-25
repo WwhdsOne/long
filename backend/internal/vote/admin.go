@@ -104,6 +104,7 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 		"image_alt":              strings.TrimSpace(definition.ImageAlt),
 		"attack_power":           strconv.FormatInt(definition.AttackPower, 10),
 		"armor_pen_percent":      strconv.FormatFloat(definition.ArmorPenPercent, 'f', -1, 64),
+		"crit_rate":              strconv.FormatFloat(definition.CritRate, 'f', -1, 64),
 		"crit_damage_multiplier": strconv.FormatFloat(definition.CritDamageMultiplier, 'f', -1, 64),
 		"part_type_damage_soft":  strconv.FormatFloat(definition.PartTypeDamageSoft, 'f', -1, 64),
 		"part_type_damage_heavy": strconv.FormatFloat(definition.PartTypeDamageHeavy, 'f', -1, 64),
@@ -184,10 +185,11 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 		bossID = "boss-" + strconv.FormatInt(time.Now().Unix(), 10)
 	}
 	parts := normalizeBossPartLayout(boss.Parts)
-	maxHP := maxInt64(1, boss.MaxHP)
-	if len(parts) > 0 {
-		maxHP = sumBossPartMaxHP(parts)
+	if len(parts) == 0 {
+		return nil, ErrBossPartsRequired
 	}
+	maxHP := maxInt64(1, boss.MaxHP)
+	maxHP = sumBossPartMaxHP(parts)
 
 	current := &Boss{
 		ID:        bossID,

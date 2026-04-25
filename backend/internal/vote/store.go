@@ -34,6 +34,7 @@ var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
 var ErrBossPoolEmpty = errors.New("boss pool empty")
+var ErrBossPartsRequired = errors.New("boss parts required")
 var ErrBossPartNotFound = errors.New("boss part not found")
 var ErrBossPartAlreadyDead = errors.New("boss part already dead")
 var ErrTalentTreeNotSet = errors.New("talent tree not set")
@@ -151,6 +152,7 @@ type EquipmentDefinition struct {
 	ImageAlt             string  `json:"imageAlt,omitempty"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
+	CritRate             float64 `json:"critRate"` // 暴击率
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
@@ -200,6 +202,7 @@ type InventoryItem struct {
 	Equipped             bool    `json:"equipped"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
+	CritRate             float64 `json:"critRate,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
@@ -1038,68 +1041,10 @@ func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, 
 	if boss == nil || boss.Status != bossStatusActive {
 		return s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
 	}
-	if len(boss.Parts) > 0 {
-		return s.applyBossPartClick(ctx, current, boss, nickname, delta, critical)
+	if len(boss.Parts) == 0 {
+		return ClickResult{}, ErrBossPartsRequired
 	}
-
-	now := time.Now().Unix()
-	scriptResult, err := s.bossClickScript.Run(ctx, s.luaRunner, []string{
-		current.RedisKey,
-		s.userPrefix + nickname,
-		s.leaderboardKey,
-		s.playerIndexKey,
-		s.bossCurrentKey,
-		s.bossDamageKey(boss.ID),
-	}, delta, nickname, now, boss.ID, now)
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	values, ok := scriptResult.([]any)
-	if !ok || len(values) < 3 {
-		return ClickResult{}, fmt.Errorf("unexpected boss click script result: %T", scriptResult)
-	}
-
-	button := current
-	button.Count = int64Value(values, 1)
-
-	result := ClickResult{
-		Button:   button,
-		Delta:    delta,
-		Critical: critical,
-		UserStats: UserStats{
-			Nickname:   nickname,
-			ClickCount: int64Value(values, 2),
-		},
-	}
-
-	if int64Value(values, 0) == 0 {
-		return result, nil
-	}
-
-	result.Boss = &Boss{
-		ID:         stringValue(values, 3),
-		TemplateID: stringValue(values, 4),
-		Name:       stringValue(values, 5),
-		Status:     stringValue(values, 6),
-		MaxHP:      int64Value(values, 7),
-		CurrentHP:  int64Value(values, 8),
-		StartedAt:  int64FromString(stringValue(values, 9)),
-		DefeatedAt: int64FromString(stringValue(values, 10)),
-	}
-
-	if result.Boss.Status == bossStatusDefeated {
-		result.BroadcastUserAll = true
-		nextBoss, finalizeErr := s.finalizeBossKill(ctx, result.Boss)
-		if finalizeErr != nil {
-			return ClickResult{}, finalizeErr
-		}
-		if nextBoss != nil {
-			result.Boss = nextBoss
-		}
-	}
-
-	return result, nil
+	return s.applyBossPartClick(ctx, current, boss, nickname, delta, critical)
 }
 
 func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
@@ -1474,9 +1419,10 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loadout Loadout) (CombatStats, error) {
 	stats := s.baseCombatStats()
 
-	attackPower, armorPen, critDmgMult := loadoutBonuses(loadout)
+	attackPower, armorPen, critRate, critDmgMult := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 0.80)
+	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+critRate*100, 0, 100)
 	stats.CritDamageMultiplier += critDmgMult
 
 	result := deriveCombatStats(stats)
@@ -1494,7 +1440,7 @@ func (s *Store) baseCombatStats() CombatStats {
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critDmgMult float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64) {
 	items := []*InventoryItem{
 		loadout.Weapon,
 		loadout.Helmet,
@@ -1509,6 +1455,7 @@ func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critD
 		}
 		attackPower += item.AttackPower
 		armorPen += item.ArmorPenPercent
+		critRate += item.CritRate
 		critDmgMult += item.CritDamageMultiplier
 	}
 	return
@@ -1687,6 +1634,7 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		ImageAlt:             strings.TrimSpace(values["image_alt"]),
 		AttackPower:          int64FromString(values["attack_power"]),
 		ArmorPenPercent:      float64FromString(values["armor_pen_percent"]),
+		CritRate:             float64FromString(values["crit_rate"]),
 		CritDamageMultiplier: float64FromString(values["crit_damage_multiplier"]),
 		PartTypeDamageSoft:   float64FromString(values["part_type_damage_soft"]),
 		PartTypeDamageHeavy:  float64FromString(values["part_type_damage_heavy"]),
@@ -2374,6 +2322,7 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 		Equipped:             equipped,
 		AttackPower:          definition.AttackPower,
 		ArmorPenPercent:      definition.ArmorPenPercent,
+		CritRate:             definition.CritRate,
 		CritDamageMultiplier: definition.CritDamageMultiplier,
 		PartTypeDamageSoft:   definition.PartTypeDamageSoft,
 		PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,

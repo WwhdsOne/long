@@ -2,6 +2,7 @@ package vote
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -59,6 +60,9 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 		Status:    bossStatusActive,
 		MaxHP:     100,
 		CurrentHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
 		StartedAt: store.now().Unix(),
 	}
 	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
@@ -103,6 +107,9 @@ func TestBossLootDropRateIsIndependentProbability(t *testing.T) {
 		Status:    bossStatusActive,
 		MaxHP:     100,
 		CurrentHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
 		StartedAt: store.now().Unix(),
 	}
 	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
@@ -203,6 +210,20 @@ func TestActivateBossWithPartsUsesPartHealthAsTotalHealth(t *testing.T) {
 	}
 }
 
+func TestActivateBossRequiresParts(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "no-parts-boss",
+		Name:  "无部位 Boss",
+		MaxHP: 100,
+	}); !errors.Is(err, ErrBossPartsRequired) {
+		t.Fatalf("expected ErrBossPartsRequired, got %v", err)
+	}
+}
+
 func TestBossTemplateActivationUsesPartHealthAsTotalHealth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -239,6 +260,20 @@ func TestBossTemplateActivationUsesPartHealthAsTotalHealth(t *testing.T) {
 		if part.CurrentHP != part.MaxHP || !part.Alive {
 			t.Fatalf("expected activated template parts to be reset to full health, got %+v", boss.Parts)
 		}
+	}
+}
+
+func TestSaveBossTemplateRequiresLayout(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "no-layout-template",
+		Name:  "无部位模板",
+		MaxHP: 100,
+	}); !errors.Is(err, ErrBossPartsRequired) {
+		t.Fatalf("expected ErrBossPartsRequired, got %v", err)
 	}
 }
 
@@ -525,5 +560,61 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	}
 	if result.Boss == nil || result.Boss.CurrentHP != 88 || result.Boss.Parts[0].CurrentHP != 88 {
 		t.Fatalf("expected auto click to damage boss, got %+v", result.Boss)
+	}
+}
+
+func TestEquipmentCritRateContributesToCriticalChance(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.critical.CriticalCount = 5
+	store.roll = func(limit int) int {
+		return 0
+	}
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    10,
+		Enabled: true,
+	}); err != nil {
+		t.Fatalf("save button: %v", err)
+	}
+
+	if err := store.SaveEquipmentDefinition(ctx, EquipmentDefinition{
+		ItemID:   "crit-ring",
+		Name:     "暴击戒指",
+		Slot:     "accessory",
+		Rarity:   "传说",
+		CritRate: 0.05,
+	}); err != nil {
+		t.Fatalf("save equipment definition: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "crit-ring", "1").Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if _, err := store.EquipItem(ctx, "阿明", "crit-ring"); err != nil {
+		t.Fatalf("equip item: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+	if !result.Critical {
+		t.Fatalf("expected critical hit from equipment critRate, got %+v", result)
+	}
+	if result.Delta != 9 {
+		t.Fatalf("expected critical delta 9, got %+v", result)
+	}
+
+	userState, err := store.GetUserState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+	if userState.CombatStats.CriticalChancePercent != 5 {
+		t.Fatalf("expected critical chance to include equipment critRate, got %+v", userState.CombatStats)
 	}
 }
