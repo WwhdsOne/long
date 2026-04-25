@@ -983,18 +983,15 @@ select {
 }
 
 .vote-stage__boss-hud {
-  position: sticky;
-  top: 14px;
-  z-index: 6;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin-top: 18px;
-  padding: 18px 20px;
-  border-radius: 24px;
+  padding: 14px 16px;
+  border-radius: 20px;
   background: rgba(255, 251, 252, 0.97);
   border: 1px solid rgba(183, 53, 97, 0.16);
   backdrop-filter: blur(18px);
-  box-shadow: 0 24px 40px rgba(183, 53, 97, 0.16);
+  box-shadow: 0 16px 28px rgba(183, 53, 97, 0.14);
 }
 
 .vote-stage__boss-hud-head {
@@ -2348,8 +2345,10 @@ select {
 .boss-part-grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px;
+  gap: 3px;
+  width: 100%;
+  max-width: min(100%, 420px);
+  padding: 6px;
   background: #0f172a;
   border-radius: 8px;
   margin: 8px 0;
@@ -2357,7 +2356,7 @@ select {
 
 .boss-part-grid__row {
   display: flex;
-  gap: 4px;
+  gap: 3px;
 }
 
 .boss-part-cell {

@@ -75,4 +75,18 @@ describe('PublicPage 三页前台边界', () => {
     expect(battleSource).not.toContain('selectedBossDrop')
     expect(battleSource).not.toContain('Boss 英雄池')
   })
+
+  it('战斗页 Boss 面板不吸顶浮动，并收紧部件网格尺寸', () => {
+    const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
+    const compactStyleSource = styleSource.replace(/\s+/g, ' ')
+    const bossHudStyle = compactStyleSource.slice(
+      compactStyleSource.indexOf('.vote-stage__boss-hud {'),
+      compactStyleSource.indexOf('.vote-stage__boss-hud-head {'),
+    )
+
+    expect(bossHudStyle).not.toContain('position: sticky')
+    expect(bossHudStyle).not.toContain('top: 14px')
+    expect(compactStyleSource).toContain('max-width: min(100%, 420px);')
+    expect(compactStyleSource).toContain('padding: 6px;')
+  })
 })
