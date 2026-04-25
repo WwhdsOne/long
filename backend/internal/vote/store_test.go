@@ -124,3 +124,77 @@ func TestClickButtonDoesNotDoubleDeltaForFormerStarlightButton(t *testing.T) {
 		t.Fatalf("expected single delta to apply to counts, got %+v", result)
 	}
 }
+
+func TestActivateBossWithPartsUsesPartHealthAsTotalHealth(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	boss, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "part-boss",
+		Name:  "分区 Boss",
+		MaxHP: 9999,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 120, CurrentHP: 120, Alive: true},
+			{X: 1, Y: 0, Type: PartTypeHeavy, MaxHP: 80, CurrentHP: 60, Alive: true},
+			{X: 2, Y: 0, Type: PartTypeWeak, MaxHP: 50, CurrentHP: 0, Alive: false},
+		},
+	})
+	if err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	if boss.MaxHP != 250 || boss.CurrentHP != 250 {
+		t.Fatalf("expected boss health to match parts max/current sums, got max=%d current=%d parts=%+v", boss.MaxHP, boss.CurrentHP, boss.Parts)
+	}
+	if boss.Parts[1].CurrentHP != 80 || !boss.Parts[2].Alive {
+		t.Fatalf("expected activated boss parts to be reset to full health, got %+v", boss.Parts)
+	}
+
+	stored, err := store.currentBoss(ctx)
+	if err != nil {
+		t.Fatalf("load current boss: %v", err)
+	}
+	if stored.MaxHP != 250 || stored.CurrentHP != 250 {
+		t.Fatalf("expected stored boss health to match parts max/current sums, got max=%d current=%d parts=%+v", stored.MaxHP, stored.CurrentHP, stored.Parts)
+	}
+}
+
+func TestBossTemplateActivationUsesPartHealthAsTotalHealth(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "template-part-boss",
+		Name:  "模板分区 Boss",
+		MaxHP: 9999,
+		Layout: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 300, CurrentHP: 10, Alive: false},
+			{X: 1, Y: 0, Type: PartTypeHeavy, MaxHP: 200, CurrentHP: 20, Alive: false},
+		},
+	}); err != nil {
+		t.Fatalf("save boss template: %v", err)
+	}
+
+	templates, err := store.ListBossTemplates(ctx)
+	if err != nil {
+		t.Fatalf("list boss templates: %v", err)
+	}
+	if len(templates) != 1 || templates[0].MaxHP != 500 {
+		t.Fatalf("expected saved template max health to match layout, got %+v", templates)
+	}
+
+	boss, err := store.activateRandomBossFromPool(ctx)
+	if err != nil {
+		t.Fatalf("activate boss from pool: %v", err)
+	}
+	if boss.MaxHP != 500 || boss.CurrentHP != 500 {
+		t.Fatalf("expected activated template boss health to match layout, got max=%d current=%d parts=%+v", boss.MaxHP, boss.CurrentHP, boss.Parts)
+	}
+	for _, part := range boss.Parts {
+		if part.CurrentHP != part.MaxHP || !part.Alive {
+			t.Fatalf("expected activated template parts to be reset to full health, got %+v", boss.Parts)
+		}
+	}
+}

@@ -184,14 +184,19 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 	if bossID == "" {
 		bossID = "boss-" + strconv.FormatInt(time.Now().Unix(), 10)
 	}
+	parts := normalizeBossPartLayout(boss.Parts)
+	maxHP := maxInt64(1, boss.MaxHP)
+	if len(parts) > 0 {
+		maxHP = sumBossPartMaxHP(parts)
+	}
 
 	current := &Boss{
 		ID:        bossID,
 		Name:      firstNonEmpty(strings.TrimSpace(boss.Name), bossID),
 		Status:    bossStatusActive,
-		MaxHP:     maxInt64(1, boss.MaxHP),
-		CurrentHP: maxInt64(1, boss.MaxHP),
-		Parts:     boss.Parts,
+		MaxHP:     maxHP,
+		CurrentHP: maxHP,
+		Parts:     parts,
 		StartedAt: time.Now().Unix(),
 	}
 
