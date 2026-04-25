@@ -108,21 +108,27 @@ type PlayerAuthenticator interface {
 	ResetPassword(context.Context, string, string) error
 }
 
+// EquipmentDraftGenerator 根据自然语言生成装备草稿，不负责持久化。
+type EquipmentDraftGenerator interface {
+	GenerateEquipmentDraft(context.Context, string) (vote.EquipmentDefinition, error)
+}
+
 // Options 路由配置，注入业务逻辑、实时更新和静态资源。
 type Options struct {
-	Store               ButtonStore
-	StateView           StateView
-	Broadcaster         Broadcaster
-	ChangePublisher     ChangePublisher
-	ClickGuard          ClickGuard
-	ManualClick         ManualClickController
-	AutoClick           AutoClickController
-	PlayerAuthenticator PlayerAuthenticator
-	Events              app.HandlerFunc
-	RealtimeHub         RealtimeHub
-	PublicDir           string
-	AdminAuthenticator  *adminauth.Authenticator
-	OSSSigner           OSSSigner
+	Store                   ButtonStore
+	StateView               StateView
+	Broadcaster             Broadcaster
+	ChangePublisher         ChangePublisher
+	ClickGuard              ClickGuard
+	ManualClick             ManualClickController
+	AutoClick               AutoClickController
+	PlayerAuthenticator     PlayerAuthenticator
+	Events                  app.HandlerFunc
+	RealtimeHub             RealtimeHub
+	PublicDir               string
+	AdminAuthenticator      *adminauth.Authenticator
+	OSSSigner               OSSSigner
+	EquipmentDraftGenerator EquipmentDraftGenerator
 }
 
 const adminSessionCookieName = "long_admin_session"

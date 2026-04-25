@@ -1511,6 +1511,155 @@ select {
   margin-top: 18px;
 }
 
+.equipment-admin {
+  display: grid;
+  gap: 18px;
+}
+
+.equipment-admin__head {
+  align-items: start;
+}
+
+.equipment-admin__new {
+  min-width: 120px;
+  padding: 0 18px;
+}
+
+.equipment-editor {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid rgba(183, 53, 97, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.equipment-generator {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 160px);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.equipment-generator__textarea {
+  min-height: 112px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.equipment-generator__button {
+  margin-top: 0;
+}
+
+.equipment-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.equipment-form__fieldset {
+  grid-column: 1 / -1;
+  border-color: rgba(183, 53, 97, 0.16);
+}
+
+.equipment-form__save {
+  grid-column: 1 / -1;
+}
+
+.admin-labeled-field {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-labeled-field > span {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.inventory-list--equipment-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.equipment-card {
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 12px;
+  border-radius: 8px;
+}
+
+.equipment-card__main {
+  min-width: 0;
+}
+
+.equipment-card__meta {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.equipment-card__meta div {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.equipment-card__meta dt {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.equipment-card__meta dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.equipment-card__stats {
+  min-height: 2.6em;
+  overflow-wrap: anywhere;
+}
+
+.equipment-card__actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+
+.equipment-card__actions .nickname-form__ghost {
+  margin-top: 0;
+}
+
+.equipment-admin__pager {
+  margin-top: 0;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .inventory-list--equipment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .equipment-form,
+  .equipment-generator {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .inventory-list--equipment-grid,
+  .admin-labeled-field {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-labeled-field > span {
+    text-align: left;
+  }
+}
+
 .admin-form--tight {
   gap: 10px;
 }

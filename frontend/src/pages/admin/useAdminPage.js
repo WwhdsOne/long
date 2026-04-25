@@ -38,6 +38,8 @@ export function useAdminPage() {
   const loginForm = ref({ username: 'admin', password: '' })
   const bossForm = ref({ id: '', name: '', maxHp: '', layout: [] })
   const equipmentForm = ref(emptyEquipmentForm())
+  const equipmentPrompt = ref('')
+  const showEquipmentEditor = ref(false)
   const buttonForm = reactive(emptyButtonForm())
   const announcementForm = ref(emptyAnnouncementForm())
   const lootRows = ref(emptyLootRows())
@@ -54,6 +56,7 @@ export function useAdminPage() {
   const loadingHistory = ref(false)
   const loadingButtons = ref(false)
   const loadingEquipment = ref(false)
+  const generatingEquipmentDraft = ref(false)
   const loadingAnnouncements = ref(false)
   const loadingMessages = ref(false)
   const loadingPlayers = ref(false)
@@ -387,6 +390,7 @@ export function useAdminPage() {
     emptyPlayerPage,
     equipmentForm,
     equipmentPage,
+    equipmentPrompt,
     errorMessage,
     fetchAdminState,
     fetchAnnouncements,
@@ -394,6 +398,7 @@ export function useAdminPage() {
     fetchEquipmentPage,
     fetchMessages,
     findBossTemplate,
+    generatingEquipmentDraft,
     loading,
     loadingAnnouncements,
     loadingButtons,
@@ -417,6 +422,7 @@ export function useAdminPage() {
     saving,
     selectedBossTemplateId,
     setSuccess,
+    showEquipmentEditor,
     successMessage,
     syncBossTemplateEditor,
     uploadImageToOSS,
@@ -444,6 +450,7 @@ export function useAdminPage() {
     editBossTemplate: actions.editBossTemplate,
     editButton: actions.editButton,
     editEquipment: actions.editEquipment,
+    equipmentPrompt,
     equipmentForm,
     equipmentOptions,
     equipmentPage,
@@ -453,6 +460,7 @@ export function useAdminPage() {
     formatTime,
     hasBoss,
     hasEquipmentTemplates,
+    generatingEquipmentDraft,
     loading,
     loadingAnnouncements,
     loadingButtons,
@@ -460,6 +468,7 @@ export function useAdminPage() {
     loadingHistory,
     loadingMessages,
     loadingPlayers,
+    showEquipmentEditor,
     loginForm,
     lootRows,
     messagePage,

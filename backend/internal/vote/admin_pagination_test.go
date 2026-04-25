@@ -88,6 +88,50 @@ func TestListAdminEquipmentPageReturnsStablePagination(t *testing.T) {
 	}
 }
 
+func TestListAdminEquipmentPageReadsMediaAndTalentFields(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveEquipmentDefinition(ctx, EquipmentDefinition{
+		ItemID:               "soft-blade",
+		Name:                 "软组织切割刃",
+		Slot:                 "weapon",
+		Rarity:               "史诗",
+		ImagePath:            "https://cdn.example.com/soft-blade.png",
+		ImageAlt:             "软组织切割刃",
+		AttackPower:          12,
+		ArmorPenPercent:      0.2,
+		CritDamageMultiplier: 1.5,
+		BossDamagePercent:    0.1,
+		PartTypeDamageSoft:   0.35,
+		PartTypeDamageHeavy:  0.05,
+		PartTypeDamageWeak:   0.15,
+		TalentAffinity:       "normal",
+	}); err != nil {
+		t.Fatalf("save equipment definition: %v", err)
+	}
+
+	page, err := store.ListAdminEquipmentPage(ctx, 1, 20)
+	if err != nil {
+		t.Fatalf("list admin equipment page: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("expected one equipment item, got %+v", page.Items)
+	}
+
+	item := page.Items[0]
+	if item.ImagePath != "https://cdn.example.com/soft-blade.png" {
+		t.Fatalf("expected image path to round trip, got %q", item.ImagePath)
+	}
+	if item.ImageAlt != "软组织切割刃" {
+		t.Fatalf("expected image alt to round trip, got %q", item.ImageAlt)
+	}
+	if item.TalentAffinity != "normal" {
+		t.Fatalf("expected talent affinity normal, got %q", item.TalentAffinity)
+	}
+}
+
 func TestListAdminBossHistoryPageReturnsStablePagination(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

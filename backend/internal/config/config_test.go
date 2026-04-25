@@ -58,6 +58,12 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               region: "cn-beijing"
               public_base_url: "https://cdn.example.com"
               upload_dir_prefix: "buttons"
+            llm:
+              enabled: true
+              api_key: "sk-test"
+              base_url: "https://llm.example.com/v1/"
+              model: "gpt-test"
+              timeout_ms: 15000
         `))
 
 		w.Header().Set("X-Consul-Index", "7")
@@ -111,6 +117,90 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if cfg.OSS.PublicBaseURL != "https://cdn.example.com" {
 		t.Fatalf("expected oss public base url, got %q", cfg.OSS.PublicBaseURL)
 	}
+	if !cfg.LLM.Enabled {
+		t.Fatal("expected llm enabled")
+	}
+	if cfg.LLM.APIKey != "sk-test" {
+		t.Fatalf("expected llm api key sk-test, got %q", cfg.LLM.APIKey)
+	}
+	if cfg.LLM.BaseURL != "https://llm.example.com/v1" {
+		t.Fatalf("expected normalized llm base url, got %q", cfg.LLM.BaseURL)
+	}
+	if cfg.LLM.Model != "gpt-test" {
+		t.Fatalf("expected llm model gpt-test, got %q", cfg.LLM.Model)
+	}
+	if cfg.LLM.Timeout != 15*time.Second {
+		t.Fatalf("expected llm timeout 15s, got %s", cfg.LLM.Timeout)
+	}
+}
+
+func TestValidateAllowsMissingLLMConfigWhenDisabled(t *testing.T) {
+	cfg := validConfigForTest()
+	cfg.LLM.Enabled = false
+	cfg.LLM.APIKey = ""
+	cfg.LLM.Model = ""
+	cfg.LLM.BaseURL = ""
+	cfg.LLM.Timeout = 0
+
+	if err := validate(cfg); err != nil {
+		t.Fatalf("expected disabled llm config to be optional, got %v", err)
+	}
+}
+
+func TestValidateRequiresLLMFieldsWhenEnabled(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Config)
+		wantErr string
+	}{
+		{
+			name: "api key",
+			mutate: func(cfg *Config) {
+				cfg.LLM.APIKey = ""
+			},
+			wantErr: "llm.api_key is required when llm is enabled",
+		},
+		{
+			name: "model",
+			mutate: func(cfg *Config) {
+				cfg.LLM.Model = ""
+			},
+			wantErr: "llm.model is required when llm is enabled",
+		},
+		{
+			name: "base url",
+			mutate: func(cfg *Config) {
+				cfg.LLM.BaseURL = ""
+			},
+			wantErr: "llm.base_url is required when llm is enabled",
+		},
+		{
+			name: "timeout",
+			mutate: func(cfg *Config) {
+				cfg.LLM.Timeout = 0
+			},
+			wantErr: "llm.timeout_ms must be greater than 0 when llm is enabled",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validConfigForTest()
+			cfg.LLM = LLMConfig{
+				Enabled: true,
+				APIKey:  "sk-test",
+				BaseURL: "https://api.openai.com/v1",
+				Model:   "gpt-test",
+				Timeout: 5 * time.Second,
+			}
+			tt.mutate(&cfg)
+
+			err := validate(cfg)
+			if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("expected %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
 }
 
 func TestLoadTestRequiresConsulEnv(t *testing.T) {
@@ -123,5 +213,44 @@ func TestLoadTestRequiresConsulEnv(t *testing.T) {
 
 	if _, err := LoadTest(); err == nil {
 		t.Fatal("expected missing env error")
+	}
+}
+
+func validConfigForTest() Config {
+	return Config{
+		Port: 2333,
+		Redis: RedisConfig{
+			Host: "127.0.0.1",
+			Port: 6379,
+		},
+		RedisPrefix:        "vote:button:",
+		ButtonPollInterval: 3 * time.Second,
+		RateLimit: RateLimitConfig{
+			Limit:             30,
+			Window:            2 * time.Second,
+			BlacklistDuration: 10 * time.Minute,
+		},
+		CriticalHit: CriticalHitConfig{
+			ChancePercent: 5,
+			Count:         5,
+		},
+		Admin: AdminConfig{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		},
+		PlayerAuth: PlayerAuthConfig{
+			JWTSecret: "player-secret",
+			JWTTTL:    7 * 24 * time.Hour,
+		},
+		ManualClick: ManualClickConfig{
+			TicketTTL:             2 * time.Second,
+			IssueLimitPerSecond:   6,
+			ConsumeLimitPerSecond: 6,
+			RiskThreshold:         4,
+			BanDuration:           10 * time.Minute,
+			MinPressDuration:      20 * time.Millisecond,
+			MaxPressDuration:      2 * time.Second,
+		},
 	}
 }
