@@ -1,11 +1,5 @@
 import { mergeBossState } from './bossState'
 
-export function buildClickRequestBody(realtimeConnected) {
-  return {
-    realtimeConnected: Boolean(realtimeConnected),
-  }
-}
-
 export function mergeClickFallbackState(currentState, payload) {
   const nextState = {
     userStats: currentState.userStats ?? null,

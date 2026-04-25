@@ -137,19 +137,6 @@ type consulKV struct {
 	Value string `json:"Value"`
 }
 
-// DefaultButtons 内置默认按钮列表
-var DefaultButtons = []ButtonSeed{
-	{Slug: "feel", Label: "有感觉吗", Sort: 10},
-	{Slug: "understand", Label: "有没有懂的", Sort: 20},
-	{
-		Slug:      "wechat-pity",
-		Label:     "微信[可怜]表情",
-		Sort:      30,
-		ImagePath: "/images/emojipedia-wechat-whimper.png",
-		ImageAlt:  "微信可怜表情",
-	},
-}
-
 var exitProcess = os.Exit
 
 // Load 从 Consul 加载运行时配置

@@ -1,18 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildClickRequestBody, mergeClickFallbackState } from './clickResponse'
+import { mergeClickFallbackState } from './clickResponse'
 
 describe('clickResponse', () => {
-  it('会携带实时连接状态', () => {
-    expect(buildClickRequestBody(true)).toEqual({
-      realtimeConnected: true,
-    })
-
-    expect(buildClickRequestBody(false)).toEqual({
-      realtimeConnected: false,
-    })
-  })
-
   it('SSE 正常时只用最小响应，不覆盖现有用户态', () => {
     const current = {
       userStats: { nickname: '阿明', clickCount: 11 },

@@ -16,6 +16,16 @@ const pageSource = [
   .join('\n')
 
 describe('PublicPage 点击响应链路', () => {
+  it('Boss 攻击通过 WebSocket 发送，不再走攻击 POST 接口', () => {
+    const clickSegment = pageSource.slice(
+      pageSource.indexOf('async function clickButton'),
+      pageSource.indexOf('async function submitNickname'),
+    )
+
+    expect(clickSegment).toContain('ensureRealtimeTransport().sendClick')
+    expect(clickSegment).not.toContain('/api/boss/parts/')
+  })
+
   it('点击成功后不会把断连状态直接改成已连接', () => {
     const clickSegment = pageSource.slice(
       pageSource.indexOf('async function clickButton'),
@@ -27,7 +37,7 @@ describe('PublicPage 点击响应链路', () => {
 
   it('页面不再使用本地 setTimeout 挂机循环', () => {
     expect(pageSource).not.toContain('createAutoClickLoop')
-    expect(pageSource).toContain("fetch('/api/auto-click/start'")
-    expect(pageSource).toContain("fetch('/api/auto-click/stop'")
+    expect(pageSource).toContain('async function startAutoClick')
+    expect(pageSource).toContain('async function stopAutoClick')
   })
 })

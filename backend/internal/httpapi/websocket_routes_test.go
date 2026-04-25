@@ -309,6 +309,90 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	}
 }
 
+func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			Buttons: []vote.Button{
+				{Key: "boss-part:1-2", Label: "核心", Count: 4, Enabled: true},
+			},
+			Boss: &vote.Boss{
+				ID:        "boss-1",
+				Name:      "木桩王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 40,
+			},
+		},
+		result: vote.ClickResult{
+			Button: vote.Button{
+				Key:     "boss-part:1-2",
+				Label:   "核心",
+				Count:   5,
+				Enabled: true,
+			},
+			Delta:    1,
+			Critical: false,
+			Boss: &vote.Boss{
+				ID:        "boss-1",
+				Name:      "木桩王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 39,
+			},
+			MyBossStats: &vote.BossUserStats{
+				Nickname: "阿明",
+				Damage:   61,
+			},
+			BroadcastUserAll: true,
+		},
+	}
+	hub := events.NewHub()
+	cache := events.NewCache(store)
+	dispatcher := events.NewDispatcher(cache, hub)
+	publisher := &dispatchingChangePublisher{dispatcher: dispatcher}
+	session := newRealtimeSession(realtimeSessionOptions{
+		stateView:            store,
+		store:                store,
+		hub:                  hub,
+		changePublisher:      publisher,
+		authenticatorEnabled: false,
+		clientID:             "127.0.0.1",
+	})
+
+	_ = captureRealtimeMessages(t, func(send func(any) error) error {
+		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	})
+	messages := captureRealtimeMessages(t, func(send func(any) error) error {
+		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"boss-part:1-2"}`), send)
+	})
+	if len(messages) != 1 {
+		t.Fatalf("expected one realtime message, got %d", len(messages))
+	}
+
+	ack := decodeRealtimeMessage[struct {
+		Type    string `json:"type"`
+		Payload struct {
+			Button vote.Button `json:"button"`
+		} `json:"payload"`
+	}](t, messages[0])
+	if ack.Type != realtimeMessageTypeClickAck {
+		t.Fatalf("expected click_ack, got %+v", ack)
+	}
+	if ack.Payload.Button.Key != "boss-part:1-2" {
+		t.Fatalf("unexpected boss click ack payload: %+v", ack.Payload)
+	}
+
+	if len(publisher.changes) != 1 {
+		t.Fatalf("expected one published change, got %+v", publisher.changes)
+	}
+	if publisher.changes[0].Type != vote.StateChangeButtonClicked {
+		t.Fatalf("expected button_clicked, got %+v", publisher.changes[0])
+	}
+	if !publisher.changes[0].BroadcastUserAll {
+		t.Fatalf("expected BroadcastUserAll to be true, got %+v", publisher.changes[0])
+	}
+}
+
 
 
 func TestRealtimeSessionReturnsProtocolErrors(t *testing.T) {

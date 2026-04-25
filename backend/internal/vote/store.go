@@ -26,24 +26,17 @@ var ErrSensitiveNickname = errors.New("sensitive nickname")
 var ErrSensitiveContent = errors.New("sensitive content")
 var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
-var ErrEquipmentNotEnough = errors.New("equipment not enough")
-var ErrEquipmentMaxEnhance = errors.New("equipment max enhance")
-var ErrGemsNotEnough = errors.New("gems not enough")
-var ErrInvalidQuantity = errors.New("invalid quantity")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
 var ErrBossPoolEmpty = errors.New("boss pool empty")
-var ErrBossPartsRequired = errors.New("boss parts required")
 var ErrBossPartNotFound = errors.New("boss part not found")
 var ErrBossPartAlreadyDead = errors.New("boss part already dead")
-var ErrAfkSettlementNotFound = errors.New("afk settlement not found")
 var ErrTalentTreeNotSet = errors.New("talent tree not set")
 var ErrTalentAlreadyLearned = errors.New("talent already learned")
 var ErrTalentPrerequisite = errors.New("talent prerequisite not met")
 var ErrTalentNotFound = errors.New("talent not found")
 var ErrTalentMaxLevel = errors.New("talent max level reached")
-var ErrInvalidPartType = errors.New("invalid part type")
 var ErrInvalidTalentTree = errors.New("invalid talent tree")
 
 const (
@@ -117,17 +110,15 @@ type BossPart struct {
 
 // Boss 世界 Boss 状态
 type Boss struct {
-	ID          string     `json:"id"`
-	TemplateID  string     `json:"templateId,omitempty"`
-	Name        string     `json:"name"`
-	Status      string     `json:"status"`
-	MaxHP       int64      `json:"maxHp"`
-	CurrentHP   int64      `json:"currentHp"`
-	GoldOnKill  int64      `json:"goldOnKill"`
-	StoneOnKill int64      `json:"stoneOnKill"`
-	Parts       []BossPart `json:"parts,omitempty"`
-	StartedAt   int64      `json:"startedAt,omitempty"`
-	DefeatedAt  int64      `json:"defeatedAt,omitempty"`
+	ID         string     `json:"id"`
+	TemplateID string     `json:"templateId,omitempty"`
+	Name       string     `json:"name"`
+	Status     string     `json:"status"`
+	MaxHP      int64      `json:"maxHp"`
+	CurrentHP  int64      `json:"currentHp"`
+	Parts      []BossPart `json:"parts,omitempty"`
+	StartedAt  int64      `json:"startedAt,omitempty"`
+	DefeatedAt int64      `json:"defeatedAt,omitempty"`
 }
 
 // BossLeaderboardEntry Boss 伤害榜
@@ -155,7 +146,6 @@ type EquipmentDefinition struct {
 	ImageAlt             string  `json:"imageAlt,omitempty"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
-	CritRate             float64 `json:"critRate"` // 暴击率
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
@@ -205,7 +195,6 @@ type InventoryItem struct {
 	Equipped             bool    `json:"equipped"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
-	CritRate             float64 `json:"critRate,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
@@ -269,15 +258,7 @@ type BossResources struct {
 	BossID     string          `json:"bossId,omitempty"`
 	TemplateID string          `json:"templateId,omitempty"`
 	Status     string          `json:"status,omitempty"`
-	GoldRange  ResourceRange   `json:"goldRange"`
-	StoneRange ResourceRange   `json:"stoneRange"`
 	BossLoot   []BossLootEntry `json:"bossLoot"`
-}
-
-// ResourceRange 掉落资源显示区间。
-type ResourceRange struct {
-	Min int64 `json:"min"`
-	Max int64 `json:"max"`
 }
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
@@ -298,8 +279,6 @@ type UserState struct {
 	Loadout       Loadout         `json:"loadout"`
 	CombatStats   CombatStats     `json:"combatStats"`
 	Gems          int64           `json:"gems"`
-	Gold          int64           `json:"gold"`
-	Stones        int64           `json:"stones"`
 	RecentRewards []Reward        `json:"recentRewards,omitempty"`
 	LastReward    *Reward         `json:"lastReward,omitempty"`
 }
@@ -320,26 +299,8 @@ type State struct {
 	Loadout             Loadout                `json:"loadout"`
 	CombatStats         CombatStats            `json:"combatStats"`
 	Gems                int64                  `json:"gems"`
-	Gold                int64                  `json:"gold"`
-	Stones              int64                  `json:"stones"`
 	RecentRewards       []Reward               `json:"recentRewards,omitempty"`
 	LastReward          *Reward                `json:"lastReward,omitempty"`
-}
-
-// AfkSettlement 挂机结算汇总。
-type AfkSettlement struct {
-	Kills      int64 `json:"kills"`
-	GoldTotal  int64 `json:"goldTotal"`
-	StoneTotal int64 `json:"stoneTotal"`
-	StartedAt  int64 `json:"startedAt"`
-	EndedAt    int64 `json:"endedAt"`
-}
-
-// SalvageResult 装备分解结果。
-type SalvageResult struct {
-	ItemID         string `json:"itemId"`
-	RefundedStones int64  `json:"refundedStones"`
-	Stones         int64  `json:"stones"`
 }
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
@@ -419,7 +380,6 @@ type Store struct {
 	inventoryPrefix      string
 	loadoutPrefix        string
 	lastRewardPrefix     string
-	equipmentSpentPrefix string
 	fallbacks            map[string]buttonFallback
 	critical             StoreOptions
 	luaRunner            luaScriptRunner
@@ -470,7 +430,6 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		inventoryPrefix:      namespace + "user-inventory:",
 		loadoutPrefix:        namespace + "user-loadout:",
 		lastRewardPrefix:     namespace + "user-last-reward:",
-		equipmentSpentPrefix: namespace + "user-equipment-spent:",
 		fallbacks: map[string]buttonFallback{
 			"wechat-pity": {
 				ImagePath: "/images/emojipedia-wechat-whimper.png",
@@ -581,13 +540,11 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		return UserState{}, err
 	}
 
-	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	gems, err := s.gemsForNickname(ctx, normalizedNickname)
 	if err != nil {
 		return UserState{}, err
 	}
-	userState.Gems = resources.Gems
-	userState.Gold = resources.Gold
-	userState.Stones = resources.Stones
+	userState.Gems = gems
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
 	if err != nil {
@@ -847,68 +804,6 @@ func (s *Store) UnequipItem(ctx context.Context, nickname string, itemID string)
 	return s.GetState(ctx, normalizedNickname)
 }
 
-// SalvageItem 分解装备，返还已消耗强化石的 60%（向下取整）。
-func (s *Store) SalvageItem(ctx context.Context, nickname string, itemID string) (SalvageResult, error) {
-	normalizedNickname, err := s.validatedNickname(nickname)
-	if err != nil {
-		return SalvageResult{}, err
-	}
-
-	itemID = strings.TrimSpace(itemID)
-	if itemID == "" {
-		return SalvageResult{}, ErrEquipmentNotFound
-	}
-	definition, err := s.getEquipmentDefinition(ctx, itemID)
-	if err != nil {
-		return SalvageResult{}, err
-	}
-
-	quantity, err := s.client.HGet(ctx, s.inventoryKey(normalizedNickname), itemID).Int64()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return SalvageResult{}, ErrEquipmentNotOwned
-		}
-		return SalvageResult{}, err
-	}
-	if quantity <= 0 {
-		return SalvageResult{}, ErrEquipmentNotOwned
-	}
-
-	spent, err := s.client.HGet(ctx, s.equipmentSpentKey(normalizedNickname), itemID).Int64()
-	if err != nil && !errors.Is(err, redis.Nil) {
-		return SalvageResult{}, err
-	}
-	refund := int64(math.Floor(float64(maxInt64(0, spent)) * 0.6))
-
-	pipe := s.client.TxPipeline()
-	remaining := quantity - 1
-	if remaining > 0 {
-		pipe.HSet(ctx, s.inventoryKey(normalizedNickname), itemID, remaining)
-	} else {
-		pipe.HDel(ctx, s.inventoryKey(normalizedNickname), itemID)
-	}
-	if refund > 0 {
-		pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", refund)
-	}
-	pipe.HDel(ctx, s.equipmentSpentKey(normalizedNickname), itemID)
-	if definition.Slot != "" {
-		pipe.HDel(ctx, s.loadoutKey(normalizedNickname), definition.Slot)
-	}
-	if _, err := pipe.Exec(ctx); err != nil {
-		return SalvageResult{}, err
-	}
-
-	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
-	if err != nil {
-		return SalvageResult{}, err
-	}
-	return SalvageResult{
-		ItemID:         itemID,
-		RefundedStones: refund,
-		Stones:         resources.Stones,
-	}, nil
-}
-
 // GetCurrentBoss 返回当前世界 Boss。
 func (s *Store) GetCurrentBoss(ctx context.Context) (*Boss, error) {
 	return s.currentBoss(ctx)
@@ -1066,8 +961,6 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Loadout:             userState.Loadout,
 		CombatStats:         userState.CombatStats,
 		Gems:                userState.Gems,
-		Gold:                userState.Gold,
-		Stones:              userState.Stones,
 		RecentRewards:       userState.RecentRewards,
 		LastReward:          userState.LastReward,
 	}
@@ -1140,10 +1033,68 @@ func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, 
 	if boss == nil || boss.Status != bossStatusActive {
 		return s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
 	}
-	if len(boss.Parts) == 0 {
-		return ClickResult{}, ErrBossPartsRequired
+	if len(boss.Parts) > 0 {
+		return s.applyBossPartClick(ctx, current, boss, nickname, delta, critical)
 	}
-	return s.applyBossPartClick(ctx, current, boss, nickname, delta, critical)
+
+	now := time.Now().Unix()
+	scriptResult, err := s.bossClickScript.Run(ctx, s.luaRunner, []string{
+		current.RedisKey,
+		s.userPrefix + nickname,
+		s.leaderboardKey,
+		s.playerIndexKey,
+		s.bossCurrentKey,
+		s.bossDamageKey(boss.ID),
+	}, delta, nickname, now, boss.ID, now)
+	if err != nil {
+		return ClickResult{}, err
+	}
+
+	values, ok := scriptResult.([]any)
+	if !ok || len(values) < 3 {
+		return ClickResult{}, fmt.Errorf("unexpected boss click script result: %T", scriptResult)
+	}
+
+	button := current
+	button.Count = int64Value(values, 1)
+
+	result := ClickResult{
+		Button:   button,
+		Delta:    delta,
+		Critical: critical,
+		UserStats: UserStats{
+			Nickname:   nickname,
+			ClickCount: int64Value(values, 2),
+		},
+	}
+
+	if int64Value(values, 0) == 0 {
+		return result, nil
+	}
+
+	result.Boss = &Boss{
+		ID:         stringValue(values, 3),
+		TemplateID: stringValue(values, 4),
+		Name:       stringValue(values, 5),
+		Status:     stringValue(values, 6),
+		MaxHP:      int64Value(values, 7),
+		CurrentHP:  int64Value(values, 8),
+		StartedAt:  int64FromString(stringValue(values, 9)),
+		DefeatedAt: int64FromString(stringValue(values, 10)),
+	}
+
+	if result.Boss.Status == bossStatusDefeated {
+		result.BroadcastUserAll = true
+		nextBoss, finalizeErr := s.finalizeBossKill(ctx, result.Boss)
+		if finalizeErr != nil {
+			return ClickResult{}, finalizeErr
+		}
+		if nextBoss != nil {
+			result.Boss = nextBoss
+		}
+	}
+
+	return result, nil
 }
 
 func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
@@ -1156,11 +1107,6 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 }
 
 func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string) (ClickResult, error) {
-	return s.AttackBossPartAFK(ctx, nickname)
-}
-
-// AttackBossPartAFK 执行一次挂机攻击，不增加点击数，伤害按攻击力*0.5 向下取整。
-func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return ClickResult{}, err
@@ -1172,100 +1118,12 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 	if boss == nil || boss.Status != bossStatusActive || len(boss.Parts) == 0 {
 		return ClickResult{}, nil
 	}
-
-	quantities, err := s.inventoryQuantities(ctx, normalizedNickname)
-	if err != nil {
-		return ClickResult{}, nil
-	}
-	loadout, _, err := s.loadoutForNickname(ctx, normalizedNickname, quantities)
-	if err != nil {
-		return ClickResult{}, nil
-	}
-	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
-	if err != nil {
-		return ClickResult{}, nil
-	}
-
-	targetIdx := s.selectTargetPart(boss.Parts, normalizedNickname)
-	if targetIdx < 0 {
-		return ClickResult{}, nil
-	}
-	part := &boss.Parts[targetIdx]
-	if !part.Alive || part.CurrentHP <= 0 {
-		return ClickResult{}, nil
-	}
-
-	damage := int64(math.Floor(float64(maxInt64(0, combatStats.AttackPower)) * 0.5))
-	if damage < 0 {
-		damage = 0
-	}
-	actualDamage := damage
-	if actualDamage > part.CurrentHP {
-		actualDamage = part.CurrentHP
-	}
-	part.CurrentHP -= damage
-	if part.CurrentHP < 0 {
-		part.CurrentHP = 0
-	}
-	if part.CurrentHP <= 0 {
-		part.Alive = false
-	}
-
-	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
-	allDead := true
-	for _, p := range boss.Parts {
-		if p.Alive {
-			allDead = false
-			break
-		}
-	}
-	if allDead {
-		boss.Status = bossStatusDefeated
-		boss.DefeatedAt = s.now().Unix()
-	}
-
-	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
-	if marshalErr != nil {
-		return ClickResult{}, nil
-	}
-	bossValues := map[string]any{
-		"parts":      string(partsRaw),
-		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
-		"status":     boss.Status,
-	}
-	if boss.DefeatedAt != 0 {
-		bossValues["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
-	}
-
-	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
-	if actualDamage > 0 {
-		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(actualDamage), normalizedNickname)
-	}
-	if _, execErr := pipe.Exec(ctx); execErr != nil {
-		return ClickResult{}, nil
-	}
-
-	result := ClickResult{
-		Delta:      0,
-		Boss:       boss,
-		BossDamage: actualDamage,
+	return s.applyBossPartDamage(ctx, boss, normalizedNickname, false, ClickResult{
+		Delta: 0,
 		UserStats: UserStats{
 			Nickname: normalizedNickname,
 		},
-	}
-
-	if allDead {
-		result.BroadcastUserAll = true
-		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss, true)
-		if finalizeErr != nil {
-			return result, nil
-		}
-		if nextBoss != nil {
-			result.Boss = nextBoss
-		}
-	}
-	return result, nil
+	}, -1)
 }
 
 func (s *Store) clickBossPart(ctx context.Context, target string, nickname string) (ClickResult, error) {
@@ -1406,7 +1264,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	if allDead {
 		result.BroadcastUserAll = true
-		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss, false)
+		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss)
 		if finalizeErr != nil {
 			return result, nil
 		}
@@ -1481,7 +1339,7 @@ func bossPartDisplayLabel(part BossPart) string {
 	}
 }
 
-func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) (*Boss, error) {
+func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error) {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil, nil
 	}
@@ -1500,56 +1358,40 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 	if err != nil {
 		return nil, err
 	}
-	participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
-	if err != nil {
-		return nil, err
-	}
-
-	pipe := s.client.Pipeline()
-	now := s.now().Unix()
-	minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
-	goldBase := boss.GoldOnKill
-	stoneBase := boss.StoneOnKill
-	if afkMode {
-		goldBase = int64(math.Floor(float64(goldBase) * 0.5))
-		stoneBase = int64(math.Floor(float64(stoneBase) * 0.5))
-	}
-	for _, participant := range participants {
-		nickname, ok := participant.Member.(string)
-		if !ok || nickname == "" || participant.Score < float64(minDamage) {
-			continue
+	if len(lootEntries) > 0 {
+		participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
+		if err != nil {
+			return nil, err
 		}
 
-		goldDelta := rollResourceReward(s.roll, goldBase, 0.75, 1.25)
-		stoneDelta := rollResourceReward(s.roll, stoneBase, 0.67, 1.33)
-		if goldDelta > 0 {
-			pipe.HIncrBy(ctx, s.gemKey(nickname), "gold", goldDelta)
-		}
-		if stoneDelta > 0 {
-			pipe.HIncrBy(ctx, s.gemKey(nickname), "stones", stoneDelta)
+		pipe := s.client.Pipeline()
+		now := s.now().Unix()
+		minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
+		for _, participant := range participants {
+			nickname, ok := participant.Member.(string)
+			if !ok || nickname == "" || participant.Score < float64(minDamage) {
+				continue
+			}
+
+			rewards := make([]Reward, 0, len(lootEntries))
+			for _, reward := range s.rollLootDrops(lootEntries) {
+				pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
+				rewards = append(rewards, Reward{
+					BossID:    bossID,
+					BossName:  bossName,
+					ItemID:    reward.ItemID,
+					ItemName:  reward.ItemName,
+					GrantedAt: now,
+				})
+			}
+			if len(rewards) > 0 {
+				pipe.HSet(ctx, s.lastRewardKey(nickname), rewardRecordValues(rewards))
+			}
 		}
 
-		if len(lootEntries) == 0 {
-			continue
+		if _, err = pipe.Exec(ctx); err != nil {
+			return nil, err
 		}
-		rewards := make([]Reward, 0, len(lootEntries))
-		for _, reward := range s.rollLootDrops(lootEntries) {
-			pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
-			rewards = append(rewards, Reward{
-				BossID:    bossID,
-				BossName:  bossName,
-				ItemID:    reward.ItemID,
-				ItemName:  reward.ItemName,
-				GrantedAt: now,
-			})
-		}
-		if len(rewards) > 0 {
-			pipe.HSet(ctx, s.lastRewardKey(nickname), rewardRecordValues(rewards))
-		}
-	}
-
-	if _, err = pipe.Exec(ctx); err != nil {
-		return nil, err
 	}
 
 	if err := s.SaveBossToHistory(ctx, boss); err != nil {
@@ -1571,27 +1413,6 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 	}
 
 	return s.currentBoss(ctx)
-}
-
-func rollResourceReward(roller func(int) int, base int64, minMultiplier float64, maxMultiplier float64) int64 {
-	if base <= 0 {
-		return 0
-	}
-	const rollSteps = 10000
-	delta := maxMultiplier - minMultiplier
-	if delta < 0 {
-		delta = 0
-	}
-	roll := 0
-	if roller != nil {
-		roll = roller(rollSteps)
-	}
-	multiplier := minMultiplier + float64(max(0, roll))*delta/float64(rollSteps)
-	result := int64(math.Floor(float64(base) * multiplier))
-	if result < 0 {
-		return 0
-	}
-	return result
 }
 
 func (s *Store) rollLootDrops(entries []BossLootEntry) []BossLootEntry {
@@ -1648,10 +1469,9 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loadout Loadout) (CombatStats, error) {
 	stats := s.baseCombatStats()
 
-	attackPower, armorPen, critRate, critDmgMult := loadoutBonuses(loadout)
+	attackPower, armorPen, critDmgMult := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 0.80)
-	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+critRate*100, 0, 100)
 	stats.CritDamageMultiplier += critDmgMult
 
 	result := deriveCombatStats(stats)
@@ -1669,7 +1489,7 @@ func (s *Store) baseCombatStats() CombatStats {
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critDmgMult float64) {
 	items := []*InventoryItem{
 		loadout.Weapon,
 		loadout.Helmet,
@@ -1684,7 +1504,6 @@ func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critR
 		}
 		attackPower += item.AttackPower
 		armorPen += item.ArmorPenPercent
-		critRate += item.CritRate
 		critDmgMult += item.CritDamageMultiplier
 	}
 	return
@@ -1803,17 +1622,15 @@ func normalizeBoss(values map[string]string) *Boss {
 	}
 
 	return &Boss{
-		ID:          id,
-		TemplateID:  strings.TrimSpace(values["template_id"]),
-		Name:        name,
-		Status:      strings.TrimSpace(values["status"]),
-		MaxHP:       int64FromString(values["max_hp"]),
-		CurrentHP:   int64FromString(values["current_hp"]),
-		GoldOnKill:  int64FromString(values["gold_on_kill"]),
-		StoneOnKill: int64FromString(values["stone_on_kill"]),
-		Parts:       parts,
-		StartedAt:   int64FromString(values["started_at"]),
-		DefeatedAt:  int64FromString(values["defeated_at"]),
+		ID:         id,
+		TemplateID: strings.TrimSpace(values["template_id"]),
+		Name:       name,
+		Status:     strings.TrimSpace(values["status"]),
+		MaxHP:      int64FromString(values["max_hp"]),
+		CurrentHP:  int64FromString(values["current_hp"]),
+		Parts:      parts,
+		StartedAt:  int64FromString(values["started_at"]),
+		DefeatedAt: int64FromString(values["defeated_at"]),
 	}
 }
 
@@ -1865,7 +1682,6 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		ImageAlt:             strings.TrimSpace(values["image_alt"]),
 		AttackPower:          int64FromString(values["attack_power"]),
 		ArmorPenPercent:      float64FromString(values["armor_pen_percent"]),
-		CritRate:             float64FromString(values["crit_rate"]),
 		CritDamageMultiplier: float64FromString(values["crit_damage_multiplier"]),
 		PartTypeDamageSoft:   float64FromString(values["part_type_damage_soft"]),
 		PartTypeDamageHeavy:  float64FromString(values["part_type_damage_heavy"]),
@@ -2438,33 +2254,14 @@ func (s *Store) gemKey(nickname string) string {
 }
 
 func (s *Store) gemsForNickname(ctx context.Context, nickname string) (int64, error) {
-	resources, err := s.resourcesForNickname(ctx, nickname)
+	val, err := s.client.HGet(ctx, s.gemKey(nickname), "gems").Result()
+	if errors.Is(err, redis.Nil) {
+		return 0, nil
+	}
 	if err != nil {
 		return 0, err
 	}
-	return resources.Gems, nil
-}
-
-type playerResources struct {
-	Gems   int64
-	Gold   int64
-	Stones int64
-}
-
-func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
-	values, err := s.client.HMGet(ctx, s.gemKey(nickname), "gems", "gold", "stones").Result()
-	if err != nil {
-		return playerResources{}, err
-	}
-	return playerResources{
-		Gems:   int64Value(values, 0),
-		Gold:   int64Value(values, 1),
-		Stones: int64Value(values, 2),
-	}, nil
-}
-
-func (s *Store) equipmentSpentKey(nickname string) string {
-	return s.equipmentSpentPrefix + nickname
+	return int64FromString(val), nil
 }
 
 func (s *Store) lastRewardKey(nickname string) string {
@@ -2572,7 +2369,6 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 		Equipped:             equipped,
 		AttackPower:          definition.AttackPower,
 		ArmorPenPercent:      definition.ArmorPenPercent,
-		CritRate:             definition.CritRate,
 		CritDamageMultiplier: definition.CritDamageMultiplier,
 		PartTypeDamageSoft:   definition.PartTypeDamageSoft,
 		PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,

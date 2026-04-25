@@ -884,20 +884,12 @@ function ensureRealtimeTransport() {
 }
 
 function connectRealtime(nextNickname = nickname.value) {
-    if (buttons.value.length === 0) {
-        async function loadState() {
-            loading.value = true
-        }
-
-        syncing.value = true
-
-        if (!realtimeTransport) {
-            ensureRealtimeTransport().connect({nickname: nextNickname})
-            return
-        }
-
-        realtimeTransport.reconnect({nickname: nextNickname})
+    syncing.value = true
+    if (!realtimeTransport) {
+        ensureRealtimeTransport().connect({nickname: nextNickname})
+        return
     }
+    realtimeTransport.reconnect({nickname: nextNickname})
 }
 
 function clearCriticalBurst(key) {
@@ -1048,13 +1040,12 @@ async function clickButton(key, options = {}) {
     if (!nickname.value || pendingKeys.value.has(key)) {
         return
     }
-    const matched = String(key || '').match(/^boss-part:(\\d+)-(\\d+)$/)
+    const matched = String(key || '').match(/^boss-part:(\d+)-(\d+)$/)
     if (!matched) {
         errorMessage.value = '仅支持攻击 Boss 部位。'
         return
     }
-    const x = matched[1]
-    const y = matched[2]
+    const bossPartKey = `boss-part:${matched[1]}-${matched[2]}`
 
     const nextPending = new Set(pendingKeys.value)
     nextPending.add(key)
@@ -1063,25 +1054,10 @@ async function clickButton(key, options = {}) {
     errorMessage.value = ''
 
     try {
-        const response = await fetch(`/api/boss/parts/${x}/${y}/attack`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({nickname: nickname.value, realtimeConnected: liveConnected.value}),
-        })
-
-        if (!response.ok) {
-            throw new Error(await readErrorMessage(response, '点击失败，请稍后重试。'))
+        const sent = ensureRealtimeTransport().sendClick(bossPartKey)
+        if (!sent) {
+            throw new Error('实时连接尚未建立，正在重连，请稍后再试。')
         }
-
-        const data = await response.json()
-        if (data.critical) {
-            triggerCriticalBurst(key, data.delta)
-        }
-        clearPendingClicks(key)
-        applyClickResult(data)
-        errorMessage.value = ''
     } catch (error) {
         clearPendingClicks(key)
         errorMessage.value = error.message || '点击失败，请稍后重试。'
@@ -1299,10 +1275,10 @@ function registerPublicPageLifecycle() {
         onlineCount.value = 1
 
         // ✅ 延迟一点再拉真实数据（避免瞬间覆盖）
-        setTimeout(fetchOnlineCount, 300)
+        setTimeout(fetchOnlineCount, 1000)
 
         // 5 秒轮询
-        onlineCountTimer = setInterval(fetchOnlineCount, 5000)
+        onlineCountTimer = setInterval(fetchOnlineCount, 10000)
     })
 
     onBeforeUnmount(() => {
