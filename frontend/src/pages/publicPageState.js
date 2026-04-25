@@ -4,6 +4,7 @@ import {mergeBossState} from '../utils/bossState'
 import {formatDropRate} from '../utils/buttonBoard'
 import {buildClickRequestBody, mergeClickFallbackState} from '../utils/clickResponse'
 import { formatRarityLabel, getRarityClassName, splitEquipmentName } from '../utils/rarity'
+import { EQUIPMENT_SLOTS, normalizeLoadout } from '../utils/equipmentSlots'
 import {createRealtimeTransport} from '../utils/realtimeTransport'
 import { buildFingerprintProof, collectFingerprintHash, createClickBehaviorTracker } from '../utils/manualClickSignals'
 
@@ -145,7 +146,8 @@ const bossProgress = computed(() => {
 
   return Math.max(0, Math.min(100, (boss.value.currentHp / boss.value.maxHp) * 100))
 })
-const equippedItems = computed(() => [loadout.value.weapon, loadout.value.armor, loadout.value.accessory].filter(Boolean))
+const loadoutSlots = EQUIPMENT_SLOTS
+const equippedItems = computed(() => loadoutSlots.map((slot) => loadout.value[slot.value]).filter(Boolean))
 const displayedRecentRewards = computed(() => {
   if (Array.isArray(recentRewards.value) && recentRewards.value.length > 0) {
     return recentRewards.value
@@ -190,11 +192,7 @@ const filteredBossHistory = computed(() => {
 })
 
 function emptyLoadout() {
-  return {
-    weapon: null,
-    armor: null,
-    accessory: null,
-  }
+  return normalizeLoadout(null)
 }
 
 function defaultCombatStats() {
@@ -725,7 +723,7 @@ function applyPlayerProfileState(payload) {
     inventory.value = Array.isArray(payload.inventory) ? payload.inventory : []
   }
   if ('loadout' in payload) {
-    loadout.value = payload.loadout ?? emptyLoadout()
+    loadout.value = normalizeLoadout(payload.loadout)
   }
   if ('combatStats' in payload) {
     combatStats.value = payload.combatStats ?? defaultCombatStats()
@@ -1364,7 +1362,8 @@ export function usePublicPageState() {
     announcements,
     myBossStats,
     inventory,
-    loadout,
+  loadout,
+  loadoutSlots,
     combatStats,
     recentRewards,
     lastReward,

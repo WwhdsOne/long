@@ -135,22 +135,22 @@ type BossUserStats struct {
 	Damage   int64  `json:"damage"`
 }
 
-// EquipmentDefinition 武器模板
+// EquipmentDefinition 装备模板
 type EquipmentDefinition struct {
-	ItemID              string  `json:"itemId"`
-	Name                string  `json:"name"`
-	Slot                string  `json:"slot"`
-	Rarity              string  `json:"rarity"`
-	ImagePath           string  `json:"imagePath,omitempty"`
-	ImageAlt            string  `json:"imageAlt,omitempty"`
-	AttackPower         int64   `json:"attackPower,omitempty"`
-	ArmorPenPercent     float64 `json:"armorPenPercent,omitempty"`
+	ItemID               string  `json:"itemId"`
+	Name                 string  `json:"name"`
+	Slot                 string  `json:"slot"`
+	Rarity               string  `json:"rarity"`
+	ImagePath            string  `json:"imagePath,omitempty"`
+	ImageAlt             string  `json:"imageAlt,omitempty"`
+	AttackPower          int64   `json:"attackPower,omitempty"`
+	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
-	BossDamagePercent   float64 `json:"bossDamagePercent,omitempty"`
-	PartTypeDamageSoft  float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
-	PartTypeDamageHeavy float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
-	PartTypeDamageWeak  float64 `json:"partTypeDamageWeak,omitempty"`  // 弱点增伤
-	TalentAffinity      string  `json:"talentAffinity,omitempty"`      // 天赋系绑定
+	BossDamagePercent    float64 `json:"bossDamagePercent,omitempty"`
+	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
+	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
+	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`  // 弱点增伤
+	TalentAffinity       string  `json:"talentAffinity,omitempty"`      // 天赋系绑定
 }
 
 // Announcement 更新公告
@@ -184,47 +184,49 @@ type MessagePage struct {
 }
 
 // InventoryItem 背包道具
-// InventoryItem 背包道具（武器/装备）
 type InventoryItem struct {
-	ItemID              string  `json:"itemId"`
-	Name                string  `json:"name"`
-	Slot                string  `json:"slot"`
-	Rarity              string  `json:"rarity"`
-	ImagePath           string  `json:"imagePath,omitempty"`
-	ImageAlt            string  `json:"imageAlt,omitempty"`
-	Quantity            int64   `json:"quantity"`
-	Equipped            bool    `json:"equipped"`
-	AttackPower         int64   `json:"attackPower,omitempty"`
-	ArmorPenPercent     float64 `json:"armorPenPercent,omitempty"`
+	ItemID               string  `json:"itemId"`
+	Name                 string  `json:"name"`
+	Slot                 string  `json:"slot"`
+	Rarity               string  `json:"rarity"`
+	ImagePath            string  `json:"imagePath,omitempty"`
+	ImageAlt             string  `json:"imageAlt,omitempty"`
+	Quantity             int64   `json:"quantity"`
+	Equipped             bool    `json:"equipped"`
+	AttackPower          int64   `json:"attackPower,omitempty"`
+	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
-	BossDamagePercent   float64 `json:"bossDamagePercent,omitempty"`
-	PartTypeDamageSoft  float64 `json:"partTypeDamageSoft,omitempty"`
-	PartTypeDamageHeavy float64 `json:"partTypeDamageHeavy,omitempty"`
-	PartTypeDamageWeak  float64 `json:"partTypeDamageWeak,omitempty"`
+	BossDamagePercent    float64 `json:"bossDamagePercent,omitempty"`
+	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
 }
 
 // Loadout 已穿戴装备
 type Loadout struct {
 	Weapon    *InventoryItem `json:"weapon,omitempty"`
-	Armor     *InventoryItem `json:"armor,omitempty"`
+	Helmet    *InventoryItem `json:"helmet,omitempty"`
+	Chest     *InventoryItem `json:"chest,omitempty"`
+	Gloves    *InventoryItem `json:"gloves,omitempty"`
+	Legs      *InventoryItem `json:"legs,omitempty"`
 	Accessory *InventoryItem `json:"accessory,omitempty"`
 }
 
 // CombatStats 当前生效的点击战斗属性
 type CombatStats struct {
-	EffectiveIncrement     int64   `json:"effectiveIncrement"`
-	NormalDamage           int64   `json:"normalDamage"`
-	CriticalChancePercent  float64 `json:"criticalChancePercent"`
-	CriticalCount          int64   `json:"criticalCount"`
-	CriticalDamage         int64   `json:"criticalDamage"`
+	EffectiveIncrement    int64   `json:"effectiveIncrement"`
+	NormalDamage          int64   `json:"normalDamage"`
+	CriticalChancePercent float64 `json:"criticalChancePercent"`
+	CriticalCount         int64   `json:"criticalCount"`
+	CriticalDamage        int64   `json:"criticalDamage"`
 	AttackPower           int64   `json:"attackPower"`
 	ArmorPenPercent       float64 `json:"armorPenPercent"`
 	CritDamageMultiplier  float64 `json:"critDamageMultiplier"`
 	BossDamagePercent     float64 `json:"bossDamagePercent"`
 	AllDamageAmplify      float64 `json:"allDamageAmplify"`
-	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
-	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
-	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
+	PartTypeDamageSoft    float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy   float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak    float64 `json:"partTypeDamageWeak,omitempty"`
 }
 
 // Reward 最近一次掉落
@@ -238,28 +240,28 @@ type Reward struct {
 
 // BossLootEntry Boss 掉落池条目
 type BossLootEntry struct {
-	ItemID              string  `json:"itemId"`
-	ItemName            string  `json:"itemName"`
-	Slot                string  `json:"slot"`
-	Rarity              string  `json:"rarity"`
-	Weight              int64   `json:"weight"`
-	DropRatePercent     float64 `json:"dropRatePercent"`
-	AttackPower         int64   `json:"attackPower,omitempty"`
-	ArmorPenPercent     float64 `json:"armorPenPercent,omitempty"`
+	ItemID               string  `json:"itemId"`
+	ItemName             string  `json:"itemName"`
+	Slot                 string  `json:"slot"`
+	Rarity               string  `json:"rarity"`
+	Weight               int64   `json:"weight"`
+	DropRatePercent      float64 `json:"dropRatePercent"`
+	AttackPower          int64   `json:"attackPower,omitempty"`
+	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
-	BossDamagePercent   float64 `json:"bossDamagePercent,omitempty"`
-	PartTypeDamageSoft  float64 `json:"partTypeDamageSoft,omitempty"`
-	PartTypeDamageHeavy float64 `json:"partTypeDamageHeavy,omitempty"`
-	PartTypeDamageWeak  float64 `json:"partTypeDamageWeak,omitempty"`
-	TalentAffinity      string  `json:"talentAffinity,omitempty"`
+	BossDamagePercent    float64 `json:"bossDamagePercent,omitempty"`
+	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
+	TalentAffinity       string  `json:"talentAffinity,omitempty"`
 }
 
 // BossResources 描述当前 Boss 的低频公共资源。
 type BossResources struct {
-	BossID       string              `json:"bossId,omitempty"`
-	TemplateID   string              `json:"templateId,omitempty"`
-	Status       string              `json:"status,omitempty"`
-	BossLoot     []BossLootEntry     `json:"bossLoot"`
+	BossID     string          `json:"bossId,omitempty"`
+	TemplateID string          `json:"templateId,omitempty"`
+	Status     string          `json:"status,omitempty"`
+	BossLoot   []BossLootEntry `json:"bossLoot"`
 }
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
@@ -274,14 +276,14 @@ type Snapshot struct {
 
 // UserState 个人实时状态，只推送给对应昵称的连接
 type UserState struct {
-	UserStats       *UserStats          `json:"userStats,omitempty"`
-	MyBossStats     *BossUserStats      `json:"myBossStats,omitempty"`
-	Inventory       []InventoryItem     `json:"inventory"`
-	Loadout         Loadout             `json:"loadout"`
-	CombatStats     CombatStats         `json:"combatStats"`
-	Gems            int64               `json:"gems"`
-	RecentRewards   []Reward            `json:"recentRewards,omitempty"`
-	LastReward      *Reward             `json:"lastReward,omitempty"`
+	UserStats     *UserStats      `json:"userStats,omitempty"`
+	MyBossStats   *BossUserStats  `json:"myBossStats,omitempty"`
+	Inventory     []InventoryItem `json:"inventory"`
+	Loadout       Loadout         `json:"loadout"`
+	CombatStats   CombatStats     `json:"combatStats"`
+	Gems          int64           `json:"gems"`
+	RecentRewards []Reward        `json:"recentRewards,omitempty"`
+	LastReward    *Reward         `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -562,7 +564,6 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		return UserState{}, err
 	}
 	userState.Inventory = inventory
-
 
 	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
 	if err != nil {
@@ -1147,7 +1148,6 @@ func (s *Store) selectTargetPart(parts []BossPart, nickname string) int {
 	return alive[s.roll(len(alive))]
 }
 
-
 func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error) {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil, nil
@@ -1312,7 +1312,14 @@ func (s *Store) baseCombatStats() CombatStats {
 }
 
 func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critDmgMult float64, bossDmg float64) {
-	items := []*InventoryItem{loadout.Weapon, loadout.Armor, loadout.Accessory}
+	items := []*InventoryItem{
+		loadout.Weapon,
+		loadout.Helmet,
+		loadout.Chest,
+		loadout.Gloves,
+		loadout.Legs,
+		loadout.Accessory,
+	}
 	for _, item := range items {
 		if item == nil {
 			continue
@@ -1343,10 +1350,11 @@ func deriveCombatStats(stats CombatStats) CombatStats {
 }
 
 // CalcBossPartDamage 计算对 Boss 部位的伤害（新减法公式）。
-//   partType: 部位类型
-//   partArmor: 部位护甲值
-//   isBoss: 是否 Boss 目标（影响 Boss 增伤）
-//   alivePartCount: 存活的部位数量（围剿技能用）
+//
+//	partType: 部位类型
+//	partArmor: 部位护甲值
+//	isBoss: 是否 Boss 目标（影响 Boss 增伤）
+//	alivePartCount: 存活的部位数量（围剿技能用）
 func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, isBoss bool, alivePartCount int) CombatStats {
 	// 基础攻击力
 	atk := max(1, stats.AttackPower)
@@ -1483,18 +1491,18 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 	}
 
 	return EquipmentDefinition{
-		ItemID:                     itemID,
-		Name:                       firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
-		Slot:                       strings.TrimSpace(values["slot"]),
-		Rarity:                     normalizeEquipmentRarity(values["rarity"]),
+		ItemID: itemID,
+		Name:   firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
+		Slot:   normalizeEquipmentSlot(values["slot"]),
+		Rarity: normalizeEquipmentRarity(values["rarity"]),
 
-		AttackPower:                int64FromString(values["attack_power"]),
-		ArmorPenPercent:            float64FromString(values["armor_pen_percent"]),
-		CritDamageMultiplier:       float64FromString(values["crit_damage_multiplier"]),
-		BossDamagePercent:          float64FromString(values["boss_damage_percent"]),
-		PartTypeDamageSoft:         float64FromString(values["part_type_damage_soft"]),
-		PartTypeDamageHeavy:        float64FromString(values["part_type_damage_heavy"]),
-		PartTypeDamageWeak:         float64FromString(values["part_type_damage_weak"]),
+		AttackPower:          int64FromString(values["attack_power"]),
+		ArmorPenPercent:      float64FromString(values["armor_pen_percent"]),
+		CritDamageMultiplier: float64FromString(values["crit_damage_multiplier"]),
+		BossDamagePercent:    float64FromString(values["boss_damage_percent"]),
+		PartTypeDamageSoft:   float64FromString(values["part_type_damage_soft"]),
+		PartTypeDamageHeavy:  float64FromString(values["part_type_damage_heavy"]),
+		PartTypeDamageWeak:   float64FromString(values["part_type_damage_weak"]),
 	}, nil
 }
 
@@ -1525,8 +1533,9 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantit
 	loadout := Loadout{}
 	equipped := make(map[string]string, len(values))
 	for slot, itemID := range values {
+		slot = normalizeEquipmentSlot(slot)
 		itemID = strings.TrimSpace(itemID)
-		if itemID == "" {
+		if itemID == "" || slot == "" {
 			continue
 		}
 
@@ -1541,8 +1550,14 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantit
 		switch slot {
 		case "weapon":
 			loadout.Weapon = &item
-		case "armor":
-			loadout.Armor = &item
+		case "helmet":
+			loadout.Helmet = &item
+		case "chest":
+			loadout.Chest = &item
+		case "gloves":
+			loadout.Gloves = &item
+		case "legs":
+			loadout.Legs = &item
 		case "accessory":
 			loadout.Accessory = &item
 		}
@@ -1696,13 +1711,12 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 		}
 
 		loot = append(loot, BossLootEntry{
-			ItemID:                     itemID,
-			ItemName:                   definition.Name,
-			Slot:                       definition.Slot,
-			Rarity:                     normalizeEquipmentRarity(definition.Rarity),
-			Weight:                     int64(entry.Score),
-			DropRatePercent:            dropRatePercent,
-
+			ItemID:          itemID,
+			ItemName:        definition.Name,
+			Slot:            definition.Slot,
+			Rarity:          normalizeEquipmentRarity(definition.Rarity),
+			Weight:          int64(entry.Score),
+			DropRatePercent: dropRatePercent,
 		})
 	}
 
@@ -2054,7 +2068,6 @@ func (s *Store) loadoutKey(nickname string) string {
 	return s.loadoutPrefix + nickname
 }
 
-
 func (s *Store) gemKey(nickname string) string {
 	return s.namespace + "gem:" + nickname
 }
@@ -2081,7 +2094,6 @@ func (s *Store) announcementItemKey(id string) string {
 func (s *Store) messageItemKey(id string) string {
 	return s.messagePrefix + strings.TrimSpace(id)
 }
-
 
 func (s *Store) equipmentKey(itemID string) string {
 	return s.equipmentDefPrefix + itemID
@@ -2175,24 +2187,42 @@ func int64FromString(raw string) int64 {
 
 func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool) InventoryItem {
 	return InventoryItem{
-		ItemID:              definition.ItemID,
-		Name:                definition.Name,
-		Slot:                definition.Slot,
-		Rarity:              normalizeEquipmentRarity(definition.Rarity),
-		ImagePath:           definition.ImagePath,
-		ImageAlt:            definition.ImageAlt,
-		Quantity:            quantity,
-		Equipped:            equipped,
-		AttackPower:         definition.AttackPower,
-		ArmorPenPercent:     definition.ArmorPenPercent,
+		ItemID:               definition.ItemID,
+		Name:                 definition.Name,
+		Slot:                 normalizeEquipmentSlot(definition.Slot),
+		Rarity:               normalizeEquipmentRarity(definition.Rarity),
+		ImagePath:            definition.ImagePath,
+		ImageAlt:             definition.ImageAlt,
+		Quantity:             quantity,
+		Equipped:             equipped,
+		AttackPower:          definition.AttackPower,
+		ArmorPenPercent:      definition.ArmorPenPercent,
 		CritDamageMultiplier: definition.CritDamageMultiplier,
-		BossDamagePercent:   definition.BossDamagePercent,
-		PartTypeDamageSoft:  definition.PartTypeDamageSoft,
-		PartTypeDamageHeavy: definition.PartTypeDamageHeavy,
-		PartTypeDamageWeak:  definition.PartTypeDamageWeak,
+		BossDamagePercent:    definition.BossDamagePercent,
+		PartTypeDamageSoft:   definition.PartTypeDamageSoft,
+		PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
+		PartTypeDamageWeak:   definition.PartTypeDamageWeak,
 	}
 }
 
+func normalizeEquipmentSlot(slot string) string {
+	switch strings.TrimSpace(slot) {
+	case "weapon", "武器":
+		return "weapon"
+	case "helmet", "头盔":
+		return "helmet"
+	case "chest", "armor", "胸甲", "护甲":
+		return "chest"
+	case "gloves", "手套":
+		return "gloves"
+	case "legs", "腿甲":
+		return "legs"
+	case "accessory", "饰品":
+		return "accessory"
+	default:
+		return strings.TrimSpace(slot)
+	}
+}
 
 func isRedisWrongTypeError(err error) bool {
 	if err == nil {

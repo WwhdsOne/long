@@ -4,6 +4,7 @@ import {usePublicPageState} from './publicPageState'
 const {
   inventory,
   loadout,
+  loadoutSlots,
   combatStats,
   nickname,
   nicknameDraft,
@@ -201,56 +202,22 @@ const {
             <section v-else-if="activeHudTab === 'loadout'" class="player-hud__panel">
               <div class="player-hud__section-head">
                 <p class="vote-stage__eyebrow">装备栏</p>
-                <strong>{{ equippedItems.length }} / 3</strong>
+                <strong>{{ equippedItems.length }} / {{ loadoutSlots.length }}</strong>
               </div>
 
               <div class="loadout-grid">
-                <article class="loadout-slot">
+                <article v-for="slot in loadoutSlots" :key="slot.value" class="loadout-slot">
                   <div class="loadout-slot__main">
-                    <span>武器</span>
-                    <strong v-if="loadout.weapon">
-                      <span v-if="equipmentNameParts(loadout.weapon).prefix">{{ equipmentNameParts(loadout.weapon).prefix }}</span>
-                      <span :class="equipmentNameClass(loadout.weapon)">{{ equipmentNameParts(loadout.weapon).text }}</span>
+                    <span>{{ slot.label }}</span>
+                    <strong v-if="loadout[slot.value]">
+                      <span v-if="equipmentNameParts(loadout[slot.value]).prefix">{{ equipmentNameParts(loadout[slot.value]).prefix }}</span>
+                      <span :class="equipmentNameClass(loadout[slot.value])">{{ equipmentNameParts(loadout[slot.value]).text }}</span>
                     </strong>
                     <strong v-else>未穿戴</strong>
                   </div>
-                  <ul v-if="loadout.weapon" class="loadout-slot__attrs">
-                    <li>{{ formatRarityLabel(loadout.weapon.rarity) }}</li>
-                    <li v-for="line in formatItemStatLines(loadout.weapon)" :key="line">
-                      {{ line }}
-                    </li>
-                  </ul>
-                  <p v-else class="loadout-slot__empty">暂无属性</p>
-                </article>
-                <article class="loadout-slot">
-                  <div class="loadout-slot__main">
-                    <span>护甲</span>
-                    <strong v-if="loadout.armor">
-                      <span v-if="equipmentNameParts(loadout.armor).prefix">{{ equipmentNameParts(loadout.armor).prefix }}</span>
-                      <span :class="equipmentNameClass(loadout.armor)">{{ equipmentNameParts(loadout.armor).text }}</span>
-                    </strong>
-                    <strong v-else>未穿戴</strong>
-                  </div>
-                  <ul v-if="loadout.armor" class="loadout-slot__attrs">
-                    <li>{{ formatRarityLabel(loadout.armor.rarity) }}</li>
-                    <li v-for="line in formatItemStatLines(loadout.armor)" :key="line">
-                      {{ line }}
-                    </li>
-                  </ul>
-                  <p v-else class="loadout-slot__empty">暂无属性</p>
-                </article>
-                <article class="loadout-slot">
-                  <div class="loadout-slot__main">
-                    <span>饰品</span>
-                    <strong v-if="loadout.accessory">
-                      <span v-if="equipmentNameParts(loadout.accessory).prefix">{{ equipmentNameParts(loadout.accessory).prefix }}</span>
-                      <span :class="equipmentNameClass(loadout.accessory)">{{ equipmentNameParts(loadout.accessory).text }}</span>
-                    </strong>
-                    <strong v-else>未穿戴</strong>
-                  </div>
-                  <ul v-if="loadout.accessory" class="loadout-slot__attrs">
-                    <li>{{ formatRarityLabel(loadout.accessory.rarity) }}</li>
-                    <li v-for="line in formatItemStatLines(loadout.accessory)" :key="line">
+                  <ul v-if="loadout[slot.value]" class="loadout-slot__attrs">
+                    <li>{{ formatRarityLabel(loadout[slot.value].rarity) }}</li>
+                    <li v-for="line in formatItemStatLines(loadout[slot.value])" :key="line">
                       {{ line }}
                     </li>
                   </ul>

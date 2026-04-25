@@ -1,4 +1,7 @@
 import { DEFAULT_RARITY, normalizeRarity } from '../../utils/rarity'
+import { EQUIPMENT_SLOTS, normalizeEquipmentSlot, normalizeLoadout as normalizeEquipmentLoadout } from '../../utils/equipmentSlots'
+
+export { EQUIPMENT_SLOTS }
 
 export function emptyAdminState() {
   return {
@@ -26,7 +29,7 @@ export function emptyEquipmentForm() {
   return {
     itemId: '',
     name: '',
-    slot: 'weapon',
+    slot: EQUIPMENT_SLOTS[0].value,
     rarity: DEFAULT_RARITY,
     imagePath: '',
     imageAlt: '',
@@ -103,18 +106,14 @@ export function emptyLootRows() {
 }
 
 export function normalizeLoadout(loadout) {
-  return {
-    weapon: loadout?.weapon ?? null,
-    armor: loadout?.armor ?? null,
-    accessory: loadout?.accessory ?? null,
-  }
+  return normalizeEquipmentLoadout(loadout)
 }
 
 export function normalizeLootEntry(entry) {
   return {
     itemId: entry?.itemId || '',
     itemName: entry?.itemName || '',
-    slot: entry?.slot || '',
+    slot: normalizeEquipmentSlot(entry?.slot),
     rarity: normalizeRarity(entry?.rarity),
     weight: Number(entry?.weight ?? 0),
     attackPower: Number(entry?.attackPower ?? 0),
@@ -165,6 +164,7 @@ export function normalizeEquipmentPage(payload) {
     items: Array.isArray(payload?.items)
       ? payload.items.map((item) => ({
           ...item,
+          slot: normalizeEquipmentSlot(item?.slot),
           rarity: normalizeRarity(item?.rarity),
         }))
       : [],
@@ -256,4 +256,3 @@ export function formatTime(timestamp) {
     minute: '2-digit',
   }).format(new Date(timestamp * 1000))
 }
-

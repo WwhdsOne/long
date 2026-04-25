@@ -1,5 +1,6 @@
 <script setup>
 import { formatRarityLabel, RARITY_OPTIONS } from '../../utils/rarity'
+import { EQUIPMENT_SLOTS } from '../../utils/equipmentSlots'
 
 defineProps({
   equipmentPage: { type: Object, required: true },
@@ -28,9 +29,9 @@ defineProps({
           <input v-model="equipmentForm.itemId" class="nickname-form__input" type="text" placeholder="唯一标识，如 wood-sword" />
           <input v-model="equipmentForm.name" class="nickname-form__input" type="text" placeholder="前台显示的名称" />
           <select v-model="equipmentForm.slot" class="nickname-form__input">
-            <option value="weapon">weapon</option>
-            <option value="armor">armor</option>
-            <option value="accessory">accessory</option>
+            <option v-for="slot in EQUIPMENT_SLOTS" :key="slot.value" :value="slot.value">
+              {{ slot.label }}（{{ slot.value }}）
+            </option>
           </select>
           <select v-model="equipmentForm.rarity" class="nickname-form__input">
             <option v-for="rarity in RARITY_OPTIONS" :key="rarity" :value="rarity">{{ rarity }}</option>

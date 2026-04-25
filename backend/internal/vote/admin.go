@@ -97,19 +97,19 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 	}
 
 	values := map[string]any{
-		"name":                 firstNonEmpty(strings.TrimSpace(definition.Name), itemID),
-		"slot":                 strings.TrimSpace(definition.Slot),
-		"rarity":               normalizeEquipmentRarity(definition.Rarity),
-		"image_path":           strings.TrimSpace(definition.ImagePath),
-		"image_alt":            strings.TrimSpace(definition.ImageAlt),
-		"attack_power":         strconv.FormatInt(definition.AttackPower, 10),
-		"armor_pen_percent":    strconv.FormatFloat(definition.ArmorPenPercent, 'f', -1, 64),
+		"name":                   firstNonEmpty(strings.TrimSpace(definition.Name), itemID),
+		"slot":                   normalizeEquipmentSlot(definition.Slot),
+		"rarity":                 normalizeEquipmentRarity(definition.Rarity),
+		"image_path":             strings.TrimSpace(definition.ImagePath),
+		"image_alt":              strings.TrimSpace(definition.ImageAlt),
+		"attack_power":           strconv.FormatInt(definition.AttackPower, 10),
+		"armor_pen_percent":      strconv.FormatFloat(definition.ArmorPenPercent, 'f', -1, 64),
 		"crit_damage_multiplier": strconv.FormatFloat(definition.CritDamageMultiplier, 'f', -1, 64),
-		"boss_damage_percent":  strconv.FormatFloat(definition.BossDamagePercent, 'f', -1, 64),
+		"boss_damage_percent":    strconv.FormatFloat(definition.BossDamagePercent, 'f', -1, 64),
 		"part_type_damage_soft":  strconv.FormatFloat(definition.PartTypeDamageSoft, 'f', -1, 64),
 		"part_type_damage_heavy": strconv.FormatFloat(definition.PartTypeDamageHeavy, 'f', -1, 64),
 		"part_type_damage_weak":  strconv.FormatFloat(definition.PartTypeDamageWeak, 'f', -1, 64),
-		"talent_affinity":      strings.TrimSpace(definition.TalentAffinity),
+		"talent_affinity":        strings.TrimSpace(definition.TalentAffinity),
 	}
 
 	pipe := s.client.TxPipeline()
