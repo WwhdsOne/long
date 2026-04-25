@@ -63,6 +63,8 @@ describe('PublicPage 三页前台边界', () => {
 
     expect(battleSource).not.toContain('class="boss-stage social-card"')
     expect(battleSource).toContain('世界 Boss 战场')
+    expect(battleSource).not.toContain('每个分区都会从已有按钮抽取名称，点击分区即可结算伤害。')
+    expect(battleSource).not.toContain('现在上墙的是')
     expect(battleSource).toContain('const bossDropPool = computed')
     expect(battleSource).toContain('class="boss-drop-link"')
     expect(battleSource).toContain('@click="openBossDropPool"')

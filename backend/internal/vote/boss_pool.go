@@ -47,12 +47,12 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 		}
 
 		templates = append(templates, BossTemplate{
-			ID:       templateID,
-			Name:     firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
-			MaxHP:    maxInt64(1, int64FromString(values["max_hp"])),
-			Loot:     loot,
-			
-			Layout:   layout,
+			ID:    templateID,
+			Name:  firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
+			MaxHP: maxInt64(1, int64FromString(values["max_hp"])),
+			Loot:  loot,
+
+			Layout: layout,
 		})
 	}
 
@@ -72,13 +72,18 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 	if templateID == "" {
 		return ErrBossTemplateNotFound
 	}
+	layout := normalizeBossPartLayout(template.Layout)
+	maxHP := maxInt64(1, template.MaxHP)
+	if len(layout) > 0 {
+		maxHP = sumBossPartMaxHP(layout)
+	}
 
 	values := map[string]any{
 		"name":   firstNonEmpty(strings.TrimSpace(template.Name), templateID),
-		"max_hp": strconv.FormatInt(maxInt64(1, template.MaxHP), 10),
+		"max_hp": strconv.FormatInt(maxHP, 10),
 	}
-	if len(template.Layout) > 0 {
-		layoutRaw, _ := sonic.Marshal(template.Layout)
+	if len(layout) > 0 {
+		layoutRaw, _ := sonic.Marshal(layout)
 		values["layout"] = string(layoutRaw)
 	}
 
@@ -179,15 +184,20 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 	if err != nil {
 		return nil, err
 	}
+	parts := normalizeBossPartLayout(template.Layout)
+	maxHP := maxInt64(1, template.MaxHP)
+	if len(parts) > 0 {
+		maxHP = sumBossPartMaxHP(parts)
+	}
 
 	current := &Boss{
 		ID:         instanceID,
 		TemplateID: template.ID,
 		Name:       firstNonEmpty(strings.TrimSpace(template.Name), template.ID),
 		Status:     bossStatusActive,
-		MaxHP:      maxInt64(1, template.MaxHP),
-		CurrentHP:  maxInt64(1, template.MaxHP),
-		Parts:      template.Layout,
+		MaxHP:      maxHP,
+		CurrentHP:  maxHP,
+		Parts:      parts,
 		StartedAt:  time.Now().Unix(),
 	}
 
@@ -287,18 +297,18 @@ func (s *Store) loadBossTemplateLoot(ctx context.Context, templateID string) ([]
 		}
 
 		loot = append(loot, BossLootEntry{
-			ItemID:                     itemID,
-			ItemName:                   definition.Name,
-			Slot:                       definition.Slot,
-			Rarity:                     normalizeEquipmentRarity(definition.Rarity),
-			Weight:                     int64(entry.Score),
-			AttackPower:                definition.AttackPower,
-			ArmorPenPercent:            definition.ArmorPenPercent,
-			CritDamageMultiplier:       definition.CritDamageMultiplier,
-			BossDamagePercent:          definition.BossDamagePercent,
-			PartTypeDamageSoft:         definition.PartTypeDamageSoft,
-			PartTypeDamageHeavy:        definition.PartTypeDamageHeavy,
-			PartTypeDamageWeak:         definition.PartTypeDamageWeak,
+			ItemID:               itemID,
+			ItemName:             definition.Name,
+			Slot:                 definition.Slot,
+			Rarity:               normalizeEquipmentRarity(definition.Rarity),
+			Weight:               int64(entry.Score),
+			AttackPower:          definition.AttackPower,
+			ArmorPenPercent:      definition.ArmorPenPercent,
+			CritDamageMultiplier: definition.CritDamageMultiplier,
+			BossDamagePercent:    definition.BossDamagePercent,
+			PartTypeDamageSoft:   definition.PartTypeDamageSoft,
+			PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
+			PartTypeDamageWeak:   definition.PartTypeDamageWeak,
 		})
 	}
 

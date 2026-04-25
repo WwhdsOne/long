@@ -176,19 +176,7 @@ function bossZoneAriaLabel(zone) {
           <div>
             <p class="vote-stage__eyebrow">世界 Boss 战场</p>
             <h2>{{ boss?.name || '等待 Boss 登场' }}</h2>
-            <p class="vote-stage__hint vote-stage__hint--wide">
-              {{
-                !boss
-                    ? '当前休战中，等后台开启下一只 Boss。'
-                    : boss.status === 'active'
-                        ? '每个分区都会从已有按钮抽取名称，点击分区即可结算伤害。'
-                        : '这只 Boss 已经倒下，等待后台开启下一只。'
-              }}
-            </p>
           </div>
-          <p v-if="!errorMessage" class="vote-stage__hint">
-            {{ isLoggedIn ? `现在上墙的是 ${nickname}` : '先登录账号，再开始冲榜。' }}
-          </p>
         </div>
 
         <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
