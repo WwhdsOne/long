@@ -18,6 +18,7 @@ const {
   myClicks,
   myRank,
   myBossDamage,
+  myBossRank,
   effectiveIncrement,
   bossStatusLabel,
   bossProgress,
@@ -146,8 +147,8 @@ function bossZoneAriaLabel(zone) {
         <strong>{{ isLoggedIn ? `#${myRank ?? '--'}` : '--' }}</strong>
       </article>
       <article class="stats-band__card">
-        <span class="stats-band__label">单击增量</span>
-        <strong>+{{ effectiveIncrement }}</strong>
+        <span class="stats-band__label">Boss 排名</span>
+        <strong>{{ isLoggedIn ? (myBossRank ? `#${myBossRank}` : '未上榜') : '先登录' }}</strong>
       </article>
     </section>
 

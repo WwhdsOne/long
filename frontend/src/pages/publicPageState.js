@@ -50,6 +50,7 @@ const activeHudTab = ref('account')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
 const criticalBursts = ref({})
+const onlineCount = ref(null)
 const bossHistory = ref([])
 const bossHistoryQuery = ref('')
 const loadingBossHistory = ref(false)
@@ -93,7 +94,10 @@ const syncLabel = computed(() => {
     return '同步中'
   }
 
-  return liveConnected.value ? '全员在线' : '正在重连'
+  if (!liveConnected.value) {
+    return '正在重连'
+  }
+  return onlineCount.value !== null ? `${onlineCount.value} 人在线` : '已连接'
 })
 const isLoggedIn = computed(() => nickname.value !== '')
 const myClicks = computed(() => userStats.value?.clickCount ?? 0)
@@ -106,6 +110,12 @@ const myRank = computed(() => {
   return matched?.rank ?? null
 })
 const myBossDamage = computed(() => myBossStats.value?.damage ?? 0)
+const myBossRank = computed(() => {
+  if (!nickname.value || !boss.value) return null
+  if (myBossStats.value?.rank) return myBossStats.value.rank
+  const matched = bossLeaderboard.value.find((entry) => entry.nickname === nickname.value)
+  return matched?.rank ?? null
+})
 const effectiveIncrement = computed(() => combatStats.value?.effectiveIncrement ?? 1)
 const normalDamage = computed(() => combatStats.value?.normalDamage ?? effectiveIncrement.value)
 const criticalDamage = computed(() => combatStats.value?.criticalDamage ?? normalDamage.value)
@@ -1327,6 +1337,20 @@ async function loadPlayerSession() {
 }
 
 function registerPublicPageLifecycle() {
+  let onlineCountTimer
+
+  async function fetchOnlineCount() {
+    try {
+      const response = await fetch('/api/online-count')
+      if (response.ok) {
+        const data = await response.json()
+        onlineCount.value = data.count
+      }
+    } catch {
+      // 静默失败，下次轮询重试
+    }
+  }
+
   onMounted(async () => {
     restoreCachedLatestAnnouncement()
     window.addEventListener('popstate', handlePublicRouteChange)
@@ -1334,6 +1358,8 @@ function registerPublicPageLifecycle() {
     await loadState()
     await activatePublicPage(currentPublicPage.value)
     connectRealtime(nickname.value)
+    fetchOnlineCount()
+    onlineCountTimer = setInterval(fetchOnlineCount, 30000)
   })
 
   onBeforeUnmount(() => {
@@ -1342,6 +1368,7 @@ function registerPublicPageLifecycle() {
     realtimeTransport?.close()
     burstTimers.forEach((timer) => window.clearTimeout(timer))
     burstTimers.clear()
+    if (onlineCountTimer) clearInterval(onlineCountTimer)
   })
 }
 
@@ -1416,10 +1443,12 @@ export function usePublicPageState() {
     totalVotes,
     displayedButtons,
     syncLabel,
+    onlineCount,
     isLoggedIn,
     myClicks,
     myRank,
     myBossDamage,
+    myBossRank,
     effectiveIncrement,
     normalDamage,
     criticalDamage,

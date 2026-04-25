@@ -66,6 +66,7 @@ type StateView interface {
 // RealtimeHub 为 SSE 与 WebSocket 共享的订阅中心。
 type RealtimeHub interface {
 	Subscribe(string) (<-chan events.ServerEvent, func())
+	SubscriberCount() int
 }
 
 // OSSSigner 负责生成 OSS 直传短时凭证。

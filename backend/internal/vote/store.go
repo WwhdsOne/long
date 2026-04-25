@@ -137,6 +137,7 @@ type BossLeaderboardEntry struct {
 type BossUserStats struct {
 	Nickname string `json:"nickname"`
 	Damage   int64  `json:"damage"`
+	Rank     int    `json:"rank"`
 }
 
 // EquipmentDefinition 装备模板
@@ -1651,10 +1652,21 @@ func (s *Store) bossStatsForNickname(ctx context.Context, bossID string, nicknam
 		return nil, err
 	}
 
-	return &BossUserStats{
+	stats := &BossUserStats{
 		Nickname: nickname,
 		Damage:   int64(score),
-	}, nil
+	}
+
+	rank, err := s.client.ZRevRank(ctx, s.bossDamageKey(bossID), nickname).Result()
+	if err != nil {
+		if !errors.Is(err, redis.Nil) {
+			return nil, err
+		}
+	} else {
+		stats.Rank = int(rank) + 1
+	}
+
+	return stats, nil
 }
 
 func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (EquipmentDefinition, error) {

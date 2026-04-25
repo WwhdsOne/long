@@ -107,6 +107,12 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 	return nil
 }
 
+func (h *Hub) SubscriberCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients)
+}
+
 func (h *Hub) ActiveNicknames() []string {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
