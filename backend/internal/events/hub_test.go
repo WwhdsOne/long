@@ -14,11 +14,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	xiaohong, unsubscribeXiaohong := hub.Subscribe("小红")
 	defer unsubscribeXiaohong()
 
-	if err := hub.BroadcastPublic(vote.Snapshot{
-		Buttons: []vote.Button{
-			{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
-		},
-	}); err != nil {
+	if err := hub.BroadcastPublic(vote.Snapshot{}); err != nil {
 		t.Fatalf("broadcast public snapshot: %v", err)
 	}
 

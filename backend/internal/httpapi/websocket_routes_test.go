@@ -74,9 +74,6 @@ func decodeRealtimeMessage[T any](t *testing.T, payload []byte) T {
 func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
-			},
 			Leaderboard: []vote.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 3},
 			},
@@ -115,7 +112,7 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	if response.Type != realtimeMessageTypeSnapshot {
 		t.Fatalf("expected snapshot response, got %+v", response)
 	}
-	if len(response.Public.Buttons) != 1 || response.Public.Buttons[0].Key != "feel" {
+	if len(response.Public.Leaderboard) == 0 || response.Public.Leaderboard[0].Nickname != "阿明" {
 		t.Fatalf("unexpected public snapshot: %+v", response.Public)
 	}
 	if response.User == nil || response.User.UserStats == nil || response.User.UserStats.Nickname != "阿明" {
@@ -126,9 +123,6 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
-			},
 		},
 	}
 	session := newRealtimeSession(realtimeSessionOptions{
@@ -165,9 +159,6 @@ func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 	store := &mockStore{
 		snapshot: vote.Snapshot{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
-			},
 			Leaderboard: []vote.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 3},
 			},
@@ -218,9 +209,6 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 4, Enabled: true},
-			},
 			Leaderboard: []vote.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 4},
 			},
@@ -228,12 +216,6 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 			CombatStats: vote.CombatStats{EffectiveIncrement: 2},
 		},
 		result: vote.ClickResult{
-			Button: vote.Button{
-				Key:     "feel",
-				Label:   "有感觉吗",
-				Count:   5,
-				Enabled: true,
-			},
 			Delta:    1,
 			Critical: false,
 			UserStats: vote.UserStats{
@@ -274,7 +256,6 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	ack := decodeRealtimeMessage[struct {
 		Type    string `json:"type"`
 		Payload struct {
-			Button   vote.Button `json:"button"`
 			Delta    int64       `json:"delta"`
 			Critical bool        `json:"critical"`
 		} `json:"payload"`
@@ -282,7 +263,7 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	if ack.Type != realtimeMessageTypeClickAck {
 		t.Fatalf("expected click_ack, got %+v", ack)
 	}
-	if ack.Payload.Button.Key != "feel" || ack.Payload.Delta != 1 || ack.Payload.Critical {
+	if ack.Payload.Delta != 1 || ack.Payload.Critical {
 		t.Fatalf("unexpected click ack payload: %+v", ack.Payload)
 	}
 
@@ -312,9 +293,6 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
-			Buttons: []vote.Button{
-				{Key: "boss-part:1-2", Label: "核心", Count: 4, Enabled: true},
-			},
 			Boss: &vote.Boss{
 				ID:        "boss-1",
 				Name:      "木桩王",
@@ -324,12 +302,6 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 			},
 		},
 		result: vote.ClickResult{
-			Button: vote.Button{
-				Key:     "boss-part:1-2",
-				Label:   "核心",
-				Count:   5,
-				Enabled: true,
-			},
 			Delta:    1,
 			Critical: false,
 			Boss: &vote.Boss{
@@ -372,13 +344,14 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	ack := decodeRealtimeMessage[struct {
 		Type    string `json:"type"`
 		Payload struct {
-			Button vote.Button `json:"button"`
+			Delta    int64 `json:"delta"`
+			Critical bool  `json:"critical"`
 		} `json:"payload"`
 	}](t, messages[0])
 	if ack.Type != realtimeMessageTypeClickAck {
 		t.Fatalf("expected click_ack, got %+v", ack)
 	}
-	if ack.Payload.Button.Key != "boss-part:1-2" {
+	if ack.Payload.Delta != 1 {
 		t.Fatalf("unexpected boss click ack payload: %+v", ack.Payload)
 	}
 

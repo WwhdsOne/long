@@ -28,7 +28,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               db: 3
               tls_enabled: false
             redis_prefix: "vote:"
-            button_poll_interval_ms: 3000
             rate_limit:
               limit: 30
               window_ms: 2000
@@ -204,7 +203,6 @@ func validConfigForTest() Config {
 			Port: 6379,
 		},
 		RedisPrefix:        "vote:",
-		ButtonPollInterval: 3 * time.Second,
 		RateLimit: RateLimitConfig{
 			Limit:             30,
 			Window:            2 * time.Second,

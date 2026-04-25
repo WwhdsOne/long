@@ -109,12 +109,6 @@ func enforceClickRateLimitForClient(guard ClickGuard, clientID string, nickname 
 
 func clickRequestError(err error) *apiResponseError {
 	switch {
-	case errors.Is(err, vote.ErrButtonNotFound):
-		return &apiResponseError{
-			Status:  consts.StatusNotFound,
-			Code:    "BUTTON_NOT_FOUND",
-			Message: "按钮不存在或已经下线。",
-		}
 	case errors.Is(err, vote.ErrBossPartNotFound):
 		return &apiResponseError{
 			Status:  consts.StatusNotFound,

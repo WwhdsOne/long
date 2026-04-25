@@ -2,7 +2,6 @@ package vote
 
 // AdminState 管理后台聚合状态
 type AdminState struct {
-	Buttons           []Button               `json:"buttons,omitempty"`
 	Boss              *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard"`
 	Equipment         []EquipmentDefinition  `json:"equipment,omitempty"`
@@ -27,17 +26,6 @@ type AdminPlayerPage struct {
 	Items      []AdminPlayerOverview `json:"items"`
 	NextCursor string                `json:"nextCursor,omitempty"`
 	Total      int64                 `json:"total"`
-}
-
-// ButtonUpsert 管理后台按钮保存载荷
-type ButtonUpsert struct {
-	Slug      string   `json:"slug"`
-	Label     string   `json:"label"`
-	Sort      int      `json:"sort"`
-	Enabled   bool     `json:"enabled"`
-	Tags      []string `json:"tags"`
-	ImagePath string   `json:"imagePath"`
-	ImageAlt  string   `json:"imageAlt"`
 }
 
 // BossUpsert 管理后台 Boss 启动载荷

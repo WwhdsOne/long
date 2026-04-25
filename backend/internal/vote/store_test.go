@@ -72,14 +72,11 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 		t.Fatalf("set current boss: %v", err)
 	}
 
-	snapshot, err := store.GetSnapshot(ctx)
+	_, err := store.GetSnapshot(ctx)
 	if err != nil {
 		t.Fatalf("get snapshot: %v", err)
 	}
 
-	if len(snapshot.Buttons) != 2 {
-		t.Fatalf("expected full button list in snapshot, got %+v", snapshot.Buttons)
-	}
 
 	resources, err := store.GetBossResources(ctx)
 	if err != nil {
@@ -144,37 +141,6 @@ func TestRollLootDropsCanReturnMultipleItems(t *testing.T) {
 		t.Fatalf("expected multiple independent drops, got %+v", drops)
 	}
 }
-func TestClickButtonDoesNotDoubleDeltaForFormerStarlightButton(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	store.now = func() time.Time {
-		return time.Unix(1713744000, 0)
-	}
-
-	ctx := context.Background()
-	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:    "feel",
-		Label:   "有感觉吗",
-		Sort:    10,
-		Enabled: true,
-	}); err != nil {
-		t.Fatalf("save button: %v", err)
-	}
-
-	result, err := store.ClickButton(ctx, "feel", "阿明")
-	if err != nil {
-		t.Fatalf("click button: %v", err)
-	}
-
-	if result.Delta != 5 {
-		t.Fatalf("expected click delta to stay 5 after removing starlight, got %+v", result)
-	}
-	if result.Button.Count != 5 || result.UserStats.ClickCount != 5 {
-		t.Fatalf("expected single delta to apply to counts, got %+v", result)
-	}
-}
-
 func TestActivateBossWithPartsUsesPartHealthAsTotalHealth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -332,13 +298,13 @@ func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:    "feel",
-		Label:   "有感觉吗",
-		Sort:    10,
-		Enabled: true,
-	}); err != nil {
-		t.Fatalf("save button: %v", err)
+	if err := store.client.HSet(ctx, "vote:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
 	}
 	if _, err := store.ActivateBoss(ctx, BossUpsert{
 		ID:    "part-boss",
@@ -351,9 +317,9 @@ func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	result, err := store.ClickButton(ctx, "feel", "阿明")
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
 	if err != nil {
-		t.Fatalf("click button: %v", err)
+		t.Fatalf("click boss part: %v", err)
 	}
 	if result.Boss == nil {
 		t.Fatal("expected click result to include boss state")
@@ -380,13 +346,13 @@ func TestClickButtonWithBossPartsPersistsDefeatedStatus(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:    "feel",
-		Label:   "有感觉吗",
-		Sort:    10,
-		Enabled: true,
-	}); err != nil {
-		t.Fatalf("save button: %v", err)
+	if err := store.client.HSet(ctx, "vote:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
 	}
 	if _, err := store.ActivateBoss(ctx, BossUpsert{
 		ID:    "fragile-boss",
@@ -399,9 +365,9 @@ func TestClickButtonWithBossPartsPersistsDefeatedStatus(t *testing.T) {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	result, err := store.ClickButton(ctx, "feel", "阿明")
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
 	if err != nil {
-		t.Fatalf("click button: %v", err)
+		t.Fatalf("click boss part: %v", err)
 	}
 	if result.Boss == nil || result.Boss.Status != bossStatusDefeated || result.Boss.CurrentHP != 0 {
 		t.Fatalf("expected click result to defeat boss, got %+v", result.Boss)
@@ -426,13 +392,13 @@ func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:    "feel",
-		Label:   "有感觉吗",
-		Sort:    10,
-		Enabled: true,
-	}); err != nil {
-		t.Fatalf("save button: %v", err)
+	if err := store.client.HSet(ctx, "vote:feel", map[string]any{
+		"label":   "有感觉吗",
+		"count":   "0",
+		"sort":    "10",
+		"enabled": "1",
+	}).Err(); err != nil {
+		t.Fatalf("seed button: %v", err)
 	}
 	seedEquipmentDefinition(t, store, ctx, "strong-sword", "weapon", 7)
 	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "strong-sword", "1").Err(); err != nil {
@@ -452,9 +418,9 @@ func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	result, err := store.ClickButton(ctx, "feel", "阿明")
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
 	if err != nil {
-		t.Fatalf("click button: %v", err)
+		t.Fatalf("click boss part: %v", err)
 	}
 	if result.Delta != 1 || result.BossDamage != 12 {
 		t.Fatalf("expected click delta 1 and boss damage 12, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
@@ -493,9 +459,6 @@ func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("click boss part: %v", err)
 	}
-	if result.Button.Key != "boss-part:1-0" || result.Button.Label != "眼核" {
-		t.Fatalf("expected pseudo part target button, got %+v", result.Button)
-	}
 	if result.Delta != 1 || result.UserStats.ClickCount != 1 {
 		t.Fatalf("expected direct part click to count once, got %+v", result)
 	}
@@ -510,8 +473,8 @@ func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get snapshot: %v", err)
 	}
-	if len(snapshot.Buttons) != 0 || snapshot.TotalVotes != 1 {
-		t.Fatalf("expected no button records and one total click, got buttons=%+v total=%d", snapshot.Buttons, snapshot.TotalVotes)
+	if snapshot.TotalVotes != 1 {
+		t.Fatalf("expected total=1, got %d", snapshot.TotalVotes)
 	}
 }
 
@@ -574,15 +537,6 @@ func TestEquipmentCritRateContributesToCriticalChance(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := store.SaveButton(ctx, ButtonUpsert{
-		Slug:    "feel",
-		Label:   "有感觉吗",
-		Sort:    10,
-		Enabled: true,
-	}); err != nil {
-		t.Fatalf("save button: %v", err)
-	}
-
 	if err := store.SaveEquipmentDefinition(ctx, EquipmentDefinition{
 		ItemID:   "crit-ring",
 		Name:     "暴击戒指",
@@ -599,15 +553,26 @@ func TestEquipmentCritRateContributesToCriticalChance(t *testing.T) {
 		t.Fatalf("equip item: %v", err)
 	}
 
-	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "crit-boss",
+		Name:  "暴击测试 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
 	if err != nil {
-		t.Fatalf("click button: %v", err)
+		t.Fatalf("click boss part: %v", err)
 	}
 	if !result.Critical {
 		t.Fatalf("expected critical hit from equipment critRate, got %+v", result)
 	}
-	if result.Delta != 9 {
-		t.Fatalf("expected critical delta 9, got %+v", result)
+	if result.Delta != 1 {
+		t.Fatalf("expected boss part click delta 1, got %+v", result)
 	}
 
 	userState, err := store.GetUserState(ctx, "阿明")

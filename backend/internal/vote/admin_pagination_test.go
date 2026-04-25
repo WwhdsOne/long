@@ -3,8 +3,6 @@ package vote
 import (
 	"context"
 	"testing"
-
-	"github.com/redis/go-redis/v9"
 )
 
 func TestGetAdminStateOmitsHeavyCollections(t *testing.T) {
@@ -36,35 +34,11 @@ func TestGetAdminStateOmitsHeavyCollections(t *testing.T) {
 		t.Fatalf("get admin state: %v", err)
 	}
 
-	if len(state.Buttons) != 0 {
-		t.Fatalf("expected buttons omitted from admin summary, got %+v", state.Buttons)
-	}
 	if len(state.Equipment) != 0 {
 		t.Fatalf("expected equipment omitted from admin summary, got %+v", state.Equipment)
 	}
 }
 
-func TestListAdminButtonsPageReturnsStablePagination(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	seedAdminButtonForPage(t, store, ctx, "feel", "有感觉吗", 10)
-	seedAdminButtonForPage(t, store, ctx, "understand", "有没有懂的", 20)
-	seedAdminButtonForPage(t, store, ctx, "wechat-pity", "微信[可怜]表情", 30)
-
-	page, err := store.ListAdminButtonsPage(ctx, 2, 1)
-	if err != nil {
-		t.Fatalf("list admin buttons page: %v", err)
-	}
-
-	if page.Page != 2 || page.PageSize != 1 || page.Total != 3 || page.TotalPages != 3 {
-		t.Fatalf("unexpected page meta: %+v", page)
-	}
-	if len(page.Items) != 1 || page.Items[0].Key != "understand" {
-		t.Fatalf("unexpected button page items: %+v", page.Items)
-	}
-}
 
 func TestListAdminEquipmentPageReturnsStablePagination(t *testing.T) {
 	store, cleanup := newTestStore(t)
@@ -153,24 +127,6 @@ func TestListAdminBossHistoryPageReturnsStablePagination(t *testing.T) {
 	}
 }
 
-func seedAdminButtonForPage(t *testing.T, store *Store, ctx context.Context, slug string, label string, sort int) {
-	t.Helper()
-
-	if err := store.client.HSet(ctx, "vote:button:"+slug, map[string]any{
-		"label":   label,
-		"count":   "0",
-		"sort":    sort,
-		"enabled": "1",
-	}).Err(); err != nil {
-		t.Fatalf("seed button %s: %v", slug, err)
-	}
-	if err := store.client.ZAdd(ctx, "vote:buttons:index", redis.Z{
-		Score:  float64(sort),
-		Member: slug,
-	}).Err(); err != nil {
-		t.Fatalf("seed button index %s: %v", slug, err)
-	}
-}
 
 func seedEquipmentDefinitionForPage(t *testing.T, store *Store, ctx context.Context, itemID string, name string, slot string) {
 	t.Helper()

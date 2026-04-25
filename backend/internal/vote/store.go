@@ -14,13 +14,11 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
-	"long/internal/config"
 	nicknamefilter "long/internal/nickname"
 )
 
 // 错误定义
 
-var ErrButtonNotFound = errors.New("button not found")
 var ErrInvalidNickname = errors.New("invalid nickname")
 var ErrSensitiveNickname = errors.New("sensitive nickname")
 var ErrSensitiveContent = errors.New("sensitive content")
@@ -46,19 +44,6 @@ const (
 
 	bossPartClickSlugPrefix = "boss-part:"
 )
-
-// Button 按钮数据结构，返回给前端和 SSE 客户端
-type Button struct {
-	Key       string   `json:"key"`
-	RedisKey  string   `json:"redisKey"`
-	Label     string   `json:"label"`
-	Count     int64    `json:"count"`
-	Sort      int      `json:"sort"`
-	Enabled   bool     `json:"enabled"`
-	Tags      []string `json:"tags,omitempty"`
-	ImagePath string   `json:"imagePath,omitempty"`
-	ImageAlt  string   `json:"imageAlt,omitempty"`
-}
 
 // UserStats 用户统计信息
 type UserStats struct {
@@ -276,7 +261,6 @@ type ResourceRange struct {
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
 type Snapshot struct {
-	Buttons             []Button               `json:"buttons"`
 	TotalVotes          int64                  `json:"totalVotes"`
 	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
 	Boss                *Boss                  `json:"boss,omitempty"`
@@ -300,7 +284,6 @@ type UserState struct {
 
 // State 完整状态，包含个人统计与玩法状态
 type State struct {
-	Buttons             []Button               `json:"buttons"`
 	TotalVotes          int64                  `json:"totalVotes"`
 	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
 	UserStats           *UserStats             `json:"userStats,omitempty"`
@@ -338,7 +321,6 @@ type SalvageResult struct {
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
 type ClickResult struct {
-	Button           Button                 `json:"button"`
 	Delta            int64                  `json:"delta"`
 	BossDamage       int64                  `json:"bossDamage,omitempty"`
 	Critical         bool                   `json:"critical"`
@@ -361,7 +343,6 @@ const (
 	StateChangeAnnouncementChanged  StateChangeType = "announcement_changed"
 	StateChangeMessageCreated       StateChangeType = "message_created"
 	StateChangeMessageDeleted       StateChangeType = "message_deleted"
-	StateChangeButtonMetaChanged    StateChangeType = "button_meta_changed"
 	StateChangeEquipmentMetaChanged StateChangeType = "equipment_meta_changed"
 )
 
@@ -379,20 +360,11 @@ type StoreOptions struct {
 	CriticalCount         int64
 }
 
-// buttonFallback 按钮回退数据（用于图片等元数据）
-type buttonFallback struct {
-	Label     string
-	ImagePath string
-	ImageAlt  string
-}
-
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
 type Store struct {
 	client               redis.UniversalClient
-	prefix               string
-	namespace            string
-	buttonIndexKey       string
-	equipmentIndexKey    string
+		namespace            string
+		equipmentIndexKey    string
 	playerIndexKey       string
 	userPrefix           string
 	leaderboardKey       string
@@ -414,24 +386,12 @@ type Store struct {
 	loadoutPrefix        string
 	lastRewardPrefix     string
 	equipmentSpentPrefix string
-	fallbacks            map[string]buttonFallback
-	critical             StoreOptions
+		critical             StoreOptions
 	luaRunner            luaScriptRunner
 	bossClickScript      *cachedLuaScript
 	roll                 func(int) int
 	now                  func() time.Time
 	validator            interface{ Validate(string) error }
-}
-
-// hashFields Redis Hash 中存储的字段列表
-var hashFields = []string{
-	"label",
-	"count",
-	"sort",
-	"enabled",
-	"tags",
-	"image_path",
-	"image_alt",
 }
 
 // NewStore 创建 Redis 投票存储实例
@@ -440,9 +400,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 
 	return &Store{
 		client:               client,
-		prefix:               namespace + "button:",
 		namespace:            namespace,
-		buttonIndexKey:       namespace + "buttons:index",
 		equipmentIndexKey:    namespace + "equipment:index",
 		playerIndexKey:       namespace + "players:index",
 		userPrefix:           namespace + "user:",
@@ -465,12 +423,6 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		loadoutPrefix:        namespace + "user-loadout:",
 		lastRewardPrefix:     namespace + "user-last-reward:",
 		equipmentSpentPrefix: namespace + "user-equipment-spent:",
-		fallbacks: map[string]buttonFallback{
-			"wechat-pity": {
-				ImagePath: "/images/emojipedia-wechat-whimper.png",
-				ImageAlt:  "微信可怜表情",
-			},
-		},
 		critical: options,
 		luaRunner: redisLuaRunner{
 			client: client,
@@ -490,22 +442,11 @@ func (s *Store) ValidateNickname(_ context.Context, nickname string) error {
 	return err
 }
 
-// GetSnapshot 获取公共快照（按钮列表 + 公共排行榜 + Boss 状态）
+// GetSnapshot 获取公共快照（公共排行榜 + Boss 状态）
 func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
-	buttons, err := s.ListButtons(ctx)
-	if err != nil {
-		return Snapshot{}, err
-	}
-	buttonTotalVotes := int64(0)
-	for _, button := range buttons {
-		buttonTotalVotes += button.Count
-	}
 	totalVotes, err := s.totalClickCount(ctx)
 	if err != nil {
 		return Snapshot{}, err
-	}
-	if totalVotes == 0 {
-		totalVotes = buttonTotalVotes
 	}
 
 	leaderboard, err := s.ListLeaderboard(ctx, 10)
@@ -532,7 +473,6 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	}
 
 	return Snapshot{
-		Buttons:             buttons,
 		TotalVotes:          totalVotes,
 		Leaderboard:         leaderboard,
 		Boss:                boss,
@@ -636,128 +576,19 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	return userState, nil
 }
 
-// ListButtons 扫描 Redis，过滤禁用按钮，按排序权重返回
-func (s *Store) ListButtons(ctx context.Context) ([]Button, error) {
-	keys, err := s.listButtonKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(keys) == 0 {
-		return []Button{}, nil
-	}
-
-	pipe := s.client.Pipeline()
-	cmds := make([]*redis.SliceCmd, len(keys))
-	for index, redisKey := range keys {
-		cmds[index] = pipe.HMGet(ctx, redisKey, hashFields...)
-	}
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		return nil, err
-	}
-
-	buttons := make([]Button, 0, len(keys))
-	for index, redisKey := range keys {
-		button := s.normalizeButton(redisKey, cmds[index].Val())
-		if button.Enabled {
-			buttons = append(buttons, button)
+	// ClickButton 处理 Boss 部位点击。slug 必须以 boss-part: 开头。
+	func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (ClickResult, error) {
+		normalizedNickname, err := s.validatedNickname(nickname)
+		if err != nil {
+			return ClickResult{}, err
 		}
-	}
-
-	slices.SortFunc(buttons, func(left, right Button) int {
-		if left.Sort == right.Sort {
-			return strings.Compare(left.Key, right.Key)
+		slug = strings.TrimSpace(slug)
+		if !strings.HasPrefix(slug, bossPartClickSlugPrefix) {
+			return ClickResult{}, fmt.Errorf("button not available")
 		}
-		if left.Sort < right.Sort {
-			return -1
-		}
-		return 1
-	})
-
-	return buttons, nil
-}
-
-// ClickButton 处理按钮点击。无活动 Boss 时只更新投票；有活动 Boss 时附加结算伤害与掉落。
-func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (ClickResult, error) {
-	normalizedNickname, err := s.validatedNickname(nickname)
-	if err != nil {
-		return ClickResult{}, err
-	}
-	slug = strings.TrimSpace(slug)
-	if strings.HasPrefix(slug, bossPartClickSlugPrefix) {
 		return s.clickBossPart(ctx, slug, normalizedNickname)
 	}
 
-	redisKey := s.prefix + slug
-	currentValues, err := s.client.HMGet(ctx, redisKey, hashFields...).Result()
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	current := s.normalizeButton(redisKey, currentValues)
-	if current.Key == slug && current.Label == slug && current.Count == 0 && current.Sort == 0 && !current.Enabled {
-		exists, existsErr := s.client.Exists(ctx, redisKey).Result()
-		if existsErr != nil {
-			return ClickResult{}, existsErr
-		}
-		if exists == 0 {
-			return ClickResult{}, ErrButtonNotFound
-		}
-	}
-	if !current.Enabled {
-		return ClickResult{}, ErrButtonNotFound
-	}
-
-	delta, critical, err := s.nextIncrement(ctx, normalizedNickname)
-	if err != nil {
-		return ClickResult{}, err
-	}
-	boss, err := s.currentBoss(ctx)
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	var result ClickResult
-	if boss == nil || boss.Status != bossStatusActive {
-		result, err = s.applyVoteOnlyClick(ctx, redisKey, normalizedNickname, delta, critical)
-		if err != nil {
-			return ClickResult{}, err
-		}
-	} else {
-		result, err = s.applyBossClick(ctx, current, boss, normalizedNickname, delta, critical)
-		if err != nil {
-			return ClickResult{}, err
-		}
-	}
-
-	if result.Boss != nil {
-		leaderboard, err := s.ListBossLeaderboard(ctx, result.Boss.ID, 10)
-		if err != nil {
-			return ClickResult{}, err
-		}
-		result.BossLeaderboard = leaderboard
-
-		myBossStats, err := s.bossStatsForNickname(ctx, result.Boss.ID, normalizedNickname)
-		if err != nil {
-			return ClickResult{}, err
-		}
-		result.MyBossStats = myBossStats
-	}
-
-	if result.BroadcastUserAll {
-		recentRewards, err := s.recentRewardsForNickname(ctx, normalizedNickname)
-		if err != nil {
-			return ClickResult{}, err
-		}
-		result.RecentRewards = recentRewards
-		if len(recentRewards) > 0 {
-			result.LastReward = new(recentRewards[len(recentRewards)-1])
-		}
-	}
-
-	return result, nil
-}
 
 // ClickBossPart 处理不绑定按钮的 Boss 部位手动点击。
 func (s *Store) ClickBossPart(ctx context.Context, target string, nickname string) (ClickResult, error) {
@@ -939,41 +770,6 @@ func (s *Store) ListBossLeaderboard(ctx context.Context, bossID string, limit in
 	return leaderboard, nil
 }
 
-// EnsureDefaults 在 Redis 为空时初始化默认按钮
-func (s *Store) EnsureDefaults(ctx context.Context, buttons []config.ButtonSeed) error {
-	keys, err := s.listButtonKeys(ctx)
-	if err != nil {
-		return err
-	}
-	if len(keys) > 0 {
-		return nil
-	}
-
-	pipe := s.client.Pipeline()
-	for _, button := range buttons {
-		values := map[string]any{
-			"label":   button.Label,
-			"count":   "0",
-			"sort":    strconv.Itoa(button.Sort),
-			"enabled": "1",
-		}
-		if button.ImagePath != "" {
-			values["image_path"] = button.ImagePath
-		}
-		if button.ImageAlt != "" {
-			values["image_alt"] = button.ImageAlt
-		}
-		pipe.HSet(ctx, s.prefix+button.Slug, values)
-		pipe.ZAdd(ctx, s.buttonIndexKey, redis.Z{
-			Score:  float64(button.Sort),
-			Member: button.Slug,
-		})
-	}
-
-	_, err = pipe.Exec(ctx)
-	return err
-}
-
 // ListLeaderboard 获取排行榜前 N 名
 func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]LeaderboardEntry, error) {
 	if limit <= 0 {
@@ -1048,7 +844,6 @@ func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, e
 // ComposeState 将公共快照与个人态组合成完整状态。
 func ComposeState(snapshot Snapshot, userState UserState) State {
 	return State{
-		Buttons:             snapshot.Buttons,
 		TotalVotes:          snapshot.TotalVotes,
 		Leaderboard:         snapshot.Leaderboard,
 		UserStats:           userState.UserStats,
@@ -1065,41 +860,6 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		RecentRewards:       userState.RecentRewards,
 		LastReward:          userState.LastReward,
 	}
-}
-
-func (s *Store) applyVoteOnlyClick(ctx context.Context, redisKey string, nickname string, delta int64, critical bool) (ClickResult, error) {
-	now := time.Now().Unix()
-	pipe := s.client.TxPipeline()
-	pipe.HIncrBy(ctx, redisKey, "count", delta)
-	userCountCmd := pipe.HIncrBy(ctx, s.userPrefix+nickname, "click_count", delta)
-	pipe.HSet(ctx, s.userPrefix+nickname, map[string]any{
-		"nickname":   nickname,
-		"updated_at": strconv.FormatInt(now, 10),
-	})
-	pipe.ZIncrBy(ctx, s.leaderboardKey, float64(delta), nickname)
-	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
-		Score:  float64(now),
-		Member: nickname,
-	})
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		return ClickResult{}, err
-	}
-
-	updatedValues, err := s.client.HMGet(ctx, redisKey, hashFields...).Result()
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	return ClickResult{
-		Button:   s.normalizeButton(redisKey, updatedValues),
-		Delta:    delta,
-		Critical: critical,
-		UserStats: UserStats{
-			Nickname:   nickname,
-			ClickCount: userCountCmd.Val(),
-		},
-	}, nil
 }
 
 func (s *Store) applyClickCountOnly(ctx context.Context, nickname string, delta int64, critical bool) (ClickResult, error) {
@@ -1128,25 +888,6 @@ func (s *Store) applyClickCountOnly(ctx context.Context, nickname string, delta 
 			ClickCount: userCountCmd.Val(),
 		},
 	}, nil
-}
-
-func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
-	if boss == nil || boss.Status != bossStatusActive {
-		return s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
-	}
-	if len(boss.Parts) == 0 {
-		return ClickResult{}, ErrBossPartsRequired
-	}
-	return s.applyBossPartClick(ctx, current, boss, nickname, delta, critical)
-}
-
-func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
-	result, err := s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, 1, critical)
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, -1)
 }
 
 func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string) (ClickResult, error) {
@@ -1293,12 +1034,6 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
-	result.Button = Button{
-		Key:     bossPartClickSlug(x, y),
-		Label:   bossPartDisplayLabel(part),
-		Enabled: true,
-	}
-
 	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx)
 }
 
@@ -2077,43 +1812,6 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 	return loot, nil
 }
 
-// normalizeButton 将 Redis 数据转换为 Button 结构
-func (s *Store) normalizeButton(redisKey string, values []any) Button {
-	slug := strings.TrimPrefix(redisKey, s.prefix)
-	fallback := s.fallbacks[slug]
-
-	label := stringValue(values, 0)
-	if label == "" {
-		if fallback.Label != "" {
-			label = fallback.Label
-		} else {
-			label = slug
-		}
-	}
-
-	imagePath := stringValue(values, 6)
-	if imagePath == "" {
-		imagePath = fallback.ImagePath
-	}
-
-	imageAlt := stringValue(values, 7)
-	if imageAlt == "" {
-		imageAlt = fallback.ImageAlt
-	}
-
-	return Button{
-		Key:       slug,
-		RedisKey:  redisKey,
-		Label:     label,
-		Count:     int64Value(values, 1),
-		Sort:      int(int64Value(values, 2)),
-		Enabled:   stringValue(values, 3) != "0",
-		Tags:      decodeStringList(stringValue(values, 4)),
-		ImagePath: imagePath,
-		ImageAlt:  imageAlt,
-	}
-}
-
 func decodeStringList(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -2181,131 +1879,6 @@ func dropRateThreshold(dropRatePercent float64) int {
 	return int(math.Round(clampFloat(dropRatePercent, 0, 100) * 100))
 }
 
-// scanKeys 扫描 Redis 中匹配前缀的所有键
-func (s *Store) scanKeys(ctx context.Context) ([]string, error) {
-	var (
-		cursor uint64
-		keys   []string
-	)
-
-	for {
-		foundKeys, nextCursor, err := s.client.Scan(ctx, cursor, s.prefix+"*", 100).Result()
-		if err != nil {
-			return nil, err
-		}
-
-		keys = append(keys, foundKeys...)
-		cursor = nextCursor
-		if cursor == 0 {
-			break
-		}
-	}
-
-	return keys, nil
-}
-
-func (s *Store) listButtonKeys(ctx context.Context) ([]string, error) {
-	slugs, err := s.client.ZRange(ctx, s.buttonIndexKey, 0, -1).Result()
-	if err != nil {
-		return nil, err
-	}
-	if len(slugs) > 0 {
-		keys := make([]string, 0, len(slugs))
-		for _, slug := range slugs {
-			slug = strings.TrimSpace(slug)
-			if slug == "" {
-				continue
-			}
-			keys = append(keys, s.prefix+slug)
-		}
-		return keys, nil
-	}
-
-	keys, err := s.scanKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if len(keys) == 0 {
-		return []string{}, nil
-	}
-	if err := s.rebuildButtonIndex(ctx, keys); err != nil {
-		return nil, err
-	}
-	return keys, nil
-}
-
-func (s *Store) rebuildButtonIndex(ctx context.Context, keys []string) error {
-	if len(keys) == 0 {
-		return nil
-	}
-
-	pipe := s.client.Pipeline()
-	cmds := make([]*redis.SliceCmd, len(keys))
-	for index, key := range keys {
-		cmds[index] = pipe.HMGet(ctx, key, "sort")
-	}
-	if _, err := pipe.Exec(ctx); err != nil {
-		return err
-	}
-
-	entries := make([]redis.Z, 0, len(keys))
-	for index, key := range keys {
-		slug := strings.TrimSpace(strings.TrimPrefix(key, s.prefix))
-		if slug == "" {
-			continue
-		}
-		entries = append(entries, redis.Z{
-			Score:  float64(int64Value(cmds[index].Val(), 0)),
-			Member: slug,
-		})
-	}
-	if len(entries) == 0 {
-		return nil
-	}
-
-	return s.client.ZAdd(ctx, s.buttonIndexKey, entries...).Err()
-}
-
-// SyncButtonIndex 将直接写入 Redis 的按钮补进显式索引，供低频兜底扫描使用。
-func (s *Store) SyncButtonIndex(ctx context.Context) (bool, error) {
-	keys, err := s.scanKeys(ctx)
-	if err != nil {
-		return false, err
-	}
-	if len(keys) == 0 {
-		return false, nil
-	}
-
-	indexedSlugs, err := s.client.ZRange(ctx, s.buttonIndexKey, 0, -1).Result()
-	if err != nil {
-		return false, err
-	}
-	indexed := make(map[string]struct{}, len(indexedSlugs))
-	for _, slug := range indexedSlugs {
-		indexed[strings.TrimSpace(slug)] = struct{}{}
-	}
-
-	missingKeys := make([]string, 0)
-	for _, key := range keys {
-		slug := strings.TrimSpace(strings.TrimPrefix(key, s.prefix))
-		if slug == "" {
-			continue
-		}
-		if _, ok := indexed[slug]; ok {
-			continue
-		}
-		missingKeys = append(missingKeys, key)
-	}
-	if len(missingKeys) == 0 {
-		return false, nil
-	}
-
-	if err := s.rebuildButtonIndex(ctx, missingKeys); err != nil {
-		return false, err
-	}
-
-	return true, nil
-}
 
 func (s *Store) listEquipmentIDs(ctx context.Context) ([]string, error) {
 	itemIDs, err := s.client.SMembers(ctx, s.equipmentIndexKey).Result()

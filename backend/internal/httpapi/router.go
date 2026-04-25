@@ -27,12 +27,10 @@ type ButtonStore interface {
 	UnequipItem(context.Context, string, string) (vote.State, error)
 	SalvageItem(context.Context, string, string) (vote.SalvageResult, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
-	ListAdminButtonsPage(context.Context, int64, int64) (vote.AdminButtonPage, error)
 	ListAdminEquipmentPage(context.Context, int64, int64) (vote.AdminEquipmentPage, error)
 	ListAdminBossHistoryPage(context.Context, int64, int64) (vote.AdminBossHistoryPage, error)
 	ListAdminPlayers(context.Context, string, int64) (vote.AdminPlayerPage, error)
 	GetAdminPlayer(context.Context, string) (*vote.AdminPlayerOverview, error)
-	SaveButton(context.Context, vote.ButtonUpsert) error
 	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
 	DeleteEquipmentDefinition(context.Context, string) error
 	ActivateBoss(context.Context, vote.BossUpsert) (*vote.Boss, error)

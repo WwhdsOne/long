@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 // GetAdminState 返回后台页面所需的聚合数据。
@@ -49,7 +47,6 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	return AdminState{
 		Boss:              boss,
 		BossLeaderboard:   bossLeaderboard,
-		Buttons:           []Button{},
 		Equipment:         []EquipmentDefinition{},
 		Loot:              loot,
 		BossCycleEnabled:  bossCycleEnabled,
@@ -130,46 +127,6 @@ func (s *Store) DeleteEquipmentDefinition(ctx context.Context, itemID string) er
 	pipe.Del(ctx, s.equipmentKey(itemID))
 	pipe.SRem(ctx, s.equipmentIndexKey, itemID)
 	_, err := pipe.Exec(ctx)
-	return err
-}
-
-// SaveButton 保存按钮配置。
-func (s *Store) SaveButton(ctx context.Context, button ButtonUpsert) error {
-	slug := strings.TrimSpace(button.Slug)
-	if slug == "" {
-		return ErrButtonNotFound
-	}
-
-	values := map[string]any{
-		"label":   firstNonEmpty(strings.TrimSpace(button.Label), slug),
-		"count":   "0",
-		"sort":    strconv.Itoa(button.Sort),
-		"enabled": boolToRedis(button.Enabled),
-		"tags":    encodeStringList(button.Tags),
-	}
-
-	existing, err := s.client.HGetAll(ctx, s.prefix+slug).Result()
-	if err != nil {
-		return err
-	}
-	if currentCount := strings.TrimSpace(existing["count"]); currentCount != "" {
-		values["count"] = currentCount
-	}
-
-	if strings.TrimSpace(button.ImagePath) != "" {
-		values["image_path"] = strings.TrimSpace(button.ImagePath)
-	}
-	if strings.TrimSpace(button.ImageAlt) != "" {
-		values["image_alt"] = strings.TrimSpace(button.ImageAlt)
-	}
-
-	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.prefix+slug, values)
-	pipe.ZAdd(ctx, s.buttonIndexKey, redis.Z{
-		Score:  float64(button.Sort),
-		Member: slug,
-	})
-	_, err = pipe.Exec(ctx)
 	return err
 }
 

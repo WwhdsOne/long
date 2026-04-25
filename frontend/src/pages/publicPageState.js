@@ -20,8 +20,6 @@ const publicPages = [
     {id: 'messages', label: '消息', path: '/messages'},
 ]
 
-const buttons = ref([])
-const buttonTotalCount = ref(0)
 const buttonTotalVotes = ref(0)
 const leaderboard = ref([])
 const boss = ref(null)
@@ -85,11 +83,7 @@ let lastBossResourceVersion = ''
 const burstTimers = new Map()
 const pendingClickSources = new Map()
 
-const buttonCount = computed(() => buttonTotalCount.value || buttons.value.length)
-const totalVotes = computed(() =>
-    buttonTotalVotes.value || buttons.value.reduce((total, button) => total + button.count, 0),
-)
-const displayedButtons = computed(() => buttons.value)
+const totalVotes = computed(() => buttonTotalVotes.value)
 const syncLabel = computed(() => {
     if (syncing.value) {
         return '同步中'
@@ -120,10 +114,6 @@ const myBossRank = computed(() => {
 const effectiveIncrement = computed(() => combatStats.value?.effectiveIncrement ?? 1)
 const normalDamage = computed(() => combatStats.value?.normalDamage ?? effectiveIncrement.value)
 const criticalDamage = computed(() => combatStats.value?.criticalDamage ?? normalDamage.value)
-const autoClickTargetButton = computed(() =>
-    buttons.value.find((button) => button.key === autoClickTargetKey.value) ?? null,
-)
-const autoClickTargetLabel = computed(() => (autoClickTargetButton.value?.label ?? autoClickTargetKey.value) || '未选择')
 const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetKey.value))
 const autoClickStatus = computed(() => {
     void autoClickEnabled.value
@@ -645,14 +635,6 @@ function applyPublicState(payload) {
         return
     }
 
-    if ('buttons' in payload) {
-        buttons.value = Array.isArray(payload.buttons) ? payload.buttons : []
-        buttonTotalCount.value = buttons.value.length
-        syncAutoClickTarget()
-    }
-    if ('buttonTotal' in payload) {
-        buttonTotalCount.value = Number(payload.buttonTotal ?? buttonTotalCount.value)
-    }
     if ('totalVotes' in payload) {
         buttonTotalVotes.value = Number(payload.totalVotes ?? buttonTotalVotes.value)
     }
@@ -756,14 +738,6 @@ function applyClickResult(payload) {
         return
     }
 
-    if (payload.button?.key) {
-        buttons.value = buttons.value.map((button) =>
-            button.key === payload.button.key
-                ? {...button, ...payload.button}
-                : button,
-        )
-        syncAutoClickTarget()
-    }
     buttonTotalVotes.value = Math.max(0, buttonTotalVotes.value + Number(payload.delta || 0))
     const nextClickState = mergeClickFallbackState(
         {
@@ -1299,8 +1273,6 @@ export function usePublicPageState() {
         EQUIPMENT_ENHANCE_COST,
         GROWTH_FORMULA_TEXT,
         publicPages,
-        buttons,
-        buttonTotalCount,
         buttonTotalVotes,
         leaderboard,
         boss,
@@ -1361,9 +1333,7 @@ export function usePublicPageState() {
         lastBossResourceVersion,
         burstTimers,
         pendingClickSources,
-        buttonCount,
         totalVotes,
-        displayedButtons,
         syncLabel,
         onlineCount,
         isLoggedIn,
@@ -1374,8 +1344,6 @@ export function usePublicPageState() {
         effectiveIncrement,
         normalDamage,
         criticalDamage,
-        autoClickTargetButton,
-        autoClickTargetLabel,
         canStartAutoClick,
         autoClickStatus,
         bossStatusLabel,

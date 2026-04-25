@@ -16,15 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ButtonSeed 内置按钮种子数据
-type ButtonSeed struct {
-	Slug      string // 按钮标识
-	Label     string // 显示名称
-	Sort      int    // 排序权重
-	ImagePath string // 图片路径
-	ImageAlt  string // 图片描述
-}
-
 // RedisConfig holds the connection settings for the Redis instance.
 type RedisConfig struct {
 	Host       string
@@ -85,7 +76,6 @@ type Config struct {
 	OSS                OSSConfig
 	LLM                LLMConfig
 	RedisPrefix        string
-	ButtonPollInterval time.Duration // 低频兜底按钮索引同步间隔
 	PublicDir          string
 }
 
@@ -99,9 +89,8 @@ type fileConfig struct {
 		DB         int    `yaml:"db"`
 		TLSEnabled bool   `yaml:"tls_enabled"`
 	} `yaml:"redis"`
-	RedisPrefix          string `yaml:"redis_prefix"`
-	ButtonPollIntervalMS int    `yaml:"button_poll_interval_ms"`
-	RateLimit            struct {
+	RedisPrefix string `yaml:"redis_prefix"`
+	RateLimit   struct {
 		Limit       int `yaml:"limit"`
 		WindowMS    int `yaml:"window_ms"`
 		BlacklistMS int `yaml:"blacklist_ms"`
@@ -220,7 +209,6 @@ func loadFromConsul() (Config, consulSource, error) {
 			Timeout: time.Duration(parsed.LLM.TimeoutMS) * time.Millisecond,
 		},
 		RedisPrefix:        parsed.RedisPrefix,
-		ButtonPollInterval: time.Duration(parsed.ButtonPollIntervalMS) * time.Millisecond,
 		PublicDir:          resolvePublicDir(),
 	}
 
@@ -245,8 +233,6 @@ func validate(config Config) error {
 		return errors.New("redis.port must be greater than 0")
 	case config.RedisPrefix == "":
 		return errors.New("redis_prefix is required")
-	case config.ButtonPollInterval <= 0:
-		return errors.New("button_poll_interval_ms must be greater than 0")
 	case config.RateLimit.Limit <= 0:
 		return errors.New("rate_limit.limit must be greater than 0")
 	case config.RateLimit.Window <= 0:
