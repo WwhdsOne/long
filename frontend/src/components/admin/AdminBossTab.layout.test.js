@@ -17,4 +17,12 @@ describe('AdminBossTab 部位血量口径', () => {
     expect(actionSource).toContain('sumBossPartMaxHp')
     expect(actionSource).toContain('maxHp: sumBossPartMaxHp(bossForm.value.layout)')
   })
+
+  it('Boss 部位编辑器支持部位名称和小图路径', () => {
+    expect(componentSource).toContain('selectedCell.displayName')
+    expect(componentSource).toContain('selectedCell.imagePath')
+    expect(componentSource).toContain('部位名称')
+    expect(componentSource).toContain('小图路径')
+    expect(componentSource).toContain('normalizeBossPartCell')
+  })
 })
