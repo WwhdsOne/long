@@ -16,38 +16,39 @@ import (
 )
 
 type mockStore struct {
-	state                  vote.State
-	snapshot               vote.Snapshot
-	equipState             vote.State
-	adminState             vote.AdminState
-	bossResources          vote.BossResources
-	adminButtonPage        vote.AdminButtonPage
-	adminEquipmentPage     vote.AdminEquipmentPage
-	adminBossHistoryPage   vote.AdminBossHistoryPage
-	adminPlayerPage        vote.AdminPlayerPage
-	adminPlayer            *vote.AdminPlayerOverview
-	bossHistory            []vote.BossHistoryEntry
-	announcements          []vote.Announcement
-	latestAnnouncement     *vote.Announcement
-	messagePage            vote.MessagePage
-	result                 vote.ClickResult
-	lastButton             vote.ButtonUpsert
-	lastBoss               vote.BossUpsert
-	lastBossTemplate       vote.BossTemplateUpsert
-	lastEquipment          vote.EquipmentDefinition
-	lastTemplateLootID     string
-	lastTemplateLoot       []vote.BossLootEntry
-	lastCycleEnabled       bool
-	lastSalvageItemID      string
-	lastSalvageQuantity    int64
-	lastClickNickname      string
-	lastGetStateNickname   string
-	getStateErr            error
-	clickErr               error
-	equipErr               error
-	validateErr            error
-	messageErr             error
-	salvageErr             error
+	state                 vote.State
+	snapshot              vote.Snapshot
+	equipState            vote.State
+	adminState            vote.AdminState
+	bossResources         vote.BossResources
+	adminButtonPage       vote.AdminButtonPage
+	adminEquipmentPage    vote.AdminEquipmentPage
+	adminBossHistoryPage  vote.AdminBossHistoryPage
+	adminPlayerPage       vote.AdminPlayerPage
+	adminPlayer           *vote.AdminPlayerOverview
+	bossHistory           []vote.BossHistoryEntry
+	announcements         []vote.Announcement
+	latestAnnouncement    *vote.Announcement
+	messagePage           vote.MessagePage
+	result                vote.ClickResult
+	lastButton            vote.ButtonUpsert
+	lastBoss              vote.BossUpsert
+	lastBossTemplate      vote.BossTemplateUpsert
+	lastEquipment         vote.EquipmentDefinition
+	lastTemplateLootID    string
+	lastTemplateLoot      []vote.BossLootEntry
+	lastCycleEnabled      bool
+	lastSalvageItemID     string
+	lastSalvageQuantity   int64
+	lastClickNickname     string
+	lastAutoClickNickname string
+	lastGetStateNickname  string
+	getStateErr           error
+	clickErr              error
+	equipErr              error
+	validateErr           error
+	messageErr            error
+	salvageErr            error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
@@ -139,6 +140,11 @@ func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string)
 	return vote.ClickResult{}, vote.ErrButtonNotFound
 }
 
+func (m *mockStore) AutoClickBossPart(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+	m.lastAutoClickNickname = nickname
+	return m.ClickButton(context.Background(), slug, nickname)
+}
+
 func (m *mockStore) ValidateNickname(_ context.Context, _ string) error {
 	return m.validateErr
 }
@@ -197,8 +203,6 @@ func (m *mockStore) SaveEquipmentDefinition(_ context.Context, definition vote.E
 	return nil
 }
 
-
-
 func (m *mockStore) DeleteEquipmentDefinition(_ context.Context, _ string) error {
 	return nil
 }
@@ -236,7 +240,6 @@ func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, lo
 	m.lastTemplateLoot = loot
 	return nil
 }
-
 
 func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.Boss, error) {
 	m.lastCycleEnabled = enabled
@@ -298,7 +301,6 @@ func (m *mockStore) ListMessages(_ context.Context, _ string, _ int64) (vote.Mes
 func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
 	return nil
 }
-
 
 func (m *mockStore) SelectTalentTree(_ context.Context, _ string, _ vote.TalentTree, _ vote.TalentTree) error {
 	return nil
@@ -435,11 +437,10 @@ func TestGetButtonsReturnsCurrentList(t *testing.T) {
 			},
 			BossLoot: []vote.BossLootEntry{
 				{
-					ItemID:                     "cloth-armor",
-					ItemName:                   "布甲",
-					Slot:                       "armor",
-					Weight:                     3,
-					
+					ItemID:   "cloth-armor",
+					ItemName: "布甲",
+					Slot:     "armor",
+					Weight:   3,
 				},
 			},
 			LatestAnnouncement: &vote.Announcement{
@@ -959,11 +960,11 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 			},
 			Loadout: vote.Loadout{
 				Weapon: &vote.InventoryItem{
-					ItemID:      "wood-sword",
-					Name:        "木剑",
-					Slot:        "weapon",
-					Quantity:    1,
-					Equipped:    true,
+					ItemID:   "wood-sword",
+					Name:     "木剑",
+					Slot:     "weapon",
+					Quantity: 1,
+					Equipped: true,
 				},
 			},
 			CombatStats: vote.CombatStats{

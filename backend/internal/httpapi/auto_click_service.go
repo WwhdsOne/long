@@ -165,7 +165,7 @@ func (s *AutoClickService) runOnce(ctx context.Context) {
 	s.mu.RUnlock()
 
 	for _, task := range tasks {
-		result, err := s.store.ClickButton(ctx, task.Slug, task.Nickname)
+		result, err := s.store.AutoClickBossPart(ctx, task.Slug, task.Nickname)
 		if err != nil {
 			if errors.Is(err, vote.ErrInvalidNickname) || errors.Is(err, vote.ErrSensitiveNickname) {
 				s.Stop(task.Nickname)

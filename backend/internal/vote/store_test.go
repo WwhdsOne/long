@@ -388,3 +388,51 @@ func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
 		t.Fatalf("expected boss health to lose 7 damage, got %+v", result.Boss)
 	}
 }
+
+func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	seedEquipmentDefinition(t, store, ctx, "strong-sword", "weapon", 7)
+	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "strong-sword", "1").Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if _, err := store.EquipItem(ctx, "阿明", "strong-sword"); err != nil {
+		t.Fatalf("equip item: %v", err)
+	}
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "auto-boss",
+		Name:  "挂机 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.AutoClickBossPart(ctx, "0-0", "阿明")
+	if err != nil {
+		t.Fatalf("auto click boss part: %v", err)
+	}
+	if result.Delta != 0 || result.BossDamage != 7 {
+		t.Fatalf("expected auto click delta 0 and boss damage 7, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
+	}
+
+	userStats, err := store.GetUserStats(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user stats: %v", err)
+	}
+	if userStats.ClickCount != 0 {
+		t.Fatalf("expected auto click not to increase click count, got %+v", userStats)
+	}
+	if result.Boss == nil || result.Boss.CurrentHP != 93 || result.Boss.Parts[0].CurrentHP != 93 {
+		t.Fatalf("expected auto click to damage boss, got %+v", result.Boss)
+	}
+}

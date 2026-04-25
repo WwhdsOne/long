@@ -95,8 +95,8 @@ func TestAutoClickServiceRunOnceUsesSharedSettlementAndPublishesChange(t *testin
 
 	service.runOnce(context.Background())
 
-	if store.lastClickNickname != "阿明" {
-		t.Fatalf("expected auto click to reuse shared settlement core, got nickname %q", store.lastClickNickname)
+	if store.lastAutoClickNickname != "阿明" {
+		t.Fatalf("expected auto click to use official boss settlement without manual click count, got nickname %q", store.lastAutoClickNickname)
 	}
 	if len(publisher.changes) != 1 {
 		t.Fatalf("expected one published change, got %d", len(publisher.changes))

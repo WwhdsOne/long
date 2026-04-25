@@ -19,6 +19,7 @@ type ButtonStore interface {
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	GetUserState(context.Context, string) (vote.UserState, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
+	AutoClickBossPart(context.Context, string, string) (vote.ClickResult, error)
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)

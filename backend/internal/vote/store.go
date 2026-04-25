@@ -1049,6 +1049,30 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 		return ClickResult{}, err
 	}
 
+	return s.applyBossPartDamage(ctx, boss, nickname, critical, result)
+}
+
+func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string) (ClickResult, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	boss, err := s.currentBoss(ctx)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	if boss == nil || boss.Status != bossStatusActive || len(boss.Parts) == 0 {
+		return ClickResult{}, nil
+	}
+	return s.applyBossPartDamage(ctx, boss, normalizedNickname, false, ClickResult{
+		Delta: 0,
+		UserStats: UserStats{
+			Nickname: normalizedNickname,
+		},
+	})
+}
+
+func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult) (ClickResult, error) {
 	quantities, err := s.inventoryQuantities(ctx, nickname)
 	if err != nil {
 		return result, nil
