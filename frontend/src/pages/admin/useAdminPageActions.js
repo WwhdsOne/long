@@ -77,7 +77,7 @@ export function createAdminPageActions(state) {
         body: JSON.stringify({
           id: bossForm.value.id,
           name: bossForm.value.name,
-          maxHp: Number(bossForm.value.maxHp),
+          maxHp: sumBossPartMaxHp(bossForm.value.layout),
           layout: bossForm.value.layout || [],
         }),
       })
@@ -363,6 +363,13 @@ export function createAdminPageActions(state) {
   function selectBossTemplate(templateId) {
     selectedBossTemplateId.value = templateId
     applyLootRows(findBossTemplate(templateId)?.loot ?? [])
+  }
+
+  function sumBossPartMaxHp(layout) {
+    if (!Array.isArray(layout) || layout.length === 0) {
+      return 1
+    }
+    return layout.reduce((total, part) => total + Math.max(1, Number(part?.maxHp ?? 0)), 0)
   }
 
   function removeLootRow(index) {
