@@ -1,5 +1,7 @@
 package vote
 
+import "strings"
+
 func normalizeBossPartLayout(parts []BossPart) []BossPart {
 	if len(parts) == 0 {
 		return nil
@@ -7,6 +9,8 @@ func normalizeBossPartLayout(parts []BossPart) []BossPart {
 
 	normalized := make([]BossPart, 0, len(parts))
 	for _, part := range parts {
+		part.DisplayName = strings.TrimSpace(part.DisplayName)
+		part.ImagePath = strings.TrimSpace(part.ImagePath)
 		part.MaxHP = maxInt64(1, part.MaxHP)
 		part.CurrentHP = part.MaxHP
 		part.Alive = true

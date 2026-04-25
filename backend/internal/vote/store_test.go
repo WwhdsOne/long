@@ -199,6 +199,52 @@ func TestBossTemplateActivationUsesPartHealthAsTotalHealth(t *testing.T) {
 	}
 }
 
+func TestBossPartDisplayFieldsPersist(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "display-part-boss",
+		Name:  "展示字段 Boss",
+		MaxHP: 100,
+		Layout: []BossPart{
+			{
+				X:           0,
+				Y:           0,
+				Type:        PartTypeWeak,
+				MaxHP:       100,
+				CurrentHP:   100,
+				Alive:       true,
+				DisplayName: "眼核",
+				ImagePath:   "/assets/boss/eye.png",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("save boss template: %v", err)
+	}
+
+	templates, err := store.ListBossTemplates(ctx)
+	if err != nil {
+		t.Fatalf("list boss templates: %v", err)
+	}
+	if len(templates) != 1 || len(templates[0].Layout) != 1 {
+		t.Fatalf("expected one template part, got %+v", templates)
+	}
+	part := templates[0].Layout[0]
+	if part.DisplayName != "眼核" || part.ImagePath != "/assets/boss/eye.png" {
+		t.Fatalf("expected template display fields to persist, got %+v", part)
+	}
+
+	boss, err := store.activateRandomBossFromPool(ctx)
+	if err != nil {
+		t.Fatalf("activate boss from pool: %v", err)
+	}
+	if len(boss.Parts) != 1 || boss.Parts[0].DisplayName != "眼核" || boss.Parts[0].ImagePath != "/assets/boss/eye.png" {
+		t.Fatalf("expected activated boss display fields to persist, got %+v", boss.Parts)
+	}
+}
+
 func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -289,5 +335,152 @@ func TestClickButtonWithBossPartsPersistsDefeatedStatus(t *testing.T) {
 	}
 	if stored.Status != bossStatusDefeated || stored.CurrentHP != 0 || stored.DefeatedAt == 0 {
 		t.Fatalf("expected stored boss to be defeated, got %+v", stored)
+	}
+}
+
+func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if err := store.SaveButton(ctx, ButtonUpsert{
+		Slug:    "feel",
+		Label:   "有感觉吗",
+		Sort:    10,
+		Enabled: true,
+	}); err != nil {
+		t.Fatalf("save button: %v", err)
+	}
+	seedEquipmentDefinition(t, store, ctx, "strong-sword", "weapon", 7)
+	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "strong-sword", "1").Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if _, err := store.EquipItem(ctx, "阿明", "strong-sword"); err != nil {
+		t.Fatalf("equip item: %v", err)
+	}
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "formula-boss",
+		Name:  "公式 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "feel", "阿明")
+	if err != nil {
+		t.Fatalf("click button: %v", err)
+	}
+	if result.Delta != 1 || result.BossDamage != 7 {
+		t.Fatalf("expected click delta 1 and boss damage 7, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
+	}
+	if result.UserStats.ClickCount != 1 {
+		t.Fatalf("expected manual click count to increase by 1, got %+v", result.UserStats)
+	}
+	if result.Boss == nil || result.Boss.CurrentHP != 93 || result.Boss.Parts[0].CurrentHP != 93 {
+		t.Fatalf("expected boss health to lose 7 damage, got %+v", result.Boss)
+	}
+}
+
+func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "direct-part-boss",
+		Name:  "直点 Boss",
+		MaxHP: 200,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, DisplayName: "左翼", MaxHP: 100, CurrentHP: 100, Alive: true},
+			{X: 1, Y: 0, Type: PartTypeWeak, DisplayName: "眼核", MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "boss-part:1-0", "阿明")
+	if err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+	if result.Button.Key != "boss-part:1-0" || result.Button.Label != "眼核" {
+		t.Fatalf("expected pseudo part target button, got %+v", result.Button)
+	}
+	if result.Delta != 1 || result.UserStats.ClickCount != 1 {
+		t.Fatalf("expected direct part click to count once, got %+v", result)
+	}
+	if result.Boss == nil || result.Boss.CurrentHP != 198 {
+		t.Fatalf("expected boss health to decrease by selected part damage, got %+v", result.Boss)
+	}
+	if result.Boss.Parts[0].CurrentHP != 100 || result.Boss.Parts[1].CurrentHP != 98 {
+		t.Fatalf("expected only selected part to lose HP, got %+v", result.Boss.Parts)
+	}
+
+	snapshot, err := store.GetSnapshot(ctx)
+	if err != nil {
+		t.Fatalf("get snapshot: %v", err)
+	}
+	if len(snapshot.Buttons) != 0 || snapshot.TotalVotes != 1 {
+		t.Fatalf("expected no button records and one total click, got buttons=%+v total=%d", snapshot.Buttons, snapshot.TotalVotes)
+	}
+}
+
+func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	seedEquipmentDefinition(t, store, ctx, "strong-sword", "weapon", 7)
+	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "strong-sword", "1").Err(); err != nil {
+		t.Fatalf("seed inventory: %v", err)
+	}
+	if _, err := store.EquipItem(ctx, "阿明", "strong-sword"); err != nil {
+		t.Fatalf("equip item: %v", err)
+	}
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "auto-boss",
+		Name:  "挂机 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.AutoClickBossPart(ctx, "0-0", "阿明")
+	if err != nil {
+		t.Fatalf("auto click boss part: %v", err)
+	}
+	if result.Delta != 0 || result.BossDamage != 7 {
+		t.Fatalf("expected auto click delta 0 and boss damage 7, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
+	}
+
+	userStats, err := store.GetUserStats(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user stats: %v", err)
+	}
+	if userStats.ClickCount != 0 {
+		t.Fatalf("expected auto click not to increase click count, got %+v", userStats)
+	}
+	if result.Boss == nil || result.Boss.CurrentHP != 93 || result.Boss.Parts[0].CurrentHP != 93 {
+		t.Fatalf("expected auto click to damage boss, got %+v", result.Boss)
 	}
 }

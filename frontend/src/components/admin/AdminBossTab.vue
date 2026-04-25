@@ -58,7 +58,7 @@ function selectCell(x, y) {
     selectedCell.value = { ...existing }
     return
   }
-  selectedCell.value = { x, y, type: 'soft', maxHp: 1000, currentHp: 1000, armor: 0, alive: true }
+  selectedCell.value = { x, y, type: 'soft', displayName: '', imagePath: '', maxHp: 1000, currentHp: 1000, armor: 0, alive: true }
 }
 
 function findPart(x, y) {
@@ -68,7 +68,7 @@ function findPart(x, y) {
 
 function saveCell() {
   if (!selectedCell.value) return
-  const cell = selectedCell.value
+  const cell = normalizeBossPartCell(selectedCell.value)
   if (!Array.isArray(props.bossForm.layout)) {
     props.bossForm.layout = []
   }
@@ -79,6 +79,20 @@ function saveCell() {
     props.bossForm.layout.push({ ...cell })
   }
   selectedCell.value = null
+}
+
+function normalizeBossPartCell(cell) {
+  const maxHp = Math.max(1, Number(cell.maxHp || 1))
+  return {
+    ...cell,
+    type: cell.type || 'soft',
+    displayName: String(cell.displayName || '').trim(),
+    imagePath: String(cell.imagePath || '').trim(),
+    maxHp,
+    currentHp: maxHp,
+    armor: Math.max(0, Number(cell.armor || 0)),
+    alive: true,
+  }
 }
 
 function deleteCell() {
@@ -186,7 +200,9 @@ function cancelCell() {
                   @click="selectCell(xi-1, yi-1)"
                 >
                   <template v-if="gridParts[yi-1][xi-1]">
-                    <span class="boss-editor-cell__type">{{ partTypeLabels[gridParts[yi-1][xi-1].type] || gridParts[yi-1][xi-1].type }}</span>
+                    <span class="boss-editor-cell__type">
+                      {{ gridParts[yi-1][xi-1].displayName || partTypeLabels[gridParts[yi-1][xi-1].type] || gridParts[yi-1][xi-1].type }}
+                    </span>
                     <span class="boss-editor-cell__hp">{{ gridParts[yi-1][xi-1].maxHp }}</span>
                   </template>
                   <span v-else class="boss-editor-cell__empty">+</span>
@@ -206,6 +222,14 @@ function cancelCell() {
                     <option value="heavy">重甲</option>
                     <option value="weak">弱点</option>
                   </select>
+                </label>
+                <label class="boss-editor-inspector__field">
+                  <span>部位名称</span>
+                  <input v-model="selectedCell.displayName" class="nickname-form__input" type="text" placeholder="例如：眼核" />
+                </label>
+                <label class="boss-editor-inspector__field">
+                  <span>小图路径</span>
+                  <input v-model="selectedCell.imagePath" class="nickname-form__input" type="text" placeholder="/images/boss/eye.png" />
                 </label>
                 <label class="boss-editor-inspector__field">
                   <span>血量</span>
