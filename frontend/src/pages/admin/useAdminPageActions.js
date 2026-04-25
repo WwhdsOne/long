@@ -292,7 +292,7 @@ export function createAdminPageActions(state) {
         body: JSON.stringify({
           loot: lootRows.value.filter((entry) => entry.itemId).map((entry) => ({
             itemId: entry.itemId,
-            weight: Number(entry.weight),
+            dropRatePercent: Number(entry.dropRatePercent),
           })),
         }),
       })

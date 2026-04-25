@@ -75,7 +75,7 @@ func run() error {
 	dispatcher := events.NewDispatcher(stateCache, hub)
 	changeBus := events.NewRedisChangeBus(redisClient, vote.RealtimeEventChannel(cfg.RedisPrefix))
 	playerAuthenticator := playerauth.NewService(redisClient, playerauth.Config{
-		Namespace: namespaceFromPrefix(cfg.RedisPrefix),
+		Namespace: cfg.RedisPrefix,
 		JWTSecret: cfg.PlayerAuth.JWTSecret,
 		TokenTTL:  cfg.PlayerAuth.JWTTTL,
 	}, nicknameValidator)
@@ -246,9 +246,3 @@ func serverAddress(port int) string {
 	return net.JoinHostPort(host, fmt.Sprintf("%d", listenPort))
 }
 
-func namespaceFromPrefix(prefix string) string {
-	if before, ok := strings.CutSuffix(prefix, "button:"); ok {
-		return before
-	}
-	return prefix
-}

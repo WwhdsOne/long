@@ -102,7 +102,7 @@ export function emptyPlayerPage() {
 }
 
 export function emptyLootRows() {
-  return [{ itemId: '', weight: '' }]
+  return [{ itemId: '', dropRatePercent: '' }]
 }
 
 export function normalizeLoadout(loadout) {
@@ -115,7 +115,7 @@ export function normalizeLootEntry(entry) {
     itemName: entry?.itemName || '',
     slot: normalizeEquipmentSlot(entry?.slot),
     rarity: normalizeRarity(entry?.rarity),
-    weight: Number(entry?.weight ?? 0),
+    dropRatePercent: Number(entry?.dropRatePercent ?? entry?.weight ?? 0),
     attackPower: Number(entry?.attackPower ?? 0),
     armorPenPercent: Number(entry?.armorPenPercent ?? 0),
     critDamageMultiplier: Number(entry?.critDamageMultiplier ?? 0),
@@ -234,15 +234,13 @@ export function normalizePlayerPage(payload) {
 
 export function formatItemStats(item) {
   const parts = []
-  if (Number(item?.attackPower ?? 0) > 0) parts.push(`攻击力+${item.attackPower}`)
-  if (Number(item?.armorPenPercent ?? 0) > 0) parts.push(`破甲+${(item.armorPenPercent * 100).toFixed(0)}%`)
-  if (Number(item?.critDamageMultiplier ?? 0) > 1) parts.push(`暴伤×${item.critDamageMultiplier}`)
-  if (Number(item?.bossDamagePercent ?? 0) > 0) parts.push(`Boss增伤+${(item.bossDamagePercent * 100).toFixed(0)}%`)
-  if (Number(item?.partTypeDamageSoft ?? 0) > 0) parts.push(`软组织+${(item.partTypeDamageSoft * 100).toFixed(0)}%`)
-  if (Number(item?.partTypeDamageHeavy ?? 0) > 0) parts.push(`重甲+${(item.partTypeDamageHeavy * 100).toFixed(0)}%`)
-  if (Number(item?.partTypeDamageWeak ?? 0) > 0) parts.push(`弱点+${(item.partTypeDamageWeak * 100).toFixed(0)}%`)
-  if (item?.talentAffinity) parts.push(`天赋:${item.talentAffinity}`)
-  return parts.join(' ')
+  if (item.attackPower != null) parts.push(`攻击力 +${item.attackPower}`)
+  if (item.armorPenPercent != null) parts.push(`破甲 +${(item.armorPenPercent * 100).toFixed(0)}%`)
+  if (item.critDamageMultiplier != null) parts.push(`暴伤 +${item.critDamageMultiplier.toFixed(1)}`)
+  if (item.partTypeDamageSoft != null) parts.push(`软组织 +${(item.partTypeDamageSoft * 100).toFixed(0)}%`)
+  if (item.partTypeDamageHeavy != null) parts.push(`重甲 +${(item.partTypeDamageHeavy * 100).toFixed(0)}%`)
+  if (item.partTypeDamageWeak != null) parts.push(`弱点 +${(item.partTypeDamageWeak * 100).toFixed(0)}%`)
+  return parts.join('，') || '无主要属性'
 }
 export function formatTime(timestamp) {
   if (!timestamp) {

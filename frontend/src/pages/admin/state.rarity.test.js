@@ -17,7 +17,8 @@ describe('admin state rarity normalization', () => {
   })
 
   it('boss 掉落规范化会保留新装备属性字段', () => {
-    const entry = normalizeLootEntry({ itemId: 'fire-ring', attackPower: 10, bossDamagePercent: 0.5 })
+    const entry = normalizeLootEntry({ itemId: 'fire-ring', dropRatePercent: 35, attackPower: 10, bossDamagePercent: 0.5 })
+    expect(entry.dropRatePercent).toBe(35)
     expect(entry.attackPower).toBe(10)
     expect(entry.bossDamagePercent).toBe(0.5)
   })

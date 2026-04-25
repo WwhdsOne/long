@@ -64,6 +64,15 @@ defineProps({
             <input v-model="equipmentForm.name" class="nickname-form__input" type="text" placeholder="前台显示名称" />
           </label>
           <label class="admin-labeled-field">
+            <span>装备描述:</span>
+            <textarea
+              v-model="equipmentForm.description"
+              class="nickname-form__input"
+              rows="4"
+              placeholder="描述装备背景故事"
+            ></textarea>
+          </label>
+          <label class="admin-labeled-field">
             <span>部位:</span>
             <select v-model="equipmentForm.slot" class="nickname-form__input">
               <option v-for="slot in EQUIPMENT_SLOTS" :key="slot.value" :value="slot.value">
@@ -113,10 +122,6 @@ defineProps({
             <label class="admin-labeled-field">
               <span>暴伤:</span>
               <input v-model="equipmentForm.critDamageMultiplier" class="nickname-form__input" type="number" min="0" step="0.1" />
-            </label>
-            <label class="admin-labeled-field">
-              <span>Boss增伤:</span>
-              <input v-model="equipmentForm.bossDamagePercent" class="nickname-form__input" type="number" min="0" max="10" step="0.01" />
             </label>
             <label class="admin-labeled-field">
               <span>软组织:</span>

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -87,6 +88,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 		draft, err := options.EquipmentDraftGenerator.GenerateEquipmentDraft(ctx, body.Prompt)
 		if err != nil {
 			if errors.Is(err, ErrInvalidEquipmentDraft) {
+				fmt.Printf("invalid equipment draft: %s\n", err)
 				writeJSON(c, consts.StatusUnprocessableEntity, map[string]string{"error": "INVALID_EQUIPMENT_DRAFT"})
 				return
 			}

@@ -25,4 +25,13 @@ describe('AdminBossTab 部位血量口径', () => {
     expect(componentSource).toContain('小图路径')
     expect(componentSource).toContain('normalizeBossPartCell')
   })
+
+  it('模板掉落池直接填写掉落几率，不再填写权重', () => {
+    expect(componentSource).toContain('entry.dropRatePercent')
+    expect(componentSource).toContain('placeholder="掉落几率 %"')
+    expect(componentSource).not.toContain('entry.weight')
+    expect(componentSource).not.toContain('权重')
+    expect(actionSource).toContain('dropRatePercent: Number(entry.dropRatePercent)')
+    expect(actionSource).not.toContain('weight: Number(entry.weight)')
+  })
 })

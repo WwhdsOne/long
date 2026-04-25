@@ -27,7 +27,7 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               password: "Wwh852456"
               db: 3
               tls_enabled: false
-            redis_prefix: "vote:button:"
+            redis_prefix: "vote:"
             button_poll_interval_ms: 3000
             rate_limit:
               limit: 30
@@ -81,7 +81,7 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if cfg.Port != 2333 {
 		t.Fatalf("expected port 2333, got %d", cfg.Port)
 	}
-	if cfg.RedisPrefix != "vote:button:" {
+	if cfg.RedisPrefix != "vote:" {
 		t.Fatalf("expected redis prefix vote:button:, got %q", cfg.RedisPrefix)
 	}
 	if cfg.RateLimit.Limit != 30 {
@@ -223,7 +223,7 @@ func validConfigForTest() Config {
 			Host: "127.0.0.1",
 			Port: 6379,
 		},
-		RedisPrefix:        "vote:button:",
+		RedisPrefix:        "vote:",
 		ButtonPollInterval: 3 * time.Second,
 		RateLimit: RateLimitConfig{
 			Limit:             30,

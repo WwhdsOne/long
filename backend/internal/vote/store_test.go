@@ -23,7 +23,7 @@ func newTestStore(t *testing.T) (*Store, func()) {
 		Addr: server.Addr(),
 	})
 
-	return NewStore(client, "vote:button:", StoreOptions{
+	return NewStore(client, "vote:", StoreOptions{
 			CriticalChancePercent: 5,
 			CriticalCount:         5,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
@@ -62,8 +62,8 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 		StartedAt: store.now().Unix(),
 	}
 	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
-		{ItemID: "cloth-armor", Weight: 1},
-		{ItemID: "fire-ring", Weight: 3},
+		{ItemID: "cloth-armor", DropRatePercent: 25},
+		{ItemID: "fire-ring", DropRatePercent: 75},
 	}); err != nil {
 		t.Fatalf("set current boss: %v", err)
 	}
@@ -84,14 +84,57 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 	if len(resources.BossLoot) != 2 {
 		t.Fatalf("expected boss loot resources, got %+v", resources.BossLoot)
 	}
-	if resources.BossLoot[0].DropRatePercent+resources.BossLoot[1].DropRatePercent != 100 {
-		t.Fatalf("expected drop rates to add up to 100, got %+v", resources.BossLoot)
-	}
 	if resources.BossLoot[0].ItemID != "cloth-armor" || resources.BossLoot[0].DropRatePercent != 25 {
 		t.Fatalf("expected cloth-armor probability 25%%, got %+v", resources.BossLoot)
 	}
 	if resources.BossLoot[1].ItemID != "fire-ring" || resources.BossLoot[1].DropRatePercent != 75 {
 		t.Fatalf("expected fire-ring probability 75%%, got %+v", resources.BossLoot)
+	}
+}
+
+func TestBossLootDropRateIsIndependentProbability(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	boss := &Boss{
+		ID:        "raid-1",
+		Name:      "裂隙领主",
+		Status:    bossStatusActive,
+		MaxHP:     100,
+		CurrentHP: 100,
+		StartedAt: store.now().Unix(),
+	}
+	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
+		{ItemID: "mythic-core", DropRatePercent: 10},
+		{ItemID: "raid-token", DropRatePercent: 10},
+	}); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+
+	resources, err := store.GetBossResources(ctx)
+	if err != nil {
+		t.Fatalf("get boss resources: %v", err)
+	}
+	if len(resources.BossLoot) != 2 {
+		t.Fatalf("expected boss loot resources, got %+v", resources.BossLoot)
+	}
+	if resources.BossLoot[0].DropRatePercent+resources.BossLoot[1].DropRatePercent != 20 {
+		t.Fatalf("expected independent drop rates to keep configured values, got %+v", resources.BossLoot)
+	}
+}
+
+func TestRollLootDropsCanReturnMultipleItems(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	drops := store.rollLootDrops([]BossLootEntry{
+		{ItemID: "mythic-core", DropRatePercent: 100},
+		{ItemID: "raid-token", DropRatePercent: 100},
+	})
+
+	if len(drops) != 2 || drops[0].ItemID != "mythic-core" || drops[1].ItemID != "raid-token" {
+		t.Fatalf("expected multiple independent drops, got %+v", drops)
 	}
 }
 func TestClickButtonDoesNotDoubleDeltaForFormerStarlightButton(t *testing.T) {

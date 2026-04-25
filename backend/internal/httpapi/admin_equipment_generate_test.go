@@ -56,7 +56,6 @@ func TestAdminEquipmentGenerateReturnsDraftWithoutSaving(t *testing.T) {
 			AttackPower:          12,
 			ArmorPenPercent:      0.2,
 			CritDamageMultiplier: 1.5,
-			BossDamagePercent:    0.1,
 			PartTypeDamageSoft:   0.35,
 			TalentAffinity:       "normal",
 		},
