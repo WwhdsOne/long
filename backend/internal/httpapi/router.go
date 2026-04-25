@@ -19,10 +19,13 @@ type ButtonStore interface {
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	GetUserState(context.Context, string) (vote.UserState, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
+	ClickBossPart(context.Context, string, string) (vote.ClickResult, error)
+	AttackBossPartAFK(context.Context, string) (vote.ClickResult, error)
 	AutoClickBossPart(context.Context, string, string) (vote.ClickResult, error)
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
+	SalvageItem(context.Context, string, string) (vote.SalvageResult, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	ListAdminButtonsPage(context.Context, int64, int64) (vote.AdminButtonPage, error)
 	ListAdminEquipmentPage(context.Context, int64, int64) (vote.AdminEquipmentPage, error)
@@ -89,7 +92,24 @@ type ClickGuard interface {
 	Allow(string) (time.Duration, error)
 }
 
-// AutoClickController 负责服务端托管挂机任务的生命周期。
+// AfkController 负责离页挂机状态流转与结算。
+type AfkController interface {
+	ReportPresence(context.Context, string, bool) error
+	ConsumeSettlement(string) vote.AfkSettlement
+	Close() error
+}
+
+// AutoClickStatus 保留兼容类型，旧接口已下线。
+type AutoClickStatus struct {
+	Active        bool   `json:"active"`
+	ButtonKey     string `json:"buttonKey,omitempty"`
+	StartedAt     int64  `json:"startedAt,omitempty"`
+	UpdatedAt     int64  `json:"updatedAt,omitempty"`
+	IntervalMs    int64  `json:"intervalMs"`
+	RatePerSecond int    `json:"ratePerSecond"`
+}
+
+// AutoClickController 保留兼容接口，旧接口已下线。
 type AutoClickController interface {
 	Start(context.Context, string, string) (AutoClickStatus, error)
 	Stop(string) AutoClickStatus
@@ -117,6 +137,7 @@ type Options struct {
 	ChangePublisher         ChangePublisher
 	ClickGuard              ClickGuard
 	AutoClick               AutoClickController
+	Afk                     AfkController
 	PlayerAuthenticator     PlayerAuthenticator
 	Events                  app.HandlerFunc
 	RealtimeHub             RealtimeHub

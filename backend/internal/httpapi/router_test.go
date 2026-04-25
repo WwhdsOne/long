@@ -148,6 +148,23 @@ func (m *mockStore) AutoClickBossPart(_ context.Context, slug string, nickname s
 	return m.ClickButton(context.Background(), slug, nickname)
 }
 
+func (m *mockStore) ClickBossPart(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+	return m.ClickButton(context.Background(), slug, nickname)
+}
+
+func (m *mockStore) AttackBossPartAFK(_ context.Context, nickname string) (vote.ClickResult, error) {
+	m.lastAutoClickNickname = nickname
+	return vote.ClickResult{
+		Boss: &vote.Boss{
+			ID:        "boss-1",
+			Name:      "测试 Boss",
+			Status:    "active",
+			MaxHP:     100,
+			CurrentHP: 90,
+		},
+	}, nil
+}
+
 func (m *mockStore) ValidateNickname(_ context.Context, _ string) error {
 	return m.validateErr
 }
@@ -170,6 +187,18 @@ func (m *mockStore) UnequipItem(_ context.Context, _ string, _ string) (vote.Sta
 		return m.state, nil
 	}
 	return m.equipState, nil
+}
+
+func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (vote.SalvageResult, error) {
+	m.lastSalvageItemID = itemID
+	if m.salvageErr != nil {
+		return vote.SalvageResult{}, m.salvageErr
+	}
+	return vote.SalvageResult{
+		ItemID:         itemID,
+		RefundedStones: 12,
+		Stones:         34,
+	}, nil
 }
 
 func (m *mockStore) GetAdminState(_ context.Context) (vote.AdminState, error) {
@@ -342,9 +371,6 @@ type mockOSSSigner struct {
 func (m *mockOSSSigner) CreatePolicy(_ context.Context) (ossupload.Policy, error) {
 	return m.policy, m.err
 }
-
-
-
 
 type mockAutoClickController struct {
 	status             AutoClickStatus
@@ -1025,7 +1051,6 @@ func TestSynthesizeItemReturnsDeprecatedError(t *testing.T) {
 		t.Fatalf("expected deprecated error payload, got %+v", payload)
 	}
 }
-
 
 func TestAutoClickRoutesUseController(t *testing.T) {
 	controller := &mockAutoClickController{

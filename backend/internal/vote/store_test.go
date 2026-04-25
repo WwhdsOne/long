@@ -547,8 +547,8 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("auto click boss part: %v", err)
 	}
-	if result.Delta != 0 || result.BossDamage != 12 {
-		t.Fatalf("expected auto click delta 0 and boss damage 12, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
+	if result.Delta != 0 || result.BossDamage != 6 {
+		t.Fatalf("expected auto click delta 0 and boss damage 6, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
 	}
 
 	userStats, err := store.GetUserStats(ctx, "阿明")
@@ -558,7 +558,7 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	if userStats.ClickCount != 0 {
 		t.Fatalf("expected auto click not to increase click count, got %+v", userStats)
 	}
-	if result.Boss == nil || result.Boss.CurrentHP != 88 || result.Boss.Parts[0].CurrentHP != 88 {
+	if result.Boss == nil || result.Boss.CurrentHP != 94 || result.Boss.Parts[0].CurrentHP != 94 {
 		t.Fatalf("expected auto click to damage boss, got %+v", result.Boss)
 	}
 }

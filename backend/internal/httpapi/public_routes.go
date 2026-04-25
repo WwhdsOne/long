@@ -20,14 +20,6 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 
-	router.GET("/api/online-count", func(_ context.Context, c *app.RequestContext) {
-		count := 0
-		if options.RealtimeHub != nil {
-			count = options.RealtimeHub.SubscriberCount()
-		}
-		writeJSON(c, consts.StatusOK, map[string]int{"count": count})
-	})
-
 	router.GET("/api/buttons", func(ctx context.Context, c *app.RequestContext) {
 		state, err := stateView.GetState(ctx, resolvedPlayerNicknameForRead(ctx, c, options.PlayerAuthenticator))
 		if err != nil {
@@ -39,6 +31,14 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 		}
 
 		writeJSON(c, consts.StatusOK, state)
+	})
+
+	router.GET("/api/online-count", func(_ context.Context, c *app.RequestContext) {
+		count := 0
+		if options.RealtimeHub != nil {
+			count = options.RealtimeHub.SubscriberCount()
+		}
+		writeJSON(c, consts.StatusOK, map[string]int{"count": count})
 	})
 
 	router.GET("/api/boss/history", func(ctx context.Context, c *app.RequestContext) {

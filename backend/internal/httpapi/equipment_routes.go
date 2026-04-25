@@ -106,7 +106,43 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		})
 	})
 
-	
+	router.POST("/api/equipment/:itemId/salvage", func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if !bindJSON(c, &body, map[string]string{
+			"error":   "INVALID_REQUEST",
+			"message": "昵称没有带上，先报个名再分解。",
+		}) {
+			return
+		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
+
+		result, err := options.Store.SalvageItem(ctx, nickname, c.Param("itemId"))
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotFound) {
+				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_OWNED",
+					"message": "这件装备还不在你的背包里。",
+				})
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "SALVAGE_FAILED"})
+			return
+		}
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, result)
+	})
 }
 
 func publishEquipmentChange(ctx context.Context, nickname string, publisher ChangePublisher) {

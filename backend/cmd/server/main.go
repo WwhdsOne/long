@@ -66,10 +66,6 @@ func run() error {
 		CriticalChancePercent: 0,
 		CriticalCount:         0,
 	}, nicknameValidator)
-	if err := store.EnsureDefaults(startupCtx, config.DefaultButtons); err != nil {
-		return fmt.Errorf("seed default buttons: %w", err)
-	}
-
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)
 	dispatcher := events.NewDispatcher(stateCache, hub)
@@ -87,13 +83,8 @@ func run() error {
 		Window:            cfg.RateLimit.Window,
 		BlacklistDuration: cfg.RateLimit.BlacklistDuration,
 	})
-	autoClickService := httpapi.NewAutoClickService(httpapi.AutoClickServiceOptions{
-		Store:           store,
-		ChangePublisher: changeBus,
-		Interval:        time.Second / 3,
-		AutoStart:       true,
-	})
-	defer autoClickService.Close()
+	afkService := httpapi.NewAfkService(store, changeBus)
+	defer afkService.Close()
 	var ossSigner *ossupload.Signer
 	if cfg.OSS.Enabled() {
 		ossSigner = ossupload.NewSigner(ossupload.Config{
@@ -120,7 +111,7 @@ func run() error {
 		StateView:               stateCache,
 		ChangePublisher:         changeBus,
 		ClickGuard:              clickLimiter,
-		AutoClick:               autoClickService,
+		Afk:                     afkService,
 		PlayerAuthenticator:     playerAuthenticator,
 		Events:                  eventHandler,
 		RealtimeHub:             hub,
@@ -151,34 +142,6 @@ func run() error {
 			select {
 			case errCh <- fmt.Errorf("listen realtime changes: %w", err):
 			default:
-			}
-		}
-	}()
-
-	go func() {
-		// 低频扫描 Redis，兜底同步手工新增但未走支持写路径的按钮。
-		ticker := time.NewTicker(cfg.ButtonPollInterval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-pollCtx.Done():
-				return
-			case <-ticker.C:
-				changed, err := store.SyncButtonIndex(pollCtx)
-				if err != nil {
-					log.Printf("Failed to sync button index from Redis: %v", err)
-					continue
-				}
-				if !changed {
-					continue
-				}
-				if err := changeBus.PublishChange(pollCtx, vote.StateChange{
-					Type:      vote.StateChangeButtonMetaChanged,
-					Timestamp: time.Now().Unix(),
-				}); err != nil {
-					log.Printf("Failed to publish button metadata change: %v", err)
-				}
 			}
 		}
 	}()
@@ -231,4 +194,3 @@ func serverAddress(port int) string {
 
 	return net.JoinHostPort(host, fmt.Sprintf("%d", listenPort))
 }
-

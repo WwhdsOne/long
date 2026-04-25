@@ -36,7 +36,7 @@ export function useAdminPage() {
   const uploadingImage = ref(false)
 
   const loginForm = ref({ username: 'admin', password: '' })
-  const bossForm = ref({ id: '', name: '', maxHp: '', layout: [] })
+  const bossForm = ref({ id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, layout: [] })
   const equipmentForm = ref(emptyEquipmentForm())
   const equipmentPrompt = ref('')
   const showEquipmentEditor = ref(false)
@@ -271,7 +271,6 @@ export function useAdminPage() {
     await Promise.all([
       fetchAdminState(),
       fetchPlayerPage(),
-      fetchButtonPage(buttonPage.value.page),
       fetchEquipmentPage(equipmentPage.value.page),
     ])
   }
@@ -290,7 +289,6 @@ export function useAdminPage() {
         fetchAnnouncements(),
         fetchMessages(),
         fetchPlayerPage(),
-        fetchButtonPage(),
         fetchEquipmentPage(),
       ])
     } catch {
@@ -316,7 +314,7 @@ export function useAdminPage() {
       checkingSession.value = false
       setSuccess('后台已解锁。')
       await fetchAdminState()
-      await Promise.all([fetchPlayerPage(), fetchButtonPage(), fetchEquipmentPage()])
+      await Promise.all([fetchPlayerPage(), fetchEquipmentPage()])
     } catch (error) {
       errorMessage.value = error.message || '登录失败'
     } finally {
@@ -336,7 +334,7 @@ export function useAdminPage() {
     announcements.value = []
     checkingSession.value = false
     successMessage.value = ''
-    bossForm.value = { id: '', name: '', maxHp: '', layout: [] }
+    bossForm.value = { id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, layout: [] }
   }
 
   async function resetPlayerPassword(nickname) {

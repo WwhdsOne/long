@@ -47,12 +47,13 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 		}
 
 		templates = append(templates, BossTemplate{
-			ID:    templateID,
-			Name:  firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
-			MaxHP: maxInt64(1, int64FromString(values["max_hp"])),
-			Loot:  loot,
-
-			Layout: layout,
+			ID:          templateID,
+			Name:        firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
+			MaxHP:       maxInt64(1, int64FromString(values["max_hp"])),
+			GoldOnKill:  maxInt64(0, int64FromString(values["gold_on_kill"])),
+			StoneOnKill: maxInt64(0, int64FromString(values["stone_on_kill"])),
+			Loot:        loot,
+			Layout:      layout,
 		})
 	}
 
@@ -80,8 +81,10 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 	maxHP = sumBossPartMaxHP(layout)
 
 	values := map[string]any{
-		"name":   firstNonEmpty(strings.TrimSpace(template.Name), templateID),
-		"max_hp": strconv.FormatInt(maxHP, 10),
+		"name":          firstNonEmpty(strings.TrimSpace(template.Name), templateID),
+		"max_hp":        strconv.FormatInt(maxHP, 10),
+		"gold_on_kill":  strconv.FormatInt(maxInt64(0, template.GoldOnKill), 10),
+		"stone_on_kill": strconv.FormatInt(maxInt64(0, template.StoneOnKill), 10),
 	}
 	if len(layout) > 0 {
 		layoutRaw, _ := sonic.Marshal(layout)
@@ -193,14 +196,16 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 	maxHP = sumBossPartMaxHP(parts)
 
 	current := &Boss{
-		ID:         instanceID,
-		TemplateID: template.ID,
-		Name:       firstNonEmpty(strings.TrimSpace(template.Name), template.ID),
-		Status:     bossStatusActive,
-		MaxHP:      maxHP,
-		CurrentHP:  maxHP,
-		Parts:      parts,
-		StartedAt:  time.Now().Unix(),
+		ID:          instanceID,
+		TemplateID:  template.ID,
+		Name:        firstNonEmpty(strings.TrimSpace(template.Name), template.ID),
+		Status:      bossStatusActive,
+		MaxHP:       maxHP,
+		CurrentHP:   maxHP,
+		GoldOnKill:  maxInt64(0, template.GoldOnKill),
+		StoneOnKill: maxInt64(0, template.StoneOnKill),
+		Parts:       parts,
+		StartedAt:   time.Now().Unix(),
 	}
 
 	if err := s.setCurrentBoss(ctx, current, template.Loot); err != nil {
@@ -233,12 +238,14 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	}
 
 	values := map[string]any{
-		"id":         boss.ID,
-		"name":       boss.Name,
-		"status":     boss.Status,
-		"max_hp":     strconv.FormatInt(boss.MaxHP, 10),
-		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
-		"started_at": strconv.FormatInt(boss.StartedAt, 10),
+		"id":            boss.ID,
+		"name":          boss.Name,
+		"status":        boss.Status,
+		"max_hp":        strconv.FormatInt(boss.MaxHP, 10),
+		"current_hp":    strconv.FormatInt(boss.CurrentHP, 10),
+		"gold_on_kill":  strconv.FormatInt(maxInt64(0, boss.GoldOnKill), 10),
+		"stone_on_kill": strconv.FormatInt(maxInt64(0, boss.StoneOnKill), 10),
+		"started_at":    strconv.FormatInt(boss.StartedAt, 10),
 	}
 	if strings.TrimSpace(boss.TemplateID) != "" {
 		values["template_id"] = boss.TemplateID

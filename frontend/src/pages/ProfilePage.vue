@@ -2,7 +2,6 @@
 import {usePublicPageState} from './publicPageState'
 
 const {
-  AUTO_CLICK_RATE_LABEL,
   inventory,
   loadout,
   loadoutSlots,
@@ -13,11 +12,9 @@ const {
   errorMessage,
   actioningItemId,
   activeHudTab,
-  autoClickEnabled,
-  autoClickTargetLabel,
-  canStartAutoClick,
-  autoClickStatus,
   gems,
+  gold,
+  stones,
   profileLoading,
   profileNotice,
   isLoggedIn,
@@ -38,7 +35,6 @@ const {
   formatPercentWithDelta,
   submitMessage,
   selectHudTab,
-  toggleAutoClick,
   submitNickname,
   resetNickname,
 } = usePublicPageState()
@@ -67,11 +63,11 @@ const {
             </button>
             <button
                 class="player-hud__tab"
-                :class="{ 'player-hud__tab--active': activeHudTab === 'auto' }"
+                :class="{ 'player-hud__tab--active': activeHudTab === 'resources' }"
                 type="button"
-                @click="selectHudTab('auto')"
+                @click="selectHudTab('resources')"
             >
-              挂机
+              资源
             </button>
             <button
                 class="player-hud__tab"
@@ -138,32 +134,28 @@ const {
               </button>
             </section>
 
-            <section v-else-if="activeHudTab === 'auto'" class="player-hud__panel player-hud__auto">
+            <section v-else-if="activeHudTab === 'resources'" class="player-hud__panel">
               <div class="player-hud__section-head">
                 <div>
-                  <p class="vote-stage__eyebrow">挂机</p>
-                  <strong>官方挂机托管</strong>
+                  <p class="vote-stage__eyebrow">资源</p>
+                  <strong>货币与材料</strong>
                 </div>
-                <span class="player-hud__pill" :class="{ 'player-hud__pill--active': autoClickEnabled }">
-                  {{ autoClickEnabled ? '运行中' : '未开启' }}
-                </span>
+                <span class="player-hud__pill">账户</span>
               </div>
-
-              <p class="player-hud__note">{{ autoClickStatus }}</p>
-
-              <div class="player-hud__auto-meta">
-                <span class="player-hud__auto-chip">目标：{{ autoClickTargetLabel }}</span>
-                <span class="player-hud__auto-chip">{{ AUTO_CLICK_RATE_LABEL }}</span>
+              <div class="me-card__stats">
+                <article>
+                  <span>金币</span>
+                  <strong>{{ gold }}</strong>
+                </article>
+                <article>
+                  <span>强化石</span>
+                  <strong>{{ stones }}</strong>
+                </article>
+                <article>
+                  <span>宝石（兼容）</span>
+                  <strong>{{ gems }}</strong>
+                </article>
               </div>
-
-              <button
-                  class="nickname-form__submit player-hud__auto-button"
-                  type="button"
-                  :disabled="!autoClickEnabled && !canStartAutoClick"
-                  @click="toggleAutoClick"
-              >
-                {{ autoClickEnabled ? '关闭挂机' : '开启挂机' }}
-              </button>
             </section>
 
             <section v-else-if="activeHudTab === 'inventory'" class="player-hud__panel">
