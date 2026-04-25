@@ -1487,7 +1487,7 @@ func (s *Store) baseCombatStats() CombatStats {
 	return deriveCombatStats(CombatStats{
 		CriticalChancePercent: clampFloat(float64(s.critical.CriticalChancePercent), 0, 100),
 		CriticalCount:         s.critical.CriticalCount,
-		AttackPower:           0,
+		AttackPower:           5,
 		ArmorPenPercent:       0,
 		CritDamageMultiplier:  1.0,
 		AllDamageAmplify:      0,

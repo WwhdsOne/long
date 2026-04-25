@@ -12,9 +12,6 @@ rate_limit:
   limit: 42
   window_ms: 2000
   blacklist_ms: 600000
-critical_hit:
-  chance_percent: 5
-  count: 5
 admin:
   username: "root"
   password: "123456"

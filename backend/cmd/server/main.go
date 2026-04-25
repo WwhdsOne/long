@@ -63,8 +63,8 @@ func run() error {
 
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
-		CriticalChancePercent: cfg.CriticalHit.ChancePercent,
-		CriticalCount:         cfg.CriticalHit.Count,
+		CriticalChancePercent: 0,
+		CriticalCount:         0,
 	}, nicknameValidator)
 	if err := store.EnsureDefaults(startupCtx, config.DefaultButtons); err != nil {
 		return fmt.Errorf("seed default buttons: %w", err)

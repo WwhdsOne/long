@@ -33,9 +33,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               limit: 30
               window_ms: 2000
               blacklist_ms: 600000
-            critical_hit:
-              chance_percent: 5
-              count: 5
             admin:
               username: "admin"
               password: "secret"
@@ -86,12 +83,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.RateLimit.Limit != 30 {
 		t.Fatalf("expected rate limit 30, got %d", cfg.RateLimit.Limit)
-	}
-	if cfg.CriticalHit.ChancePercent != 5 {
-		t.Fatalf("expected critical chance 5, got %d", cfg.CriticalHit.ChancePercent)
-	}
-	if cfg.CriticalHit.Count != 5 {
-		t.Fatalf("expected critical count 5, got %d", cfg.CriticalHit.Count)
 	}
 	if cfg.Admin.Username != "admin" {
 		t.Fatalf("expected admin username admin, got %q", cfg.Admin.Username)
@@ -229,10 +220,6 @@ func validConfigForTest() Config {
 			Limit:             30,
 			Window:            2 * time.Second,
 			BlacklistDuration: 10 * time.Minute,
-		},
-		CriticalHit: CriticalHitConfig{
-			ChancePercent: 5,
-			Count:         5,
 		},
 		Admin: AdminConfig{
 			Username:      "admin",

@@ -160,10 +160,10 @@ func TestClickButtonDoesNotDoubleDeltaForFormerStarlightButton(t *testing.T) {
 		t.Fatalf("click button: %v", err)
 	}
 
-	if result.Delta != 1 {
-		t.Fatalf("expected click delta to stay 1 after removing starlight, got %+v", result)
+	if result.Delta != 5 {
+		t.Fatalf("expected click delta to stay 5 after removing starlight, got %+v", result)
 	}
-	if result.Button.Count != 1 || result.UserStats.ClickCount != 1 {
+	if result.Button.Count != 5 || result.UserStats.ClickCount != 5 {
 		t.Fatalf("expected single delta to apply to counts, got %+v", result)
 	}
 }
@@ -323,7 +323,7 @@ func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	if result.Boss == nil {
 		t.Fatal("expected click result to include boss state")
 	}
-	if result.Boss.CurrentHP != 99 || len(result.Boss.Parts) != 1 || result.Boss.Parts[0].CurrentHP != 99 {
+	if result.Boss.CurrentHP != 95 || len(result.Boss.Parts) != 1 || result.Boss.Parts[0].CurrentHP != 95 {
 		t.Fatalf("expected click result to reduce boss and part health, got %+v", result.Boss)
 	}
 
@@ -331,7 +331,7 @@ func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load current boss: %v", err)
 	}
-	if stored.CurrentHP != 99 || len(stored.Parts) != 1 || stored.Parts[0].CurrentHP != 99 {
+	if stored.CurrentHP != 95 || len(stored.Parts) != 1 || stored.Parts[0].CurrentHP != 95 {
 		t.Fatalf("expected stored boss and part health to be reduced, got %+v", stored)
 	}
 }
@@ -421,14 +421,14 @@ func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
 	if err != nil {
 		t.Fatalf("click button: %v", err)
 	}
-	if result.Delta != 1 || result.BossDamage != 7 {
-		t.Fatalf("expected click delta 1 and boss damage 7, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
+	if result.Delta != 1 || result.BossDamage != 12 {
+		t.Fatalf("expected click delta 1 and boss damage 12, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
 	}
 	if result.UserStats.ClickCount != 1 {
 		t.Fatalf("expected manual click count to increase by 1, got %+v", result.UserStats)
 	}
-	if result.Boss == nil || result.Boss.CurrentHP != 93 || result.Boss.Parts[0].CurrentHP != 93 {
-		t.Fatalf("expected boss health to lose 7 damage, got %+v", result.Boss)
+	if result.Boss == nil || result.Boss.CurrentHP != 88 || result.Boss.Parts[0].CurrentHP != 88 {
+		t.Fatalf("expected boss health to lose 12 damage, got %+v", result.Boss)
 	}
 }
 
@@ -464,10 +464,10 @@ func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
 	if result.Delta != 1 || result.UserStats.ClickCount != 1 {
 		t.Fatalf("expected direct part click to count once, got %+v", result)
 	}
-	if result.Boss == nil || result.Boss.CurrentHP != 198 {
+	if result.Boss == nil || result.Boss.CurrentHP != 188 {
 		t.Fatalf("expected boss health to decrease by selected part damage, got %+v", result.Boss)
 	}
-	if result.Boss.Parts[0].CurrentHP != 100 || result.Boss.Parts[1].CurrentHP != 98 {
+	if result.Boss.Parts[0].CurrentHP != 100 || result.Boss.Parts[1].CurrentHP != 88 {
 		t.Fatalf("expected only selected part to lose HP, got %+v", result.Boss.Parts)
 	}
 
@@ -512,8 +512,8 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("auto click boss part: %v", err)
 	}
-	if result.Delta != 0 || result.BossDamage != 7 {
-		t.Fatalf("expected auto click delta 0 and boss damage 7, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
+	if result.Delta != 0 || result.BossDamage != 12 {
+		t.Fatalf("expected auto click delta 0 and boss damage 12, got delta=%d bossDamage=%d result=%+v", result.Delta, result.BossDamage, result)
 	}
 
 	userStats, err := store.GetUserStats(ctx, "阿明")
@@ -523,7 +523,7 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	if userStats.ClickCount != 0 {
 		t.Fatalf("expected auto click not to increase click count, got %+v", userStats)
 	}
-	if result.Boss == nil || result.Boss.CurrentHP != 93 || result.Boss.Parts[0].CurrentHP != 93 {
+	if result.Boss == nil || result.Boss.CurrentHP != 88 || result.Boss.Parts[0].CurrentHP != 88 {
 		t.Fatalf("expected auto click to damage boss, got %+v", result.Boss)
 	}
 }

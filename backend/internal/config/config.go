@@ -53,12 +53,6 @@ type ManualClickConfig struct {
 	MaxPressDuration      time.Duration
 }
 
-// CriticalHitConfig 暴击机制配置
-type CriticalHitConfig struct {
-	ChancePercent int   // 暴击概率（百分比）
-	Count         int64 // 暴击时的增量倍数
-}
-
 // AdminConfig 管理后台鉴权配置
 type AdminConfig struct {
 	Username      string
@@ -97,7 +91,6 @@ type Config struct {
 	Port               int
 	Redis              RedisConfig
 	RateLimit          RateLimitConfig
-	CriticalHit        CriticalHitConfig
 	Admin              AdminConfig
 	PlayerAuth         PlayerAuthConfig
 	ManualClick        ManualClickConfig
@@ -125,10 +118,6 @@ type fileConfig struct {
 		WindowMS    int `yaml:"window_ms"`
 		BlacklistMS int `yaml:"blacklist_ms"`
 	} `yaml:"rate_limit"`
-	CriticalHit struct {
-		ChancePercent int   `yaml:"chance_percent"`
-		Count         int64 `yaml:"count"`
-	} `yaml:"critical_hit"`
 	Admin struct {
 		Username      string `yaml:"username"`
 		Password      string `yaml:"password"`
@@ -239,10 +228,6 @@ func loadFromConsul() (Config, consulSource, error) {
 			Window:            time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
 			BlacklistDuration: time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
 		},
-		CriticalHit: CriticalHitConfig{
-			ChancePercent: parsed.CriticalHit.ChancePercent,
-			Count:         parsed.CriticalHit.Count,
-		},
 		Admin: AdminConfig{
 			Username:      parsed.Admin.Username,
 			Password:      parsed.Admin.Password,
@@ -311,11 +296,6 @@ func validate(config Config) error {
 		return errors.New("rate_limit.window_ms must be greater than 0")
 	case config.RateLimit.BlacklistDuration <= 0:
 		return errors.New("rate_limit.blacklist_ms must be greater than 0")
-	case config.CriticalHit.ChancePercent <= 0 || config.CriticalHit.ChancePercent > 100:
-		return errors.New("critical_hit.chance_percent must be between 1 and 100")
-	case config.CriticalHit.Count <= 1:
-		return errors.New("critical_hit.count must be greater than 1")
-	case strings.TrimSpace(config.Admin.Username) == "":
 		return errors.New("admin.username is required")
 	case strings.TrimSpace(config.Admin.Password) == "":
 		return errors.New("admin.password is required")
