@@ -15,6 +15,7 @@ export function createAdminPageActions(state) {
     emptyEquipmentForm,
     equipmentForm,
     equipmentPage,
+    equipmentPrompt,
     errorMessage,
     fetchAdminState,
     fetchAnnouncements,
@@ -22,11 +23,13 @@ export function createAdminPageActions(state) {
     fetchEquipmentPage,
     fetchMessages,
     findBossTemplate,
+    generatingEquipmentDraft,
     lootRows,
     readErrorMessage,
     saving,
     selectedBossTemplateId,
     setSuccess,
+    showEquipmentEditor,
     uploadImageToOSS,
   } = state
 
@@ -129,11 +132,54 @@ export function createAdminPageActions(state) {
       }
       setSuccess('装备模板已保存。')
       equipmentForm.value = emptyEquipmentForm()
+      showEquipmentEditor.value = false
       await fetchEquipmentPage(equipmentPage.value.page)
     } catch (error) {
       errorMessage.value = error.message || '保存装备失败'
     } finally {
       saving.value = false
+    }
+  }
+
+  function openNewEquipment() {
+    equipmentForm.value = emptyEquipmentForm()
+    showEquipmentEditor.value = true
+    activeTab.value = 'equipment'
+  }
+
+  function updateEquipmentPrompt(value) {
+    equipmentPrompt.value = value
+  }
+
+  async function generateEquipmentDraft() {
+    const prompt = equipmentPrompt.value.trim()
+    if (!prompt) {
+      errorMessage.value = '先输入装备描述。'
+      return
+    }
+
+    generatingEquipmentDraft.value = true
+    try {
+      const response = await fetch('/api/admin/equipment/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '生成装备草稿失败'))
+      }
+
+      const payload = await response.json()
+      equipmentForm.value = {
+        ...emptyEquipmentForm(),
+        ...(payload.draft || {}),
+      }
+      showEquipmentEditor.value = true
+      setSuccess('装备草稿已生成，请检查后保存。')
+    } catch (error) {
+      errorMessage.value = error.message || '生成装备草稿失败'
+    } finally {
+      generatingEquipmentDraft.value = false
     }
   }
 
@@ -288,6 +334,7 @@ export function createAdminPageActions(state) {
 
   function editEquipment(entry) {
     equipmentForm.value = { ...entry }
+    showEquipmentEditor.value = true
     activeTab.value = 'equipment'
   }
 
@@ -338,6 +385,8 @@ export function createAdminPageActions(state) {
     editButton,
     editEquipment,
     enableBossCycle,
+    generateEquipmentDraft,
+    openNewEquipment,
     removeLootRow,
     saveAnnouncement,
     saveBossTemplate,
@@ -345,6 +394,7 @@ export function createAdminPageActions(state) {
     saveEquipment,
     saveLoot,
     selectBossTemplate,
+    updateEquipmentPrompt,
     uploadButtonImage,
     uploadEquipmentImage,
   }

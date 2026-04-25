@@ -83,6 +83,15 @@ type OSSConfig struct {
 	ExpireSeconds   int
 }
 
+// LLMConfig 控制后台装备草稿生成的大模型调用。
+type LLMConfig struct {
+	Enabled bool
+	APIKey  string
+	BaseURL string
+	Model   string
+	Timeout time.Duration
+}
+
 // Config 运行时配置集合
 type Config struct {
 	Port               int
@@ -93,6 +102,7 @@ type Config struct {
 	PlayerAuth         PlayerAuthConfig
 	ManualClick        ManualClickConfig
 	OSS                OSSConfig
+	LLM                LLMConfig
 	RedisPrefix        string
 	ButtonPollInterval time.Duration // 低频兜底按钮索引同步间隔
 	PublicDir          string
@@ -129,13 +139,13 @@ type fileConfig struct {
 		JWTTTLSecond int    `yaml:"jwt_ttl_seconds"`
 	} `yaml:"player_auth"`
 	ManualClick struct {
-		TicketTTLMS           int     `yaml:"ticket_ttl_ms"`
-		IssueLimitPerSecond   int     `yaml:"issue_limit_per_second"`
-		ConsumeLimitPerSecond int     `yaml:"consume_limit_per_second"`
-		RiskThreshold         int     `yaml:"risk_threshold"`
-		BanMS                 int     `yaml:"ban_ms"`
-		MinPressDurationMS    int     `yaml:"min_press_duration_ms"`
-		MaxPressDurationMS    int     `yaml:"max_press_duration_ms"`
+		TicketTTLMS           int `yaml:"ticket_ttl_ms"`
+		IssueLimitPerSecond   int `yaml:"issue_limit_per_second"`
+		ConsumeLimitPerSecond int `yaml:"consume_limit_per_second"`
+		RiskThreshold         int `yaml:"risk_threshold"`
+		BanMS                 int `yaml:"ban_ms"`
+		MinPressDurationMS    int `yaml:"min_press_duration_ms"`
+		MaxPressDurationMS    int `yaml:"max_press_duration_ms"`
 	} `yaml:"manual_click"`
 	OSS struct {
 		AccessKeyID     string `yaml:"access_key_id"`
@@ -146,6 +156,13 @@ type fileConfig struct {
 		UploadDirPrefix string `yaml:"upload_dir_prefix"`
 		ExpireSeconds   int    `yaml:"expire_seconds"`
 	} `yaml:"oss"`
+	LLM struct {
+		Enabled   bool   `yaml:"enabled"`
+		APIKey    string `yaml:"api_key"`
+		BaseURL   string `yaml:"base_url"`
+		Model     string `yaml:"model"`
+		TimeoutMS int    `yaml:"timeout_ms"`
+	} `yaml:"llm"`
 }
 
 type consulKV struct {
@@ -253,6 +270,13 @@ func loadFromConsul() (Config, consulSource, error) {
 			UploadDirPrefix: parsed.OSS.UploadDirPrefix,
 			ExpireSeconds:   parsed.OSS.ExpireSeconds,
 		},
+		LLM: LLMConfig{
+			Enabled: parsed.LLM.Enabled,
+			APIKey:  strings.TrimSpace(parsed.LLM.APIKey),
+			BaseURL: normalizeLLMBaseURL(parsed.LLM.BaseURL),
+			Model:   strings.TrimSpace(parsed.LLM.Model),
+			Timeout: time.Duration(parsed.LLM.TimeoutMS) * time.Millisecond,
+		},
 		RedisPrefix:        parsed.RedisPrefix,
 		ButtonPollInterval: time.Duration(parsed.ButtonPollIntervalMS) * time.Millisecond,
 		PublicDir:          resolvePublicDir(),
@@ -323,9 +347,25 @@ func validate(config Config) error {
 		return errors.New("oss.bucket is required when oss is configured")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.Region) == "":
 		return errors.New("oss.region is required when oss is configured")
+	case config.LLM.Enabled && strings.TrimSpace(config.LLM.APIKey) == "":
+		return errors.New("llm.api_key is required when llm is enabled")
+	case config.LLM.Enabled && strings.TrimSpace(config.LLM.Model) == "":
+		return errors.New("llm.model is required when llm is enabled")
+	case config.LLM.Enabled && strings.TrimSpace(config.LLM.BaseURL) == "":
+		return errors.New("llm.base_url is required when llm is enabled")
+	case config.LLM.Enabled && config.LLM.Timeout <= 0:
+		return errors.New("llm.timeout_ms must be greater than 0 when llm is enabled")
 	}
 
 	return nil
+}
+
+func normalizeLLMBaseURL(baseURL string) string {
+	trimmed := strings.TrimSpace(baseURL)
+	if trimmed == "" {
+		return "https://api.openai.com/v1"
+	}
+	return strings.TrimRight(trimmed, "/")
 }
 
 // Enabled reports whether OSS direct-upload has been configured.

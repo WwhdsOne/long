@@ -119,18 +119,28 @@ func run() error {
 			ExpireSeconds:   cfg.OSS.ExpireSeconds,
 		})
 	}
+	var equipmentDraftGenerator httpapi.EquipmentDraftGenerator
+	if cfg.LLM.Enabled {
+		equipmentDraftGenerator = httpapi.NewOpenAIEquipmentDraftGenerator(httpapi.EquipmentDraftGeneratorConfig{
+			APIKey:  cfg.LLM.APIKey,
+			BaseURL: cfg.LLM.BaseURL,
+			Model:   cfg.LLM.Model,
+			Timeout: cfg.LLM.Timeout,
+		})
+	}
 	httpServer := httpapi.NewHertzServer(serverAddress(cfg.Port), httpapi.Options{
-		Store:               store,
-		StateView:           stateCache,
-		ChangePublisher:     changeBus,
-		ClickGuard:          clickLimiter,
-		ManualClick:         manualClickService,
-		AutoClick:           autoClickService,
-		PlayerAuthenticator: playerAuthenticator,
-		Events:              eventHandler,
-		RealtimeHub:         hub,
-		PublicDir:           cfg.PublicDir,
-		OSSSigner:           ossSigner,
+		Store:                   store,
+		StateView:               stateCache,
+		ChangePublisher:         changeBus,
+		ClickGuard:              clickLimiter,
+		ManualClick:             manualClickService,
+		AutoClick:               autoClickService,
+		PlayerAuthenticator:     playerAuthenticator,
+		Events:                  eventHandler,
+		RealtimeHub:             hub,
+		PublicDir:               cfg.PublicDir,
+		OSSSigner:               ossSigner,
+		EquipmentDraftGenerator: equipmentDraftGenerator,
 		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
 			Username:      cfg.Admin.Username,
 			Password:      cfg.Admin.Password,

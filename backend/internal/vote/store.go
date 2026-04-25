@@ -1491,11 +1491,12 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 	}
 
 	return EquipmentDefinition{
-		ItemID: itemID,
-		Name:   firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
-		Slot:   normalizeEquipmentSlot(values["slot"]),
-		Rarity: normalizeEquipmentRarity(values["rarity"]),
-
+		ItemID:               itemID,
+		Name:                 firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
+		Slot:                 normalizeEquipmentSlot(values["slot"]),
+		Rarity:               normalizeEquipmentRarity(values["rarity"]),
+		ImagePath:            strings.TrimSpace(values["image_path"]),
+		ImageAlt:             strings.TrimSpace(values["image_alt"]),
 		AttackPower:          int64FromString(values["attack_power"]),
 		ArmorPenPercent:      float64FromString(values["armor_pen_percent"]),
 		CritDamageMultiplier: float64FromString(values["crit_damage_multiplier"]),
@@ -1503,6 +1504,7 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		PartTypeDamageSoft:   float64FromString(values["part_type_damage_soft"]),
 		PartTypeDamageHeavy:  float64FromString(values["part_type_damage_heavy"]),
 		PartTypeDamageWeak:   float64FromString(values["part_type_damage_weak"]),
+		TalentAffinity:       strings.TrimSpace(values["talent_affinity"]),
 	}, nil
 }
 

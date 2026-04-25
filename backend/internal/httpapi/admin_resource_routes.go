@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -66,6 +67,36 @@ func registerAdminButtonRoutes(router route.IRouter, options Options) {
 }
 
 func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
+	router.POST("/api/admin/equipment/generate", func(ctx context.Context, c *app.RequestContext) {
+		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
+			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+			return
+		}
+		if options.EquipmentDraftGenerator == nil {
+			writeJSON(c, consts.StatusServiceUnavailable, map[string]string{"error": "EQUIPMENT_GENERATOR_DISABLED"})
+			return
+		}
+
+		var body struct {
+			Prompt string `json:"prompt"`
+		}
+		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
+			return
+		}
+
+		draft, err := options.EquipmentDraftGenerator.GenerateEquipmentDraft(ctx, body.Prompt)
+		if err != nil {
+			if errors.Is(err, ErrInvalidEquipmentDraft) {
+				writeJSON(c, consts.StatusUnprocessableEntity, map[string]string{"error": "INVALID_EQUIPMENT_DRAFT"})
+				return
+			}
+			writeJSON(c, consts.StatusBadGateway, map[string]string{"error": "EQUIPMENT_GENERATE_FAILED"})
+			return
+		}
+
+		writeJSON(c, consts.StatusOK, map[string]vote.EquipmentDefinition{"draft": draft})
+	})
+
 	router.POST("/api/admin/equipment", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
@@ -134,4 +165,3 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 }
-
