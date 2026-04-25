@@ -299,16 +299,16 @@ function bossZoneAriaLabel(zone) {
           <div class="boss-drop-pool__grid">
             <article class="boss-drop-card boss-drop-card--detail">
               <span class="boss-drop-card__type">金币</span>
-              <strong>{{ bossGoldRange.min }} ~ {{ bossGoldRange.max }}</strong>
+              <strong>可获取金币量 : {{ bossGoldRange.min }} ~ {{ bossGoldRange.max }}</strong>
               <ul class="boss-drop-card__details">
-                <li>按击杀结算随机波动（向下取整）</li>
+                <li>按击杀结算</li>
               </ul>
             </article>
             <article class="boss-drop-card boss-drop-card--detail">
               <span class="boss-drop-card__type">强化石</span>
-              <strong>{{ bossStoneRange.min }} ~ {{ bossStoneRange.max }}</strong>
+              <strong>可获取强化石量 : {{ bossStoneRange.min }} ~ {{ bossStoneRange.max }}</strong>
               <ul class="boss-drop-card__details">
-                <li>按击杀结算随机波动（向下取整）</li>
+                <li>按击杀结算</li>
               </ul>
             </article>
           </div>

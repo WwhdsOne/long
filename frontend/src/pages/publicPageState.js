@@ -1275,7 +1275,7 @@ function registerPublicPageLifecycle() {
         onlineCount.value = 1
 
         // ✅ 延迟一点再拉真实数据（避免瞬间覆盖）
-        setTimeout(fetchOnlineCount, 1000)
+        setTimeout(fetchOnlineCount, 300)
 
         // 5 秒轮询
         onlineCountTimer = setInterval(fetchOnlineCount, 10000)
