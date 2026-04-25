@@ -123,6 +123,18 @@ func clickRequestError(err error) *apiResponseError {
 			Code:    "BUTTON_NOT_FOUND",
 			Message: "按钮不存在或已经下线。",
 		}
+	case errors.Is(err, vote.ErrBossPartNotFound):
+		return &apiResponseError{
+			Status:  consts.StatusNotFound,
+			Code:    "BOSS_PART_NOT_FOUND",
+			Message: "Boss 部位不存在或当前不可攻击。",
+		}
+	case errors.Is(err, vote.ErrBossPartAlreadyDead):
+		return &apiResponseError{
+			Status:  consts.StatusConflict,
+			Code:    "BOSS_PART_ALREADY_DEAD",
+			Message: "Boss 部位已被击碎，请选择其他部位。",
+		}
 	case errors.Is(err, vote.ErrInvalidNickname):
 		return &apiResponseError{
 			Status:  consts.StatusBadRequest,

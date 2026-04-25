@@ -47,6 +47,8 @@ var ErrInvalidTalentTree = errors.New("invalid talent tree")
 const (
 	bossStatusActive   = "active"
 	bossStatusDefeated = "defeated"
+
+	bossPartClickSlugPrefix = "boss-part:"
 )
 
 // Button 按钮数据结构，返回给前端和 SSE 客户端
@@ -467,9 +469,16 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	totalVotes := int64(0)
+	buttonTotalVotes := int64(0)
 	for _, button := range buttons {
-		totalVotes += button.Count
+		buttonTotalVotes += button.Count
+	}
+	totalVotes, err := s.totalClickCount(ctx)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if totalVotes == 0 {
+		totalVotes = buttonTotalVotes
 	}
 
 	leaderboard, err := s.ListLeaderboard(ctx, 10)
@@ -646,6 +655,10 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 	if err != nil {
 		return ClickResult{}, err
 	}
+	slug = strings.TrimSpace(slug)
+	if strings.HasPrefix(slug, bossPartClickSlugPrefix) {
+		return s.clickBossPart(ctx, slug, normalizedNickname)
+	}
 
 	redisKey := s.prefix + slug
 	currentValues, err := s.client.HMGet(ctx, redisKey, hashFields...).Result()
@@ -715,6 +728,15 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 	}
 
 	return result, nil
+}
+
+// ClickBossPart 处理不绑定按钮的 Boss 部位手动点击。
+func (s *Store) ClickBossPart(ctx context.Context, target string, nickname string) (ClickResult, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	return s.clickBossPart(ctx, target, normalizedNickname)
 }
 
 // EquipItem 穿戴一件装备。装备效果会影响平时点击与 Boss 伤害。
@@ -889,6 +911,18 @@ func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]Leaderboard
 	return leaderboard, nil
 }
 
+func (s *Store) totalClickCount(ctx context.Context) (int64, error) {
+	scores, err := s.client.ZRangeWithScores(ctx, s.leaderboardKey, 0, -1).Result()
+	if err != nil {
+		return 0, err
+	}
+	total := int64(0)
+	for _, score := range scores {
+		total += int64(score.Score)
+	}
+	return total, nil
+}
+
 // GetUserStats 获取指定用户的统计信息
 func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
@@ -975,6 +1009,34 @@ func (s *Store) applyVoteOnlyClick(ctx context.Context, redisKey string, nicknam
 	}, nil
 }
 
+func (s *Store) applyClickCountOnly(ctx context.Context, nickname string, delta int64, critical bool) (ClickResult, error) {
+	now := time.Now().Unix()
+	pipe := s.client.TxPipeline()
+	userCountCmd := pipe.HIncrBy(ctx, s.userPrefix+nickname, "click_count", delta)
+	pipe.HSet(ctx, s.userPrefix+nickname, map[string]any{
+		"nickname":   nickname,
+		"updated_at": strconv.FormatInt(now, 10),
+	})
+	pipe.ZIncrBy(ctx, s.leaderboardKey, float64(delta), nickname)
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: nickname,
+	})
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return ClickResult{}, err
+	}
+
+	return ClickResult{
+		Delta:    delta,
+		Critical: critical,
+		UserStats: UserStats{
+			Nickname:   nickname,
+			ClickCount: userCountCmd.Val(),
+		},
+	}, nil
+}
+
 func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
 	if boss == nil || boss.Status != bossStatusActive {
 		return s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
@@ -1049,7 +1111,7 @@ func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Bo
 		return ClickResult{}, err
 	}
 
-	return s.applyBossPartDamage(ctx, boss, nickname, critical, result)
+	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, -1)
 }
 
 func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string) (ClickResult, error) {
@@ -1069,10 +1131,50 @@ func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string
 		UserStats: UserStats{
 			Nickname: normalizedNickname,
 		},
-	})
+	}, -1)
 }
 
-func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult) (ClickResult, error) {
+func (s *Store) clickBossPart(ctx context.Context, target string, nickname string) (ClickResult, error) {
+	x, y, ok := parseBossPartClickTarget(target)
+	if !ok {
+		return ClickResult{}, ErrBossPartNotFound
+	}
+
+	boss, err := s.currentBoss(ctx)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	if boss == nil || boss.Status != bossStatusActive || len(boss.Parts) == 0 {
+		return ClickResult{}, ErrBossPartNotFound
+	}
+
+	targetIdx := findBossPartIndex(boss.Parts, x, y)
+	if targetIdx < 0 {
+		return ClickResult{}, ErrBossPartNotFound
+	}
+	part := boss.Parts[targetIdx]
+	if !part.Alive || part.CurrentHP <= 0 {
+		return ClickResult{}, ErrBossPartAlreadyDead
+	}
+
+	_, critical, err := s.nextIncrement(ctx, nickname)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	result, err := s.applyClickCountOnly(ctx, nickname, 1, critical)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	result.Button = Button{
+		Key:     bossPartClickSlug(x, y),
+		Label:   bossPartDisplayLabel(part),
+		Enabled: true,
+	}
+
+	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx)
+}
+
+func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult, targetIdx int) (ClickResult, error) {
 	quantities, err := s.inventoryQuantities(ctx, nickname)
 	if err != nil {
 		return result, nil
@@ -1087,11 +1189,16 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		return result, nil
 	}
 
-	targetIdx := s.selectTargetPart(boss.Parts, nickname)
+	if targetIdx < 0 {
+		targetIdx = s.selectTargetPart(boss.Parts, nickname)
+	}
 	if targetIdx < 0 {
 		return result, nil
 	}
 	part := &boss.Parts[targetIdx]
+	if !part.Alive || part.CurrentHP <= 0 {
+		return result, ErrBossPartAlreadyDead
+	}
 
 	aliveCount := 0
 	for _, p := range boss.Parts {
@@ -1194,6 +1301,50 @@ func (s *Store) selectTargetPart(parts []BossPart, nickname string) int {
 		return alive[0]
 	}
 	return alive[s.roll(len(alive))]
+}
+
+func parseBossPartClickTarget(target string) (int, int, bool) {
+	raw := strings.TrimSpace(target)
+	raw = strings.TrimPrefix(raw, bossPartClickSlugPrefix)
+	parts := strings.Split(raw, "-")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	x, xErr := strconv.Atoi(strings.TrimSpace(parts[0]))
+	y, yErr := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if xErr != nil || yErr != nil || x < 0 || x >= 5 || y < 0 || y >= 5 {
+		return 0, 0, false
+	}
+	return x, y, true
+}
+
+func findBossPartIndex(parts []BossPart, x int, y int) int {
+	for index, part := range parts {
+		if part.X == x && part.Y == y {
+			return index
+		}
+	}
+	return -1
+}
+
+func bossPartClickSlug(x int, y int) string {
+	return bossPartClickSlugPrefix + strconv.Itoa(x) + "-" + strconv.Itoa(y)
+}
+
+func bossPartDisplayLabel(part BossPart) string {
+	if label := strings.TrimSpace(part.DisplayName); label != "" {
+		return label
+	}
+	switch part.Type {
+	case PartTypeSoft:
+		return "软组织"
+	case PartTypeHeavy:
+		return "重甲"
+	case PartTypeWeak:
+		return "弱点"
+	default:
+		return string(part.Type)
+	}
 }
 
 func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error) {

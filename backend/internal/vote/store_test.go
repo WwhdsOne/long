@@ -389,6 +389,54 @@ func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
 	}
 }
 
+func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "direct-part-boss",
+		Name:  "直点 Boss",
+		MaxHP: 200,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, DisplayName: "左翼", MaxHP: 100, CurrentHP: 100, Alive: true},
+			{X: 1, Y: 0, Type: PartTypeWeak, DisplayName: "眼核", MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickButton(ctx, "boss-part:1-0", "阿明")
+	if err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+	if result.Button.Key != "boss-part:1-0" || result.Button.Label != "眼核" {
+		t.Fatalf("expected pseudo part target button, got %+v", result.Button)
+	}
+	if result.Delta != 1 || result.UserStats.ClickCount != 1 {
+		t.Fatalf("expected direct part click to count once, got %+v", result)
+	}
+	if result.Boss == nil || result.Boss.CurrentHP != 198 {
+		t.Fatalf("expected boss health to decrease by selected part damage, got %+v", result.Boss)
+	}
+	if result.Boss.Parts[0].CurrentHP != 100 || result.Boss.Parts[1].CurrentHP != 98 {
+		t.Fatalf("expected only selected part to lose HP, got %+v", result.Boss.Parts)
+	}
+
+	snapshot, err := store.GetSnapshot(ctx)
+	if err != nil {
+		t.Fatalf("get snapshot: %v", err)
+	}
+	if len(snapshot.Buttons) != 0 || snapshot.TotalVotes != 1 {
+		t.Fatalf("expected no button records and one total click, got buttons=%+v total=%d", snapshot.Buttons, snapshot.TotalVotes)
+	}
+}
+
 func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

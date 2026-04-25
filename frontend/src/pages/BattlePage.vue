@@ -13,9 +13,7 @@ const {
   errorMessage,
   pendingKeys,
   criticalBursts,
-  buttonCount,
   totalVotes,
-  displayedButtons,
   isLoggedIn,
   myClicks,
   myRank,
@@ -38,29 +36,24 @@ const {
 
 const bossDropModalOpen = ref(false)
 
-const bossZoneButtonPool = computed(() => {
-  const bossSeed = boss.value?.id || boss.value?.name || 'boss'
-  return [...displayedButtons.value].sort((left, right) => {
-    const leftRank = hashString(`${bossSeed}:${left.key}:${left.label}`)
-    const rightRank = hashString(`${bossSeed}:${right.key}:${right.label}`)
-    return leftRank - rightRank
-  })
-})
-
 const bossZones = computed(() => {
   if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return []
   const grid = Array.from({length: 5}, () => Array(5).fill(null))
-  boss.value.parts.forEach((part, index) => {
+  boss.value.parts.forEach((part) => {
     if (part.x >= 0 && part.x < 5 && part.y >= 0 && part.y < 5) {
       grid[part.y][part.x] = {
         ...part,
-        assignedButton: pickButtonForBossPart(part, index, bossZoneButtonPool.value),
         healthPercent: getPartHealthPercent(part),
-        zoneKey: `${part.x}-${part.y}-${part.type}-${index}`,
+        zoneKey: `${part.x}-${part.y}`,
       }
     }
   })
   return grid
+})
+
+const bossPartCount = computed(() => {
+  if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return 0
+  return boss.value.parts.length
 })
 
 const partTypeLabels = {
@@ -71,8 +64,8 @@ const partTypeLabels = {
 
 const partTypeColors = {
   soft: '#4ade80',
-  heavy: '#fbbf24',
-  weak: '#f472b6',
+  heavy: '#9ca3af',
+  weak: '#ef4444',
 }
 
 const bossDropPool = computed(() =>
@@ -92,26 +85,14 @@ function closeBossDropPool() {
   bossDropModalOpen.value = false
 }
 
-function hashString(value) {
-  let hash = 0
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0
-  }
-  return hash
-}
-
-function pickButtonForBossPart(part, index, sourceButtons) {
-  if (!sourceButtons.length) return null
-  return sourceButtons[index % sourceButtons.length]
-}
-
 function getPartHealthPercent(part) {
   if (!part?.maxHp) return 0
   return Math.max(0, Math.min(100, (part.currentHp / part.maxHp) * 100))
 }
 
 function getBossZoneButtonKey(zone) {
-  return zone?.assignedButton?.key || ''
+  if (!zone) return ''
+  return `boss-part:${zone.x}-${zone.y}`
 }
 
 function handleBossZonePressStart(zone, event) {
@@ -140,17 +121,17 @@ function isBossZoneDisabled(zone) {
 }
 
 function bossZoneAriaLabel(zone) {
-  const button = zone?.assignedButton
-  if (!button) return 'Boss 分区暂无可用按钮'
-  return `${button.label} 分区，当前 ${button.count} 票，部位血量 ${zone.currentHp}/${zone.maxHp}`
+  if (!zone) return '空 Boss 分区'
+  const label = zone.displayName || partTypeLabels[zone.type] || zone.type
+  return `${label} 分区，部位血量 ${zone.currentHp}/${zone.maxHp}`
 }
 </script>
 
 <template>
 <section class="stats-band stats-band--wide" aria-label="实时统计">
       <article class="stats-band__card">
-        <span class="stats-band__label">当前按钮</span>
-        <strong>{{ buttonCount }}</strong>
+        <span class="stats-band__label">Boss 部位</span>
+        <strong>{{ bossPartCount }}</strong>
       </article>
       <article class="stats-band__card">
         <span class="stats-band__label">累计点击</span>
@@ -202,9 +183,6 @@ function bossZoneAriaLabel(zone) {
           <div v-else-if="!boss" class="feedback-panel feedback-panel--compact">
             <p>当前没有活动 Boss。</p>
           </div>
-          <div v-else-if="displayedButtons.length === 0" class="feedback-panel feedback-panel--compact">
-            <p>还没有可用按钮名，Boss 分区暂时无法开战。</p>
-          </div>
           <div v-else-if="bossZones.length === 0" class="feedback-panel feedback-panel--compact">
             <p>当前 Boss 尚未配置可攻击分区。</p>
           </div>
@@ -231,6 +209,12 @@ function bossZoneAriaLabel(zone) {
                 @click="clickBossZone(zone)"
               >
                 <template v-if="zone">
+                  <img
+                    v-if="zone.imagePath"
+                    class="boss-part-cell__image"
+                    :src="zone.imagePath"
+                    :alt="zone.displayName || partTypeLabels[zone.type] || zone.type"
+                  />
                   <span
                     v-if="criticalBursts[getBossZoneButtonKey(zone)]"
                     :key="criticalBursts[getBossZoneButtonKey(zone)].nonce"
@@ -240,7 +224,7 @@ function bossZoneAriaLabel(zone) {
                     {{ criticalBursts[getBossZoneButtonKey(zone)].label }}
                   </span>
                   <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
-                  <strong class="boss-zone-button__label">{{ zone.assignedButton.label }}</strong>
+                  <strong class="boss-zone-button__label">{{ zone.displayName || partTypeLabels[zone.type] || zone.type }}</strong>
                   <div class="boss-part-cell__bar">
                     <span
                       class="boss-part-cell__fill"
@@ -249,7 +233,7 @@ function bossZoneAriaLabel(zone) {
                   </div>
                   <div class="boss-zone-button__meta">
                     <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
-                    <span>{{ zone.assignedButton.count }} 票</span>
+                    <span>点击 +1</span>
                   </div>
                 </template>
                 <span v-else class="boss-part-cell__empty"></span>
