@@ -195,6 +195,10 @@ function bossZoneAriaLabel(zone) {
                 :class="{
                   'boss-part-cell--alive': zone?.alive,
                   'boss-part-cell--dead': zone && !zone.alive,
+                  'boss-part-cell--soft': zone?.type === 'soft',
+                  'boss-part-cell--heavy': zone?.type === 'heavy',
+                  'boss-part-cell--weak': zone?.type === 'weak',
+                  'boss-part-cell--low': zone?.alive && zone.healthPercent < 25,
                   'boss-zone-button--empty': !zone,
                   'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
                   'boss-zone-button--critical': Boolean(criticalBursts[getBossZoneButtonKey(zone)]),

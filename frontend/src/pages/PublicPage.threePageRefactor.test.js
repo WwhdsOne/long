@@ -122,4 +122,20 @@ describe('PublicPage 三页前台边界', () => {
     expect(compactStyleSource).toContain('max-width: min(100%, 560px);')
     expect(compactStyleSource).toContain('padding: 10px;')
   })
+
+  it('战斗页提供三类 Boss 部位基础视觉状态', () => {
+    const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+    const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
+
+    expect(battleSource).toContain('boss-part-cell--soft')
+    expect(battleSource).toContain('boss-part-cell--heavy')
+    expect(battleSource).toContain('boss-part-cell--weak')
+    expect(battleSource).toContain('boss-part-cell--low')
+    expect(battleSource).toContain('boss-part-cell__image')
+    expect(styleSource).toContain('@keyframes boss-soft-breathe')
+    expect(styleSource).toContain('@keyframes boss-heavy-sheen')
+    expect(styleSource).toContain('@keyframes boss-weak-pulse')
+    expect(styleSource).toContain('@keyframes boss-part-hit-flash')
+    expect(styleSource).toContain('@keyframes boss-part-break')
+  })
 })

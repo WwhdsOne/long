@@ -2337,6 +2337,72 @@ select {
   }
 }
 
+@keyframes boss-soft-breathe {
+  0%, 100% {
+    filter: brightness(0.82);
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.18);
+  }
+  50% {
+    filter: brightness(1);
+    box-shadow: 0 0 18px rgba(74, 222, 128, 0.36);
+  }
+}
+
+@keyframes boss-heavy-sheen {
+  0%, 72%, 100% {
+    background-position: -140% 0;
+  }
+  86% {
+    background-position: 140% 0;
+  }
+}
+
+@keyframes boss-weak-pulse {
+  0%, 100% {
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.28);
+    filter: brightness(0.92);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.5);
+    filter: brightness(1.12);
+  }
+}
+
+@keyframes boss-part-hit-flash {
+  0% {
+    box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.82);
+  }
+  100% {
+    box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0);
+  }
+}
+
+@keyframes boss-part-break {
+  0% {
+    transform: scale(1);
+    filter: grayscale(0);
+  }
+  48% {
+    transform: scale(1.04) rotate(-1deg);
+  }
+  100% {
+    transform: translateY(3px) scale(0.97);
+    filter: grayscale(1);
+  }
+}
+
+@keyframes boss-part-low-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-1px);
+  }
+  75% {
+    transform: translateX(1px);
+  }
+}
+
 /* Boss part grid */
 .boss-part-grid {
   display: flex;
@@ -2360,7 +2426,7 @@ select {
   flex: 1;
   aspect-ratio: 1;
   border: 1px solid #334155;
-  border-radius: 12px;
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2370,7 +2436,7 @@ select {
   min-width: 0;
   background: #1e293b;
   color: #e2e8f0;
-  transition: transform 0.2s, border-color 0.2s, background 0.2s, opacity 0.2s;
+  transition: transform 0.16s, border-color 0.2s, background 0.2s, opacity 0.2s, box-shadow 0.2s;
 }
 
 .boss-zone-button {
@@ -2382,7 +2448,13 @@ select {
 }
 
 .boss-zone-button:not(:disabled):hover {
-  transform: translateY(-2px);
+  transform: scale(1.02);
+  filter: brightness(1.08);
+}
+
+.boss-zone-button:not(:disabled):active {
+  transform: translateY(2px) scale(0.99);
+  box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.34);
 }
 
 .boss-zone-button:disabled {
@@ -2391,6 +2463,7 @@ select {
 
 .boss-zone-button--pending {
   opacity: 0.72;
+  animation: boss-part-hit-flash 0.08s ease-out;
 }
 
 .boss-zone-button--critical {
@@ -2400,16 +2473,57 @@ select {
 
 .boss-part-cell--alive {
   border-color: var(--part-color, #64748b);
-  background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--part-color, #64748b) 16%, #1e293b),
-      #111827
-    );
+}
+
+.boss-part-cell--soft {
+  border: 2px solid #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+  animation: boss-soft-breathe 2s ease-in-out infinite;
+}
+
+.boss-part-cell--heavy {
+  border: 3px solid #9ca3af;
+  background:
+    linear-gradient(105deg, transparent 0 36%, rgba(255, 255, 255, 0.22) 46%, transparent 58%),
+    rgba(156, 163, 175, 0.2);
+  background-size: 220% 100%, auto;
+  box-shadow: inset 0 3px 8px rgba(255, 255, 255, 0.12), inset 0 -8px 16px rgba(0, 0, 0, 0.28);
+  animation: boss-heavy-sheen 4s linear infinite;
+}
+
+.boss-part-cell--weak {
+  border: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  animation: boss-weak-pulse 0.8s ease-in-out infinite;
+}
+
+.boss-part-cell--low {
+  filter: brightness(0.72) saturate(0.92);
+}
+
+.boss-part-cell--low.boss-part-cell--soft {
+  animation: boss-soft-breathe 2s ease-in-out infinite, boss-part-low-shake 0.28s linear infinite;
+}
+
+.boss-part-cell--low.boss-part-cell--heavy {
+  background:
+    linear-gradient(105deg, transparent 0 36%, rgba(255, 255, 255, 0.14) 46%, transparent 58%),
+    radial-gradient(circle at 30% 35%, rgba(120, 53, 15, 0.28), transparent 34%),
+    rgba(107, 114, 128, 0.26);
+}
+
+.boss-part-cell--low.boss-part-cell--weak {
+  animation: boss-weak-pulse 0.4s ease-in-out infinite;
+  background: rgba(127, 29, 29, 0.2);
 }
 
 .boss-part-cell--dead {
-  opacity: 0.3;
-  border-color: #334155;
+  opacity: 0.5;
+  border-color: #475569;
+  background: #1f2937;
+  box-shadow: inset 0 8px 18px rgba(0, 0, 0, 0.34);
+  animation: boss-part-break 0.32s ease-out both;
+  filter: grayscale(1);
 }
 
 .boss-part-cell__type {
@@ -2428,6 +2542,14 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.boss-part-cell__image {
+  width: clamp(22px, 36%, 46px);
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 .boss-part-cell__bar {
