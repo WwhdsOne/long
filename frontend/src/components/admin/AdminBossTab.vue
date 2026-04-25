@@ -1,20 +1,18 @@
 <script setup>
-defineProps({
+import {computed, ref} from 'vue'
+
+const props = defineProps({
   adminState: { type: Object, required: true },
   bossCycleEnabled: { type: Boolean, required: true },
   bossForm: { type: Object, required: true },
   bossTemplates: { type: Array, required: true },
   equipmentOptions: { type: Array, required: true },
-  heroLootRows: { type: Array, required: true },
-  heroOptions: { type: Array, required: true },
   hasBoss: { type: Boolean, required: true },
   hasEquipmentTemplates: { type: Boolean, required: true },
-  hasHeroTemplates: { type: Boolean, required: true },
   lootRows: { type: Array, required: true },
   saving: { type: Boolean, required: true },
   selectedBossTemplate: { type: Object, default: null },
   selectedBossTemplateId: { type: String, required: true },
-  addHeroLootRow: { type: Function, required: true },
   addLootRow: { type: Function, required: true },
   deactivateBoss: { type: Function, required: true },
   deleteBossTemplate: { type: Function, required: true },
@@ -22,17 +20,72 @@ defineProps({
   editBossTemplate: { type: Function, required: true },
   enableBossCycle: { type: Function, required: true },
   findEquipmentTemplate: { type: Function, required: true },
-  findHeroTemplate: { type: Function, required: true },
-  formatHeroTrait: { type: Function, required: true },
   formatItemStats: { type: Function, required: true },
-  heroImageAlt: { type: Function, required: true },
-  removeHeroLootRow: { type: Function, required: true },
   removeLootRow: { type: Function, required: true },
   saveBossTemplate: { type: Function, required: true },
-  saveHeroLoot: { type: Function, required: true },
   saveLoot: { type: Function, required: true },
   selectBossTemplate: { type: Function, required: true },
 })
+
+const partTypeLabels = { soft: '软组织', heavy: '重甲', weak: '弱点' }
+const partTypeColors = { soft: '#4ade80', heavy: '#fbbf24', weak: '#f472b6' }
+
+const selectedCell = ref(null)
+
+const gridParts = computed(() => {
+  const grid = Array.from({length: 5}, () => Array(5).fill(null))
+  const layout = Array.isArray(props.bossForm.layout) ? props.bossForm.layout : []
+  for (const part of layout) {
+    if (part.x >= 0 && part.x < 5 && part.y >= 0 && part.y < 5) {
+      grid[part.y][part.x] = part
+    }
+  }
+  return grid
+})
+
+function selectCell(x, y) {
+  const existing = findPart(x, y)
+  if (existing) {
+    selectedCell.value = { ...existing }
+    return
+  }
+  selectedCell.value = { x, y, type: 'soft', maxHp: 1000, currentHp: 1000, armor: 0, alive: true }
+}
+
+function findPart(x, y) {
+  if (!Array.isArray(props.bossForm.layout)) return null
+  return props.bossForm.layout.find((p) => p.x === x && p.y === y)
+}
+
+function saveCell() {
+  if (!selectedCell.value) return
+  const cell = selectedCell.value
+  if (!Array.isArray(props.bossForm.layout)) {
+    props.bossForm.layout = []
+  }
+  const existing = props.bossForm.layout.findIndex((p) => p.x === cell.x && p.y === cell.y)
+  if (existing >= 0) {
+    props.bossForm.layout[existing] = { ...cell }
+  } else {
+    props.bossForm.layout.push({ ...cell })
+  }
+  selectedCell.value = null
+}
+
+function deleteCell() {
+  if (!selectedCell.value) return
+  const cell = selectedCell.value
+  if (!Array.isArray(props.bossForm.layout)) return
+  const existing = props.bossForm.layout.findIndex((p) => p.x === cell.x && p.y === cell.y)
+  if (existing >= 0) {
+    props.bossForm.layout.splice(existing, 1)
+  }
+  selectedCell.value = null
+}
+
+function cancelCell() {
+  selectedCell.value = null
+}
 </script>
 
 <template>
@@ -87,22 +140,6 @@ defineProps({
           </ul>
         </div>
 
-        <div v-if="hasBoss && adminState.heroLoot.length > 0" style="margin-top: 1rem;">
-          <p class="vote-stage__eyebrow">当前实例英雄快照</p>
-          <ul class="inventory-list">
-            <li v-for="hero in adminState.heroLoot" :key="hero.heroId" class="inventory-item">
-              <div class="admin-entity">
-                <img v-if="hero.imagePath" class="admin-entity__avatar" :src="hero.imagePath" :alt="heroImageAlt(hero)" />
-                <div>
-                  <strong>{{ hero.heroName || hero.heroId }}</strong>
-                  <p>{{ hero.heroId }} · 权重 {{ hero.weight }}</p>
-                  <p>{{ formatItemStats(hero) }}</p>
-                  <p>{{ formatHeroTrait(hero) }}</p>
-                </div>
-              </div>
-            </li>
-          </ul>
-        </div>
       </section>
 
       <section class="social-card">
@@ -115,6 +152,58 @@ defineProps({
           <input v-model="bossForm.id" class="nickname-form__input" type="text" placeholder="模板 ID，如 dragon" />
           <input v-model="bossForm.name" class="nickname-form__input" type="text" placeholder="Boss 显示名称" />
           <input v-model="bossForm.maxHp" class="nickname-form__input" type="number" min="1" placeholder="总血量，玩家点击消耗" />
+          <fieldset class="admin-fieldset">
+            <legend class="admin-fieldset__legend">部位布局（点击网格格子编辑部位）</legend>
+            <div class="boss-editor-grid">
+              <div v-for="yi in 5" :key="'row-'+yi" class="boss-editor-grid__row">
+                <div
+                  v-for="xi in 5"
+                  :key="'cell-'+yi+'-'+xi"
+                  class="boss-editor-cell"
+                  :class="{
+                    'boss-editor-cell--filled': gridParts[yi-1][xi-1],
+                    'boss-editor-cell--selected': selectedCell?.x === xi-1 && selectedCell?.y === yi-1,
+                  }"
+                  :style="gridParts[yi-1][xi-1] ? { '--cell-color': partTypeColors[gridParts[yi-1][xi-1].type] || '#64748b' } : {}"
+                  @click="selectCell(xi-1, yi-1)"
+                >
+                  <template v-if="gridParts[yi-1][xi-1]">
+                    <span class="boss-editor-cell__type">{{ partTypeLabels[gridParts[yi-1][xi-1].type] || gridParts[yi-1][xi-1].type }}</span>
+                    <span class="boss-editor-cell__hp">{{ gridParts[yi-1][xi-1].maxHp }}</span>
+                  </template>
+                  <span v-else class="boss-editor-cell__empty">+</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="selectedCell" class="boss-editor-inspector">
+              <div class="boss-editor-inspector__head">
+                <strong>部位 ({{ selectedCell.x }}, {{ selectedCell.y }})</strong>
+                <button class="nickname-form__ghost" type="button" @click="cancelCell">取消</button>
+              </div>
+              <div class="boss-editor-inspector__form">
+                <label class="boss-editor-inspector__field">
+                  <span>类型</span>
+                  <select v-model="selectedCell.type" class="nickname-form__input">
+                    <option value="soft">软组织</option>
+                    <option value="heavy">重甲</option>
+                    <option value="weak">弱点</option>
+                  </select>
+                </label>
+                <label class="boss-editor-inspector__field">
+                  <span>血量</span>
+                  <input v-model="selectedCell.maxHp" class="nickname-form__input" type="number" min="1" />
+                </label>
+                <label class="boss-editor-inspector__field">
+                  <span>护甲</span>
+                  <input v-model="selectedCell.armor" class="nickname-form__input" type="number" min="0" />
+                </label>
+              </div>
+              <div class="boss-editor-inspector__actions">
+                <button class="nickname-form__submit" type="button" @click="saveCell">保存部位</button>
+                <button class="nickname-form__ghost boss-editor-inspector__delete" type="button" @click="deleteCell">删除</button>
+              </div>
+            </div>
+          </fieldset>
           <button class="nickname-form__submit" type="submit" :disabled="saving">保存 Boss 模板</button>
         </form>
 
@@ -122,7 +211,7 @@ defineProps({
           <li v-for="entry in bossTemplates" :key="entry.id" class="inventory-item inventory-item--stacked">
             <div>
               <strong>{{ entry.name }}</strong>
-              <p>{{ entry.id }} · 血量 {{ entry.maxHp }} · 装备 {{ entry.loot.length }} 件 · 英雄 {{ entry.heroLoot.length }} 位</p>
+              <p>{{ entry.id }} · 血量 {{ entry.maxHp }} · 部位 {{ entry.layout?.length || 0 }} 个 · 装备 {{ entry.loot.length }} 件</p>
             </div>
             <div class="admin-inline-actions admin-inline-actions--stacked">
               <button class="inventory-item__action" type="button" @click="selectBossTemplate(entry.id)">编辑掉落</button>
@@ -174,42 +263,103 @@ defineProps({
       </div>
     </section>
 
-    <section class="social-card admin-section-card">
-      <div class="social-card__head">
-        <p class="vote-stage__eyebrow">模板英雄池</p>
-        <strong>{{ selectedBossTemplate?.name || selectedBossTemplateId || '未选择模板' }}</strong>
-      </div>
-
-      <p class="feedback" style="margin-bottom: 0.75rem;">英雄池和装备池分开配置，Boss 被击败时会分别独立抽取。</p>
-
-      <p v-if="!hasHeroTemplates" class="feedback" style="margin-bottom: 0.75rem;">
-        当前还没有英雄模板，先去“英雄”页创建模板，再回来配置英雄池。
-      </p>
-
-      <div class="admin-form admin-form--tight">
-        <div v-for="(entry, index) in heroLootRows" :key="`${selectedBossTemplateId}-hero-${index}-${entry.heroId}`" class="admin-inline-row">
-          <div class="admin-loot-select">
-            <select v-model="entry.heroId" class="nickname-form__input" :disabled="!hasHeroTemplates && !entry.heroId">
-              <option value="">选择已有英雄</option>
-              <option v-if="entry.heroId && !findHeroTemplate(entry.heroId)" :value="entry.heroId">
-                {{ entry.heroId }}（已删除的英雄）
-              </option>
-              <option v-for="hero in heroOptions" :key="hero.heroId" :value="hero.heroId">
-                {{ hero.name }} · {{ hero.heroId }}
-              </option>
-            </select>
-            <p v-if="findHeroTemplate(entry.heroId)" class="admin-loot-select__meta">
-              {{ formatItemStats(findHeroTemplate(entry.heroId)) }} · {{ formatHeroTrait(findHeroTemplate(entry.heroId)) }}
-            </p>
-          </div>
-          <input v-model="entry.weight" class="nickname-form__input" type="number" min="1" placeholder="掉率权重，越大越容易招募" />
-          <button class="nickname-form__ghost" type="button" @click="removeHeroLootRow(index)">删</button>
-        </div>
-        <div class="admin-inline-actions">
-          <button class="nickname-form__ghost" type="button" @click="addHeroLootRow">加一行</button>
-          <button class="nickname-form__submit" type="button" :disabled="saving" @click="saveHeroLoot">保存模板英雄池</button>
-        </div>
-      </div>
-    </section>
   </div>
 </template>
+
+<style scoped>
+.boss-editor-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: var(--surface-2, #1e293b);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.boss-editor-grid__row {
+  display: flex;
+  gap: 4px;
+}
+.boss-editor-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 6px;
+  background: var(--surface-1, #0f172a);
+  border: 2px solid transparent;
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  transition: border-color 0.15s, background 0.15s;
+  min-height: 56px;
+}
+.boss-editor-cell:hover {
+  border-color: var(--accent, #38bdf8);
+}
+.boss-editor-cell--filled {
+  background: color-mix(in srgb, var(--cell-color, #64748b) 25%, var(--surface-1, #0f172a));
+  border-color: var(--cell-color, #64748b);
+}
+.boss-editor-cell--selected {
+  box-shadow: 0 0 0 2px var(--accent, #38bdf8);
+}
+.boss-editor-cell__type {
+  font-weight: 600;
+  color: var(--cell-color, #94a3b8);
+  font-size: 0.65rem;
+}
+.boss-editor-cell__hp {
+  color: var(--text-2, #94a3b8);
+  font-size: 0.6rem;
+}
+.boss-editor-cell__empty {
+  color: var(--text-3, #64748b);
+  font-size: 1.2rem;
+  font-weight: 300;
+}
+.boss-editor-inspector {
+  background: var(--surface-2, #1e293b);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+.boss-editor-inspector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.boss-editor-inspector__head strong {
+  font-size: 0.85rem;
+}
+.boss-editor-inspector__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.boss-editor-inspector__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.boss-editor-inspector__field span {
+  min-width: 48px;
+  font-size: 0.8rem;
+  color: var(--text-2, #94a3b8);
+}
+.boss-editor-inspector__field .nickname-form__input {
+  flex: 1;
+}
+.boss-editor-inspector__actions {
+  display: flex;
+  gap: 8px;
+}
+.boss-editor-inspector__delete {
+  color: #f87171 !important;
+}
+</style>

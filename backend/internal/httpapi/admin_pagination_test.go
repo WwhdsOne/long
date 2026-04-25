@@ -68,7 +68,7 @@ func TestAdminCatalogPagesRequireAuthAndReturnPagePayloads(t *testing.T) {
 		},
 		adminEquipmentPage: vote.AdminEquipmentPage{
 			Items: []vote.EquipmentDefinition{
-				{ItemID: "wood-sword", Name: "木剑", Slot: "weapon", BonusClicks: 2},
+				{ItemID: "wood-sword", Name: "木剑", Slot: "weapon"},
 			},
 			Page:       2,
 			PageSize:   1,

@@ -1,5 +1,6 @@
 <script setup>
 import { formatRarityLabel, RARITY_OPTIONS } from '../../utils/rarity'
+import { EQUIPMENT_SLOTS } from '../../utils/equipmentSlots'
 
 defineProps({
   equipmentPage: { type: Object, required: true },
@@ -11,6 +12,7 @@ defineProps({
   editEquipment: { type: Function, required: true },
   deleteEquipment: { type: Function, required: true },
   fetchEquipmentPage: { type: Function, required: true },
+  uploadEquipmentImage: { type: Function, required: true },
 })
 </script>
 
@@ -27,17 +29,46 @@ defineProps({
           <input v-model="equipmentForm.itemId" class="nickname-form__input" type="text" placeholder="唯一标识，如 wood-sword" />
           <input v-model="equipmentForm.name" class="nickname-form__input" type="text" placeholder="前台显示的名称" />
           <select v-model="equipmentForm.slot" class="nickname-form__input">
-            <option value="weapon">weapon</option>
-            <option value="armor">armor</option>
-            <option value="accessory">accessory</option>
+            <option v-for="slot in EQUIPMENT_SLOTS" :key="slot.value" :value="slot.value">
+              {{ slot.label }}（{{ slot.value }}）
+            </option>
           </select>
           <select v-model="equipmentForm.rarity" class="nickname-form__input">
             <option v-for="rarity in RARITY_OPTIONS" :key="rarity" :value="rarity">{{ rarity }}</option>
           </select>
-          <input v-model="equipmentForm.bonusClicks" class="nickname-form__input" type="number" min="0" placeholder="每次点击额外加几票" />
-          <input v-model="equipmentForm.bonusCriticalChancePercent" class="nickname-form__input" type="number" min="0" max="100" placeholder="暴击概率 +N%" />
-          <input v-model="equipmentForm.bonusCriticalCount" class="nickname-form__input" type="number" min="0" placeholder="暴击时额外加几票" />
-          <input v-model="equipmentForm.enhanceCap" class="nickname-form__input" type="number" min="0" placeholder="强化上限（0 表示不设上限）" />
+
+          <fieldset class="admin-fieldset">
+            <legend class="admin-fieldset__legend">图片</legend>
+            <input v-model="equipmentForm.imagePath" class="nickname-form__input" type="text" placeholder="图片 URL（可直接填 OSS/CDN 地址）" />
+            <input v-model="equipmentForm.imageAlt" class="nickname-form__input" type="text" placeholder="图片说明（可选）" />
+            <label class="admin-upload">
+              <span>上传到 OSS</span>
+              <input type="file" accept="image/*" @change="uploadEquipmentImage" />
+            </label>
+            <img
+              v-if="equipmentForm.imagePath"
+              class="admin-upload__preview"
+              :src="equipmentForm.imagePath"
+              :alt="equipmentForm.imageAlt || equipmentForm.name || '装备预览图'"
+            />
+          </fieldset>
+
+          <fieldset class="admin-fieldset">
+            <legend class="admin-fieldset__legend">属性</legend>
+            <input v-model="equipmentForm.attackPower" class="nickname-form__input" type="number" min="0" step="1" placeholder="攻击力" />
+            <input v-model="equipmentForm.armorPenPercent" class="nickname-form__input" type="number" min="0" max="1" step="0.01" placeholder="破甲率 0~0.80" />
+            <input v-model="equipmentForm.critDamageMultiplier" class="nickname-form__input" type="number" min="1" step="0.1" placeholder="暴击伤害倍率，默认 1.0" />
+            <input v-model="equipmentForm.bossDamagePercent" class="nickname-form__input" type="number" min="0" max="10" step="0.01" placeholder="Boss 增伤百分比，如 0.30" />
+            <input v-model="equipmentForm.partTypeDamageSoft" class="nickname-form__input" type="number" min="0" step="0.01" placeholder="软组织增伤，如 0.40" />
+            <input v-model="equipmentForm.partTypeDamageHeavy" class="nickname-form__input" type="number" min="0" step="0.01" placeholder="重甲增伤，如 0.50" />
+            <input v-model="equipmentForm.partTypeDamageWeak" class="nickname-form__input" type="number" min="0" step="0.01" placeholder="弱点增伤，如 0.30" />
+            <select v-model="equipmentForm.talentAffinity" class="nickname-form__input">
+              <option value="">通用（无天赋绑定）</option>
+              <option value="normal">均衡攻势</option>
+              <option value="armor">碎盾攻坚</option>
+              <option value="crit">致命洞察</option>
+            </select>
+          </fieldset>
           <button class="nickname-form__submit" type="submit" :disabled="saving">
             保存装备
           </button>
@@ -53,7 +84,6 @@ defineProps({
             <div>
               <strong>{{ item.name }}</strong>
               <p>{{ item.itemId }} · {{ item.slot }} · {{ formatRarityLabel(item.rarity) }}</p>
-              <p>强化上限 {{ item.enhanceCap || '未设置' }}</p>
               <p>{{ formatItemStats(item) }}</p>
             </div>
             <div class="admin-inline-actions">

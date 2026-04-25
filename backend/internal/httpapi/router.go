@@ -22,12 +22,6 @@ type ButtonStore interface {
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
-	SalvageEquipment(context.Context, string, string, int64) (vote.State, error)
-	EnhanceEquipment(context.Context, string, string) (vote.State, error)
-	EquipHero(context.Context, string, string) (vote.State, error)
-	UnequipHero(context.Context, string, string) (vote.State, error)
-	SalvageHero(context.Context, string, string, int64) (vote.State, error)
-	AwakenHero(context.Context, string, string) (vote.State, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	ListAdminButtonsPage(context.Context, int64, int64) (vote.AdminButtonPage, error)
 	ListAdminEquipmentPage(context.Context, int64, int64) (vote.AdminEquipmentPage, error)
@@ -36,16 +30,13 @@ type ButtonStore interface {
 	GetAdminPlayer(context.Context, string) (*vote.AdminPlayerOverview, error)
 	SaveButton(context.Context, vote.ButtonUpsert) error
 	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
-	SaveHeroDefinition(context.Context, vote.HeroDefinition) error
 	DeleteEquipmentDefinition(context.Context, string) error
-	DeleteHeroDefinition(context.Context, string) error
 	ActivateBoss(context.Context, vote.BossUpsert) (*vote.Boss, error)
 	DeactivateBoss(context.Context) error
 	SetBossLoot(context.Context, string, []vote.BossLootEntry) error
 	SaveBossTemplate(context.Context, vote.BossTemplateUpsert) error
 	DeleteBossTemplate(context.Context, string) error
 	SetBossTemplateLoot(context.Context, string, []vote.BossLootEntry) error
-	SetBossTemplateHeroLoot(context.Context, string, []vote.BossHeroLootEntry) error
 	SetBossCycleEnabled(context.Context, bool) (*vote.Boss, error)
 	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
 	GetBossResources(context.Context) (vote.BossResources, error)
@@ -56,6 +47,12 @@ type ButtonStore interface {
 	CreateMessage(context.Context, string, string) (*vote.Message, error)
 	ListMessages(context.Context, string, int64) (vote.MessagePage, error)
 	DeleteMessage(context.Context, string) error
+	// 天赋系统
+	SelectTalentTree(context.Context, string, vote.TalentTree, vote.TalentTree) error
+	GetTalentState(context.Context, string) (*vote.TalentState, error)
+	LearnTalent(context.Context, string, string) error
+	ResetTalents(context.Context, string) error
+	ComputeTalentModifiers(context.Context, string) (*vote.TalentModifiers, error)
 }
 
 // StateView 为只读聚合提供公共态、个人态和完整态读取能力。
@@ -140,6 +137,7 @@ func registerRoutes(engine *route.Engine, options Options) {
 	registerPublicRoutes(engine, options, stateView)
 	registerPlayerAuthRoutes(engine, options)
 	registerPlayerActionRoutes(engine, options)
+	registerTalentRoutes(engine, options)
 	registerAdminRoutes(engine, options)
 	registerRealtimeRoutes(engine, options)
 	registerStaticRoutes(engine, options)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -40,9 +41,9 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 		if err != nil {
 			return nil, err
 		}
-		heroLoot, err := s.loadBossTemplateHeroLoot(ctx, templateID)
-		if err != nil {
-			return nil, err
+		var layout []BossPart
+		if layoutRaw, ok := values["layout"]; ok && layoutRaw != "" {
+			_ = sonic.Unmarshal([]byte(layoutRaw), &layout)
 		}
 
 		templates = append(templates, BossTemplate{
@@ -50,7 +51,8 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 			Name:     firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
 			MaxHP:    maxInt64(1, int64FromString(values["max_hp"])),
 			Loot:     loot,
-			HeroLoot: heroLoot,
+			
+			Layout:   layout,
 		})
 	}
 
@@ -74,6 +76,10 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 	values := map[string]any{
 		"name":   firstNonEmpty(strings.TrimSpace(template.Name), templateID),
 		"max_hp": strconv.FormatInt(maxInt64(1, template.MaxHP), 10),
+	}
+	if len(template.Layout) > 0 {
+		layoutRaw, _ := sonic.Marshal(template.Layout)
+		values["layout"] = string(layoutRaw)
 	}
 
 	pipe := s.client.TxPipeline()
@@ -181,10 +187,11 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 		Status:     bossStatusActive,
 		MaxHP:      maxInt64(1, template.MaxHP),
 		CurrentHP:  maxInt64(1, template.MaxHP),
+		Parts:      template.Layout,
 		StartedAt:  time.Now().Unix(),
 	}
 
-	if err := s.setCurrentBoss(ctx, current, template.Loot, template.HeroLoot); err != nil {
+	if err := s.setCurrentBoss(ctx, current, template.Loot); err != nil {
 		return nil, err
 	}
 
@@ -205,7 +212,7 @@ func (s *Store) nextBossInstanceID(ctx context.Context, templateID string) (stri
 	return baseID + "-" + strconv.FormatInt(seq, 10), nil
 }
 
-func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootEntry, heroLoot []BossHeroLootEntry) error {
+func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootEntry) error {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil
 	}
@@ -224,12 +231,15 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	if boss.DefeatedAt != 0 {
 		values["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
 	}
+	if len(boss.Parts) > 0 {
+		partsRaw, _ := sonic.Marshal(boss.Parts)
+		values["parts"] = string(partsRaw)
+	}
 
 	pipe := s.client.TxPipeline()
 	pipe.Del(ctx, s.bossCurrentKey)
 	pipe.HSet(ctx, s.bossCurrentKey, values)
 	pipe.Del(ctx, s.bossLootKey(boss.ID))
-	pipe.Del(ctx, s.bossHeroLootKey(boss.ID))
 
 	entries := make([]redis.Z, 0, len(loot))
 	for _, item := range loot {
@@ -243,19 +253,6 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	}
 	if len(entries) > 0 {
 		pipe.ZAdd(ctx, s.bossLootKey(boss.ID), entries...)
-	}
-	heroEntries := make([]redis.Z, 0, len(heroLoot))
-	for _, item := range heroLoot {
-		if strings.TrimSpace(item.HeroID) == "" || item.Weight <= 0 {
-			continue
-		}
-		heroEntries = append(heroEntries, redis.Z{
-			Score:  float64(item.Weight),
-			Member: strings.TrimSpace(item.HeroID),
-		})
-	}
-	if len(heroEntries) > 0 {
-		pipe.ZAdd(ctx, s.bossHeroLootKey(boss.ID), heroEntries...)
 	}
 
 	_, err := pipe.Exec(ctx)
@@ -295,10 +292,13 @@ func (s *Store) loadBossTemplateLoot(ctx context.Context, templateID string) ([]
 			Slot:                       definition.Slot,
 			Rarity:                     normalizeEquipmentRarity(definition.Rarity),
 			Weight:                     int64(entry.Score),
-			EnhanceCap:                 definition.EnhanceCap,
-			BonusClicks:                definition.BonusClicks,
-			BonusCriticalChancePercent: definition.BonusCriticalChancePercent,
-			BonusCriticalCount:         definition.BonusCriticalCount,
+			AttackPower:                definition.AttackPower,
+			ArmorPenPercent:            definition.ArmorPenPercent,
+			CritDamageMultiplier:       definition.CritDamageMultiplier,
+			BossDamagePercent:          definition.BossDamagePercent,
+			PartTypeDamageSoft:         definition.PartTypeDamageSoft,
+			PartTypeDamageHeavy:        definition.PartTypeDamageHeavy,
+			PartTypeDamageWeak:         definition.PartTypeDamageWeak,
 		})
 	}
 

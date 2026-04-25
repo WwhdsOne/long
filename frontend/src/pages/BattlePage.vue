@@ -9,7 +9,7 @@ const {
   boss,
   bossLeaderboard,
   bossLoot,
-  bossHeroLoot,
+  leaderboard,
   nickname,
   loading,
   errorMessage,
@@ -36,10 +36,6 @@ const {
   formatItemStats,
   equipmentNameParts,
   equipmentNameClass,
-  formatEnhanceCap,
-  formatAwakenCap,
-  formatHeroTrait,
-  heroImageAlt,
   handlePressStart,
   handlePressEnd,
   handlePressCancel,
@@ -49,20 +45,37 @@ const {
 
 const bossDropModalOpen = ref(false)
 
-const bossDropPool = computed(() => [
-  ...bossLoot.value.map((item) => ({
+const bossPartGrid = computed(() => {
+  if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return []
+  const grid = Array.from({length: 5}, () => Array(5).fill(null))
+  for (const part of boss.value.parts) {
+    if (part.x >= 0 && part.x < 5 && part.y >= 0 && part.y < 5) {
+      grid[part.y][part.x] = part
+    }
+  }
+  return grid
+})
+
+const partTypeLabels = {
+  soft: '\u8f6f\u7ec4\u7ec7',
+  heavy: '\u91cd\u7532',
+  weak: '\u5f31\u70b9',
+}
+
+const partTypeColors = {
+  soft: '#4ade80',
+  heavy: '#fbbf24',
+  weak: '#f472b6',
+}
+
+const bossDropPool = computed(() =>
+  bossLoot.value.map((item) => ({
     id: `equipment:${item.itemId}`,
     type: 'equipment',
     label: '装备',
     item,
   })),
-  ...bossHeroLoot.value.map((hero) => ({
-    id: `hero:${hero.heroId}`,
-    type: 'hero',
-    label: '英雄',
-    item: hero,
-  })),
-])
+)
 
 function openBossDropPool() {
   bossDropModalOpen.value = true
@@ -134,6 +147,29 @@ function closeBossDropPool() {
           </div>
           <div v-if="boss" class="boss-stage__bar boss-stage__bar--compact">
             <span class="boss-stage__bar-fill" :style="{ width: `${bossProgress}%` }"></span>
+          </div>
+          <div v-if="boss?.parts?.length > 0" class="boss-part-grid">
+            <div v-for="(row, yi) in bossPartGrid" :key="yi" class="boss-part-grid__row">
+              <div
+                v-for="(part, xi) in row"
+                :key="yi + '-' + xi"
+                class="boss-part-cell"
+                :class="{ 'boss-part-cell--alive': part?.alive, 'boss-part-cell--dead': part && !part.alive }"
+                :style="part ? { '--part-color': partTypeColors[part.type] || '#64748b' } : {}"
+              >
+                <template v-if="part">
+                  <div class="boss-part-cell__type">{{ partTypeLabels[part.type] || part.type }}</div>
+                  <div class="boss-part-cell__bar">
+                    <span
+                      class="boss-part-cell__fill"
+                      :style="{ width: (part.currentHp / part.maxHp * 100) + '%' }"
+                    ></span>
+                  </div>
+                  <div class="boss-part-cell__hp">{{ part.currentHp }}/{{ part.maxHp }}</div>
+                </template>
+                <div v-else class="boss-part-cell__empty"></div>
+              </div>
+            </div>
           </div>
           <div class="vote-stage__boss-hud-stats">
             <span>我的伤害 {{ myBossDamage }}</span>
@@ -292,42 +328,11 @@ function closeBossDropPool() {
                   <li>掉落概率：{{ formatDropRate(item.dropRatePercent) }}</li>
                   <li>稀有度：{{ formatRarityLabel(item.rarity) }}</li>
                   <li>部位：{{ item.slot || '未分类' }}</li>
-                  <li>{{ formatEnhanceCap(item.enhanceCap) }}</li>
                   <li>{{ formatItemStats(item) }}</li>
                 </ul>
               </article>
             </div>
-          </section>
-
-          <section v-if="bossHeroLoot.length > 0" class="boss-drop-modal__section">
-            <div class="boss-drop-modal__section-head">
-              <span>英雄掉落</span>
-              <strong>{{ bossHeroLoot.length }} 位</strong>
-            </div>
-            <div class="boss-drop-pool__grid">
-              <article
-                  v-for="hero in bossHeroLoot"
-                  :key="hero.heroId"
-                  class="boss-drop-card boss-drop-card--detail"
-              >
-                  <span class="boss-drop-card__type">英雄</span>
-                  <img
-                      v-if="hero.imagePath"
-                      class="boss-drop-card__avatar"
-                      :src="hero.imagePath"
-                      :alt="heroImageAlt(hero)"
-                  />
-                  <strong>{{ hero.heroName || hero.name || hero.heroId }}</strong>
-                <ul class="boss-drop-card__details">
-                  <li>掉落概率：{{ formatDropRate(hero.dropRatePercent) }}</li>
-                  <li>{{ formatAwakenCap(hero.awakenCap) }}</li>
-                  <li>{{ formatItemStats(hero) }}</li>
-                  <li>{{ formatHeroTrait(hero) }}</li>
-                </ul>
-              </article>
-            </div>
-          </section>
-        </article>
+          </section>        </article>
       </section>
 
 

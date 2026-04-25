@@ -1,12 +1,13 @@
 import { DEFAULT_RARITY, normalizeRarity } from '../../utils/rarity'
+import { EQUIPMENT_SLOTS, normalizeEquipmentSlot, normalizeLoadout as normalizeEquipmentLoadout } from '../../utils/equipmentSlots'
+
+export { EQUIPMENT_SLOTS }
 
 export function emptyAdminState() {
   return {
     boss: null,
     bossLeaderboard: [],
-    heroes: [],
     loot: [],
-    heroLoot: [],
     bossCycleEnabled: false,
     bossPool: [],
     playerCount: 0,
@@ -28,12 +29,18 @@ export function emptyEquipmentForm() {
   return {
     itemId: '',
     name: '',
-    slot: 'weapon',
+    slot: EQUIPMENT_SLOTS[0].value,
     rarity: DEFAULT_RARITY,
-    bonusClicks: '',
-    bonusCriticalChancePercent: '',
-    bonusCriticalCount: '',
-    enhanceCap: '',
+    imagePath: '',
+    imageAlt: '',
+    attackPower: '',
+    armorPenPercent: '',
+    critDamageMultiplier: '',
+    bossDamagePercent: '',
+    partTypeDamageSoft: '',
+    partTypeDamageHeavy: '',
+    partTypeDamageWeak: '',
+    talentAffinity: '',
   }
 }
 
@@ -49,20 +56,7 @@ export function emptyButtonForm() {
   }
 }
 
-export function emptyHeroForm() {
-  return {
-    heroId: '',
-    name: '',
-    imagePath: '',
-    imageAlt: '',
-    bonusClicks: '',
-    bonusCriticalChancePercent: '',
-    bonusCriticalCount: '',
-    awakenCap: '',
-    traitType: 'bonus_clicks',
-    traitValue: '',
-  }
-}
+
 
 export function emptyAnnouncementForm() {
   return {
@@ -111,67 +105,25 @@ export function emptyLootRows() {
   return [{ itemId: '', weight: '' }]
 }
 
-export function emptyHeroLootRows() {
-  return [{ heroId: '', weight: '' }]
-}
-
 export function normalizeLoadout(loadout) {
-  return {
-    weapon: loadout?.weapon ?? null,
-    armor: loadout?.armor ?? null,
-    accessory: loadout?.accessory ?? null,
-  }
+  return normalizeEquipmentLoadout(loadout)
 }
 
 export function normalizeLootEntry(entry) {
   return {
     itemId: entry?.itemId || '',
     itemName: entry?.itemName || '',
-    slot: entry?.slot || '',
+    slot: normalizeEquipmentSlot(entry?.slot),
     rarity: normalizeRarity(entry?.rarity),
     weight: Number(entry?.weight ?? 0),
-    bonusClicks: Number(entry?.bonusClicks ?? 0),
-    bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
-    bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
-    enhanceCap: Number(entry?.enhanceCap ?? 0),
-  }
-}
-
-export function normalizeHeroLootEntry(entry) {
-  const effects = Array.isArray(entry?.effects) ? entry.effects : []
-  const primaryEffect = effects[0] ?? null
-  return {
-    heroId: entry?.heroId || '',
-    heroName: entry?.heroName || '',
-    imagePath: entry?.imagePath || '',
-    imageAlt: entry?.imageAlt || '',
-    weight: Number(entry?.weight ?? 0),
-    dropRatePercent: Number(entry?.dropRatePercent ?? 0),
-    awakenCap: Number(entry?.awakenCap ?? 0),
-    bonusClicks: Number(entry?.bonusClicks ?? 0),
-    bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
-    bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
-    effects,
-    traitType: primaryEffect?.type || entry?.traitType || '',
-    traitValue: Number(primaryEffect?.value ?? entry?.traitValue ?? 0),
-  }
-}
-
-export function normalizeHeroDefinition(entry) {
-  const effects = Array.isArray(entry?.effects) ? entry.effects : []
-  const primaryEffect = effects[0] ?? null
-  return {
-    heroId: entry?.heroId || '',
-    name: entry?.name || '',
-    imagePath: entry?.imagePath || '',
-    imageAlt: entry?.imageAlt || '',
-    bonusClicks: Number(entry?.bonusClicks ?? 0),
-    bonusCriticalChancePercent: Number(entry?.bonusCriticalChancePercent ?? 0),
-    bonusCriticalCount: Number(entry?.bonusCriticalCount ?? 0),
-    awakenCap: Number(entry?.awakenCap ?? 0),
-    effects,
-    traitType: primaryEffect?.type || entry?.traitType || 'bonus_clicks',
-    traitValue: Number(primaryEffect?.value ?? entry?.traitValue ?? 0),
+    attackPower: Number(entry?.attackPower ?? 0),
+    armorPenPercent: Number(entry?.armorPenPercent ?? 0),
+    critDamageMultiplier: Number(entry?.critDamageMultiplier ?? 0),
+    bossDamagePercent: Number(entry?.bossDamagePercent ?? 0),
+    partTypeDamageSoft: Number(entry?.partTypeDamageSoft ?? 0),
+    partTypeDamageHeavy: Number(entry?.partTypeDamageHeavy ?? 0),
+    partTypeDamageWeak: Number(entry?.partTypeDamageWeak ?? 0),
+    talentAffinity: entry?.talentAffinity || '',
   }
 }
 
@@ -180,8 +132,8 @@ export function normalizeBossTemplate(entry) {
     id: entry?.id || '',
     name: entry?.name || '',
     maxHp: Number(entry?.maxHp ?? 0),
+    layout: Array.isArray(entry?.layout) ? entry.layout : [],
     loot: Array.isArray(entry?.loot) ? entry.loot.map(normalizeLootEntry) : [],
-    heroLoot: Array.isArray(entry?.heroLoot) ? entry.heroLoot.map(normalizeHeroLootEntry) : [],
   }
 }
 
@@ -189,9 +141,7 @@ export function normalizeAdminState(payload) {
   return {
     boss: payload?.boss ?? null,
     bossLeaderboard: Array.isArray(payload?.bossLeaderboard) ? payload.bossLeaderboard : [],
-    heroes: Array.isArray(payload?.heroes) ? payload.heroes.map(normalizeHeroDefinition) : [],
     loot: Array.isArray(payload?.loot) ? payload.loot.map(normalizeLootEntry) : [],
-    heroLoot: Array.isArray(payload?.heroLoot) ? payload.heroLoot.map(normalizeHeroLootEntry) : [],
     bossCycleEnabled: Boolean(payload?.bossCycleEnabled),
     bossPool: Array.isArray(payload?.bossPool) ? payload.bossPool.map(normalizeBossTemplate) : [],
     playerCount: Number(payload?.playerCount ?? 0),
@@ -214,6 +164,7 @@ export function normalizeEquipmentPage(payload) {
     items: Array.isArray(payload?.items)
       ? payload.items.map((item) => ({
           ...item,
+          slot: normalizeEquipmentSlot(item?.slot),
           rarity: normalizeRarity(item?.rarity),
         }))
       : [],
@@ -282,23 +233,17 @@ export function normalizePlayerPage(payload) {
 }
 
 export function formatItemStats(item) {
-  const critChance = Number(item?.bonusCriticalChancePercent ?? 0).toFixed(2)
-  return `点击+${item?.bonusClicks ?? 0} 暴击率+${critChance}% 暴击+${item?.bonusCriticalCount ?? 0}`
+  const parts = []
+  if (Number(item?.attackPower ?? 0) > 0) parts.push(`攻击力+${item.attackPower}`)
+  if (Number(item?.armorPenPercent ?? 0) > 0) parts.push(`破甲+${(item.armorPenPercent * 100).toFixed(0)}%`)
+  if (Number(item?.critDamageMultiplier ?? 0) > 1) parts.push(`暴伤×${item.critDamageMultiplier}`)
+  if (Number(item?.bossDamagePercent ?? 0) > 0) parts.push(`Boss增伤+${(item.bossDamagePercent * 100).toFixed(0)}%`)
+  if (Number(item?.partTypeDamageSoft ?? 0) > 0) parts.push(`软组织+${(item.partTypeDamageSoft * 100).toFixed(0)}%`)
+  if (Number(item?.partTypeDamageHeavy ?? 0) > 0) parts.push(`重甲+${(item.partTypeDamageHeavy * 100).toFixed(0)}%`)
+  if (Number(item?.partTypeDamageWeak ?? 0) > 0) parts.push(`弱点+${(item.partTypeDamageWeak * 100).toFixed(0)}%`)
+  if (item?.talentAffinity) parts.push(`天赋:${item.talentAffinity}`)
+  return parts.join(' ')
 }
-
-export function formatHeroTrait(hero) {
-  const effects = Array.isArray(hero?.effects) ? hero.effects : []
-  if (effects.length === 0) {
-    return '被动：暂无'
-  }
-
-  return `被动：${effects.map((effect) => formatHeroEffect(effect)).join(' / ')}`
-}
-
-export function heroImageAlt(hero) {
-  return hero?.imageAlt || hero?.name || hero?.heroId || '英雄头像'
-}
-
 export function formatTime(timestamp) {
   if (!timestamp) {
     return '未记录'
@@ -310,19 +255,4 @@ export function formatTime(timestamp) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(timestamp * 1000))
-}
-
-function formatHeroEffect(effect) {
-  switch (effect?.type) {
-    case 'bonus_clicks':
-      return `额外点击 +${effect?.value ?? 0}`
-    case 'critical_chance_percent':
-      return `暴击率 +${effect?.value ?? 0}%`
-    case 'critical_count_bonus':
-      return `暴击额外 +${effect?.value ?? 0}`
-    case 'final_damage_percent':
-      return `最终伤害 +${effect?.value ?? 0}%`
-    default:
-      return effect?.displayName || effect?.type || '未知效果'
-  }
 }

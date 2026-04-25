@@ -29,9 +29,6 @@ func TestDebugWwhdsUserState(t *testing.T) {
 	if _, err := store.gemsForNickname(ctx, nickname); err != nil {
 		t.Fatalf("gemsForNickname: %v", err)
 	}
-	if _, err := store.lastForgeResultForNickname(ctx, nickname); err != nil {
-		t.Fatalf("lastForgeResultForNickname: %v", err)
-	}
 	if _, err := store.GetUserStats(ctx, nickname); err != nil {
 		t.Fatalf("GetUserStats: %v", err)
 	}
@@ -39,26 +36,12 @@ func TestDebugWwhdsUserState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inventoryQuantities: %v", err)
 	}
-	loadout, equipped, err := store.loadoutForNickname(ctx, nickname, quantities)
+	_, equipped, err := store.loadoutForNickname(ctx, nickname, quantities)
 	if err != nil {
 		t.Fatalf("loadoutForNickname: %v", err)
 	}
 	if _, err := store.inventoryForNickname(ctx, nickname, quantities, equipped); err != nil {
 		t.Fatalf("inventoryForNickname: %v", err)
-	}
-	heroQuantities, err := store.heroInventoryQuantities(ctx, nickname)
-	if err != nil {
-		t.Fatalf("heroInventoryQuantities: %v", err)
-	}
-	activeHero, err := store.activeHeroForNickname(ctx, nickname, heroQuantities)
-	if err != nil {
-		t.Fatalf("activeHeroForNickname: %v", err)
-	}
-	if _, err := store.heroInventoryForNickname(ctx, nickname, heroQuantities, activeHero); err != nil {
-		t.Fatalf("heroInventoryForNickname: %v", err)
-	}
-	if _, err := store.combatStatsForNickname(ctx, nickname, loadout, activeHero); err != nil {
-		t.Fatalf("combatStatsForNickname: %v", err)
 	}
 	if _, err := store.recentRewardsForNickname(ctx, nickname); err != nil {
 		t.Fatalf("recentRewardsForNickname: %v", err)

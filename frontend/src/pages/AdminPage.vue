@@ -4,7 +4,6 @@ import AdminButtonsTab from '../components/admin/AdminButtonsTab.vue'
 import AdminContentTab from '../components/admin/AdminContentTab.vue'
 import AdminDashboardTab from '../components/admin/AdminDashboardTab.vue'
 import AdminEquipmentTab from '../components/admin/AdminEquipmentTab.vue'
-import AdminHeroesTab from '../components/admin/AdminHeroesTab.vue'
 import AdminHistoryTab from '../components/admin/AdminHistoryTab.vue'
 import { useAdminPage } from './admin/useAdminPage'
 import {reactive} from "vue";
@@ -76,7 +75,6 @@ const admin = reactive(useAdminPage())
         <div class="admin-tabs">
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'boss' }" @click="admin.activeTab = 'boss'">Boss</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'equipment' }" @click="admin.activeTab = 'equipment'; admin.fetchEquipmentPage(admin.equipmentPage.page)">装备</button>
-          <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'heroes' }" @click="admin.activeTab = 'heroes'">英雄</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'buttons' }" @click="admin.activeTab = 'buttons'; admin.fetchButtonPage(admin.buttonPage.page)">按钮</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'content' }" @click="admin.activeTab = 'content'; admin.fetchAnnouncements(); admin.fetchMessages()">内容</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'history' }" @click="admin.activeTab = 'history'; admin.fetchBossHistory(admin.bossHistoryPage.page)">历史</button>
@@ -94,16 +92,12 @@ const admin = reactive(useAdminPage())
           :boss-form="admin.bossForm"
           :boss-templates="admin.bossTemplates"
           :equipment-options="admin.equipmentOptions"
-          :hero-loot-rows="admin.heroLootRows"
-          :hero-options="admin.heroOptions"
           :has-boss="admin.hasBoss"
           :has-equipment-templates="admin.hasEquipmentTemplates"
-          :has-hero-templates="admin.hasHeroTemplates"
           :loot-rows="admin.lootRows"
           :saving="admin.saving"
           :selected-boss-template="admin.selectedBossTemplate"
           :selected-boss-template-id="admin.selectedBossTemplateId"
-          :add-hero-loot-row="admin.addHeroLootRow"
           :add-loot-row="admin.addLootRow"
           :deactivate-boss="admin.deactivateBoss"
           :delete-boss-template="admin.deleteBossTemplate"
@@ -111,14 +105,9 @@ const admin = reactive(useAdminPage())
           :edit-boss-template="admin.editBossTemplate"
           :enable-boss-cycle="admin.enableBossCycle"
           :find-equipment-template="admin.findEquipmentTemplate"
-          :find-hero-template="admin.findHeroTemplate"
-          :format-hero-trait="admin.formatHeroTrait"
           :format-item-stats="admin.formatItemStats"
-          :hero-image-alt="admin.heroImageAlt"
-          :remove-hero-loot-row="admin.removeHeroLootRow"
           :remove-loot-row="admin.removeLootRow"
           :save-boss-template="admin.saveBossTemplate"
-          :save-hero-loot="admin.saveHeroLoot"
           :save-loot="admin.saveLoot"
           :select-boss-template="admin.selectBossTemplate"
         />
@@ -134,22 +123,10 @@ const admin = reactive(useAdminPage())
           :edit-equipment="admin.editEquipment"
           :delete-equipment="admin.deleteEquipment"
           :fetch-equipment-page="admin.fetchEquipmentPage"
+          :upload-equipment-image="admin.uploadEquipmentImage"
         />
 
-        <AdminHeroesTab
-          v-else-if="admin.activeTab === 'heroes'"
-          :heroes="admin.adminState.heroes"
-          :hero-form="admin.heroForm"
-          :uploading-image="admin.uploadingImage"
-          :saving="admin.saving"
-          :format-item-stats="admin.formatItemStats"
-          :format-hero-trait="admin.formatHeroTrait"
-          :hero-image-alt="admin.heroImageAlt"
-          :save-hero="admin.saveHero"
-          :upload-hero-image="admin.uploadHeroImage"
-          :edit-hero="admin.editHero"
-          :delete-hero="admin.deleteHero"
-        />
+
 
         <AdminButtonsTab
           v-else-if="admin.activeTab === 'buttons'"

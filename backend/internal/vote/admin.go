@@ -18,10 +18,6 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		return AdminState{}, err
 	}
 
-	heroes, err := s.ListHeroDefinitions(ctx)
-	if err != nil {
-		return AdminState{}, err
-	}
 	bossCycleEnabled, err := s.bossCycleEnabled(ctx)
 	if err != nil {
 		return AdminState{}, err
@@ -33,7 +29,6 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 
 	bossLeaderboard := []BossLeaderboardEntry{}
 	loot := []BossLootEntry{}
-	heroLoot := []BossHeroLootEntry{}
 	if boss != nil {
 		bossLeaderboard, err = s.ListBossLeaderboard(ctx, boss.ID, 20)
 		if err != nil {
@@ -41,10 +36,6 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		}
 
 		loot, err = s.loadBossLoot(ctx, boss.ID)
-		if err != nil {
-			return AdminState{}, err
-		}
-		heroLoot, err = s.loadBossHeroLoot(ctx, boss.ID)
 		if err != nil {
 			return AdminState{}, err
 		}
@@ -60,9 +51,7 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		BossLeaderboard:   bossLeaderboard,
 		Buttons:           []Button{},
 		Equipment:         []EquipmentDefinition{},
-		Heroes:            heroes,
 		Loot:              loot,
-		HeroLoot:          heroLoot,
 		BossCycleEnabled:  bossCycleEnabled,
 		BossPool:          bossPool,
 		PlayerCount:       playerCount,
@@ -108,13 +97,19 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 	}
 
 	values := map[string]any{
-		"name":                          firstNonEmpty(strings.TrimSpace(definition.Name), itemID),
-		"slot":                          strings.TrimSpace(definition.Slot),
-		"rarity":                        normalizeEquipmentRarity(definition.Rarity),
-		"bonus_clicks":                  strconv.FormatInt(definition.BonusClicks, 10),
-		"bonus_critical_chance_percent": formatFloatForRedis(definition.BonusCriticalChancePercent),
-		"bonus_critical_count":          strconv.FormatInt(definition.BonusCriticalCount, 10),
-		"enhance_cap":                   strconv.Itoa(definition.EnhanceCap),
+		"name":                   firstNonEmpty(strings.TrimSpace(definition.Name), itemID),
+		"slot":                   normalizeEquipmentSlot(definition.Slot),
+		"rarity":                 normalizeEquipmentRarity(definition.Rarity),
+		"image_path":             strings.TrimSpace(definition.ImagePath),
+		"image_alt":              strings.TrimSpace(definition.ImageAlt),
+		"attack_power":           strconv.FormatInt(definition.AttackPower, 10),
+		"armor_pen_percent":      strconv.FormatFloat(definition.ArmorPenPercent, 'f', -1, 64),
+		"crit_damage_multiplier": strconv.FormatFloat(definition.CritDamageMultiplier, 'f', -1, 64),
+		"boss_damage_percent":    strconv.FormatFloat(definition.BossDamagePercent, 'f', -1, 64),
+		"part_type_damage_soft":  strconv.FormatFloat(definition.PartTypeDamageSoft, 'f', -1, 64),
+		"part_type_damage_heavy": strconv.FormatFloat(definition.PartTypeDamageHeavy, 'f', -1, 64),
+		"part_type_damage_weak":  strconv.FormatFloat(definition.PartTypeDamageWeak, 'f', -1, 64),
+		"talent_affinity":        strings.TrimSpace(definition.TalentAffinity),
 	}
 
 	pipe := s.client.TxPipeline()
@@ -196,10 +191,11 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 		Status:    bossStatusActive,
 		MaxHP:     maxInt64(1, boss.MaxHP),
 		CurrentHP: maxInt64(1, boss.MaxHP),
+		Parts:     boss.Parts,
 		StartedAt: time.Now().Unix(),
 	}
 
-	if err := s.setCurrentBoss(ctx, current, nil, nil); err != nil {
+	if err := s.setCurrentBoss(ctx, current, nil); err != nil {
 		return nil, err
 	}
 

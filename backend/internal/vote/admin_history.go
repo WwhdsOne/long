@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -28,6 +29,10 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 	}
 	if boss.DefeatedAt != 0 {
 		values["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
+	}
+	if len(boss.Parts) > 0 {
+		partsRaw, _ := sonic.Marshal(boss.Parts)
+		values["parts"] = string(partsRaw)
 	}
 
 	key := s.bossHistoryPrefix + boss.ID

@@ -30,7 +30,7 @@ describe('PublicPage 点击响应链路', () => {
   it('点击成功后不会把断连状态直接改成已连接', () => {
     const clickSegment = pageSource.slice(
       pageSource.indexOf('async function clickButton'),
-      pageSource.indexOf('async function postEquipmentAction'),
+      pageSource.indexOf('async function submitNickname'),
     )
 
     expect(clickSegment).not.toContain('liveConnected.value = true')

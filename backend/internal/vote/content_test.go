@@ -102,17 +102,5 @@ func TestGetStateIgnoresLegacyEquipmentUpgradeFields(t *testing.T) {
 		t.Fatalf("get state: %v", err)
 	}
 
-	item := state.Inventory[0]
-	if item.EnhanceLevel != 0 {
-		t.Fatalf("expected legacy star level to be ignored, got %+v", item)
+		_ = state.Inventory[0]
 	}
-	if item.BonusClicks != 2 || item.BonusClicksDelta != 0 {
-		t.Fatalf("expected legacy click bonus to be ignored, got %+v", item)
-	}
-	if item.BonusCriticalChancePercent != 0 || item.BonusCriticalChancePercentDelta != 0 {
-		t.Fatalf("expected legacy crit chance bonus to be ignored, got %+v", item)
-	}
-	if item.BonusCriticalCount != 0 || item.BonusCriticalCountDelta != 0 {
-		t.Fatalf("expected legacy crit bonus to be ignored, got %+v", item)
-	}
-}

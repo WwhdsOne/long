@@ -1,11 +1,9 @@
 export function createAdminPageActions(state) {
   const {
     activeTab,
-    addHeroLootRow,
     addLootRow,
     adminState,
     announcementForm,
-    applyHeroLootRows,
     applyLootRows,
     bossCycleEnabled,
     bossForm,
@@ -15,7 +13,6 @@ export function createAdminPageActions(state) {
     emptyAnnouncementForm,
     emptyButtonForm,
     emptyEquipmentForm,
-    emptyHeroForm,
     equipmentForm,
     equipmentPage,
     errorMessage,
@@ -25,8 +22,6 @@ export function createAdminPageActions(state) {
     fetchEquipmentPage,
     fetchMessages,
     findBossTemplate,
-    heroForm,
-    heroLootRows,
     lootRows,
     readErrorMessage,
     saving,
@@ -80,6 +75,7 @@ export function createAdminPageActions(state) {
           id: bossForm.value.id,
           name: bossForm.value.name,
           maxHp: Number(bossForm.value.maxHp),
+          layout: bossForm.value.layout || [],
         }),
       })
       if (!response.ok) {
@@ -118,10 +114,14 @@ export function createAdminPageActions(state) {
         body: JSON.stringify({
           ...equipmentForm.value,
           rarity: equipmentForm.value.rarity,
-          bonusClicks: Number(equipmentForm.value.bonusClicks),
-          bonusCriticalChancePercent: Number(equipmentForm.value.bonusCriticalChancePercent),
-          bonusCriticalCount: Number(equipmentForm.value.bonusCriticalCount),
-          enhanceCap: Number(equipmentForm.value.enhanceCap),
+          attackPower: Number(equipmentForm.value.attackPower),
+          armorPenPercent: Number(equipmentForm.value.armorPenPercent),
+          critDamageMultiplier: Number(equipmentForm.value.critDamageMultiplier),
+          bossDamagePercent: Number(equipmentForm.value.bossDamagePercent),
+          partTypeDamageSoft: Number(equipmentForm.value.partTypeDamageSoft),
+          partTypeDamageHeavy: Number(equipmentForm.value.partTypeDamageHeavy),
+          partTypeDamageWeak: Number(equipmentForm.value.partTypeDamageWeak),
+          talentAffinity: equipmentForm.value.talentAffinity,
         }),
       })
       if (!response.ok) {
@@ -137,47 +137,7 @@ export function createAdminPageActions(state) {
     }
   }
 
-  async function saveHero() {
-    saving.value = true
-    try {
-      const method = adminState.value.heroes.some((entry) => entry.heroId === heroForm.value.heroId) ? 'PUT' : 'POST'
-      const url = method === 'PUT' ? `/api/admin/heroes/${encodeURIComponent(heroForm.value.heroId)}` : '/api/admin/heroes'
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bonusClicks: Number(heroForm.value.bonusClicks),
-          bonusCriticalChancePercent: Number(heroForm.value.bonusCriticalChancePercent),
-          bonusCriticalCount: Number(heroForm.value.bonusCriticalCount),
-          awakenCap: Number(heroForm.value.awakenCap),
-          heroId: heroForm.value.heroId,
-          name: heroForm.value.name,
-          imagePath: heroForm.value.imagePath,
-          imageAlt: heroForm.value.imageAlt,
-          effects: heroForm.value.traitType
-            ? [{
-                type: heroForm.value.traitType,
-                value: Number(heroForm.value.traitValue),
-              }]
-            : [],
-        }),
-      })
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, '保存英雄失败'))
-      }
-      setSuccess('英雄模板已保存。')
-      heroForm.value = emptyHeroForm()
-      await fetchAdminState()
-    } catch (error) {
-      errorMessage.value = error.message || '保存英雄失败'
-    } finally {
-      saving.value = false
-    }
-  }
 
-  async function deleteHero(heroId) {
-    await deleteByID(`/api/admin/heroes/${encodeURIComponent(heroId)}`, '英雄模板已删除。', '删除英雄失败', fetchAdminState)
-  }
 
   async function deleteEquipment(itemId) {
     await deleteByID(
@@ -263,14 +223,13 @@ export function createAdminPageActions(state) {
     }, '按钮图片已上传到 OSS。')
   }
 
-  async function uploadHeroImage(event) {
+  async function uploadEquipmentImage(event) {
     await uploadImageInner(event, (finalURL, file) => {
-    heroForm.value = {
-      ...heroForm.value,
-      imagePath: finalURL,
-      imageAlt: heroForm.value.imageAlt || file.name.replace(/\.[^.]+$/, ''),
+      equipmentForm.value.imagePath = finalURL
+      if (!equipmentForm.value.imageAlt) {
+        equipmentForm.value.imageAlt = file.name.replace(/\.[^.]+$/, '')
       }
-    }, '英雄头像已上传到 OSS。')
+    }, '装备图片已上传到 OSS。')
   }
 
   async function saveLoot() {
@@ -303,35 +262,7 @@ export function createAdminPageActions(state) {
     }
   }
 
-  async function saveHeroLoot() {
-    if (!selectedBossTemplateId.value) {
-      errorMessage.value = '先选一只 Boss 模板，再配置英雄掉落池。'
-      return
-    }
 
-    saving.value = true
-    try {
-      const response = await fetch(`/api/admin/boss/pool/${encodeURIComponent(selectedBossTemplateId.value)}/hero-loot`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          loot: heroLootRows.value.filter((entry) => entry.heroId).map((entry) => ({
-            heroId: entry.heroId,
-            weight: Number(entry.weight),
-          })),
-        }),
-      })
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, '保存模板英雄池失败'))
-      }
-      setSuccess('模板英雄池已保存。')
-      await fetchAdminState()
-    } catch (error) {
-      errorMessage.value = error.message || '保存模板英雄池失败'
-    } finally {
-      saving.value = false
-    }
-  }
 
   async function deleteBossTemplate(templateId) {
     saving.value = true
@@ -344,7 +275,7 @@ export function createAdminPageActions(state) {
         selectedBossTemplateId.value = ''
       }
       if (bossForm.value.id === templateId) {
-        bossForm.value = { id: '', name: '', maxHp: '' }
+        bossForm.value = { id: '', name: '', maxHp: '', layout: [] }
       }
       setSuccess('Boss 模板已删除。')
       await fetchAdminState()
@@ -373,30 +304,18 @@ export function createAdminPageActions(state) {
     activeTab.value = 'buttons'
   }
 
-  function editHero(entry) {
-    heroForm.value = {
-      ...entry,
-      bonusClicks: entry.bonusClicks,
-      bonusCriticalChancePercent: entry.bonusCriticalChancePercent,
-      bonusCriticalCount: entry.bonusCriticalCount,
-      awakenCap: entry.awakenCap,
-      traitValue: entry.traitValue,
-    }
-    activeTab.value = 'heroes'
-  }
+
 
   function editBossTemplate(entry) {
-    bossForm.value = { id: entry.id, name: entry.name, maxHp: entry.maxHp }
+    bossForm.value = { id: entry.id, name: entry.name, maxHp: entry.maxHp, layout: entry.layout || [] }
     selectedBossTemplateId.value = entry.id
     applyLootRows(entry.loot)
-    applyHeroLootRows(entry.heroLoot)
     activeTab.value = 'boss'
   }
 
   function selectBossTemplate(templateId) {
     selectedBossTemplateId.value = templateId
     applyLootRows(findBossTemplate(templateId)?.loot ?? [])
-    applyHeroLootRows(findBossTemplate(templateId)?.heroLoot ?? [])
   }
 
   function removeLootRow(index) {
@@ -406,37 +325,27 @@ export function createAdminPageActions(state) {
     }
   }
 
-  function removeHeroLootRow(index) {
-    heroLootRows.value.splice(index, 1)
-    if (heroLootRows.value.length === 0) {
-      addHeroLootRow()
-    }
-  }
+
 
   return {
     deactivateBoss,
     deleteAnnouncement,
     deleteBossTemplate,
     deleteEquipment,
-    deleteHero,
     deleteMessage,
     disableBossCycle,
     editBossTemplate,
     editButton,
     editEquipment,
-    editHero,
     enableBossCycle,
-    removeHeroLootRow,
     removeLootRow,
     saveAnnouncement,
     saveBossTemplate,
     saveButton,
     saveEquipment,
-    saveHero,
-    saveHeroLoot,
     saveLoot,
     selectBossTemplate,
     uploadButtonImage,
-    uploadHeroImage,
+    uploadEquipmentImage,
   }
 }

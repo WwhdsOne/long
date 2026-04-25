@@ -1,4 +1,6 @@
 <script setup>
+import { EQUIPMENT_SLOTS } from '../../utils/equipmentSlots'
+
 defineProps({
   adminState: { type: Object, required: true },
   loadingPlayers: { type: Boolean, required: true },
@@ -7,6 +9,12 @@ defineProps({
   resetPlayerPassword: { type: Function, required: true },
   saving: { type: Boolean, required: true },
 })
+
+function formatPlayerLoadout(loadout) {
+  return EQUIPMENT_SLOTS
+    .map((slot) => loadout?.[slot.value]?.name || `空${slot.label}`)
+    .join(' / ')
+}
 </script>
 
 <template>
@@ -45,9 +53,7 @@ defineProps({
               <p>累计点击 {{ player.clickCount }} · 背包 {{ player.inventory.length }} 件</p>
               <p>
                 穿戴：
-                {{ player.loadout.weapon?.name || '空武器' }} /
-                {{ player.loadout.armor?.name || '空护甲' }} /
-                {{ player.loadout.accessory?.name || '空饰品' }}
+                {{ formatPlayerLoadout(player.loadout) }}
               </p>
             </div>
             <button class="nickname-form__ghost" type="button" :disabled="saving" @click="resetPlayerPassword(player.nickname)">
