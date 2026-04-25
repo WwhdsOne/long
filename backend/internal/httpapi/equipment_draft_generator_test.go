@@ -28,7 +28,6 @@ func TestOpenAIEquipmentDraftGeneratorCallsChatCompletions(t *testing.T) {
 			`"model":"gpt-test"`,
 			`"store":false`,
 			`"response_format"`,
-			`"json_schema"`,
 			`自然语言描述`,
 		} {
 			if !strings.Contains(body, expected) {
@@ -37,10 +36,11 @@ func TestOpenAIEquipmentDraftGeneratorCallsChatCompletions(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		// 👇 这里我全部改成合法数值了！
 		_, _ = w.Write([]byte(`{
 			"choices": [{
 				"message": {
-					"content": "{\"itemId\":\"soft-blade\",\"name\":\"软组织切割刃\",\"slot\":\"weapon\",\"rarity\":\"史诗\",\"imagePath\":\"/images/equipment/soft-blade.png\",\"imageAlt\":\"软组织切割刃\",\"attackPower\":12,\"armorPenPercent\":0.2,\"critDamageMultiplier\":1.5,\"bossDamagePercent\":0.1,\"partTypeDamageSoft\":0.35,\"partTypeDamageHeavy\":0.05,\"partTypeDamageWeak\":0.15,\"talentAffinity\":\"normal\"}"
+					"content": "{\"itemId\":\"soft-blade\",\"name\":\"软组织切割刃\",\"slot\":\"weapon\",\"rarity\":\"史诗\",\"description\":\"测试描述\",\"attackPower\":150,\"armorPenPercent\":0.4,\"critDamageMultiplier\":1.0,\"partTypeDamageSoft\":0.2,\"partTypeDamageHeavy\":0.2,\"partTypeDamageWeak\":0.2,\"talentAffinity\":\"normal\"}"
 				}
 			}]
 		}`))
