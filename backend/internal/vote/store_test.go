@@ -199,6 +199,52 @@ func TestBossTemplateActivationUsesPartHealthAsTotalHealth(t *testing.T) {
 	}
 }
 
+func TestBossPartDisplayFieldsPersist(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "display-part-boss",
+		Name:  "展示字段 Boss",
+		MaxHP: 100,
+		Layout: []BossPart{
+			{
+				X:           0,
+				Y:           0,
+				Type:        PartTypeWeak,
+				MaxHP:       100,
+				CurrentHP:   100,
+				Alive:       true,
+				DisplayName: "眼核",
+				ImagePath:   "/assets/boss/eye.png",
+			},
+		},
+	}); err != nil {
+		t.Fatalf("save boss template: %v", err)
+	}
+
+	templates, err := store.ListBossTemplates(ctx)
+	if err != nil {
+		t.Fatalf("list boss templates: %v", err)
+	}
+	if len(templates) != 1 || len(templates[0].Layout) != 1 {
+		t.Fatalf("expected one template part, got %+v", templates)
+	}
+	part := templates[0].Layout[0]
+	if part.DisplayName != "眼核" || part.ImagePath != "/assets/boss/eye.png" {
+		t.Fatalf("expected template display fields to persist, got %+v", part)
+	}
+
+	boss, err := store.activateRandomBossFromPool(ctx)
+	if err != nil {
+		t.Fatalf("activate boss from pool: %v", err)
+	}
+	if len(boss.Parts) != 1 || boss.Parts[0].DisplayName != "眼核" || boss.Parts[0].ImagePath != "/assets/boss/eye.png" {
+		t.Fatalf("expected activated boss display fields to persist, got %+v", boss.Parts)
+	}
+}
+
 func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

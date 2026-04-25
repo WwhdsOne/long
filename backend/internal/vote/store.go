@@ -100,13 +100,15 @@ func (p PartType) DamageCoefficient() float64 {
 
 // BossPart Boss 的战斗部位
 type BossPart struct {
-	X         int      `json:"x"`
-	Y         int      `json:"y"`
-	Type      PartType `json:"type"`
-	MaxHP     int64    `json:"maxHp"`
-	CurrentHP int64    `json:"currentHp"`
-	Armor     int64    `json:"armor"`
-	Alive     bool     `json:"alive"`
+	X           int      `json:"x"`
+	Y           int      `json:"y"`
+	Type        PartType `json:"type"`
+	DisplayName string   `json:"displayName,omitempty"`
+	ImagePath   string   `json:"imagePath,omitempty"`
+	MaxHP       int64    `json:"maxHp"`
+	CurrentHP   int64    `json:"currentHp"`
+	Armor       int64    `json:"armor"`
+	Alive       bool     `json:"alive"`
 }
 
 // Boss 世界 Boss 状态
