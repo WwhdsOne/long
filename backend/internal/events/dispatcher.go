@@ -2,21 +2,33 @@ package events
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"long/internal/vote"
 )
 
 // Dispatcher 将业务变更转换成公共态和个人态推送。
 type Dispatcher struct {
-	cache *Cache
-	hub   *Hub
+	cache      *Cache
+	hub        *Hub
+	debounceMs int
+
+	mu          sync.Mutex
+	publicDirty bool
+	publicTimer *time.Timer
 }
 
 // NewDispatcher 创建一个实时分发器。
-func NewDispatcher(cache *Cache, hub *Hub) *Dispatcher {
+func NewDispatcher(cache *Cache, hub *Hub, debounceMs ...int) *Dispatcher {
+	ms := 50
+	if len(debounceMs) > 0 && debounceMs[0] > 0 {
+		ms = debounceMs[0]
+	}
 	return &Dispatcher{
-		cache: cache,
-		hub:   hub,
+		cache:      cache,
+		hub:        hub,
+		debounceMs: ms,
 	}
 }
 
@@ -27,18 +39,13 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change vote.StateChange) 
 	}
 
 	if affectsPublicState(change.Type) {
-		snapshot, err := d.cache.RefreshSnapshot(ctx)
-		if err != nil {
-			return err
+		d.mu.Lock()
+		d.publicDirty = true
+		if d.publicTimer != nil {
+			d.publicTimer.Stop()
 		}
-		if change.Type == vote.StateChangeBossChanged {
-			if _, err := d.cache.RefreshBossResources(ctx); err != nil {
-				return err
-			}
-		}
-		if err := d.hub.BroadcastPublic(snapshot); err != nil {
-			return err
-		}
+		d.publicTimer = time.AfterFunc(time.Duration(d.debounceMs)*time.Millisecond, d.flushPublic)
+		d.mu.Unlock()
 	}
 
 	targetNicknames := userTargetsForChange(change, d.hub.ActiveNicknames())
@@ -57,6 +64,27 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change vote.StateChange) 
 	}
 
 	return nil
+}
+
+func (d *Dispatcher) flushPublic() {
+	d.mu.Lock()
+	if !d.publicDirty {
+		d.mu.Unlock()
+		return
+	}
+	d.publicDirty = false
+	d.publicTimer = nil
+	d.mu.Unlock()
+
+	ctx := context.Background()
+	snapshot, err := d.cache.RefreshSnapshot(ctx)
+	if err != nil {
+		return
+	}
+	if snapshot.Boss != nil {
+		_, _ = d.cache.RefreshBossResources(ctx)
+	}
+	_ = d.hub.BroadcastPublic(snapshot)
 }
 
 func affectsPublicState(changeType vote.StateChangeType) bool {

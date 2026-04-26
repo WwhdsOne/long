@@ -90,6 +90,27 @@ func readHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name string)
 	}
 }
 
+func readHubEventSet(t *testing.T, ch <-chan events.ServerEvent, expected map[string]struct{}) {
+	t.Helper()
+
+	remain := make(map[string]struct{}, len(expected))
+	for name := range expected {
+		remain[name] = struct{}{}
+	}
+	timeout := time.After(2 * time.Second)
+	for len(remain) > 0 {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				t.Fatalf("hub channel closed while waiting events: %+v", remain)
+			}
+			delete(remain, event.Name)
+		case <-timeout:
+			t.Fatalf("timed out waiting events: %+v", remain)
+		}
+	}
+}
+
 func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
@@ -141,8 +162,7 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 
 func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
-		},
+		state: vote.State{},
 	}
 	session := newRealtimeSession(realtimeSessionOptions{
 		stateView:             store,
@@ -275,8 +295,8 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	ack := decodeRealtimeMessage[struct {
 		Type    string `json:"type"`
 		Payload struct {
-			Delta    int64       `json:"delta"`
-			Critical bool        `json:"critical"`
+			Delta    int64 `json:"delta"`
+			Critical bool  `json:"critical"`
 		} `json:"payload"`
 	}](t, messages[0])
 	if ack.Type != realtimeMessageTypeClickAck {
@@ -286,23 +306,14 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 		t.Fatalf("unexpected click ack payload: %+v", ack.Payload)
 	}
 
-	publicEvent := readHubEventByName(t, sseClient, events.PublicStateEventName)
-	if publicEvent.Name != events.PublicStateEventName {
-		t.Fatalf("expected public state event for SSE subscriber, got %+v", publicEvent)
-	}
-	userEvent := readHubEventByName(t, sseClient, events.UserStateEventName)
-	if userEvent.Name != events.UserStateEventName {
-		t.Fatalf("expected user state event for SSE subscriber, got %+v", userEvent)
-	}
-
-	publicEvent = readHubEventByName(t, wsClient, events.PublicStateEventName)
-	if publicEvent.Name != events.PublicStateEventName {
-		t.Fatalf("expected public state event for realtime subscriber, got %+v", publicEvent)
-	}
-	userEvent = readHubEventByName(t, wsClient, events.UserStateEventName)
-	if userEvent.Name != events.UserStateEventName {
-		t.Fatalf("expected user state event for realtime subscriber, got %+v", userEvent)
-	}
+	readHubEventSet(t, sseClient, map[string]struct{}{
+		events.PublicStateEventName: {},
+		events.UserStateEventName:   {},
+	})
+	readHubEventSet(t, wsClient, map[string]struct{}{
+		events.PublicStateEventName: {},
+		events.UserStateEventName:   {},
+	})
 
 	if len(publisher.changes) != 1 || publisher.changes[0].Type != vote.StateChangeButtonClicked {
 		t.Fatalf("expected one click change, got %+v", publisher.changes)
@@ -384,8 +395,6 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 		t.Fatalf("expected BroadcastUserAll to be true, got %+v", publisher.changes[0])
 	}
 }
-
-
 
 func TestRealtimeSessionReturnsProtocolErrors(t *testing.T) {
 	session := newRealtimeSession(realtimeSessionOptions{

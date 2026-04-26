@@ -68,7 +68,7 @@ func run() error {
 	}, nicknameValidator)
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)
-	dispatcher := events.NewDispatcher(stateCache, hub)
+	dispatcher := events.NewDispatcher(stateCache, hub, cfg.Realtime.DebounceMs)
 	changeBus := events.NewRedisChangeBus(redisClient, vote.RealtimeEventChannel(cfg.RedisPrefix))
 	playerAuthenticator := playerauth.NewService(redisClient, playerauth.Config{
 		Namespace: cfg.RedisPrefix,
