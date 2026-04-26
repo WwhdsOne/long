@@ -1,38 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildClickRequestBody, mergeClickFallbackState } from './clickResponse'
+import { mergeClickFallbackState } from './clickResponse'
 
 describe('clickResponse', () => {
-  it('会把票据和实时连接状态带进点击请求体', () => {
-    expect(buildClickRequestBody('ticket-1', true, {
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
-    })).toEqual({
-      ticket: 'ticket-1',
-      realtimeConnected: true,
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
-    })
-
-    expect(buildClickRequestBody('ticket-1', false, {
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
-    })).toEqual({
-      ticket: 'ticket-1',
-      realtimeConnected: false,
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
-    })
-  })
-
   it('SSE 正常时只用最小响应，不覆盖现有用户态', () => {
     const current = {
       userStats: { nickname: '阿明', clickCount: 11 },

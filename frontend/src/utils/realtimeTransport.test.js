@@ -142,20 +142,10 @@ describe('realtimeTransport', () => {
     transport.connect({ nickname: '阿明' })
     sockets[0].emitOpen()
 
-    expect(transport.sendClick('feel', 'ticket-1', {
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
-    })).toBe(true)
+    expect(transport.sendClick('feel')).toBe(true)
     expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({
       type: 'click',
       slug: 'feel',
-      ticket: 'ticket-1',
-      pointerType: 'mouse',
-      pressDurationMs: 120,
-      fingerprintHash: 'fp-1',
-      fingerprintProof: 'proof-1',
     }))
 
     sockets[0].emitMessage({
@@ -176,42 +166,37 @@ describe('realtimeTransport', () => {
     ])
   })
 
-  it('会优先通过 WebSocket 申请点击票据', async () => {
+  it('online_count 可通过 WebSocket 与 SSE 回调在线人数', () => {
     const sockets = []
+    const sources = []
+    const onlineCounts = []
     const transport = createRealtimeTransport({
       createWebSocket(url) {
         const socket = new FakeWebSocket(url)
         sockets.push(socket)
         return socket
       },
-      createEventSource() {
-        throw new Error('should not create event source')
+      createEventSource(url) {
+        const source = new FakeEventSource(url)
+        sources.push(source)
+        return source
+      },
+      onOnlineCount(payload) {
+        onlineCounts.push(payload?.count)
       },
     })
 
     transport.connect({ nickname: '阿明' })
     sockets[0].emitOpen()
-
-    const ticketPromise = transport.requestClickTicket('feel', 'fp-1')
-    const requestPayload = JSON.parse(sockets[0].sent.at(-1))
-    expect(requestPayload.type).toBe('click_ticket_request')
-    expect(requestPayload.slug).toBe('feel')
-    expect(requestPayload.fingerprintHash).toBe('fp-1')
-    expect(requestPayload.requestId).toContain('ticket-')
-
     sockets[0].emitMessage({
-      type: 'click_ticket',
-      requestId: requestPayload.requestId,
-      ticket: 'ticket-1',
-      challengeNonce: 'nonce-1',
+      type: 'online_count',
+      payload: { count: 3 },
     })
 
-    await expect(ticketPromise).resolves.toEqual({
-      ticket: 'ticket-1',
-      challengeNonce: 'nonce-1',
-      issuedAt: 0,
-      expiresAt: 0,
-    })
+    sockets[0].emitClose()
+    sources[0].emitEvent('online_count', { count: 4 })
+
+    expect(onlineCounts).toEqual([3, 4])
   })
 
   it('WebSocket 断开后会自动退回 SSE 并继续消费增量事件', () => {

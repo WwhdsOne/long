@@ -77,26 +77,6 @@ func registerAdminOverviewRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, state)
 	})
 
-	router.GET("/api/admin/buttons", func(ctx context.Context, c *app.RequestContext) {
-		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
-			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
-			return
-		}
-
-		page, pageSize, ok := parseAdminPageParams(c)
-		if !ok {
-			return
-		}
-
-		result, err := options.Store.ListAdminButtonsPage(ctx, page, pageSize)
-		if err != nil {
-			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ADMIN_BUTTONS_FAILED"})
-			return
-		}
-
-		writeJSON(c, consts.StatusOK, result)
-	})
-
 	router.GET("/api/admin/equipment", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})

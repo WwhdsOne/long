@@ -8,7 +8,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const pageSource = [
   './PublicPage.vue',
   './BattlePage.vue',
-  './ProfilePage.vue',
+  './ArmoryPage.vue',
   './MessagesPage.vue',
   './publicPageState.js',
 ]
@@ -16,15 +16,14 @@ const pageSource = [
   .join('\n')
 
 describe('PublicPage 点击响应链路', () => {
-  it('点击前会先申请一次性票据，并显式上报当前实时连接状态', () => {
-    expect(pageSource).toContain("ensureRealtimeTransport().requestClickTicket(key, nextFingerprintHash)")
-    expect(pageSource).toContain('buildClickRequestBody(ticketInfo.ticket, liveConnected.value, behavior)')
-    expect(pageSource).toContain('consumeClickBehavior(key)')
-    expect(pageSource).toContain('buildFingerprintProof({')
-    expect(pageSource).toContain('fingerprintHash')
-    expect(pageSource).toContain('fingerprintProof')
-    expect(pageSource).toContain('@pointerdown="handleBossZonePressStart(zone, $event)"')
-    expect(pageSource).toContain('@pointerup="handleBossZonePressEnd(zone, $event)"')
+  it('Boss 攻击通过 WebSocket 发送，不再走攻击 POST 接口', () => {
+    const clickSegment = pageSource.slice(
+      pageSource.indexOf('async function clickButton'),
+      pageSource.indexOf('async function submitNickname'),
+    )
+
+    expect(clickSegment).toContain('ensureRealtimeTransport().sendClick')
+    expect(clickSegment).not.toContain('/api/boss/parts/')
   })
 
   it('点击成功后不会把断连状态直接改成已连接', () => {
@@ -38,7 +37,7 @@ describe('PublicPage 点击响应链路', () => {
 
   it('页面不再使用本地 setTimeout 挂机循环', () => {
     expect(pageSource).not.toContain('createAutoClickLoop')
-    expect(pageSource).toContain("fetch('/api/auto-click/start'")
-    expect(pageSource).toContain("fetch('/api/auto-click/stop'")
+    expect(pageSource).toContain('async function startAutoClick')
+    expect(pageSource).toContain('async function stopAutoClick')
   })
 })

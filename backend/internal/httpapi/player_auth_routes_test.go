@@ -87,7 +87,7 @@ func TestPlayerLoginCreatesCookieAndSessionUsesAuthenticatedNickname(t *testing.
 		t.Fatalf("expected 200 from player session, got %d", sessionResponse.Code)
 	}
 
-	clickRequest := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"别人"}`))
+	clickRequest := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/equip", strings.NewReader(`{"nickname":"别人"}`))
 	clickRequest.Header.Set("Content-Type", "application/json")
 	clickRequest.AddCookie(cookies[0])
 	clickResponse := httptest.NewRecorder()
@@ -95,23 +95,23 @@ func TestPlayerLoginCreatesCookieAndSessionUsesAuthenticatedNickname(t *testing.
 	handler.ServeHTTP(clickResponse, clickRequest)
 
 	if clickResponse.Code != http.StatusOK {
-		t.Fatalf("expected authenticated click to pass, got %d", clickResponse.Code)
+		t.Fatalf("expected authenticated equip to pass, got %d", clickResponse.Code)
 	}
 	if store.lastClickNickname != "阿明" {
 		t.Fatalf("expected click to use authenticated nickname, got %q", store.lastClickNickname)
 	}
 
-	stateRequest := httptest.NewRequest(http.MethodGet, "/api/buttons?nickname=%E5%88%AB%E4%BA%BA", nil)
+	stateRequest := httptest.NewRequest(http.MethodGet, "/api/battle/state?nickname=%E5%88%AB%E4%BA%BA", nil)
 	stateRequest.AddCookie(cookies[0])
 	stateResponse := httptest.NewRecorder()
 
 	handler.ServeHTTP(stateResponse, stateRequest)
 
 	if stateResponse.Code != http.StatusOK {
-		t.Fatalf("expected authenticated state request to pass, got %d", stateResponse.Code)
+		t.Fatalf("expected authenticated battle state request to pass, got %d", stateResponse.Code)
 	}
 	if store.lastGetStateNickname != "阿明" {
-		t.Fatalf("expected state fetch to use authenticated nickname, got %q", store.lastGetStateNickname)
+		t.Fatalf("expected battle state fetch to use authenticated nickname, got %q", store.lastGetStateNickname)
 	}
 }
 
@@ -122,7 +122,7 @@ func TestPlayerWriteRoutesRequireAuthenticatedSession(t *testing.T) {
 		PlayerAuthenticator: &mockPlayerAuthenticator{verifyErr: errors.New("missing")},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/buttons/feel/click", strings.NewReader(`{"nickname":"阿明"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/equip", strings.NewReader(`{"nickname":"阿明"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 
@@ -178,7 +178,6 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 		Gems            int64                    `json:"gems"`
 		RecentRewards   []vote.Reward            `json:"recentRewards"`
 		LastReward      *vote.Reward             `json:"lastReward"`
-		Buttons         []vote.Button            `json:"buttons"`
 		Leaderboard     []vote.LeaderboardEntry  `json:"leaderboard"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
@@ -190,9 +189,9 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 	if len(payload.Inventory) != 1 {
 		t.Fatalf("expected inventory, heroes and active hero in profile, got %+v", payload)
 	}
-	if len(payload.Buttons) != 0 || len(payload.Leaderboard) != 0 {
-		t.Fatalf("profile endpoint should not include public battle fields, got buttons=%d leaderboard=%d", len(payload.Buttons), len(payload.Leaderboard))
-	}
+		if len(payload.Leaderboard) != 0 {
+			t.Fatalf("profile endpoint should not include public battle fields, got leaderboard=%d", len(payload.Leaderboard))
+		}
 }
 
 func TestAdminCanResetPlayerPassword(t *testing.T) {
@@ -238,16 +237,6 @@ func TestAdminCanResetPlayerPassword(t *testing.T) {
 
 func voteStateForPlayerTests() vote.State {
 	return vote.State{
-		Buttons: []vote.Button{
-			{
-				Key:      "feel",
-				RedisKey: "vote:button:feel",
-				Label:    "有感觉吗",
-				Count:    2,
-				Sort:     10,
-				Enabled:  true,
-			},
-		},
 		UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 2},
 	}
 }

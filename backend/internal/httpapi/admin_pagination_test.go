@@ -57,15 +57,6 @@ func TestAdminStateReturnsLightweightSummary(t *testing.T) {
 
 func TestAdminCatalogPagesRequireAuthAndReturnPagePayloads(t *testing.T) {
 	store := &mockStore{
-		adminButtonPage: vote.AdminButtonPage{
-			Items: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Sort: 10, Enabled: true},
-			},
-			Page:       2,
-			PageSize:   1,
-			Total:      3,
-			TotalPages: 3,
-		},
 		adminEquipmentPage: vote.AdminEquipmentPage{
 			Items: []vote.EquipmentDefinition{
 				{ItemID: "wood-sword", Name: "木剑", Slot: "weapon"},
@@ -95,30 +86,7 @@ func TestAdminCatalogPagesRequireAuthAndReturnPagePayloads(t *testing.T) {
 		}),
 	})
 
-	unauthorizedRequest := httptest.NewRequest(http.MethodGet, "/api/admin/buttons?page=2&pageSize=1", nil)
-	unauthorizedResponse := httptest.NewRecorder()
-	handler.ServeHTTP(unauthorizedResponse, unauthorizedRequest)
-	if unauthorizedResponse.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 without session, got %d", unauthorizedResponse.Code)
-	}
-
 	cookie := loginAdminForTest(t, handler)
-
-	buttonRequest := httptest.NewRequest(http.MethodGet, "/api/admin/buttons?page=2&pageSize=1", nil)
-	buttonRequest.AddCookie(cookie)
-	buttonResponse := httptest.NewRecorder()
-	handler.ServeHTTP(buttonResponse, buttonRequest)
-	if buttonResponse.Code != http.StatusOK {
-		t.Fatalf("expected 200 from admin buttons page, got %d", buttonResponse.Code)
-	}
-
-	var buttonPayload vote.AdminButtonPage
-	if err := sonic.Unmarshal(buttonResponse.Body.Bytes(), &buttonPayload); err != nil {
-		t.Fatalf("decode button page: %v", err)
-	}
-	if buttonPayload.Page != 2 || buttonPayload.PageSize != 1 || buttonPayload.Total != 3 || len(buttonPayload.Items) != 1 {
-		t.Fatalf("unexpected button page payload: %+v", buttonPayload)
-	}
 
 	equipmentRequest := httptest.NewRequest(http.MethodGet, "/api/admin/equipment?page=2&pageSize=1", nil)
 	equipmentRequest.AddCookie(cookie)

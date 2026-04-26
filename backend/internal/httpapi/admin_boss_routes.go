@@ -26,6 +26,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		boss, err := options.Store.ActivateBoss(ctx, body)
 		if err != nil {
+			if errors.Is(err, vote.ErrBossPartsRequired) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "BOSS_PARTS_REQUIRED",
+					"message": "Boss 必须配置至少一个部位。",
+				})
+				return
+			}
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_ACTIVATE_FAILED"})
 			return
 		}
@@ -96,6 +103,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 		}
 
 		if err := options.Store.SaveBossTemplate(ctx, body); err != nil {
+			if errors.Is(err, vote.ErrBossPartsRequired) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "BOSS_PARTS_REQUIRED",
+					"message": "Boss 模板必须配置至少一个部位。",
+				})
+				return
+			}
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_SAVE_FAILED"})
 			return
 		}
@@ -116,6 +130,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 		body.ID = c.Param("templateId")
 
 		if err := options.Store.SaveBossTemplate(ctx, body); err != nil {
+			if errors.Is(err, vote.ErrBossPartsRequired) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "BOSS_PARTS_REQUIRED",
+					"message": "Boss 模板必须配置至少一个部位。",
+				})
+				return
+			}
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_SAVE_FAILED"})
 			return
 		}
@@ -170,6 +191,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_POOL_EMPTY",
 					"message": "Boss 池还是空的，先加模板再开启循环。",
+				})
+				return
+			}
+			if errors.Is(err, vote.ErrBossPartsRequired) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "BOSS_PARTS_REQUIRED",
+					"message": "Boss 模板缺少部位，请先修正模板。",
 				})
 				return
 			}

@@ -1,7 +1,8 @@
 <script setup>
+import {ref} from 'vue'
 import BattlePage from './BattlePage.vue'
+import ArmoryPage from './ArmoryPage.vue'
 import MessagesPage from './MessagesPage.vue'
-import ProfilePage from './ProfilePage.vue'
 import TalentsPage from './TalentsPage.vue'
 import {usePublicPageState} from './publicPageState'
 
@@ -17,9 +18,40 @@ const {
   closeAnnouncementModal,
   formatTime,
   registerPublicPageLifecycle,
+  isLoggedIn,
+  nickname,
+  nicknameDraft,
+  passwordDraft,
+  errorMessage,
+  submitNickname,
+  resetNickname,
 } = usePublicPageState()
 
 registerPublicPageLifecycle()
+
+const loginModalOpen = ref(false)
+const armoryPageIDs = new Set(['resources', 'inventory', 'stats', 'loadout'])
+
+function isArmoryPage(pageID) {
+  return armoryPageIDs.has(pageID)
+}
+
+async function handleAuthClick() {
+  if (isLoggedIn.value) {
+    await resetNickname()
+  } else {
+    loginModalOpen.value = true
+    errorMessage.value = ''
+  }
+}
+
+async function handleLoginSubmit() {
+  await submitNickname()
+  if (nickname.value) {
+    loginModalOpen.value = false
+    errorMessage.value = ''
+  }
+}
 </script>
 
 <template>
@@ -38,6 +70,13 @@ registerPublicPageLifecycle()
           @click="navigatePublicPage(page.id)"
       >
         {{ page.label }}
+      </button>
+      <button
+          class="public-nav__item public-nav__auth"
+          type="button"
+          @click="handleAuthClick"
+      >
+        {{ isLoggedIn ? '退出登录' : '登录/注册' }}
       </button>
     </nav>
 
@@ -72,9 +111,39 @@ registerPublicPageLifecycle()
     </section>
 
 
+    <section v-if="loginModalOpen" class="login-modal" aria-label="登录">
+      <div class="login-modal__backdrop" @click="loginModalOpen = false"></div>
+      <div class="login-modal__card">
+        <div class="login-modal__header">
+          <p class="vote-stage__eyebrow">账号</p>
+          <strong>登录 / 注册</strong>
+        </div>
+        <p class="login-modal__note">输入昵称和密码，首次输入自动注册</p>
+        <form class="nickname-form login-modal__form" @submit.prevent="handleLoginSubmit">
+          <input
+              v-model="nicknameDraft"
+              class="nickname-form__input"
+              type="text"
+              maxlength="20"
+              placeholder="比如：阿明"
+          />
+          <input
+              v-model="passwordDraft"
+              class="nickname-form__input"
+              type="password"
+              placeholder="输入密码"
+          />
+          <button class="nickname-form__submit" type="submit">
+            登录 / 首次认领
+          </button>
+        </form>
+        <p v-if="errorMessage" class="feedback">{{ errorMessage }}</p>
+      </div>
+    </section>
+
     <BattlePage v-if="currentPublicPage === 'battle'" />
     <TalentsPage v-else-if="currentPublicPage === 'talents'" />
-    <ProfilePage v-else-if="currentPublicPage === 'profile'" />
+    <ArmoryPage v-else-if="isArmoryPage(currentPublicPage)" :focus-section="currentPublicPage" />
     <MessagesPage v-else />
   </main>
 </template>

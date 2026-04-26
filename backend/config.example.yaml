@@ -7,14 +7,10 @@ redis:
   db: 0
   tls_enabled: false
 redis_prefix: "vote:button:"
-button_poll_interval_ms: 3000
 rate_limit:
   limit: 42
   window_ms: 2000
   blacklist_ms: 600000
-critical_hit:
-  chance_percent: 5
-  count: 5
 admin:
   username: "root"
   password: "123456"
@@ -36,46 +32,3 @@ llm:
   base_url: "https://api.openai.com/v1"
   model: ""
   timeout_ms: 30000
-manual_click:
-  
-  # ---------- 票据/令牌配置 ----------
-  ticket_ttl_ms: 2000
-  # 票据有效期（毫秒）
-  # 每次点击前需要先申请票据，超过此时间未使用则失效
-  # 防止攻击者提前获取票据后延迟重放
-  # 2000ms = 2秒
-
-  # ---------- 限流配置 ----------
-  issue_limit_per_second: 15
-  # 票据颁发限流（每秒最多颁发几个票据）
-  # 限制攻击者无法在短时间内大量申请票据
-  # 6 = 每秒最多6次申请，超过则拒绝
-
-  consume_limit_per_second: 15
-  # 票据消费限流（每秒最多验证几个点击）
-  # 与颁发限流配合，形成双向速率控制
-  # 6 = 每秒最多处理6次点击，超过则拒绝
-
-  # ---------- 风险/封禁配置 ----------
-  risk_threshold: 5
-  # 风险累积阈值
-  # 每检测到一次异常行为，风险分+1
-  # 当风险分 >= 5 时，触发封禁
-  # 正常用户几乎不会累积任何风险分
-
-  ban_ms: 600000
-  # 封禁时长（毫秒）
-  # 触发封禁后，该用户在此时间内无法进行任何点击操作
-  # 600000ms = 10分钟
-
-  # ---------- 点击时长配置（按下到抬起的时间差）----------
-  min_press_duration_ms: 20
-  # 最小按下持续时间（毫秒）
-  # 人类正常点击至少需要20ms（极快点击）
-  # 脚本直接调用click()事件时，duration ≈ 0，会被拦截
-  # 低于此值 → 认定为脚本
-
-  max_press_duration_ms: 2000
-  # 最大按下持续时间（毫秒）
-  # 人类不可能按住一个按钮超过2秒还称为“点击”
-  # 超过此值 → 认定为异常（可能是卡键或脚本）

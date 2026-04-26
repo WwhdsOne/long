@@ -64,7 +64,6 @@ func affectsPublicState(changeType vote.StateChangeType) bool {
 	case vote.StateChangeButtonClicked,
 		vote.StateChangeBossChanged,
 		vote.StateChangeAnnouncementChanged,
-		vote.StateChangeButtonMetaChanged,
 		vote.StateChangeEquipmentMetaChanged:
 		return true
 	default:

@@ -14,26 +14,24 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
-	"long/internal/config"
 	nicknamefilter "long/internal/nickname"
 )
 
 // 错误定义
 
-var ErrButtonNotFound = errors.New("button not found")
 var ErrInvalidNickname = errors.New("invalid nickname")
 var ErrSensitiveNickname = errors.New("sensitive nickname")
 var ErrSensitiveContent = errors.New("sensitive content")
 var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
-var ErrEquipmentNotEnough = errors.New("equipment not enough")
-var ErrEquipmentMaxEnhance = errors.New("equipment max enhance")
-var ErrGemsNotEnough = errors.New("gems not enough")
-var ErrInvalidQuantity = errors.New("invalid quantity")
+var ErrEquipmentEnhanceMaxLevel = errors.New("equipment enhance max level")
+var ErrEquipmentEnhanceInsufficientGold = errors.New("equipment enhance insufficient gold")
+var ErrEquipmentEnhanceInsufficientStones = errors.New("equipment enhance insufficient stones")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
 var ErrBossPoolEmpty = errors.New("boss pool empty")
+var ErrBossPartsRequired = errors.New("boss parts required")
 var ErrBossPartNotFound = errors.New("boss part not found")
 var ErrBossPartAlreadyDead = errors.New("boss part already dead")
 var ErrTalentTreeNotSet = errors.New("talent tree not set")
@@ -41,7 +39,6 @@ var ErrTalentAlreadyLearned = errors.New("talent already learned")
 var ErrTalentPrerequisite = errors.New("talent prerequisite not met")
 var ErrTalentNotFound = errors.New("talent not found")
 var ErrTalentMaxLevel = errors.New("talent max level reached")
-var ErrInvalidPartType = errors.New("invalid part type")
 var ErrInvalidTalentTree = errors.New("invalid talent tree")
 
 const (
@@ -50,19 +47,6 @@ const (
 
 	bossPartClickSlugPrefix = "boss-part:"
 )
-
-// Button 按钮数据结构，返回给前端和 SSE 客户端
-type Button struct {
-	Key       string   `json:"key"`
-	RedisKey  string   `json:"redisKey"`
-	Label     string   `json:"label"`
-	Count     int64    `json:"count"`
-	Sort      int      `json:"sort"`
-	Enabled   bool     `json:"enabled"`
-	Tags      []string `json:"tags,omitempty"`
-	ImagePath string   `json:"imagePath,omitempty"`
-	ImageAlt  string   `json:"imageAlt,omitempty"`
-}
 
 // UserStats 用户统计信息
 type UserStats struct {
@@ -115,15 +99,17 @@ type BossPart struct {
 
 // Boss 世界 Boss 状态
 type Boss struct {
-	ID         string     `json:"id"`
-	TemplateID string     `json:"templateId,omitempty"`
-	Name       string     `json:"name"`
-	Status     string     `json:"status"`
-	MaxHP      int64      `json:"maxHp"`
-	CurrentHP  int64      `json:"currentHp"`
-	Parts      []BossPart `json:"parts,omitempty"`
-	StartedAt  int64      `json:"startedAt,omitempty"`
-	DefeatedAt int64      `json:"defeatedAt,omitempty"`
+	ID          string     `json:"id"`
+	TemplateID  string     `json:"templateId,omitempty"`
+	Name        string     `json:"name"`
+	Status      string     `json:"status"`
+	MaxHP       int64      `json:"maxHp"`
+	CurrentHP   int64      `json:"currentHp"`
+	GoldOnKill  int64      `json:"goldOnKill"`
+	StoneOnKill int64      `json:"stoneOnKill"`
+	Parts       []BossPart `json:"parts,omitempty"`
+	StartedAt   int64      `json:"startedAt,omitempty"`
+	DefeatedAt  int64      `json:"defeatedAt,omitempty"`
 }
 
 // BossLeaderboardEntry Boss 伤害榜
@@ -137,6 +123,7 @@ type BossLeaderboardEntry struct {
 type BossUserStats struct {
 	Nickname string `json:"nickname"`
 	Damage   int64  `json:"damage"`
+	Rank     int    `json:"rank"`
 }
 
 // EquipmentDefinition 装备模板
@@ -150,6 +137,7 @@ type EquipmentDefinition struct {
 	ImageAlt             string  `json:"imageAlt,omitempty"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
+	CritRate             float64 `json:"critRate"` // 暴击率
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
@@ -190,6 +178,7 @@ type MessagePage struct {
 // InventoryItem 背包道具
 type InventoryItem struct {
 	ItemID               string  `json:"itemId"`
+	InstanceID           string  `json:"instanceId,omitempty"`
 	Name                 string  `json:"name"`
 	Slot                 string  `json:"slot"`
 	Rarity               string  `json:"rarity"`
@@ -197,12 +186,25 @@ type InventoryItem struct {
 	ImageAlt             string  `json:"imageAlt,omitempty"`
 	Quantity             int64   `json:"quantity"`
 	Equipped             bool    `json:"equipped"`
+	EnhanceLevel         int     `json:"enhanceLevel,omitempty"`
+	Bound                bool    `json:"bound,omitempty"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
+	CritRate             float64 `json:"critRate,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
+}
+
+// ItemInstance 装备实例
+type ItemInstance struct {
+	InstanceID   string `json:"instanceId"`
+	ItemID       string `json:"itemId"`
+	EnhanceLevel int    `json:"enhanceLevel"`
+	SpentStones  int64  `json:"spentStones"`
+	Bound        bool   `json:"bound"`
+	CreatedAt    int64  `json:"createdAt"`
 }
 
 // Loadout 已穿戴装备
@@ -246,6 +248,8 @@ type BossLootEntry struct {
 	ItemName             string  `json:"itemName"`
 	Slot                 string  `json:"slot"`
 	Rarity               string  `json:"rarity"`
+	ImagePath            string  `json:"imagePath,omitempty"`
+	ImageAlt             string  `json:"imageAlt,omitempty"`
 	Weight               int64   `json:"weight"`
 	DropRatePercent      float64 `json:"dropRatePercent"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
@@ -262,12 +266,19 @@ type BossResources struct {
 	BossID     string          `json:"bossId,omitempty"`
 	TemplateID string          `json:"templateId,omitempty"`
 	Status     string          `json:"status,omitempty"`
+	GoldRange  ResourceRange   `json:"goldRange"`
+	StoneRange ResourceRange   `json:"stoneRange"`
 	BossLoot   []BossLootEntry `json:"bossLoot"`
+}
+
+// ResourceRange 掉落资源显示区间。
+type ResourceRange struct {
+	Min int64 `json:"min"`
+	Max int64 `json:"max"`
 }
 
 // Snapshot 公共实时状态，广播给所有连接的客户端
 type Snapshot struct {
-	Buttons             []Button               `json:"buttons"`
 	TotalVotes          int64                  `json:"totalVotes"`
 	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
 	Boss                *Boss                  `json:"boss,omitempty"`
@@ -283,13 +294,14 @@ type UserState struct {
 	Loadout       Loadout         `json:"loadout"`
 	CombatStats   CombatStats     `json:"combatStats"`
 	Gems          int64           `json:"gems"`
+	Gold          int64           `json:"gold"`
+	Stones        int64           `json:"stones"`
 	RecentRewards []Reward        `json:"recentRewards,omitempty"`
 	LastReward    *Reward         `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
 type State struct {
-	Buttons             []Button               `json:"buttons"`
 	TotalVotes          int64                  `json:"totalVotes"`
 	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
 	UserStats           *UserStats             `json:"userStats,omitempty"`
@@ -303,15 +315,34 @@ type State struct {
 	Loadout             Loadout                `json:"loadout"`
 	CombatStats         CombatStats            `json:"combatStats"`
 	Gems                int64                  `json:"gems"`
+	Gold                int64                  `json:"gold"`
+	Stones              int64                  `json:"stones"`
 	RecentRewards       []Reward               `json:"recentRewards,omitempty"`
 	LastReward          *Reward                `json:"lastReward,omitempty"`
 }
 
+// AfkSettlement 挂机结算汇总。
+type AfkSettlement struct {
+	Kills      int64    `json:"kills"`
+	GoldTotal  int64    `json:"goldTotal"`
+	StoneTotal int64    `json:"stoneTotal"`
+	StartedAt  int64    `json:"startedAt"`
+	EndedAt    int64    `json:"endedAt"`
+	Rewards    []Reward `json:"rewards,omitempty"`
+}
+
+// SalvageResult 装备分解结果。
+type SalvageResult struct {
+	ItemID         string `json:"itemId"`
+	RefundedStones int64  `json:"refundedStones"`
+	Stones         int64  `json:"stones"`
+}
+
 // ClickResult 点击结果，包含更新后的增量与状态摘要
 type ClickResult struct {
-	Button           Button                 `json:"button"`
 	Delta            int64                  `json:"delta"`
 	BossDamage       int64                  `json:"bossDamage,omitempty"`
+	DamageType       string                 `json:"damageType,omitempty"`
 	Critical         bool                   `json:"critical"`
 	UserStats        UserStats              `json:"userStats"`
 	Boss             *Boss                  `json:"boss,omitempty"`
@@ -332,7 +363,6 @@ const (
 	StateChangeAnnouncementChanged  StateChangeType = "announcement_changed"
 	StateChangeMessageCreated       StateChangeType = "message_created"
 	StateChangeMessageDeleted       StateChangeType = "message_deleted"
-	StateChangeButtonMetaChanged    StateChangeType = "button_meta_changed"
 	StateChangeEquipmentMetaChanged StateChangeType = "equipment_meta_changed"
 )
 
@@ -350,58 +380,42 @@ type StoreOptions struct {
 	CriticalCount         int64
 }
 
-// buttonFallback 按钮回退数据（用于图片等元数据）
-type buttonFallback struct {
-	Label     string
-	ImagePath string
-	ImageAlt  string
-}
-
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
 type Store struct {
-	client               redis.UniversalClient
-	prefix               string
-	namespace            string
-	buttonIndexKey       string
-	equipmentIndexKey    string
-	playerIndexKey       string
-	userPrefix           string
-	leaderboardKey       string
-	bossCurrentKey       string
-	bossHistoryKey       string
-	bossHistoryPrefix    string
-	bossTemplateIndexKey string
-	bossTemplatePrefix   string
-	bossCycleKey         string
-	bossInstanceSeqKey   string
-	announcementSeqKey   string
-	announcementKey      string
-	announcementPrefix   string
-	messageSeqKey        string
-	messageKey           string
-	messagePrefix        string
-	equipmentDefPrefix   string
-	inventoryPrefix      string
-	loadoutPrefix        string
-	lastRewardPrefix     string
-	fallbacks            map[string]buttonFallback
-	critical             StoreOptions
-	luaRunner            luaScriptRunner
-	bossClickScript      *cachedLuaScript
-	roll                 func(int) int
-	now                  func() time.Time
-	validator            interface{ Validate(string) error }
-}
-
-// hashFields Redis Hash 中存储的字段列表
-var hashFields = []string{
-	"label",
-	"count",
-	"sort",
-	"enabled",
-	"tags",
-	"image_path",
-	"image_alt",
+	client                  redis.UniversalClient
+	namespace               string
+	equipmentIndexKey       string
+	playerIndexKey          string
+	userPrefix              string
+	leaderboardKey          string
+	bossCurrentKey          string
+	bossHistoryKey          string
+	bossHistoryPrefix       string
+	bossTemplateIndexKey    string
+	bossTemplatePrefix      string
+	bossCycleKey            string
+	bossInstanceSeqKey      string
+	announcementSeqKey      string
+	announcementKey         string
+	announcementPrefix      string
+	messageSeqKey           string
+	messageKey              string
+	messagePrefix           string
+	equipmentDefPrefix      string
+	equipmentInstancePrefix string
+	inventoryPrefix         string
+	playerInstancesPrefix   string
+	loadoutPrefix           string
+	lastRewardPrefix        string
+	equipmentInstanceSeqKey string
+	equipmentSpentPrefix    string
+	equipmentEnhancePrefix  string
+	critical                StoreOptions
+	luaRunner               luaScriptRunner
+	bossClickScript         *cachedLuaScript
+	roll                    func(int) int
+	now                     func() time.Time
+	validator               interface{ Validate(string) error }
 }
 
 // NewStore 创建 Redis 投票存储实例
@@ -409,38 +423,35 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 	luaCache := newLuaScriptCache()
 
 	return &Store{
-		client:               client,
-		prefix:               namespace + "button:",
-		namespace:            namespace,
-		buttonIndexKey:       namespace + "buttons:index",
-		equipmentIndexKey:    namespace + "equipment:index",
-		playerIndexKey:       namespace + "players:index",
-		userPrefix:           namespace + "user:",
-		leaderboardKey:       namespace + "leaderboard",
-		bossCurrentKey:       namespace + "boss:current",
-		bossHistoryKey:       namespace + "boss:history",
-		bossHistoryPrefix:    namespace + "boss:history:",
-		bossTemplateIndexKey: namespace + "boss:pool:index",
-		bossTemplatePrefix:   namespace + "boss:pool:",
-		bossCycleKey:         namespace + "boss:cycle",
-		bossInstanceSeqKey:   namespace + "boss:instance:seq",
-		announcementSeqKey:   namespace + "announcement:seq",
-		announcementKey:      namespace + "announcements",
-		announcementPrefix:   namespace + "announcement:",
-		messageSeqKey:        namespace + "message:seq",
-		messageKey:           namespace + "messages",
-		messagePrefix:        namespace + "message:",
-		equipmentDefPrefix:   namespace + "equip:def:",
-		inventoryPrefix:      namespace + "user-inventory:",
-		loadoutPrefix:        namespace + "user-loadout:",
-		lastRewardPrefix:     namespace + "user-last-reward:",
-		fallbacks: map[string]buttonFallback{
-			"wechat-pity": {
-				ImagePath: "/images/emojipedia-wechat-whimper.png",
-				ImageAlt:  "微信可怜表情",
-			},
-		},
-		critical: options,
+		client:                  client,
+		namespace:               namespace,
+		equipmentIndexKey:       namespace + "equipment:index",
+		playerIndexKey:          namespace + "players:index",
+		userPrefix:              namespace + "user:",
+		leaderboardKey:          namespace + "leaderboard",
+		bossCurrentKey:          namespace + "boss:current",
+		bossHistoryKey:          namespace + "boss:history",
+		bossHistoryPrefix:       namespace + "boss:history:",
+		bossTemplateIndexKey:    namespace + "boss:pool:index",
+		bossTemplatePrefix:      namespace + "boss:pool:",
+		bossCycleKey:            namespace + "boss:cycle",
+		bossInstanceSeqKey:      namespace + "boss:instance:seq",
+		announcementSeqKey:      namespace + "announcement:seq",
+		announcementKey:         namespace + "announcements",
+		announcementPrefix:      namespace + "announcement:",
+		messageSeqKey:           namespace + "message:seq",
+		messageKey:              namespace + "messages",
+		messagePrefix:           namespace + "message:",
+		equipmentDefPrefix:      namespace + "equip:def:",
+		equipmentInstancePrefix: namespace + "instance:",
+		inventoryPrefix:         namespace + "user-inventory:",
+		playerInstancesPrefix:   namespace + "player-instances:",
+		loadoutPrefix:           namespace + "user-loadout:",
+		lastRewardPrefix:        namespace + "user-last-reward:",
+		equipmentInstanceSeqKey: namespace + "instance:seq",
+		equipmentSpentPrefix:    namespace + "user-equipment-spent:",
+		equipmentEnhancePrefix:  namespace + "user-equipment-enhance:",
+		critical:                options,
 		luaRunner: redisLuaRunner{
 			client: client,
 		},
@@ -459,22 +470,11 @@ func (s *Store) ValidateNickname(_ context.Context, nickname string) error {
 	return err
 }
 
-// GetSnapshot 获取公共快照（按钮列表 + 公共排行榜 + Boss 状态）
+// GetSnapshot 获取公共快照（公共排行榜 + Boss 状态）
 func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
-	buttons, err := s.ListButtons(ctx)
-	if err != nil {
-		return Snapshot{}, err
-	}
-	buttonTotalVotes := int64(0)
-	for _, button := range buttons {
-		buttonTotalVotes += button.Count
-	}
 	totalVotes, err := s.totalClickCount(ctx)
 	if err != nil {
 		return Snapshot{}, err
-	}
-	if totalVotes == 0 {
-		totalVotes = buttonTotalVotes
 	}
 
 	leaderboard, err := s.ListLeaderboard(ctx, 10)
@@ -501,7 +501,6 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	}
 
 	return Snapshot{
-		Buttons:             buttons,
 		TotalVotes:          totalVotes,
 		Leaderboard:         leaderboard,
 		Boss:                boss,
@@ -544,11 +543,13 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		return UserState{}, err
 	}
 
-	gems, err := s.gemsForNickname(ctx, normalizedNickname)
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
 	if err != nil {
 		return UserState{}, err
 	}
-	userState.Gems = gems
+	userState.Gems = resources.Gems
+	userState.Gold = resources.Gold
+	userState.Stones = resources.Stones
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
 	if err != nil {
@@ -556,18 +557,13 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	}
 	userState.UserStats = &userStats
 
-	quantities, err := s.inventoryQuantities(ctx, normalizedNickname)
-	if err != nil {
-		return UserState{}, err
-	}
-
-	loadout, equipped, err := s.loadoutForNickname(ctx, normalizedNickname, quantities)
+	loadout, equipped, err := s.loadoutForNickname(ctx, normalizedNickname)
 	if err != nil {
 		return UserState{}, err
 	}
 	userState.Loadout = loadout
 
-	inventory, err := s.inventoryForNickname(ctx, normalizedNickname, quantities, equipped)
+	inventory, err := s.inventoryForNickname(ctx, normalizedNickname, equipped)
 	if err != nil {
 		return UserState{}, err
 	}
@@ -603,127 +599,17 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	return userState, nil
 }
 
-// ListButtons 扫描 Redis，过滤禁用按钮，按排序权重返回
-func (s *Store) ListButtons(ctx context.Context) ([]Button, error) {
-	keys, err := s.listButtonKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(keys) == 0 {
-		return []Button{}, nil
-	}
-
-	pipe := s.client.Pipeline()
-	cmds := make([]*redis.SliceCmd, len(keys))
-	for index, redisKey := range keys {
-		cmds[index] = pipe.HMGet(ctx, redisKey, hashFields...)
-	}
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		return nil, err
-	}
-
-	buttons := make([]Button, 0, len(keys))
-	for index, redisKey := range keys {
-		button := s.normalizeButton(redisKey, cmds[index].Val())
-		if button.Enabled {
-			buttons = append(buttons, button)
-		}
-	}
-
-	slices.SortFunc(buttons, func(left, right Button) int {
-		if left.Sort == right.Sort {
-			return strings.Compare(left.Key, right.Key)
-		}
-		if left.Sort < right.Sort {
-			return -1
-		}
-		return 1
-	})
-
-	return buttons, nil
-}
-
-// ClickButton 处理按钮点击。无活动 Boss 时只更新投票；有活动 Boss 时附加结算伤害与掉落。
+// ClickButton 处理 Boss 部位点击。slug 必须以 boss-part: 开头。
 func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (ClickResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return ClickResult{}, err
 	}
 	slug = strings.TrimSpace(slug)
-	if strings.HasPrefix(slug, bossPartClickSlugPrefix) {
-		return s.clickBossPart(ctx, slug, normalizedNickname)
+	if !strings.HasPrefix(slug, bossPartClickSlugPrefix) {
+		return ClickResult{}, fmt.Errorf("button not available")
 	}
-
-	redisKey := s.prefix + slug
-	currentValues, err := s.client.HMGet(ctx, redisKey, hashFields...).Result()
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	current := s.normalizeButton(redisKey, currentValues)
-	if current.Key == slug && current.Label == slug && current.Count == 0 && current.Sort == 0 && !current.Enabled {
-		exists, existsErr := s.client.Exists(ctx, redisKey).Result()
-		if existsErr != nil {
-			return ClickResult{}, existsErr
-		}
-		if exists == 0 {
-			return ClickResult{}, ErrButtonNotFound
-		}
-	}
-	if !current.Enabled {
-		return ClickResult{}, ErrButtonNotFound
-	}
-
-	delta, critical, err := s.nextIncrement(ctx, normalizedNickname)
-	if err != nil {
-		return ClickResult{}, err
-	}
-	boss, err := s.currentBoss(ctx)
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	var result ClickResult
-	if boss == nil || boss.Status != bossStatusActive {
-		result, err = s.applyVoteOnlyClick(ctx, redisKey, normalizedNickname, delta, critical)
-		if err != nil {
-			return ClickResult{}, err
-		}
-	} else {
-		result, err = s.applyBossClick(ctx, current, boss, normalizedNickname, delta, critical)
-		if err != nil {
-			return ClickResult{}, err
-		}
-	}
-
-	if result.Boss != nil {
-		leaderboard, err := s.ListBossLeaderboard(ctx, result.Boss.ID, 10)
-		if err != nil {
-			return ClickResult{}, err
-		}
-		result.BossLeaderboard = leaderboard
-
-		myBossStats, err := s.bossStatsForNickname(ctx, result.Boss.ID, normalizedNickname)
-		if err != nil {
-			return ClickResult{}, err
-		}
-		result.MyBossStats = myBossStats
-	}
-
-	if result.BroadcastUserAll {
-		recentRewards, err := s.recentRewardsForNickname(ctx, normalizedNickname)
-		if err != nil {
-			return ClickResult{}, err
-		}
-		result.RecentRewards = recentRewards
-		if len(recentRewards) > 0 {
-			result.LastReward = new(recentRewards[len(recentRewards)-1])
-		}
-	}
-
-	return result, nil
+	return s.clickBossPart(ctx, slug, normalizedNickname)
 }
 
 // ClickBossPart 处理不绑定按钮的 Boss 部位手动点击。
@@ -735,37 +621,30 @@ func (s *Store) ClickBossPart(ctx context.Context, target string, nickname strin
 	return s.clickBossPart(ctx, target, normalizedNickname)
 }
 
-// EquipItem 穿戴一件装备。装备效果会影响平时点击与 Boss 伤害。
-func (s *Store) EquipItem(ctx context.Context, nickname string, itemID string) (State, error) {
+// EquipItem 穿戴一件装备实例。装备效果会影响平时点击与 Boss 伤害。
+func (s *Store) EquipItem(ctx context.Context, nickname string, instanceID string) (State, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return State{}, err
 	}
 
-	itemID = strings.TrimSpace(itemID)
-	if itemID == "" {
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
 		return State{}, ErrEquipmentNotFound
 	}
 
-	definition, err := s.getEquipmentDefinition(ctx, itemID)
+	instance, err := s.getOwnedInstance(ctx, normalizedNickname, instanceID)
 	if err != nil {
 		return State{}, err
 	}
-
-	quantity, err := s.client.HGet(ctx, s.inventoryKey(normalizedNickname), itemID).Int64()
+	definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
-			return State{}, ErrEquipmentNotOwned
-		}
 		return State{}, err
-	}
-	if quantity <= 0 {
-		return State{}, ErrEquipmentNotOwned
 	}
 
 	now := time.Now().Unix()
 	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.loadoutKey(normalizedNickname), definition.Slot, itemID)
+	pipe.HSet(ctx, s.loadoutKey(normalizedNickname), definition.Slot, instance.InstanceID)
 	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
 		Score:  float64(now),
 		Member: normalizedNickname,
@@ -777,19 +656,23 @@ func (s *Store) EquipItem(ctx context.Context, nickname string, itemID string) (
 	return s.GetState(ctx, normalizedNickname)
 }
 
-// UnequipItem 卸下一件当前已穿戴的装备。
-func (s *Store) UnequipItem(ctx context.Context, nickname string, itemID string) (State, error) {
+// UnequipItem 卸下一件当前已穿戴的装备实例。
+func (s *Store) UnequipItem(ctx context.Context, nickname string, instanceID string) (State, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return State{}, err
 	}
 
-	itemID = strings.TrimSpace(itemID)
-	if itemID == "" {
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
 		return State{}, ErrEquipmentNotFound
 	}
 
-	definition, err := s.getEquipmentDefinition(ctx, itemID)
+	instance, err := s.getOwnedInstance(ctx, normalizedNickname, instanceID)
+	if err != nil {
+		return State{}, err
+	}
+	definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
 	if err != nil {
 		return State{}, err
 	}
@@ -806,6 +689,116 @@ func (s *Store) UnequipItem(ctx context.Context, nickname string, itemID string)
 	}
 
 	return s.GetState(ctx, normalizedNickname)
+}
+
+// EnhanceItem 强化一件装备实例，消耗金币和强化石并提升等级。
+func (s *Store) EnhanceItem(ctx context.Context, nickname string, instanceID string) (State, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return State{}, err
+	}
+
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return State{}, ErrEquipmentNotFound
+	}
+
+	instance, err := s.getOwnedInstance(ctx, normalizedNickname, instanceID)
+	if err != nil {
+		return State{}, err
+	}
+
+	definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
+	if err != nil {
+		return State{}, err
+	}
+
+	maxLevel := maxEnhanceLevel(definition.Rarity)
+	if instance.EnhanceLevel >= maxLevel {
+		return State{}, ErrEquipmentEnhanceMaxLevel
+	}
+
+	goldCost := enhanceGoldCost(instance.EnhanceLevel)
+	stoneCost := enhanceStoneCost(instance.EnhanceLevel)
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return State{}, err
+	}
+	if resources.Gold < goldCost {
+		return State{}, ErrEquipmentEnhanceInsufficientGold
+	}
+	if resources.Stones < stoneCost {
+		return State{}, ErrEquipmentEnhanceInsufficientStones
+	}
+
+	now := time.Now().Unix()
+	pipe := s.client.TxPipeline()
+	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "gold", -goldCost)
+	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", -stoneCost)
+	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "spent_stones", stoneCost)
+	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "enhance_level", 1)
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: normalizedNickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
+		return State{}, err
+	}
+
+	return s.GetState(ctx, normalizedNickname)
+}
+
+// SalvageItem 分解装备实例，返还已消耗强化石的 60%（向下取整）。
+func (s *Store) SalvageItem(ctx context.Context, nickname string, instanceID string) (SalvageResult, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return SalvageResult{}, err
+	}
+
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return SalvageResult{}, ErrEquipmentNotFound
+	}
+
+	instance, err := s.getOwnedInstance(ctx, normalizedNickname, instanceID)
+	if err != nil {
+		return SalvageResult{}, err
+	}
+	definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
+	if err != nil {
+		return SalvageResult{}, err
+	}
+
+	refund := int64(math.Floor(float64(maxInt64(0, instance.SpentStones)) * 0.6))
+
+	pipe := s.client.TxPipeline()
+	pipe.SRem(ctx, s.playerInstancesKey(normalizedNickname), instance.InstanceID)
+	pipe.Del(ctx, s.equipmentInstanceKey(instance.InstanceID))
+	if refund > 0 {
+		pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", refund)
+	}
+	if definition.Slot != "" {
+		equippedRef, getErr := s.client.HGet(ctx, s.loadoutKey(normalizedNickname), definition.Slot).Result()
+		if getErr != nil && !errors.Is(getErr, redis.Nil) {
+			return SalvageResult{}, getErr
+		}
+		if strings.TrimSpace(equippedRef) == instance.InstanceID {
+			pipe.HDel(ctx, s.loadoutKey(normalizedNickname), definition.Slot)
+		}
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return SalvageResult{}, err
+	}
+
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return SalvageResult{}, err
+	}
+	return SalvageResult{
+		ItemID:         instance.ItemID,
+		RefundedStones: refund,
+		Stones:         resources.Stones,
+	}, nil
 }
 
 // GetCurrentBoss 返回当前世界 Boss。
@@ -842,41 +835,6 @@ func (s *Store) ListBossLeaderboard(ctx context.Context, bossID string, limit in
 	}
 
 	return leaderboard, nil
-}
-
-// EnsureDefaults 在 Redis 为空时初始化默认按钮
-func (s *Store) EnsureDefaults(ctx context.Context, buttons []config.ButtonSeed) error {
-	keys, err := s.listButtonKeys(ctx)
-	if err != nil {
-		return err
-	}
-	if len(keys) > 0 {
-		return nil
-	}
-
-	pipe := s.client.Pipeline()
-	for _, button := range buttons {
-		values := map[string]any{
-			"label":   button.Label,
-			"count":   "0",
-			"sort":    strconv.Itoa(button.Sort),
-			"enabled": "1",
-		}
-		if button.ImagePath != "" {
-			values["image_path"] = button.ImagePath
-		}
-		if button.ImageAlt != "" {
-			values["image_alt"] = button.ImageAlt
-		}
-		pipe.HSet(ctx, s.prefix+button.Slug, values)
-		pipe.ZAdd(ctx, s.buttonIndexKey, redis.Z{
-			Score:  float64(button.Sort),
-			Member: button.Slug,
-		})
-	}
-
-	_, err = pipe.Exec(ctx)
-	return err
 }
 
 // ListLeaderboard 获取排行榜前 N 名
@@ -953,7 +911,6 @@ func (s *Store) GetUserStats(ctx context.Context, nickname string) (UserStats, e
 // ComposeState 将公共快照与个人态组合成完整状态。
 func ComposeState(snapshot Snapshot, userState UserState) State {
 	return State{
-		Buttons:             snapshot.Buttons,
 		TotalVotes:          snapshot.TotalVotes,
 		Leaderboard:         snapshot.Leaderboard,
 		UserStats:           userState.UserStats,
@@ -965,44 +922,11 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Loadout:             userState.Loadout,
 		CombatStats:         userState.CombatStats,
 		Gems:                userState.Gems,
+		Gold:                userState.Gold,
+		Stones:              userState.Stones,
 		RecentRewards:       userState.RecentRewards,
 		LastReward:          userState.LastReward,
 	}
-}
-
-func (s *Store) applyVoteOnlyClick(ctx context.Context, redisKey string, nickname string, delta int64, critical bool) (ClickResult, error) {
-	now := time.Now().Unix()
-	pipe := s.client.TxPipeline()
-	pipe.HIncrBy(ctx, redisKey, "count", delta)
-	userCountCmd := pipe.HIncrBy(ctx, s.userPrefix+nickname, "click_count", delta)
-	pipe.HSet(ctx, s.userPrefix+nickname, map[string]any{
-		"nickname":   nickname,
-		"updated_at": strconv.FormatInt(now, 10),
-	})
-	pipe.ZIncrBy(ctx, s.leaderboardKey, float64(delta), nickname)
-	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
-		Score:  float64(now),
-		Member: nickname,
-	})
-
-	if _, err := pipe.Exec(ctx); err != nil {
-		return ClickResult{}, err
-	}
-
-	updatedValues, err := s.client.HMGet(ctx, redisKey, hashFields...).Result()
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	return ClickResult{
-		Button:   s.normalizeButton(redisKey, updatedValues),
-		Delta:    delta,
-		Critical: critical,
-		UserStats: UserStats{
-			Nickname:   nickname,
-			ClickCount: userCountCmd.Val(),
-		},
-	}, nil
 }
 
 func (s *Store) applyClickCountOnly(ctx context.Context, nickname string, delta int64, critical bool) (ClickResult, error) {
@@ -1033,84 +957,12 @@ func (s *Store) applyClickCountOnly(ctx context.Context, nickname string, delta 
 	}, nil
 }
 
-func (s *Store) applyBossClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
-	if boss == nil || boss.Status != bossStatusActive {
-		return s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, delta, critical)
-	}
-	if len(boss.Parts) > 0 {
-		return s.applyBossPartClick(ctx, current, boss, nickname, delta, critical)
-	}
-
-	now := time.Now().Unix()
-	scriptResult, err := s.bossClickScript.Run(ctx, s.luaRunner, []string{
-		current.RedisKey,
-		s.userPrefix + nickname,
-		s.leaderboardKey,
-		s.playerIndexKey,
-		s.bossCurrentKey,
-		s.bossDamageKey(boss.ID),
-	}, delta, nickname, now, boss.ID, now)
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	values, ok := scriptResult.([]any)
-	if !ok || len(values) < 3 {
-		return ClickResult{}, fmt.Errorf("unexpected boss click script result: %T", scriptResult)
-	}
-
-	button := current
-	button.Count = int64Value(values, 1)
-
-	result := ClickResult{
-		Button:   button,
-		Delta:    delta,
-		Critical: critical,
-		UserStats: UserStats{
-			Nickname:   nickname,
-			ClickCount: int64Value(values, 2),
-		},
-	}
-
-	if int64Value(values, 0) == 0 {
-		return result, nil
-	}
-
-	result.Boss = &Boss{
-		ID:         stringValue(values, 3),
-		TemplateID: stringValue(values, 4),
-		Name:       stringValue(values, 5),
-		Status:     stringValue(values, 6),
-		MaxHP:      int64Value(values, 7),
-		CurrentHP:  int64Value(values, 8),
-		StartedAt:  int64FromString(stringValue(values, 9)),
-		DefeatedAt: int64FromString(stringValue(values, 10)),
-	}
-
-	if result.Boss.Status == bossStatusDefeated {
-		result.BroadcastUserAll = true
-		nextBoss, finalizeErr := s.finalizeBossKill(ctx, result.Boss)
-		if finalizeErr != nil {
-			return ClickResult{}, finalizeErr
-		}
-		if nextBoss != nil {
-			result.Boss = nextBoss
-		}
-	}
-
-	return result, nil
-}
-
-func (s *Store) applyBossPartClick(ctx context.Context, current Button, boss *Boss, nickname string, delta int64, critical bool) (ClickResult, error) {
-	result, err := s.applyVoteOnlyClick(ctx, current.RedisKey, nickname, 1, critical)
-	if err != nil {
-		return ClickResult{}, err
-	}
-
-	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, -1)
-}
-
 func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string) (ClickResult, error) {
+	return s.AttackBossPartAFK(ctx, nickname)
+}
+
+// AttackBossPartAFK 执行一次挂机攻击，不增加点击数，伤害按攻击力*0.5 向下取整。
+func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return ClickResult{}, err
@@ -1122,12 +974,103 @@ func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string
 	if boss == nil || boss.Status != bossStatusActive || len(boss.Parts) == 0 {
 		return ClickResult{}, nil
 	}
-	return s.applyBossPartDamage(ctx, boss, normalizedNickname, false, ClickResult{
-		Delta: 0,
+
+	loadout, _, err := s.loadoutForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return ClickResult{}, nil
+	}
+	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
+	if err != nil {
+		return ClickResult{}, nil
+	}
+
+	targetIdx := s.selectTargetPart(boss.Parts, normalizedNickname)
+	if targetIdx < 0 {
+		return ClickResult{}, nil
+	}
+	part := &boss.Parts[targetIdx]
+	if !part.Alive || part.CurrentHP <= 0 {
+		return ClickResult{}, nil
+	}
+
+	damage := int64(math.Floor(float64(maxInt64(0, combatStats.AttackPower)) * 0.5))
+	if damage < 0 {
+		damage = 0
+	}
+	actualDamage := damage
+	if actualDamage > part.CurrentHP {
+		actualDamage = part.CurrentHP
+	}
+	part.CurrentHP -= damage
+	if part.CurrentHP < 0 {
+		part.CurrentHP = 0
+	}
+	if part.CurrentHP <= 0 {
+		part.Alive = false
+	}
+
+	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+	allDead := true
+	for _, p := range boss.Parts {
+		if p.Alive {
+			allDead = false
+			break
+		}
+	}
+	if allDead {
+		boss.Status = bossStatusDefeated
+		boss.DefeatedAt = s.now().Unix()
+	}
+
+	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
+	if marshalErr != nil {
+		return ClickResult{}, nil
+	}
+	bossValues := map[string]any{
+		"parts":      string(partsRaw),
+		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
+		"status":     boss.Status,
+	}
+	if boss.DefeatedAt != 0 {
+		bossValues["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
+	if actualDamage > 0 {
+		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(actualDamage), normalizedNickname)
+	}
+	if _, execErr := pipe.Exec(ctx); execErr != nil {
+		return ClickResult{}, nil
+	}
+
+	result := ClickResult{
+		Delta:      0,
+		Boss:       boss,
+		BossDamage: actualDamage,
+		DamageType: resolveBossDamageType(resolveBossDamageTypeInput{
+			PartType:    part.Type,
+			Critical:    false,
+			BossDamage:  actualDamage,
+			BossMaxHP:   boss.MaxHP,
+			IsAfkAttack: true,
+		}),
 		UserStats: UserStats{
 			Nickname: normalizedNickname,
 		},
-	}, -1)
+	}
+
+	if allDead {
+		result.BroadcastUserAll = true
+		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss, true)
+		if finalizeErr != nil {
+			return result, nil
+		}
+		if nextBoss != nil {
+			result.Boss = nextBoss
+		}
+	}
+	return result, nil
 }
 
 func (s *Store) clickBossPart(ctx context.Context, target string, nickname string) (ClickResult, error) {
@@ -1161,21 +1104,11 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
-	result.Button = Button{
-		Key:     bossPartClickSlug(x, y),
-		Label:   bossPartDisplayLabel(part),
-		Enabled: true,
-	}
-
 	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx)
 }
 
 func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult, targetIdx int) (ClickResult, error) {
-	quantities, err := s.inventoryQuantities(ctx, nickname)
-	if err != nil {
-		return result, nil
-	}
-	loadout, _, err := s.loadoutForNickname(ctx, nickname, quantities)
+	loadout, _, err := s.loadoutForNickname(ctx, nickname)
 	if err != nil {
 		return result, nil
 	}
@@ -1227,6 +1160,13 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
 	result.BossDamage = actualDamage
 	result.Critical = critical
+	result.DamageType = resolveBossDamageType(resolveBossDamageTypeInput{
+		PartType:    part.Type,
+		Critical:    critical,
+		BossDamage:  actualDamage,
+		BossMaxHP:   boss.MaxHP,
+		IsAfkAttack: false,
+	})
 
 	allDead := true
 	for _, p := range boss.Parts {
@@ -1268,7 +1208,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	if allDead {
 		result.BroadcastUserAll = true
-		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss)
+		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss, false)
 		if finalizeErr != nil {
 			return result, nil
 		}
@@ -1343,7 +1283,41 @@ func bossPartDisplayLabel(part BossPart) string {
 	}
 }
 
-func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error) {
+type resolveBossDamageTypeInput struct {
+	PartType    PartType
+	Critical    bool
+	BossDamage  int64
+	BossMaxHP   int64
+	IsAfkAttack bool
+}
+
+func resolveBossDamageType(input resolveBossDamageTypeInput) string {
+	damage := maxInt64(0, input.BossDamage)
+	maxHP := maxInt64(1, input.BossMaxHP)
+	damageRatio := float64(damage) / float64(maxHP)
+
+	if damageRatio >= 0.2 {
+		return "doomsday"
+	}
+	if input.Critical && damageRatio >= 0.11 {
+		return "judgement"
+	}
+	if input.Critical && input.PartType == PartTypeWeak {
+		return "weakCritical"
+	}
+	if input.Critical {
+		return "critical"
+	}
+	if input.PartType == PartTypeHeavy {
+		return "trueDamage"
+	}
+	if input.IsAfkAttack {
+		return "pursuit"
+	}
+	return "normal"
+}
+
+func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) (*Boss, error) {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil, nil
 	}
@@ -1362,40 +1336,67 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 	if err != nil {
 		return nil, err
 	}
-	if len(lootEntries) > 0 {
-		participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
-		if err != nil {
-			return nil, err
+	participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	pipe := s.client.Pipeline()
+	now := s.now().Unix()
+	minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
+	goldBase := boss.GoldOnKill
+	stoneBase := boss.StoneOnKill
+	if afkMode {
+		goldBase = int64(math.Floor(float64(goldBase) * 0.5))
+		stoneBase = int64(math.Floor(float64(stoneBase) * 0.5))
+	}
+	for _, participant := range participants {
+		nickname, ok := participant.Member.(string)
+		if !ok || nickname == "" || participant.Score < float64(minDamage) {
+			continue
 		}
 
-		pipe := s.client.Pipeline()
-		now := s.now().Unix()
-		minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
-		for _, participant := range participants {
-			nickname, ok := participant.Member.(string)
-			if !ok || nickname == "" || participant.Score < float64(minDamage) {
-				continue
-			}
-
-			rewards := make([]Reward, 0, len(lootEntries))
-			for _, reward := range s.rollLootDrops(lootEntries) {
-				pipe.HIncrBy(ctx, s.inventoryKey(nickname), reward.ItemID, 1)
-				rewards = append(rewards, Reward{
-					BossID:    bossID,
-					BossName:  bossName,
-					ItemID:    reward.ItemID,
-					ItemName:  reward.ItemName,
-					GrantedAt: now,
-				})
-			}
-			if len(rewards) > 0 {
-				pipe.HSet(ctx, s.lastRewardKey(nickname), rewardRecordValues(rewards))
-			}
+		goldDelta := rollResourceReward(s.roll, goldBase, 0.75, 1.25)
+		stoneDelta := rollResourceReward(s.roll, stoneBase, 0.67, 1.33)
+		if goldDelta > 0 {
+			pipe.HIncrBy(ctx, s.gemKey(nickname), "gold", goldDelta)
+		}
+		if stoneDelta > 0 {
+			pipe.HIncrBy(ctx, s.gemKey(nickname), "stones", stoneDelta)
 		}
 
-		if _, err = pipe.Exec(ctx); err != nil {
-			return nil, err
+		if len(lootEntries) == 0 {
+			continue
 		}
+		rewards := make([]Reward, 0, len(lootEntries))
+		for _, reward := range s.rollLootDrops(lootEntries) {
+			instanceID, createErr := s.newEquipmentInstanceID(ctx)
+			if createErr != nil {
+				return nil, createErr
+			}
+			pipe.HSet(ctx, s.equipmentInstanceKey(instanceID), map[string]any{
+				"item_id":       reward.ItemID,
+				"enhance_level": "0",
+				"spent_stones":  "0",
+				"bound":         "0",
+				"created_at":    strconv.FormatInt(now, 10),
+			})
+			pipe.SAdd(ctx, s.playerInstancesKey(nickname), instanceID)
+			rewards = append(rewards, Reward{
+				BossID:    bossID,
+				BossName:  bossName,
+				ItemID:    reward.ItemID,
+				ItemName:  reward.ItemName,
+				GrantedAt: now,
+			})
+		}
+		if len(rewards) > 0 {
+			pipe.HSet(ctx, s.lastRewardKey(nickname), rewardRecordValues(rewards))
+		}
+	}
+
+	if _, err = pipe.Exec(ctx); err != nil {
+		return nil, err
 	}
 
 	if err := s.SaveBossToHistory(ctx, boss); err != nil {
@@ -1419,6 +1420,27 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss) (*Boss, error)
 	return s.currentBoss(ctx)
 }
 
+func rollResourceReward(roller func(int) int, base int64, minMultiplier float64, maxMultiplier float64) int64 {
+	if base <= 0 {
+		return 0
+	}
+	const rollSteps = 10000
+	delta := maxMultiplier - minMultiplier
+	if delta < 0 {
+		delta = 0
+	}
+	roll := 0
+	if roller != nil {
+		roll = roller(rollSteps)
+	}
+	multiplier := minMultiplier + float64(max(0, roll))*delta/float64(rollSteps)
+	result := int64(math.Floor(float64(base) * multiplier))
+	if result < 0 {
+		return 0
+	}
+	return result
+}
+
 func (s *Store) rollLootDrops(entries []BossLootEntry) []BossLootEntry {
 	if len(entries) == 0 {
 		return nil
@@ -1439,11 +1461,7 @@ func (s *Store) rollLootDrops(entries []BossLootEntry) []BossLootEntry {
 }
 
 func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool, error) {
-	quantities, err := s.inventoryQuantities(ctx, nickname)
-	if err != nil {
-		return 0, false, err
-	}
-	loadout, _, err := s.loadoutForNickname(ctx, nickname, quantities)
+	loadout, _, err := s.loadoutForNickname(ctx, nickname)
 	if err != nil {
 		return 0, false, err
 	}
@@ -1473,9 +1491,10 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loadout Loadout) (CombatStats, error) {
 	stats := s.baseCombatStats()
 
-	attackPower, armorPen, critDmgMult := loadoutBonuses(loadout)
+	attackPower, armorPen, critRate, critDmgMult := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 0.80)
+	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+critRate*100, 0, 100)
 	stats.CritDamageMultiplier += critDmgMult
 
 	result := deriveCombatStats(stats)
@@ -1486,14 +1505,14 @@ func (s *Store) baseCombatStats() CombatStats {
 	return deriveCombatStats(CombatStats{
 		CriticalChancePercent: clampFloat(float64(s.critical.CriticalChancePercent), 0, 100),
 		CriticalCount:         s.critical.CriticalCount,
-		AttackPower:           0,
+		AttackPower:           5,
 		ArmorPenPercent:       0,
 		CritDamageMultiplier:  1.0,
 		AllDamageAmplify:      0,
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critDmgMult float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64) {
 	items := []*InventoryItem{
 		loadout.Weapon,
 		loadout.Helmet,
@@ -1508,6 +1527,7 @@ func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critD
 		}
 		attackPower += item.AttackPower
 		armorPen += item.ArmorPenPercent
+		critRate += item.CritRate
 		critDmgMult += item.CritDamageMultiplier
 	}
 	return
@@ -1626,15 +1646,17 @@ func normalizeBoss(values map[string]string) *Boss {
 	}
 
 	return &Boss{
-		ID:         id,
-		TemplateID: strings.TrimSpace(values["template_id"]),
-		Name:       name,
-		Status:     strings.TrimSpace(values["status"]),
-		MaxHP:      int64FromString(values["max_hp"]),
-		CurrentHP:  int64FromString(values["current_hp"]),
-		Parts:      parts,
-		StartedAt:  int64FromString(values["started_at"]),
-		DefeatedAt: int64FromString(values["defeated_at"]),
+		ID:          id,
+		TemplateID:  strings.TrimSpace(values["template_id"]),
+		Name:        name,
+		Status:      strings.TrimSpace(values["status"]),
+		MaxHP:       int64FromString(values["max_hp"]),
+		CurrentHP:   int64FromString(values["current_hp"]),
+		GoldOnKill:  int64FromString(values["gold_on_kill"]),
+		StoneOnKill: int64FromString(values["stone_on_kill"]),
+		Parts:       parts,
+		StartedAt:   int64FromString(values["started_at"]),
+		DefeatedAt:  int64FromString(values["defeated_at"]),
 	}
 }
 
@@ -1651,10 +1673,21 @@ func (s *Store) bossStatsForNickname(ctx context.Context, bossID string, nicknam
 		return nil, err
 	}
 
-	return &BossUserStats{
+	stats := &BossUserStats{
 		Nickname: nickname,
 		Damage:   int64(score),
-	}, nil
+	}
+
+	rank, err := s.client.ZRevRank(ctx, s.bossDamageKey(bossID), nickname).Result()
+	if err != nil {
+		if !errors.Is(err, redis.Nil) {
+			return nil, err
+		}
+	} else {
+		stats.Rank = int(rank) + 1
+	}
+
+	return stats, nil
 }
 
 func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (EquipmentDefinition, error) {
@@ -1675,6 +1708,7 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		ImageAlt:             strings.TrimSpace(values["image_alt"]),
 		AttackPower:          int64FromString(values["attack_power"]),
 		ArmorPenPercent:      float64FromString(values["armor_pen_percent"]),
+		CritRate:             float64FromString(values["crit_rate"]),
 		CritDamageMultiplier: float64FromString(values["crit_damage_multiplier"]),
 		PartTypeDamageSoft:   float64FromString(values["part_type_damage_soft"]),
 		PartTypeDamageHeavy:  float64FromString(values["part_type_damage_heavy"]),
@@ -1683,47 +1717,118 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 	}, nil
 }
 
-func (s *Store) inventoryQuantities(ctx context.Context, nickname string) (map[string]int64, error) {
-	values, err := s.client.HGetAll(ctx, s.inventoryKey(nickname)).Result()
+func (s *Store) itemInstancesByIDForNickname(ctx context.Context, nickname string) (map[string]ItemInstance, error) {
+	instanceIDs, err := s.client.SMembers(ctx, s.playerInstancesKey(nickname)).Result()
+	if err != nil {
+		if isRedisWrongTypeError(err) {
+			return map[string]ItemInstance{}, nil
+		}
+		return nil, err
+	}
+	if len(instanceIDs) == 0 {
+		return map[string]ItemInstance{}, nil
+	}
+
+	instances := make(map[string]ItemInstance, len(instanceIDs))
+	for _, instanceID := range instanceIDs {
+		instanceID = strings.TrimSpace(instanceID)
+		if instanceID == "" {
+			continue
+		}
+		values, err := s.client.HGetAll(ctx, s.equipmentInstanceKey(instanceID)).Result()
+		if err != nil {
+			return nil, err
+		}
+		if len(values) == 0 {
+			continue
+		}
+		itemID := strings.TrimSpace(values["item_id"])
+		if itemID == "" {
+			continue
+		}
+		instance := ItemInstance{
+			InstanceID:   instanceID,
+			ItemID:       itemID,
+			EnhanceLevel: int(int64FromString(values["enhance_level"])),
+			SpentStones:  int64FromString(values["spent_stones"]),
+			Bound:        int64FromString(values["bound"]) > 0,
+			CreatedAt:    int64FromString(values["created_at"]),
+		}
+		instances[instanceID] = instance
+	}
+
+	return instances, nil
+}
+
+func (s *Store) getOwnedInstance(ctx context.Context, nickname string, ref string) (*ItemInstance, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return nil, ErrEquipmentNotFound
+	}
+
+	owned, err := s.client.SIsMember(ctx, s.playerInstancesKey(nickname), ref).Result()
+	if err != nil {
+		if isRedisWrongTypeError(err) {
+			return nil, ErrEquipmentNotOwned
+		}
+		return nil, err
+	}
+	if !owned {
+		return nil, ErrEquipmentNotOwned
+	}
+
+	values, err := s.client.HGetAll(ctx, s.equipmentInstanceKey(ref)).Result()
 	if err != nil {
 		return nil, err
 	}
-
-	quantities := make(map[string]int64, len(values))
-	for itemID, rawQuantity := range values {
-		quantity := int64FromString(rawQuantity)
-		if quantity <= 0 {
-			continue
-		}
-		quantities[itemID] = quantity
+	if len(values) == 0 {
+		return nil, ErrEquipmentNotOwned
+	}
+	itemID := strings.TrimSpace(values["item_id"])
+	if itemID == "" {
+		return nil, ErrEquipmentNotOwned
 	}
 
-	return quantities, nil
+	instance := &ItemInstance{
+		InstanceID:   ref,
+		ItemID:       itemID,
+		EnhanceLevel: int(int64FromString(values["enhance_level"])),
+		SpentStones:  int64FromString(values["spent_stones"]),
+		Bound:        int64FromString(values["bound"]) > 0,
+		CreatedAt:    int64FromString(values["created_at"]),
+	}
+	return instance, nil
 }
 
-func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantities map[string]int64) (Loadout, map[string]string, error) {
+func (s *Store) loadoutForNickname(ctx context.Context, nickname string) (Loadout, map[string]string, error) {
 	values, err := s.client.HGetAll(ctx, s.loadoutKey(nickname)).Result()
+	if err != nil {
+		return Loadout{}, nil, err
+	}
+	instances, err := s.itemInstancesByIDForNickname(ctx, nickname)
 	if err != nil {
 		return Loadout{}, nil, err
 	}
 
 	loadout := Loadout{}
 	equipped := make(map[string]string, len(values))
-	for slot, itemID := range values {
+	for slot, equippedRef := range values {
 		slot = normalizeEquipmentSlot(slot)
-		itemID = strings.TrimSpace(itemID)
-		if itemID == "" || slot == "" {
+		equippedRef = strings.TrimSpace(equippedRef)
+		if equippedRef == "" || slot == "" {
 			continue
 		}
 
-		definition, defErr := s.getEquipmentDefinition(ctx, itemID)
+		instance, ok := instances[equippedRef]
+		if !ok {
+			continue
+		}
+		definition, defErr := s.getEquipmentDefinition(ctx, instance.ItemID)
 		if defErr != nil {
 			continue
 		}
-
-		item := buildInventoryItem(definition, quantities[itemID], true)
-
-		equipped[itemID] = slot
+		item := buildInventoryItem(definition, 1, true, instance.EnhanceLevel, instance.InstanceID, instance.Bound)
+		equipped[instance.InstanceID] = slot
 		switch slot {
 		case "weapon":
 			loadout.Weapon = &item
@@ -1743,25 +1848,32 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantit
 	return loadout, equipped, nil
 }
 
-func (s *Store) inventoryForNickname(ctx context.Context, nickname string, quantities map[string]int64, equipped map[string]string) ([]InventoryItem, error) {
-	if len(quantities) == 0 {
-		return []InventoryItem{}, nil
+func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equipped map[string]string) ([]InventoryItem, error) {
+	instances, err := s.itemInstancesByIDForNickname(ctx, nickname)
+	if err != nil {
+		return nil, err
 	}
 
-	items := make([]InventoryItem, 0, len(quantities))
-	for itemID, quantity := range quantities {
-		definition, err := s.getEquipmentDefinition(ctx, itemID)
+	items := make([]InventoryItem, 0, len(instances))
+	for _, instance := range instances {
+		definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
 		if err != nil {
 			items = append(items, InventoryItem{
-				ItemID:   itemID,
-				Name:     itemID,
-				Quantity: quantity,
-				Equipped: equipped[itemID] != "",
+				ItemID:       instance.ItemID,
+				InstanceID:   instance.InstanceID,
+				Name:         instance.ItemID,
+				Quantity:     1,
+				Equipped:     equipped[instance.InstanceID] != "",
+				EnhanceLevel: instance.EnhanceLevel,
+				Bound:        instance.Bound,
 			})
 			continue
 		}
+		items = append(items, buildInventoryItem(definition, 1, equipped[instance.InstanceID] != "", instance.EnhanceLevel, instance.InstanceID, instance.Bound))
+	}
 
-		items = append(items, buildInventoryItem(definition, quantity, equipped[itemID] != ""))
+	if len(items) == 0 {
+		return []InventoryItem{}, nil
 	}
 
 	slices.SortFunc(items, func(left, right InventoryItem) int {
@@ -1885,48 +1997,13 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			ItemName:        definition.Name,
 			Slot:            definition.Slot,
 			Rarity:          normalizeEquipmentRarity(definition.Rarity),
+			ImagePath:       definition.ImagePath,
+			ImageAlt:        definition.ImageAlt,
 			DropRatePercent: dropRatePercent,
 		})
 	}
 
 	return loot, nil
-}
-
-// normalizeButton 将 Redis 数据转换为 Button 结构
-func (s *Store) normalizeButton(redisKey string, values []any) Button {
-	slug := strings.TrimPrefix(redisKey, s.prefix)
-	fallback := s.fallbacks[slug]
-
-	label := stringValue(values, 0)
-	if label == "" {
-		if fallback.Label != "" {
-			label = fallback.Label
-		} else {
-			label = slug
-		}
-	}
-
-	imagePath := stringValue(values, 6)
-	if imagePath == "" {
-		imagePath = fallback.ImagePath
-	}
-
-	imageAlt := stringValue(values, 7)
-	if imageAlt == "" {
-		imageAlt = fallback.ImageAlt
-	}
-
-	return Button{
-		Key:       slug,
-		RedisKey:  redisKey,
-		Label:     label,
-		Count:     int64Value(values, 1),
-		Sort:      int(int64Value(values, 2)),
-		Enabled:   stringValue(values, 3) != "0",
-		Tags:      decodeStringList(stringValue(values, 4)),
-		ImagePath: imagePath,
-		ImageAlt:  imageAlt,
-	}
 }
 
 func decodeStringList(raw string) []string {
@@ -1994,132 +2071,6 @@ func normalizeLootDropRate(item BossLootEntry) float64 {
 
 func dropRateThreshold(dropRatePercent float64) int {
 	return int(math.Round(clampFloat(dropRatePercent, 0, 100) * 100))
-}
-
-// scanKeys 扫描 Redis 中匹配前缀的所有键
-func (s *Store) scanKeys(ctx context.Context) ([]string, error) {
-	var (
-		cursor uint64
-		keys   []string
-	)
-
-	for {
-		foundKeys, nextCursor, err := s.client.Scan(ctx, cursor, s.prefix+"*", 100).Result()
-		if err != nil {
-			return nil, err
-		}
-
-		keys = append(keys, foundKeys...)
-		cursor = nextCursor
-		if cursor == 0 {
-			break
-		}
-	}
-
-	return keys, nil
-}
-
-func (s *Store) listButtonKeys(ctx context.Context) ([]string, error) {
-	slugs, err := s.client.ZRange(ctx, s.buttonIndexKey, 0, -1).Result()
-	if err != nil {
-		return nil, err
-	}
-	if len(slugs) > 0 {
-		keys := make([]string, 0, len(slugs))
-		for _, slug := range slugs {
-			slug = strings.TrimSpace(slug)
-			if slug == "" {
-				continue
-			}
-			keys = append(keys, s.prefix+slug)
-		}
-		return keys, nil
-	}
-
-	keys, err := s.scanKeys(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if len(keys) == 0 {
-		return []string{}, nil
-	}
-	if err := s.rebuildButtonIndex(ctx, keys); err != nil {
-		return nil, err
-	}
-	return keys, nil
-}
-
-func (s *Store) rebuildButtonIndex(ctx context.Context, keys []string) error {
-	if len(keys) == 0 {
-		return nil
-	}
-
-	pipe := s.client.Pipeline()
-	cmds := make([]*redis.SliceCmd, len(keys))
-	for index, key := range keys {
-		cmds[index] = pipe.HMGet(ctx, key, "sort")
-	}
-	if _, err := pipe.Exec(ctx); err != nil {
-		return err
-	}
-
-	entries := make([]redis.Z, 0, len(keys))
-	for index, key := range keys {
-		slug := strings.TrimSpace(strings.TrimPrefix(key, s.prefix))
-		if slug == "" {
-			continue
-		}
-		entries = append(entries, redis.Z{
-			Score:  float64(int64Value(cmds[index].Val(), 0)),
-			Member: slug,
-		})
-	}
-	if len(entries) == 0 {
-		return nil
-	}
-
-	return s.client.ZAdd(ctx, s.buttonIndexKey, entries...).Err()
-}
-
-// SyncButtonIndex 将直接写入 Redis 的按钮补进显式索引，供低频兜底扫描使用。
-func (s *Store) SyncButtonIndex(ctx context.Context) (bool, error) {
-	keys, err := s.scanKeys(ctx)
-	if err != nil {
-		return false, err
-	}
-	if len(keys) == 0 {
-		return false, nil
-	}
-
-	indexedSlugs, err := s.client.ZRange(ctx, s.buttonIndexKey, 0, -1).Result()
-	if err != nil {
-		return false, err
-	}
-	indexed := make(map[string]struct{}, len(indexedSlugs))
-	for _, slug := range indexedSlugs {
-		indexed[strings.TrimSpace(slug)] = struct{}{}
-	}
-
-	missingKeys := make([]string, 0)
-	for _, key := range keys {
-		slug := strings.TrimSpace(strings.TrimPrefix(key, s.prefix))
-		if slug == "" {
-			continue
-		}
-		if _, ok := indexed[slug]; ok {
-			continue
-		}
-		missingKeys = append(missingKeys, key)
-	}
-	if len(missingKeys) == 0 {
-		return false, nil
-	}
-
-	if err := s.rebuildButtonIndex(ctx, missingKeys); err != nil {
-		return false, err
-	}
-
-	return true, nil
 }
 
 func (s *Store) listEquipmentIDs(ctx context.Context) ([]string, error) {
@@ -2242,19 +2193,58 @@ func (s *Store) loadoutKey(nickname string) string {
 	return s.loadoutPrefix + nickname
 }
 
+func (s *Store) playerInstancesKey(nickname string) string {
+	return s.playerInstancesPrefix + nickname
+}
+
+func (s *Store) equipmentInstanceKey(instanceID string) string {
+	return s.equipmentInstancePrefix + strings.TrimSpace(instanceID)
+}
+
+func (s *Store) newEquipmentInstanceID(ctx context.Context) (string, error) {
+	seq, err := s.client.Incr(ctx, s.equipmentInstanceSeqKey).Result()
+	if err != nil {
+		return "", err
+	}
+	return "inst-" + strconv.FormatInt(seq, 10), nil
+}
+
 func (s *Store) gemKey(nickname string) string {
 	return s.namespace + "gem:" + nickname
 }
 
 func (s *Store) gemsForNickname(ctx context.Context, nickname string) (int64, error) {
-	val, err := s.client.HGet(ctx, s.gemKey(nickname), "gems").Result()
-	if errors.Is(err, redis.Nil) {
-		return 0, nil
-	}
+	resources, err := s.resourcesForNickname(ctx, nickname)
 	if err != nil {
 		return 0, err
 	}
-	return int64FromString(val), nil
+	return resources.Gems, nil
+}
+
+type playerResources struct {
+	Gems   int64
+	Gold   int64
+	Stones int64
+}
+
+func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
+	values, err := s.client.HMGet(ctx, s.gemKey(nickname), "gems", "gold", "stones").Result()
+	if err != nil {
+		return playerResources{}, err
+	}
+	return playerResources{
+		Gems:   int64Value(values, 0),
+		Gold:   int64Value(values, 1),
+		Stones: int64Value(values, 2),
+	}, nil
+}
+
+func (s *Store) equipmentSpentKey(nickname string) string {
+	return s.equipmentSpentPrefix + nickname
+}
+
+func (s *Store) equipmentEnhanceKey(nickname string) string {
+	return s.equipmentEnhancePrefix + nickname
 }
 
 func (s *Store) lastRewardKey(nickname string) string {
@@ -2350,23 +2340,65 @@ func int64FromString(raw string) int64 {
 	return value
 }
 
-func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool) InventoryItem {
+func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool, enhanceLevel int, instanceID string, bound bool) InventoryItem {
+	enhanceLevel = maxInt(0, enhanceLevel)
+	multValue := math.Pow(1.12, float64(enhanceLevel))
+	multPercent := math.Pow(1.08, float64(enhanceLevel))
+
+	name := displayItemName(definition.Name, enhanceLevel)
+	attackPower := int64(math.Round(float64(definition.AttackPower) * multValue))
+	armorPenPercent := definition.ArmorPenPercent * multPercent
+	critRate := definition.CritRate * multPercent
+	critDamageMultiplier := definition.CritDamageMultiplier * multPercent
+	partTypeDamageSoft := definition.PartTypeDamageSoft * multPercent
+	partTypeDamageHeavy := definition.PartTypeDamageHeavy * multPercent
+	partTypeDamageWeak := definition.PartTypeDamageWeak * multPercent
+
 	return InventoryItem{
 		ItemID:               definition.ItemID,
-		Name:                 definition.Name,
+		InstanceID:           strings.TrimSpace(instanceID),
+		Name:                 name,
 		Slot:                 normalizeEquipmentSlot(definition.Slot),
 		Rarity:               normalizeEquipmentRarity(definition.Rarity),
 		ImagePath:            definition.ImagePath,
 		ImageAlt:             definition.ImageAlt,
 		Quantity:             quantity,
 		Equipped:             equipped,
-		AttackPower:          definition.AttackPower,
-		ArmorPenPercent:      definition.ArmorPenPercent,
-		CritDamageMultiplier: definition.CritDamageMultiplier,
-		PartTypeDamageSoft:   definition.PartTypeDamageSoft,
-		PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
-		PartTypeDamageWeak:   definition.PartTypeDamageWeak,
+		EnhanceLevel:         enhanceLevel,
+		Bound:                bound,
+		AttackPower:          attackPower,
+		ArmorPenPercent:      armorPenPercent,
+		CritRate:             critRate,
+		CritDamageMultiplier: critDamageMultiplier,
+		PartTypeDamageSoft:   partTypeDamageSoft,
+		PartTypeDamageHeavy:  partTypeDamageHeavy,
+		PartTypeDamageWeak:   partTypeDamageWeak,
 	}
+}
+
+// 获取装备的强化金币消耗。
+func enhanceGoldCost(currentLevel int) int64 {
+	level := maxInt(0, currentLevel)
+	return int64(math.Ceil(500 * math.Pow(1.5, float64(level))))
+}
+
+// 获取装备的强化石消耗。
+func enhanceStoneCost(currentLevel int) int64 {
+	level := maxInt(0, currentLevel)
+	// 公式：3 * 1.4^level，然后向上取整
+	return int64(math.Ceil(3 * math.Pow(1.5, float64(level))))
+}
+
+func maxEnhanceLevel(rarity string) int {
+	// 当前版本统一基础上限 + 稀有度额外上限。
+	return 5 + RarityStatsForRarity(rarity).EnhanceCapExtra
+}
+
+func maxInt(a, b int) int {
+	if a >= b {
+		return a
+	}
+	return b
 }
 
 func normalizeEquipmentSlot(slot string) string {

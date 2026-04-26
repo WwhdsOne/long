@@ -30,11 +30,10 @@ export function createRealtimeTransport(options = {}) {
   const onSnapshot = options.onSnapshot || (() => {})
   const onPublicDelta = options.onPublicDelta || (() => {})
   const onUserDelta = options.onUserDelta || (() => {})
+  const onOnlineCount = options.onOnlineCount || (() => {})
   const onClickAck = options.onClickAck || (() => {})
   const onTransportState = options.onTransportState || (() => {})
   const onTransportError = options.onTransportError || (() => {})
-  let nextTicketRequestID = 0
-  const pendingTicketRequests = new Map()
 
   let ws = null
   let wsOpen = false
@@ -82,14 +81,6 @@ export function createRealtimeTransport(options = {}) {
 
     globalThis.clearTimeout?.(reconnectTimer)
     reconnectTimer = 0
-  }
-
-  function rejectPendingTicketRequests(message) {
-    for (const [requestId, pending] of pendingTicketRequests.entries()) {
-      globalThis.clearTimeout?.(pending.timeoutId)
-      pending.reject(new Error(message || '点击票据申请失败，请稍后重试。'))
-      pendingTicketRequests.delete(requestId)
-    }
   }
 
   function scheduleWebSocketRetry() {
@@ -143,6 +134,15 @@ export function createRealtimeTransport(options = {}) {
           mode: 'ws',
         })
         return
+      case 'online_count':
+        clearReconnectTimer()
+        onOnlineCount(message.payload ?? {})
+        updateState({
+          connected: true,
+          degraded: false,
+          mode: 'ws',
+        })
+        return
       case 'click_ack':
         clearReconnectTimer()
         onClickAck(message.payload ?? {})
@@ -152,32 +152,6 @@ export function createRealtimeTransport(options = {}) {
           mode: 'ws',
         })
         return
-      case 'click_ticket': {
-        clearReconnectTimer()
-        updateState({
-          connected: true,
-          degraded: false,
-          mode: 'ws',
-        })
-        const requestId = String(message?.requestId || '').trim()
-        if (!requestId) {
-          onTransportError('点击票据响应缺少请求标识，请稍后重试。')
-          return
-        }
-        const pending = pendingTicketRequests.get(requestId)
-        if (!pending) {
-          return
-        }
-        globalThis.clearTimeout?.(pending.timeoutId)
-        pendingTicketRequests.delete(requestId)
-        pending.resolve({
-          ticket: String(message?.ticket || '').trim(),
-          challengeNonce: String(message?.challengeNonce || '').trim(),
-          issuedAt: Number(message?.issuedAt || 0),
-          expiresAt: Number(message?.expiresAt || 0),
-        })
-        return
-      }
       case 'error':
         onTransportError(message.message || '实时消息处理失败，请稍后重试。')
         return
@@ -194,7 +168,6 @@ export function createRealtimeTransport(options = {}) {
     }
 
     closeWebSocket()
-    rejectPendingTicketRequests(message || '实时主链路暂时不可用，已切回兼容模式。')
     if (sse) {
       return
     }
@@ -254,6 +227,7 @@ export function createRealtimeTransport(options = {}) {
 
     source.addEventListener('public_state', handleNamedEvent(onPublicDelta))
     source.addEventListener('user_state', handleNamedEvent(onUserDelta))
+    source.addEventListener('online_count', handleNamedEvent(onOnlineCount))
   }
 
   function connectWebSocket() {
@@ -316,7 +290,7 @@ export function createRealtimeTransport(options = {}) {
       closeWebSocket()
       connectWebSocket()
     },
-    sendClick(slug, ticket, behavior = {}) {
+    sendClick(slug) {
       if (!ws || !wsOpen) {
         return false
       }
@@ -325,45 +299,12 @@ export function createRealtimeTransport(options = {}) {
         ws.send(JSON.stringify({
           type: 'click',
           slug,
-          ticket,
-          ...behavior,
         }))
         return true
       } catch {
         startEventSourceFallback('实时主链路暂时不可用，已切回兼容模式。')
         return false
       }
-    },
-    requestClickTicket(slug, fingerprintHash) {
-      if (!ws || !wsOpen) {
-        return null
-      }
-
-      const requestId = `ticket-${Date.now()}-${nextTicketRequestID}`
-      nextTicketRequestID += 1
-
-      return new Promise((resolve, reject) => {
-        const timeoutId = globalThis.setTimeout?.(() => {
-          pendingTicketRequests.delete(requestId)
-          reject(new Error('点击票据申请超时，请稍后重试。'))
-        }, 3000)
-
-        pendingTicketRequests.set(requestId, { resolve, reject, timeoutId })
-
-        try {
-          ws.send(JSON.stringify({
-            type: 'click_ticket_request',
-            requestId,
-            slug,
-            fingerprintHash,
-          }))
-        } catch {
-          pendingTicketRequests.delete(requestId)
-          globalThis.clearTimeout?.(timeoutId)
-          startEventSourceFallback('实时主链路暂时不可用，已切回兼容模式。')
-          resolve(null)
-        }
-      })
     },
     requestSync() {
       if (!ws || !wsOpen) {
@@ -383,7 +324,6 @@ export function createRealtimeTransport(options = {}) {
     close() {
       closed = true
       clearReconnectTimer()
-      rejectPendingTicketRequests('实时连接已关闭，请稍后重试。')
       closeEventSource()
       closeWebSocket()
       updateState({

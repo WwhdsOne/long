@@ -71,12 +71,28 @@ func decodeRealtimeMessage[T any](t *testing.T, payload []byte) T {
 	return message
 }
 
+func readHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name string) events.ServerEvent {
+	t.Helper()
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				t.Fatalf("hub channel closed while waiting for %s", name)
+			}
+			if event.Name == name {
+				return event
+			}
+		case <-timeout:
+			t.Fatalf("timed out waiting for event %s", name)
+		}
+	}
+}
+
 func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
-			},
 			Leaderboard: []vote.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 3},
 			},
@@ -115,7 +131,7 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	if response.Type != realtimeMessageTypeSnapshot {
 		t.Fatalf("expected snapshot response, got %+v", response)
 	}
-	if len(response.Public.Buttons) != 1 || response.Public.Buttons[0].Key != "feel" {
+	if len(response.Public.Leaderboard) == 0 || response.Public.Leaderboard[0].Nickname != "阿明" {
 		t.Fatalf("unexpected public snapshot: %+v", response.Public)
 	}
 	if response.User == nil || response.User.UserStats == nil || response.User.UserStats.Nickname != "阿明" {
@@ -126,9 +142,6 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
-			},
 		},
 	}
 	session := newRealtimeSession(realtimeSessionOptions{
@@ -165,9 +178,6 @@ func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 	store := &mockStore{
 		snapshot: vote.Snapshot{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 3, Enabled: true},
-			},
 			Leaderboard: []vote.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 3},
 			},
@@ -218,9 +228,6 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
-			Buttons: []vote.Button{
-				{Key: "feel", Label: "有感觉吗", Count: 4, Enabled: true},
-			},
 			Leaderboard: []vote.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 4},
 			},
@@ -228,12 +235,6 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 			CombatStats: vote.CombatStats{EffectiveIncrement: 2},
 		},
 		result: vote.ClickResult{
-			Button: vote.Button{
-				Key:     "feel",
-				Label:   "有感觉吗",
-				Count:   5,
-				Enabled: true,
-			},
 			Delta:    1,
 			Critical: false,
 			UserStats: vote.UserStats{
@@ -274,7 +275,6 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	ack := decodeRealtimeMessage[struct {
 		Type    string `json:"type"`
 		Payload struct {
-			Button   vote.Button `json:"button"`
 			Delta    int64       `json:"delta"`
 			Critical bool        `json:"critical"`
 		} `json:"payload"`
@@ -282,24 +282,24 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	if ack.Type != realtimeMessageTypeClickAck {
 		t.Fatalf("expected click_ack, got %+v", ack)
 	}
-	if ack.Payload.Button.Key != "feel" || ack.Payload.Delta != 1 || ack.Payload.Critical {
+	if ack.Payload.Delta != 1 || ack.Payload.Critical {
 		t.Fatalf("unexpected click ack payload: %+v", ack.Payload)
 	}
 
-	publicEvent := <-sseClient
+	publicEvent := readHubEventByName(t, sseClient, events.PublicStateEventName)
 	if publicEvent.Name != events.PublicStateEventName {
 		t.Fatalf("expected public state event for SSE subscriber, got %+v", publicEvent)
 	}
-	userEvent := <-sseClient
+	userEvent := readHubEventByName(t, sseClient, events.UserStateEventName)
 	if userEvent.Name != events.UserStateEventName {
 		t.Fatalf("expected user state event for SSE subscriber, got %+v", userEvent)
 	}
 
-	publicEvent = <-wsClient
+	publicEvent = readHubEventByName(t, wsClient, events.PublicStateEventName)
 	if publicEvent.Name != events.PublicStateEventName {
 		t.Fatalf("expected public state event for realtime subscriber, got %+v", publicEvent)
 	}
-	userEvent = <-wsClient
+	userEvent = readHubEventByName(t, wsClient, events.UserStateEventName)
 	if userEvent.Name != events.UserStateEventName {
 		t.Fatalf("expected user state event for realtime subscriber, got %+v", userEvent)
 	}
@@ -309,83 +309,83 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	}
 }
 
-func TestRealtimeSessionClickForwardsTicketToManualClickController(t *testing.T) {
-	controller := &mockManualClickController{
-		clickResult: vote.ClickResult{
-			Button: vote.Button{
-				Key:     "feel",
-				Label:   "有感觉吗",
-				Count:   5,
-				Enabled: true,
-			},
-			Delta: 1,
-			UserStats: vote.UserStats{
-				Nickname:   "阿明",
-				ClickCount: 5,
+func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			Boss: &vote.Boss{
+				ID:        "boss-1",
+				Name:      "木桩王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 40,
 			},
 		},
+		result: vote.ClickResult{
+			Delta:    1,
+			Critical: false,
+			Boss: &vote.Boss{
+				ID:        "boss-1",
+				Name:      "木桩王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 39,
+			},
+			MyBossStats: &vote.BossUserStats{
+				Nickname: "阿明",
+				Damage:   61,
+			},
+			BroadcastUserAll: true,
+		},
 	}
+	hub := events.NewHub()
+	cache := events.NewCache(store)
+	dispatcher := events.NewDispatcher(cache, hub)
+	publisher := &dispatchingChangePublisher{dispatcher: dispatcher}
 	session := newRealtimeSession(realtimeSessionOptions{
-		store:                 &mockStore{state: voteStateForPlayerTests()},
-		manualClick:           controller,
-		authenticatorEnabled:  true,
-		authenticatedNickname: "阿明",
-		clientID:              "127.0.0.1",
+		stateView:            store,
+		store:                store,
+		hub:                  hub,
+		changePublisher:      publisher,
+		authenticatorEnabled: false,
+		clientID:             "127.0.0.1",
 	})
 
+	_ = captureRealtimeMessages(t, func(send func(any) error) error {
+		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	})
 	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"feel","ticket":"ticket-1"}`), send)
+		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"boss-part:1-2"}`), send)
 	})
 	if len(messages) != 1 {
 		t.Fatalf("expected one realtime message, got %d", len(messages))
 	}
 
-	response := decodeRealtimeMessage[realtimeClickAckMessage](t, messages[0])
-	if response.Type != realtimeMessageTypeClickAck {
-		t.Fatalf("expected click ack, got %+v", response)
-	}
-	if controller.lastClickReq.Ticket != "ticket-1" || controller.lastClickReq.EntryType != clickEntryWS {
-		t.Fatalf("expected websocket click to forward ticket, got %+v", controller.lastClickReq)
-	}
-}
-
-func TestRealtimeSessionCanIssueClickTicketThroughWebsocket(t *testing.T) {
-	controller := &mockManualClickController{
-		ticket: ClickTicket{
-			Value:          "ticket-1",
-			IssuedAt:       1710000000,
-			ExpiresAt:      1710000002,
-			ChallengeNonce: "nonce-1",
-		},
-	}
-	session := newRealtimeSession(realtimeSessionOptions{
-		store:                 &mockStore{state: voteStateForPlayerTests()},
-		manualClick:           controller,
-		authenticatorEnabled:  true,
-		authenticatedNickname: "阿明",
-		clientID:              "127.0.0.1",
-	})
-
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"click_ticket_request","requestId":"req-1","slug":"feel","fingerprintHash":"fp-1"}`), send)
-	})
-	if len(messages) != 1 {
-		t.Fatalf("expected one realtime message, got %d", len(messages))
-	}
-
-	response := decodeRealtimeMessage[struct {
-		Type           string `json:"type"`
-		RequestID      string `json:"requestId"`
-		Ticket         string `json:"ticket"`
-		ChallengeNonce string `json:"challengeNonce"`
+	ack := decodeRealtimeMessage[struct {
+		Type    string `json:"type"`
+		Payload struct {
+			Delta    int64 `json:"delta"`
+			Critical bool  `json:"critical"`
+		} `json:"payload"`
 	}](t, messages[0])
-	if response.Type != "click_ticket" || response.RequestID != "req-1" || response.Ticket != "ticket-1" || response.ChallengeNonce != "nonce-1" {
-		t.Fatalf("unexpected click ticket response: %+v", response)
+	if ack.Type != realtimeMessageTypeClickAck {
+		t.Fatalf("expected click_ack, got %+v", ack)
 	}
-	if controller.lastIssueReq.Nickname != "阿明" || controller.lastIssueReq.Slug != "feel" || controller.lastIssueReq.FingerprintHash != "fp-1" {
-		t.Fatalf("expected websocket ticket request to reach controller, got %+v", controller.lastIssueReq)
+	if ack.Payload.Delta != 1 {
+		t.Fatalf("unexpected boss click ack payload: %+v", ack.Payload)
+	}
+
+	if len(publisher.changes) != 1 {
+		t.Fatalf("expected one published change, got %+v", publisher.changes)
+	}
+	if publisher.changes[0].Type != vote.StateChangeButtonClicked {
+		t.Fatalf("expected button_clicked, got %+v", publisher.changes[0])
+	}
+	if !publisher.changes[0].BroadcastUserAll {
+		t.Fatalf("expected BroadcastUserAll to be true, got %+v", publisher.changes[0])
 	}
 }
+
+
 
 func TestRealtimeSessionReturnsProtocolErrors(t *testing.T) {
 	session := newRealtimeSession(realtimeSessionOptions{

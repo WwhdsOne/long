@@ -28,14 +28,10 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               db: 3
               tls_enabled: false
             redis_prefix: "vote:"
-            button_poll_interval_ms: 3000
             rate_limit:
               limit: 30
               window_ms: 2000
               blacklist_ms: 600000
-            critical_hit:
-              chance_percent: 5
-              count: 5
             admin:
               username: "admin"
               password: "secret"
@@ -43,14 +39,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
             player_auth:
               jwt_secret: "player-secret"
               jwt_ttl_seconds: 604800
-            manual_click:
-              ticket_ttl_ms: 2000
-              issue_limit_per_second: 6
-              consume_limit_per_second: 6
-              risk_threshold: 4
-              ban_ms: 600000
-              min_press_duration_ms: 20
-              max_press_duration_ms: 2000
             oss:
               access_key_id: "test-ak"
               access_key_secret: "test-secret"
@@ -87,12 +75,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if cfg.RateLimit.Limit != 30 {
 		t.Fatalf("expected rate limit 30, got %d", cfg.RateLimit.Limit)
 	}
-	if cfg.CriticalHit.ChancePercent != 5 {
-		t.Fatalf("expected critical chance 5, got %d", cfg.CriticalHit.ChancePercent)
-	}
-	if cfg.CriticalHit.Count != 5 {
-		t.Fatalf("expected critical count 5, got %d", cfg.CriticalHit.Count)
-	}
 	if cfg.Admin.Username != "admin" {
 		t.Fatalf("expected admin username admin, got %q", cfg.Admin.Username)
 	}
@@ -104,9 +86,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.PlayerAuth.JWTSecret != "player-secret" {
 		t.Fatalf("expected player jwt secret player-secret, got %q", cfg.PlayerAuth.JWTSecret)
-	}
-	if cfg.ManualClick.TicketTTL != 2*time.Second {
-		t.Fatalf("expected manual click ticket ttl 2s, got %s", cfg.ManualClick.TicketTTL)
 	}
 	if cfg.OSS.AccessKeyID != "test-ak" {
 		t.Fatalf("expected oss access key id test-ak, got %q", cfg.OSS.AccessKeyID)
@@ -224,15 +203,10 @@ func validConfigForTest() Config {
 			Port: 6379,
 		},
 		RedisPrefix:        "vote:",
-		ButtonPollInterval: 3 * time.Second,
 		RateLimit: RateLimitConfig{
 			Limit:             30,
 			Window:            2 * time.Second,
 			BlacklistDuration: 10 * time.Minute,
-		},
-		CriticalHit: CriticalHitConfig{
-			ChancePercent: 5,
-			Count:         5,
 		},
 		Admin: AdminConfig{
 			Username:      "admin",
@@ -242,15 +216,6 @@ func validConfigForTest() Config {
 		PlayerAuth: PlayerAuthConfig{
 			JWTSecret: "player-secret",
 			JWTTTL:    7 * 24 * time.Hour,
-		},
-		ManualClick: ManualClickConfig{
-			TicketTTL:             2 * time.Second,
-			IssueLimitPerSecond:   6,
-			ConsumeLimitPerSecond: 6,
-			RiskThreshold:         4,
-			BanDuration:           10 * time.Minute,
-			MinPressDuration:      20 * time.Millisecond,
-			MaxPressDuration:      2 * time.Second,
 		},
 	}
 }

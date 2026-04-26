@@ -133,6 +133,7 @@ function cancelCell() {
         <div v-if="hasBoss" class="admin-boss-summary">
           <p>实例 ID：{{ adminState.boss.id }}</p>
           <p>状态：{{ adminState.boss.status }} · 血量 {{ adminState.boss.currentHp }}/{{ adminState.boss.maxHp }}</p>
+          <p>金币基准：{{ adminState.boss.goldOnKill || 0 }} · 强化石基准：{{ adminState.boss.stoneOnKill || 0 }}</p>
         </div>
         <p v-else class="feedback" style="margin-top: 0.75rem;">
           开启循环后，如果当前没有 Boss，会立刻从 Boss 池里随机刷出一只。
@@ -174,6 +175,8 @@ function cancelCell() {
         <form class="admin-form" @submit.prevent="saveBossTemplate">
           <input v-model="bossForm.id" class="nickname-form__input" type="text" placeholder="模板 ID，如 dragon" />
           <input v-model="bossForm.name" class="nickname-form__input" type="text" placeholder="Boss 显示名称" />
+          <input v-model.number="bossForm.goldOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀金币基准" />
+          <input v-model.number="bossForm.stoneOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀强化石基准" />
           <input
             class="nickname-form__input"
             type="number"
@@ -254,6 +257,7 @@ function cancelCell() {
             <div>
               <strong>{{ entry.name }}</strong>
               <p>{{ entry.id }} · 血量 {{ entry.maxHp }} · 部位 {{ entry.layout?.length || 0 }} 个 · 装备 {{ entry.loot.length }} 件</p>
+              <p>金币基准 {{ entry.goldOnKill || 0 }} · 强化石基准 {{ entry.stoneOnKill || 0 }}</p>
             </div>
             <div class="admin-inline-actions admin-inline-actions--stacked">
               <button class="inventory-item__action" type="button" @click="selectBossTemplate(entry.id)">编辑掉落</button>

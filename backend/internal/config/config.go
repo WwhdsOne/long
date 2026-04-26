@@ -16,15 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ButtonSeed 内置按钮种子数据
-type ButtonSeed struct {
-	Slug      string // 按钮标识
-	Label     string // 显示名称
-	Sort      int    // 排序权重
-	ImagePath string // 图片路径
-	ImageAlt  string // 图片描述
-}
-
 // RedisConfig holds the connection settings for the Redis instance.
 type RedisConfig struct {
 	Host       string
@@ -40,23 +31,6 @@ type RateLimitConfig struct {
 	Limit             int
 	Window            time.Duration
 	BlacklistDuration time.Duration
-}
-
-// ManualClickConfig 控制票据有效期、节奏阈值与短时封禁。
-type ManualClickConfig struct {
-	TicketTTL             time.Duration
-	IssueLimitPerSecond   int
-	ConsumeLimitPerSecond int
-	RiskThreshold         int
-	BanDuration           time.Duration
-	MinPressDuration      time.Duration
-	MaxPressDuration      time.Duration
-}
-
-// CriticalHitConfig 暴击机制配置
-type CriticalHitConfig struct {
-	ChancePercent int   // 暴击概率（百分比）
-	Count         int64 // 暴击时的增量倍数
 }
 
 // AdminConfig 管理后台鉴权配置
@@ -97,14 +71,11 @@ type Config struct {
 	Port               int
 	Redis              RedisConfig
 	RateLimit          RateLimitConfig
-	CriticalHit        CriticalHitConfig
 	Admin              AdminConfig
 	PlayerAuth         PlayerAuthConfig
-	ManualClick        ManualClickConfig
 	OSS                OSSConfig
 	LLM                LLMConfig
 	RedisPrefix        string
-	ButtonPollInterval time.Duration // 低频兜底按钮索引同步间隔
 	PublicDir          string
 }
 
@@ -118,17 +89,12 @@ type fileConfig struct {
 		DB         int    `yaml:"db"`
 		TLSEnabled bool   `yaml:"tls_enabled"`
 	} `yaml:"redis"`
-	RedisPrefix          string `yaml:"redis_prefix"`
-	ButtonPollIntervalMS int    `yaml:"button_poll_interval_ms"`
-	RateLimit            struct {
+	RedisPrefix string `yaml:"redis_prefix"`
+	RateLimit   struct {
 		Limit       int `yaml:"limit"`
 		WindowMS    int `yaml:"window_ms"`
 		BlacklistMS int `yaml:"blacklist_ms"`
 	} `yaml:"rate_limit"`
-	CriticalHit struct {
-		ChancePercent int   `yaml:"chance_percent"`
-		Count         int64 `yaml:"count"`
-	} `yaml:"critical_hit"`
 	Admin struct {
 		Username      string `yaml:"username"`
 		Password      string `yaml:"password"`
@@ -138,15 +104,6 @@ type fileConfig struct {
 		JWTSecret    string `yaml:"jwt_secret"`
 		JWTTTLSecond int    `yaml:"jwt_ttl_seconds"`
 	} `yaml:"player_auth"`
-	ManualClick struct {
-		TicketTTLMS           int `yaml:"ticket_ttl_ms"`
-		IssueLimitPerSecond   int `yaml:"issue_limit_per_second"`
-		ConsumeLimitPerSecond int `yaml:"consume_limit_per_second"`
-		RiskThreshold         int `yaml:"risk_threshold"`
-		BanMS                 int `yaml:"ban_ms"`
-		MinPressDurationMS    int `yaml:"min_press_duration_ms"`
-		MaxPressDurationMS    int `yaml:"max_press_duration_ms"`
-	} `yaml:"manual_click"`
 	OSS struct {
 		AccessKeyID     string `yaml:"access_key_id"`
 		AccessKeySecret string `yaml:"access_key_secret"`
@@ -167,19 +124,6 @@ type fileConfig struct {
 
 type consulKV struct {
 	Value string `json:"Value"`
-}
-
-// DefaultButtons 内置默认按钮列表
-var DefaultButtons = []ButtonSeed{
-	{Slug: "feel", Label: "有感觉吗", Sort: 10},
-	{Slug: "understand", Label: "有没有懂的", Sort: 20},
-	{
-		Slug:      "wechat-pity",
-		Label:     "微信[可怜]表情",
-		Sort:      30,
-		ImagePath: "/images/emojipedia-wechat-whimper.png",
-		ImageAlt:  "微信可怜表情",
-	},
 }
 
 var exitProcess = os.Exit
@@ -239,10 +183,6 @@ func loadFromConsul() (Config, consulSource, error) {
 			Window:            time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
 			BlacklistDuration: time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
 		},
-		CriticalHit: CriticalHitConfig{
-			ChancePercent: parsed.CriticalHit.ChancePercent,
-			Count:         parsed.CriticalHit.Count,
-		},
 		Admin: AdminConfig{
 			Username:      parsed.Admin.Username,
 			Password:      parsed.Admin.Password,
@@ -251,15 +191,6 @@ func loadFromConsul() (Config, consulSource, error) {
 		PlayerAuth: PlayerAuthConfig{
 			JWTSecret: parsed.PlayerAuth.JWTSecret,
 			JWTTTL:    time.Duration(parsed.PlayerAuth.JWTTTLSecond) * time.Second,
-		},
-		ManualClick: ManualClickConfig{
-			TicketTTL:             time.Duration(parsed.ManualClick.TicketTTLMS) * time.Millisecond,
-			IssueLimitPerSecond:   parsed.ManualClick.IssueLimitPerSecond,
-			ConsumeLimitPerSecond: parsed.ManualClick.ConsumeLimitPerSecond,
-			RiskThreshold:         parsed.ManualClick.RiskThreshold,
-			BanDuration:           time.Duration(parsed.ManualClick.BanMS) * time.Millisecond,
-			MinPressDuration:      time.Duration(parsed.ManualClick.MinPressDurationMS) * time.Millisecond,
-			MaxPressDuration:      time.Duration(parsed.ManualClick.MaxPressDurationMS) * time.Millisecond,
 		},
 		OSS: OSSConfig{
 			AccessKeyID:     parsed.OSS.AccessKeyID,
@@ -278,7 +209,6 @@ func loadFromConsul() (Config, consulSource, error) {
 			Timeout: time.Duration(parsed.LLM.TimeoutMS) * time.Millisecond,
 		},
 		RedisPrefix:        parsed.RedisPrefix,
-		ButtonPollInterval: time.Duration(parsed.ButtonPollIntervalMS) * time.Millisecond,
 		PublicDir:          resolvePublicDir(),
 	}
 
@@ -303,18 +233,12 @@ func validate(config Config) error {
 		return errors.New("redis.port must be greater than 0")
 	case config.RedisPrefix == "":
 		return errors.New("redis_prefix is required")
-	case config.ButtonPollInterval <= 0:
-		return errors.New("button_poll_interval_ms must be greater than 0")
 	case config.RateLimit.Limit <= 0:
 		return errors.New("rate_limit.limit must be greater than 0")
 	case config.RateLimit.Window <= 0:
 		return errors.New("rate_limit.window_ms must be greater than 0")
 	case config.RateLimit.BlacklistDuration <= 0:
 		return errors.New("rate_limit.blacklist_ms must be greater than 0")
-	case config.CriticalHit.ChancePercent <= 0 || config.CriticalHit.ChancePercent > 100:
-		return errors.New("critical_hit.chance_percent must be between 1 and 100")
-	case config.CriticalHit.Count <= 1:
-		return errors.New("critical_hit.count must be greater than 1")
 	case strings.TrimSpace(config.Admin.Username) == "":
 		return errors.New("admin.username is required")
 	case strings.TrimSpace(config.Admin.Password) == "":
@@ -325,20 +249,6 @@ func validate(config Config) error {
 		return errors.New("player_auth.jwt_secret is required")
 	case config.PlayerAuth.JWTTTL <= 0:
 		return errors.New("player_auth.jwt_ttl_seconds must be greater than 0")
-	case config.ManualClick.TicketTTL <= 0:
-		return errors.New("manual_click.ticket_ttl_ms must be greater than 0")
-	case config.ManualClick.IssueLimitPerSecond <= 0:
-		return errors.New("manual_click.issue_limit_per_second must be greater than 0")
-	case config.ManualClick.ConsumeLimitPerSecond <= 0:
-		return errors.New("manual_click.consume_limit_per_second must be greater than 0")
-	case config.ManualClick.RiskThreshold <= 0:
-		return errors.New("manual_click.risk_threshold must be greater than 0")
-	case config.ManualClick.BanDuration <= 0:
-		return errors.New("manual_click.ban_ms must be greater than 0")
-	case config.ManualClick.MinPressDuration <= 0:
-		return errors.New("manual_click.min_press_duration_ms must be greater than 0")
-	case config.ManualClick.MaxPressDuration <= config.ManualClick.MinPressDuration:
-		return errors.New("manual_click.max_press_duration_ms must be greater than min_press_duration_ms")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeyID) == "":
 		return errors.New("oss.access_key_id is required when oss is configured")
 	case config.OSS.Enabled() && strings.TrimSpace(config.OSS.AccessKeySecret) == "":

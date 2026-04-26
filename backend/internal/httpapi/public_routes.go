@@ -20,17 +20,12 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 
-	router.GET("/api/buttons", func(ctx context.Context, c *app.RequestContext) {
-		state, err := stateView.GetState(ctx, resolvedPlayerNicknameForRead(ctx, c, options.PlayerAuthenticator))
-		if err != nil {
-			if writeNicknameError(c, err) {
-				return
-			}
-			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
-			return
+	router.GET("/api/online-count", func(_ context.Context, c *app.RequestContext) {
+		count := 0
+		if options.RealtimeHub != nil {
+			count = options.RealtimeHub.SubscriberCount()
 		}
-
-		writeJSON(c, consts.StatusOK, state)
+		writeJSON(c, consts.StatusOK, map[string]int{"count": count})
 	})
 
 	router.GET("/api/boss/history", func(ctx context.Context, c *app.RequestContext) {

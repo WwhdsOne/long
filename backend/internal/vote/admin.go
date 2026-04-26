@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 // GetAdminState 返回后台页面所需的聚合数据。
@@ -49,7 +47,6 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	return AdminState{
 		Boss:              boss,
 		BossLeaderboard:   bossLeaderboard,
-		Buttons:           []Button{},
 		Equipment:         []EquipmentDefinition{},
 		Loot:              loot,
 		BossCycleEnabled:  bossCycleEnabled,
@@ -104,6 +101,7 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 		"image_alt":              strings.TrimSpace(definition.ImageAlt),
 		"attack_power":           strconv.FormatInt(definition.AttackPower, 10),
 		"armor_pen_percent":      strconv.FormatFloat(definition.ArmorPenPercent, 'f', -1, 64),
+		"crit_rate":              strconv.FormatFloat(definition.CritRate, 'f', -1, 64),
 		"crit_damage_multiplier": strconv.FormatFloat(definition.CritDamageMultiplier, 'f', -1, 64),
 		"part_type_damage_soft":  strconv.FormatFloat(definition.PartTypeDamageSoft, 'f', -1, 64),
 		"part_type_damage_heavy": strconv.FormatFloat(definition.PartTypeDamageHeavy, 'f', -1, 64),
@@ -132,46 +130,6 @@ func (s *Store) DeleteEquipmentDefinition(ctx context.Context, itemID string) er
 	return err
 }
 
-// SaveButton 保存按钮配置。
-func (s *Store) SaveButton(ctx context.Context, button ButtonUpsert) error {
-	slug := strings.TrimSpace(button.Slug)
-	if slug == "" {
-		return ErrButtonNotFound
-	}
-
-	values := map[string]any{
-		"label":   firstNonEmpty(strings.TrimSpace(button.Label), slug),
-		"count":   "0",
-		"sort":    strconv.Itoa(button.Sort),
-		"enabled": boolToRedis(button.Enabled),
-		"tags":    encodeStringList(button.Tags),
-	}
-
-	existing, err := s.client.HGetAll(ctx, s.prefix+slug).Result()
-	if err != nil {
-		return err
-	}
-	if currentCount := strings.TrimSpace(existing["count"]); currentCount != "" {
-		values["count"] = currentCount
-	}
-
-	if strings.TrimSpace(button.ImagePath) != "" {
-		values["image_path"] = strings.TrimSpace(button.ImagePath)
-	}
-	if strings.TrimSpace(button.ImageAlt) != "" {
-		values["image_alt"] = strings.TrimSpace(button.ImageAlt)
-	}
-
-	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.prefix+slug, values)
-	pipe.ZAdd(ctx, s.buttonIndexKey, redis.Z{
-		Score:  float64(button.Sort),
-		Member: slug,
-	})
-	_, err = pipe.Exec(ctx)
-	return err
-}
-
 // ActivateBoss 覆盖当前活动 Boss。
 func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error) {
 	// 保存旧 Boss 到历史
@@ -184,19 +142,22 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 		bossID = "boss-" + strconv.FormatInt(time.Now().Unix(), 10)
 	}
 	parts := normalizeBossPartLayout(boss.Parts)
-	maxHP := maxInt64(1, boss.MaxHP)
-	if len(parts) > 0 {
-		maxHP = sumBossPartMaxHP(parts)
+	if len(parts) == 0 {
+		return nil, ErrBossPartsRequired
 	}
+	maxHP := maxInt64(1, boss.MaxHP)
+	maxHP = sumBossPartMaxHP(parts)
 
 	current := &Boss{
-		ID:        bossID,
-		Name:      firstNonEmpty(strings.TrimSpace(boss.Name), bossID),
-		Status:    bossStatusActive,
-		MaxHP:     maxHP,
-		CurrentHP: maxHP,
-		Parts:     parts,
-		StartedAt: time.Now().Unix(),
+		ID:          bossID,
+		Name:        firstNonEmpty(strings.TrimSpace(boss.Name), bossID),
+		Status:      bossStatusActive,
+		MaxHP:       maxHP,
+		CurrentHP:   maxHP,
+		GoldOnKill:  maxInt64(0, boss.GoldOnKill),
+		StoneOnKill: maxInt64(0, boss.StoneOnKill),
+		Parts:       parts,
+		StartedAt:   time.Now().Unix(),
 	}
 
 	if err := s.setCurrentBoss(ctx, current, nil); err != nil {
@@ -262,15 +223,11 @@ func (s *Store) ListPlayerOverviews(ctx context.Context) ([]AdminPlayerOverview,
 			return nil, err
 		}
 
-		quantities, err := s.inventoryQuantities(ctx, nickname)
+		loadout, equipped, err := s.loadoutForNickname(ctx, nickname)
 		if err != nil {
 			return nil, err
 		}
-		loadout, equipped, err := s.loadoutForNickname(ctx, nickname, quantities)
-		if err != nil {
-			return nil, err
-		}
-		inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped)
+		inventory, err := s.inventoryForNickname(ctx, nickname, equipped)
 		if err != nil {
 			return nil, err
 		}
@@ -391,15 +348,11 @@ func (s *Store) adminPlayerOverview(ctx context.Context, nickname string) (*Admi
 		return nil, err
 	}
 
-	quantities, err := s.inventoryQuantities(ctx, nickname)
+	loadout, equipped, err := s.loadoutForNickname(ctx, nickname)
 	if err != nil {
 		return nil, err
 	}
-	loadout, equipped, err := s.loadoutForNickname(ctx, nickname, quantities)
-	if err != nil {
-		return nil, err
-	}
-	inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped)
+	inventory, err := s.inventoryForNickname(ctx, nickname, equipped)
 	if err != nil {
 		return nil, err
 	}

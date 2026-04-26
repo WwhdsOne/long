@@ -2,6 +2,7 @@ package vote
 
 import (
 	"context"
+	"math"
 	"strings"
 )
 
@@ -13,7 +14,9 @@ func (s *Store) GetBossResources(ctx context.Context) (BossResources, error) {
 	}
 	if boss == nil {
 		return BossResources{
-			BossLoot: []BossLootEntry{},
+			BossLoot:   []BossLootEntry{},
+			GoldRange:  ResourceRange{},
+			StoneRange: ResourceRange{},
 		}, nil
 	}
 
@@ -26,7 +29,15 @@ func (s *Store) GetBossResources(ctx context.Context) (BossResources, error) {
 		BossID:     boss.ID,
 		TemplateID: boss.TemplateID,
 		Status:     boss.Status,
-		BossLoot:   loot,
+		GoldRange: ResourceRange{
+			Min: int64(math.Floor(float64(maxInt64(0, boss.GoldOnKill)) * 0.75)),
+			Max: int64(math.Floor(float64(maxInt64(0, boss.GoldOnKill)) * 1.25)),
+		},
+		StoneRange: ResourceRange{
+			Min: int64(math.Floor(float64(maxInt64(0, boss.StoneOnKill)) * 0.67)),
+			Max: int64(math.Floor(float64(maxInt64(0, boss.StoneOnKill)) * 1.33)),
+		},
+		BossLoot: loot,
 	}, nil
 }
 

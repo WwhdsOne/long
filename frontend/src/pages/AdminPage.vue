@@ -1,6 +1,5 @@
 <script setup>
 import AdminBossTab from '../components/admin/AdminBossTab.vue'
-import AdminButtonsTab from '../components/admin/AdminButtonsTab.vue'
 import AdminContentTab from '../components/admin/AdminContentTab.vue'
 import AdminDashboardTab from '../components/admin/AdminDashboardTab.vue'
 import AdminEquipmentTab from '../components/admin/AdminEquipmentTab.vue'
@@ -21,7 +20,7 @@ const admin = reactive(useAdminPage())
       <div class="hero__copy">
         <p class="hero__eyebrow">Long Control Room</p>
         <h1>管理现场、Boss 与掉落。</h1>
-        <p class="hero__lede">这里管理 Boss、装备、公告、留言和前台按钮，也能把按钮图片直传到 OSS。</p>
+        <p class="hero__lede">这里管理 Boss、装备、公告和留言，也能把素材图片直传到 OSS。</p>
       </div>
 
       <div class="hero__status">
@@ -43,7 +42,7 @@ const admin = reactive(useAdminPage())
         <strong>固定口令</strong>
       </div>
 
-      <p class="social-card__copy">先输入后台账号口令，解锁 Boss、装备和按钮配置。</p>
+        <p class="social-card__copy">先输入后台账号口令，解锁 Boss、装备和内容配置。</p>
       <p v-if="admin.errorMessage" class="feedback feedback--error">{{ admin.errorMessage }}</p>
 
       <form class="admin-form" @submit.prevent="admin.login">
@@ -75,7 +74,6 @@ const admin = reactive(useAdminPage())
         <div class="admin-tabs">
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'boss' }" @click="admin.activeTab = 'boss'">Boss</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'equipment' }" @click="admin.activeTab = 'equipment'; admin.fetchEquipmentPage(admin.equipmentPage.page)">装备</button>
-          <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'buttons' }" @click="admin.activeTab = 'buttons'; admin.fetchButtonPage(admin.buttonPage.page)">按钮</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'content' }" @click="admin.activeTab = 'content'; admin.fetchAnnouncements(); admin.fetchMessages()">内容</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'history' }" @click="admin.activeTab = 'history'; admin.fetchBossHistory(admin.bossHistoryPage.page)">历史</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'dashboard' }" @click="admin.activeTab = 'dashboard'">看板</button>
@@ -131,22 +129,6 @@ const admin = reactive(useAdminPage())
           :fetch-equipment-page="admin.fetchEquipmentPage"
           :upload-equipment-image="admin.uploadEquipmentImage"
         />
-
-
-
-        <AdminButtonsTab
-          v-else-if="admin.activeTab === 'buttons'"
-          :button-page="admin.buttonPage"
-          :button-form="admin.buttonForm"
-          :uploading-image="admin.uploadingImage"
-          :loading-buttons="admin.loadingButtons"
-          :saving="admin.saving"
-          :save-button="admin.saveButton"
-          :upload-button-image="admin.uploadButtonImage"
-          :edit-button="admin.editButton"
-          :fetch-button-page="admin.fetchButtonPage"
-        />
-
         <AdminContentTab
           v-else-if="admin.activeTab === 'content'"
           :announcement-form="admin.announcementForm"

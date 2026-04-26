@@ -14,58 +14,9 @@ import (
 )
 
 func registerAdminResourceRoutes(router route.IRouter, options Options) {
-	registerAdminButtonRoutes(router, options)
 	registerAdminEquipmentRoutes(router, options)
 }
 
-func registerAdminButtonRoutes(router route.IRouter, options Options) {
-	router.POST("/api/admin/buttons", func(ctx context.Context, c *app.RequestContext) {
-		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
-			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
-			return
-		}
-
-		var body vote.ButtonUpsert
-		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
-			return
-		}
-
-		if err := options.Store.SaveButton(ctx, body); err != nil {
-			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BUTTON_SAVE_FAILED"})
-			return
-		}
-
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:      vote.StateChangeButtonMetaChanged,
-			Timestamp: time.Now().Unix(),
-		})
-		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
-	})
-
-	router.PUT("/api/admin/buttons/:slug", func(ctx context.Context, c *app.RequestContext) {
-		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
-			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
-			return
-		}
-
-		var body vote.ButtonUpsert
-		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
-			return
-		}
-		body.Slug = c.Param("slug")
-
-		if err := options.Store.SaveButton(ctx, body); err != nil {
-			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BUTTON_SAVE_FAILED"})
-			return
-		}
-
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:      vote.StateChangeButtonMetaChanged,
-			Timestamp: time.Now().Unix(),
-		})
-		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
-	})
-}
 
 func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 	router.POST("/api/admin/equipment/generate", func(ctx context.Context, c *app.RequestContext) {

@@ -16,15 +16,14 @@ import (
 
 const (
 	realtimeMessageTypeHello       = "hello"
-	realtimeMessageTypeClickTicketRequest = "click_ticket_request"
 	realtimeMessageTypeClick       = "click"
 	realtimeMessageTypeSyncRequest = "sync_request"
 	realtimeMessageTypePing        = "ping"
 
-	realtimeMessageTypeClickTicket = "click_ticket"
 	realtimeMessageTypeSnapshot    = "snapshot"
 	realtimeMessageTypePublicDelta = "public_delta"
 	realtimeMessageTypeUserDelta   = "user_delta"
+	realtimeMessageTypeOnlineCount = "online_count"
 	realtimeMessageTypeClickAck    = "click_ack"
 	realtimeMessageTypeError       = "error"
 	realtimeMessageTypePong        = "pong"
@@ -35,24 +34,10 @@ const (
 )
 
 type realtimeClientMessage struct {
-	Type             string `json:"type"`
-	RequestID        string `json:"requestId"`
-	Nickname         string `json:"nickname"`
-	Slug             string `json:"slug"`
-	Ticket           string `json:"ticket"`
-	PointerType      string `json:"pointerType"`
-	PressDurationMS  int64  `json:"pressDurationMs"`
-	FingerprintHash  string `json:"fingerprintHash"`
-	FingerprintProof string `json:"fingerprintProof"`
-}
-
-type realtimeClickTicketMessage struct {
-	Type           string `json:"type"`
-	RequestID      string `json:"requestId"`
-	Ticket         string `json:"ticket"`
-	IssuedAt       int64  `json:"issuedAt"`
-	ExpiresAt      int64  `json:"expiresAt"`
-	ChallengeNonce string `json:"challengeNonce"`
+	Type      string `json:"type"`
+	RequestID string `json:"requestId"`
+	Nickname  string `json:"nickname"`
+	Slug      string `json:"slug"`
 }
 
 type realtimeSnapshotMessage struct {
@@ -67,9 +52,13 @@ type realtimeDeltaMessage struct {
 }
 
 type realtimeClickAckPayload struct {
-	Button   vote.Button `json:"button"`
-	Delta    int64       `json:"delta"`
-	Critical bool        `json:"critical"`
+	Delta      int64  `json:"delta"`
+	Critical   bool   `json:"critical"`
+	BossDamage int64  `json:"bossDamage,omitempty"`
+	DamageType string `json:"damageType,omitempty"`
+	Button     struct {
+		Key string `json:"key"`
+	} `json:"button"`
 }
 
 type realtimeClickAckMessage struct {
@@ -93,7 +82,6 @@ type realtimeSessionOptions struct {
 	hub                   RealtimeHub
 	changePublisher       ChangePublisher
 	clickGuard            ClickGuard
-	manualClick           ManualClickController
 	authenticatorEnabled  bool
 	authenticatedNickname string
 	clientID              string
@@ -105,7 +93,6 @@ type realtimeSession struct {
 	hub                   RealtimeHub
 	changePublisher       ChangePublisher
 	clickGuard            ClickGuard
-	manualClick           ManualClickController
 	authenticatorEnabled  bool
 	authenticatedNickname string
 	clientID              string
@@ -122,7 +109,6 @@ func newRealtimeSession(options realtimeSessionOptions) *realtimeSession {
 		hub:                   options.hub,
 		changePublisher:       options.changePublisher,
 		clickGuard:            options.clickGuard,
-		manualClick:           options.manualClick,
 		authenticatorEnabled:  options.authenticatorEnabled,
 		authenticatedNickname: strings.TrimSpace(options.authenticatedNickname),
 		clientID:              strings.TrimSpace(options.clientID),
@@ -142,7 +128,6 @@ func newRealtimeSocketHandler(options Options) app.HandlerFunc {
 			hub:                   options.RealtimeHub,
 			changePublisher:       options.ChangePublisher,
 			clickGuard:            options.ClickGuard,
-			manualClick:           options.ManualClick,
 			authenticatorEnabled:  options.PlayerAuthenticator != nil,
 			authenticatedNickname: authenticatedNickname,
 			clientID:              clientIdentifier(c),
@@ -224,46 +209,6 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		return s.sendSnapshot(ctx, send)
 	case realtimeMessageTypePing:
 		return send(realtimePongMessage{Type: realtimeMessageTypePong})
-	case realtimeMessageTypeClickTicketRequest:
-		slug := strings.TrimSpace(message.Slug)
-		if slug == "" {
-			return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击票据消息缺少按钮标识。"))
-		}
-		if s.manualClick == nil {
-			return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击票据服务暂不可用，请稍后重试。"))
-		}
-
-		nickname, apiErr := resolveClickNickname(clickRequestContext{
-			Slug:                  slug,
-			NicknameHint:          s.nickname,
-			AuthenticatedNickname: s.authenticatedNickname,
-			AuthenticatorEnabled:  s.authenticatorEnabled,
-		})
-		if apiErr != nil {
-			return send(s.protocolError(apiErr.Code, apiErr.Message))
-		}
-
-		ticket, err := s.manualClick.IssueTicket(ctx, TicketIssueRequest{
-			Nickname:        nickname,
-			Slug:            slug,
-			ClientID:        s.clientID,
-			FingerprintHash: message.FingerprintHash,
-		})
-		if err != nil {
-			if apiErr := manualClickRequestError(err); apiErr != nil {
-				return send(s.protocolError(apiErr.Code, apiErr.Message))
-			}
-			return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击票据签发失败，请稍后重试。"))
-		}
-
-		return send(realtimeClickTicketMessage{
-			Type:           realtimeMessageTypeClickTicket,
-			RequestID:      strings.TrimSpace(message.RequestID),
-			Ticket:         ticket.Value,
-			IssuedAt:       ticket.IssuedAt,
-			ExpiresAt:      ticket.ExpiresAt,
-			ChallengeNonce: ticket.ChallengeNonce,
-		})
 	case realtimeMessageTypeClick:
 		slug := strings.TrimSpace(message.Slug)
 		if slug == "" {
@@ -274,21 +219,12 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 			Store:           s.store,
 			ClickGuard:      s.clickGuard,
 			ChangePublisher: s.changePublisher,
-			ManualClick:     s.manualClick,
 		}, clickRequestContext{
 			Slug:                  slug,
 			NicknameHint:          s.nickname,
 			AuthenticatedNickname: s.authenticatedNickname,
 			AuthenticatorEnabled:  s.authenticatorEnabled,
 			ClientID:              s.clientID,
-			Ticket:                message.Ticket,
-			EntryType:             clickEntryWS,
-			FingerprintHash:       message.FingerprintHash,
-			FingerprintProof:      message.FingerprintProof,
-			Behavior: ClickBehavior{
-				PointerType:     message.PointerType,
-				PressDurationMS: message.PressDurationMS,
-			},
 		})
 		if apiErr != nil {
 			return send(s.protocolError(apiErr.Code, apiErr.Message))
@@ -309,9 +245,15 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		return send(realtimeClickAckMessage{
 			Type: realtimeMessageTypeClickAck,
 			Payload: realtimeClickAckPayload{
-				Button:   result.Button,
-				Delta:    result.Delta,
-				Critical: result.Critical,
+				Delta:      result.Delta,
+				Critical:   result.Critical,
+				BossDamage: result.BossDamage,
+				DamageType: result.DamageType,
+				Button: struct {
+					Key string `json:"key"`
+				}{
+					Key: slug,
+				},
 			},
 		})
 	default:
@@ -396,12 +338,17 @@ func realtimeMessageFromEvent(event events.ServerEvent) (any, bool) {
 	case events.PublicStateEventName:
 		return realtimeDeltaMessage{
 			Type:    realtimeMessageTypePublicDelta,
-			Payload: json.RawMessage(event.Payload),
+			Payload: event.Payload,
 		}, true
 	case events.UserStateEventName:
 		return realtimeDeltaMessage{
 			Type:    realtimeMessageTypeUserDelta,
-			Payload: json.RawMessage(event.Payload),
+			Payload: event.Payload,
+		}, true
+	case events.OnlineCountEventName:
+		return realtimeDeltaMessage{
+			Type:    realtimeMessageTypeOnlineCount,
+			Payload: event.Payload,
 		}, true
 	default:
 		return nil, false

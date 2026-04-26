@@ -28,11 +28,6 @@ type clickRequestContext struct {
 	AuthenticatedNickname string
 	AuthenticatorEnabled  bool
 	ClientID              string
-	Ticket                string
-	EntryType             string
-	FingerprintHash       string
-	FingerprintProof      string
-	Behavior              ClickBehavior
 }
 
 func (e *apiResponseError) writeTo(c *app.RequestContext) {
@@ -113,16 +108,7 @@ func enforceClickRateLimitForClient(guard ClickGuard, clientID string, nickname 
 }
 
 func clickRequestError(err error) *apiResponseError {
-	if apiErr := manualClickRequestError(err); apiErr != nil {
-		return apiErr
-	}
 	switch {
-	case errors.Is(err, vote.ErrButtonNotFound):
-		return &apiResponseError{
-			Status:  consts.StatusNotFound,
-			Code:    "BUTTON_NOT_FOUND",
-			Message: "按钮不存在或已经下线。",
-		}
 	case errors.Is(err, vote.ErrBossPartNotFound):
 		return &apiResponseError{
 			Status:  consts.StatusNotFound,
@@ -156,46 +142,10 @@ func clickRequestError(err error) *apiResponseError {
 	}
 }
 
-func manualClickRequestError(err error) *apiResponseError {
-	if manualClickRequiresRetry(err) {
-		return &apiResponseError{
-			Status:  consts.StatusConflict,
-			Code:    "CLICK_RETRY_REQUIRED",
-			Message: "操作已过期，请重试。",
-		}
-	}
-	if manualClickTooFrequent(err) {
-		return &apiResponseError{
-			Status:     consts.StatusTooManyRequests,
-			Code:       "CLICK_TOO_FREQUENT",
-			Message:    "请求过于频繁，请稍后再试。",
-			RetryAfter: manualClickRetryAfter(err),
-		}
-	}
-	return nil
-}
-
 func executeButtonClick(ctx context.Context, options Options, request clickRequestContext) (string, vote.ClickResult, *apiResponseError) {
 	nickname, apiErr := resolveClickNickname(request)
 	if apiErr != nil {
 		return "", vote.ClickResult{}, apiErr
-	}
-
-	if options.ManualClick != nil {
-		result, err := options.ManualClick.Click(ctx, ManualClickRequest{
-			Nickname:         nickname,
-			Slug:             request.Slug,
-			Ticket:           request.Ticket,
-			ClientID:         request.ClientID,
-			EntryType:        request.EntryType,
-			FingerprintHash:  request.FingerprintHash,
-			FingerprintProof: request.FingerprintProof,
-			Behavior:         request.Behavior,
-		})
-		if err != nil {
-			return "", vote.ClickResult{}, clickRequestError(err)
-		}
-		return nickname, result, nil
 	}
 
 	if apiErr := enforceClickRateLimitForClient(options.ClickGuard, request.ClientID, nickname); apiErr != nil {

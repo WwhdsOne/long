@@ -19,17 +19,19 @@ type ButtonStore interface {
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	GetUserState(context.Context, string) (vote.UserState, error)
 	ClickButton(context.Context, string, string) (vote.ClickResult, error)
+	ClickBossPart(context.Context, string, string) (vote.ClickResult, error)
+	AttackBossPartAFK(context.Context, string) (vote.ClickResult, error)
 	AutoClickBossPart(context.Context, string, string) (vote.ClickResult, error)
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
+	EnhanceItem(context.Context, string, string) (vote.State, error)
+	SalvageItem(context.Context, string, string) (vote.SalvageResult, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
-	ListAdminButtonsPage(context.Context, int64, int64) (vote.AdminButtonPage, error)
 	ListAdminEquipmentPage(context.Context, int64, int64) (vote.AdminEquipmentPage, error)
 	ListAdminBossHistoryPage(context.Context, int64, int64) (vote.AdminBossHistoryPage, error)
 	ListAdminPlayers(context.Context, string, int64) (vote.AdminPlayerPage, error)
 	GetAdminPlayer(context.Context, string) (*vote.AdminPlayerOverview, error)
-	SaveButton(context.Context, vote.ButtonUpsert) error
 	SaveEquipmentDefinition(context.Context, vote.EquipmentDefinition) error
 	DeleteEquipmentDefinition(context.Context, string) error
 	ActivateBoss(context.Context, vote.BossUpsert) (*vote.Boss, error)
@@ -66,6 +68,7 @@ type StateView interface {
 // RealtimeHub 为 SSE 与 WebSocket 共享的订阅中心。
 type RealtimeHub interface {
 	Subscribe(string) (<-chan events.ServerEvent, func())
+	SubscriberCount() int
 }
 
 // OSSSigner 负责生成 OSS 直传短时凭证。
@@ -88,13 +91,24 @@ type ClickGuard interface {
 	Allow(string) (time.Duration, error)
 }
 
-// ManualClickController 负责签发一次性票据并校验手动点击请求。
-type ManualClickController interface {
-	IssueTicket(context.Context, TicketIssueRequest) (ClickTicket, error)
-	Click(context.Context, ManualClickRequest) (vote.ClickResult, error)
+// AfkController 负责离页挂机状态流转与结算。
+type AfkController interface {
+	ReportPresence(context.Context, string, bool) error
+	ConsumeSettlement(string) vote.AfkSettlement
+	Close() error
 }
 
-// AutoClickController 负责服务端托管挂机任务的生命周期。
+// AutoClickStatus 保留兼容类型，旧接口已下线。
+type AutoClickStatus struct {
+	Active        bool   `json:"active"`
+	ButtonKey     string `json:"buttonKey,omitempty"`
+	StartedAt     int64  `json:"startedAt,omitempty"`
+	UpdatedAt     int64  `json:"updatedAt,omitempty"`
+	IntervalMs    int64  `json:"intervalMs"`
+	RatePerSecond int    `json:"ratePerSecond"`
+}
+
+// AutoClickController 保留兼容接口，旧接口已下线。
 type AutoClickController interface {
 	Start(context.Context, string, string) (AutoClickStatus, error)
 	Stop(string) AutoClickStatus
@@ -121,8 +135,8 @@ type Options struct {
 	Broadcaster             Broadcaster
 	ChangePublisher         ChangePublisher
 	ClickGuard              ClickGuard
-	ManualClick             ManualClickController
 	AutoClick               AutoClickController
+	Afk                     AfkController
 	PlayerAuthenticator     PlayerAuthenticator
 	Events                  app.HandlerFunc
 	RealtimeHub             RealtimeHub

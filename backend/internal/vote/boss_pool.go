@@ -47,12 +47,13 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 		}
 
 		templates = append(templates, BossTemplate{
-			ID:    templateID,
-			Name:  firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
-			MaxHP: maxInt64(1, int64FromString(values["max_hp"])),
-			Loot:  loot,
-
-			Layout: layout,
+			ID:          templateID,
+			Name:        firstNonEmpty(strings.TrimSpace(values["name"]), templateID),
+			MaxHP:       maxInt64(1, int64FromString(values["max_hp"])),
+			GoldOnKill:  maxInt64(0, int64FromString(values["gold_on_kill"])),
+			StoneOnKill: maxInt64(0, int64FromString(values["stone_on_kill"])),
+			Loot:        loot,
+			Layout:      layout,
 		})
 	}
 
@@ -73,14 +74,17 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 		return ErrBossTemplateNotFound
 	}
 	layout := normalizeBossPartLayout(template.Layout)
-	maxHP := maxInt64(1, template.MaxHP)
-	if len(layout) > 0 {
-		maxHP = sumBossPartMaxHP(layout)
+	if len(layout) == 0 {
+		return ErrBossPartsRequired
 	}
+	maxHP := maxInt64(1, template.MaxHP)
+	maxHP = sumBossPartMaxHP(layout)
 
 	values := map[string]any{
-		"name":   firstNonEmpty(strings.TrimSpace(template.Name), templateID),
-		"max_hp": strconv.FormatInt(maxHP, 10),
+		"name":          firstNonEmpty(strings.TrimSpace(template.Name), templateID),
+		"max_hp":        strconv.FormatInt(maxHP, 10),
+		"gold_on_kill":  strconv.FormatInt(maxInt64(0, template.GoldOnKill), 10),
+		"stone_on_kill": strconv.FormatInt(maxInt64(0, template.StoneOnKill), 10),
 	}
 	if len(layout) > 0 {
 		layoutRaw, _ := sonic.Marshal(layout)
@@ -185,20 +189,23 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 		return nil, err
 	}
 	parts := normalizeBossPartLayout(template.Layout)
-	maxHP := maxInt64(1, template.MaxHP)
-	if len(parts) > 0 {
-		maxHP = sumBossPartMaxHP(parts)
+	if len(parts) == 0 {
+		return nil, ErrBossPartsRequired
 	}
+	maxHP := maxInt64(1, template.MaxHP)
+	maxHP = sumBossPartMaxHP(parts)
 
 	current := &Boss{
-		ID:         instanceID,
-		TemplateID: template.ID,
-		Name:       firstNonEmpty(strings.TrimSpace(template.Name), template.ID),
-		Status:     bossStatusActive,
-		MaxHP:      maxHP,
-		CurrentHP:  maxHP,
-		Parts:      parts,
-		StartedAt:  time.Now().Unix(),
+		ID:          instanceID,
+		TemplateID:  template.ID,
+		Name:        firstNonEmpty(strings.TrimSpace(template.Name), template.ID),
+		Status:      bossStatusActive,
+		MaxHP:       maxHP,
+		CurrentHP:   maxHP,
+		GoldOnKill:  maxInt64(0, template.GoldOnKill),
+		StoneOnKill: maxInt64(0, template.StoneOnKill),
+		Parts:       parts,
+		StartedAt:   time.Now().Unix(),
 	}
 
 	if err := s.setCurrentBoss(ctx, current, template.Loot); err != nil {
@@ -226,14 +233,19 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
 		return nil
 	}
+	if len(boss.Parts) == 0 {
+		return ErrBossPartsRequired
+	}
 
 	values := map[string]any{
-		"id":         boss.ID,
-		"name":       boss.Name,
-		"status":     boss.Status,
-		"max_hp":     strconv.FormatInt(boss.MaxHP, 10),
-		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
-		"started_at": strconv.FormatInt(boss.StartedAt, 10),
+		"id":            boss.ID,
+		"name":          boss.Name,
+		"status":        boss.Status,
+		"max_hp":        strconv.FormatInt(boss.MaxHP, 10),
+		"current_hp":    strconv.FormatInt(boss.CurrentHP, 10),
+		"gold_on_kill":  strconv.FormatInt(maxInt64(0, boss.GoldOnKill), 10),
+		"stone_on_kill": strconv.FormatInt(maxInt64(0, boss.StoneOnKill), 10),
+		"started_at":    strconv.FormatInt(boss.StartedAt, 10),
 	}
 	if strings.TrimSpace(boss.TemplateID) != "" {
 		values["template_id"] = boss.TemplateID
@@ -241,10 +253,8 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	if boss.DefeatedAt != 0 {
 		values["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
 	}
-	if len(boss.Parts) > 0 {
-		partsRaw, _ := sonic.Marshal(boss.Parts)
-		values["parts"] = string(partsRaw)
-	}
+	partsRaw, _ := sonic.Marshal(boss.Parts)
+	values["parts"] = string(partsRaw)
 
 	pipe := s.client.TxPipeline()
 	pipe.Del(ctx, s.bossCurrentKey)
