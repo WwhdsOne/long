@@ -32,3 +32,5 @@ llm:
   base_url: "https://api.openai.com/v1"
   model: ""
   timeout_ms: 30000
+realtime:
+  debounce_ms: 50

@@ -58,9 +58,16 @@ type realtimeClickAckPayload struct {
 	DamageType      string                    `json:"damageType,omitempty"`
 	TalentEvents    []vote.TalentTriggerEvent `json:"talentEvents,omitempty"`
 	PartStateDeltas []vote.BossPartStateDelta `json:"partStateDeltas,omitempty"`
+	UserDelta       *realtimeUserDelta        `json:"userDelta,omitempty"`
 	Button          struct {
 		Key string `json:"key"`
 	} `json:"button"`
+}
+
+type realtimeUserDelta struct {
+	Gold         *int64 `json:"gold,omitempty"`
+	Stones       *int64 `json:"stones,omitempty"`
+	TalentPoints *int64 `json:"talentPoints,omitempty"`
 }
 
 type realtimeClickAckMessage struct {
@@ -119,7 +126,8 @@ func newRealtimeSession(options realtimeSessionOptions) *realtimeSession {
 
 func newRealtimeSocketHandler(options Options) app.HandlerFunc {
 	upgrader := websocket.HertzUpgrader{
-		CheckOrigin: func(_ *app.RequestContext) bool { return true },
+		CheckOrigin:       func(_ *app.RequestContext) bool { return true },
+		EnableCompression: true,
 	}
 
 	return func(ctx context.Context, c *app.RequestContext) {
@@ -244,7 +252,7 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		}
 		publishChange(ctx, s.changePublisher, change)
 
-		return send(realtimeClickAckMessage{
+		ack := realtimeClickAckMessage{
 			Type: realtimeMessageTypeClickAck,
 			Payload: realtimeClickAckPayload{
 				Delta:           result.Delta,
@@ -259,7 +267,17 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 					Key: slug,
 				},
 			},
-		})
+		}
+		if s.nickname != "" && s.stateView != nil {
+			if userState, err := s.stateView.GetUserState(ctx, s.nickname); err == nil {
+				ack.Payload.UserDelta = &realtimeUserDelta{
+					Gold:         &userState.Gold,
+					Stones:       &userState.Stones,
+					TalentPoints: &userState.TalentPoints,
+				}
+			}
+		}
+		return send(ack)
 	default:
 		return send(s.protocolError(realtimeErrorCodeInvalidMessage, "不支持的实时消息类型。"))
 	}

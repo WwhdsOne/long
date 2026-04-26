@@ -932,6 +932,17 @@ function applyClickResult(payload) {
     }
 
     buttonTotalVotes.value = Math.max(0, buttonTotalVotes.value + Number(payload.delta || 0))
+    if (payload.userDelta && typeof payload.userDelta === 'object') {
+        if (payload.userDelta.gold !== undefined) {
+            gold.value = Number(payload.userDelta.gold)
+        }
+        if (payload.userDelta.stones !== undefined) {
+            stones.value = Number(payload.userDelta.stones)
+        }
+        if (payload.userDelta.talentPoints !== undefined) {
+            talentPoints.value = Number(payload.userDelta.talentPoints)
+        }
+    }
     const nextClickState = mergeClickFallbackState(
         {
             userStats: userStats.value,

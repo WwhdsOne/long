@@ -66,17 +66,23 @@ type LLMConfig struct {
 	Timeout time.Duration
 }
 
+// RealtimeConfig 控制实时链路行为。
+type RealtimeConfig struct {
+	DebounceMs int
+}
+
 // Config 运行时配置集合
 type Config struct {
-	Port               int
-	Redis              RedisConfig
-	RateLimit          RateLimitConfig
-	Admin              AdminConfig
-	PlayerAuth         PlayerAuthConfig
-	OSS                OSSConfig
-	LLM                LLMConfig
-	RedisPrefix        string
-	PublicDir          string
+	Port        int
+	Redis       RedisConfig
+	RateLimit   RateLimitConfig
+	Admin       AdminConfig
+	PlayerAuth  PlayerAuthConfig
+	OSS         OSSConfig
+	LLM         LLMConfig
+	Realtime    RealtimeConfig
+	RedisPrefix string
+	PublicDir   string
 }
 
 type fileConfig struct {
@@ -120,6 +126,9 @@ type fileConfig struct {
 		Model     string `yaml:"model"`
 		TimeoutMS int    `yaml:"timeout_ms"`
 	} `yaml:"llm"`
+	Realtime struct {
+		DebounceMs int `yaml:"debounce_ms"`
+	} `yaml:"realtime"`
 }
 
 type consulKV struct {
@@ -208,8 +217,14 @@ func loadFromConsul() (Config, consulSource, error) {
 			Model:   strings.TrimSpace(parsed.LLM.Model),
 			Timeout: time.Duration(parsed.LLM.TimeoutMS) * time.Millisecond,
 		},
-		RedisPrefix:        parsed.RedisPrefix,
-		PublicDir:          resolvePublicDir(),
+		Realtime: RealtimeConfig{
+			DebounceMs: parsed.Realtime.DebounceMs,
+		},
+		RedisPrefix: parsed.RedisPrefix,
+		PublicDir:   resolvePublicDir(),
+	}
+	if config.Realtime.DebounceMs <= 0 {
+		config.Realtime.DebounceMs = 50
 	}
 
 	if err := validate(config); err != nil {
