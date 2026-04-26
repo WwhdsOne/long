@@ -1477,11 +1477,14 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 		delta = 1
 	}
 
-	if combatStats.CriticalChancePercent <= 0 || combatStats.CriticalCount <= 1 {
+	if combatStats.CriticalChancePercent <= 0 || !hasCriticalBonus(combatStats) {
 		return delta, false, nil
 	}
 
 	rollLimit, threshold := criticalRollPlan(combatStats.CriticalChancePercent)
+	if rollLimit <= 0 {
+		return delta, false, nil
+	}
 	if s.roll(rollLimit) < threshold {
 		return combatStats.CriticalDamage, true, nil
 	}
@@ -1508,7 +1511,7 @@ func (s *Store) baseCombatStats() CombatStats {
 		CriticalCount:         s.critical.CriticalCount,
 		AttackPower:           5,
 		ArmorPenPercent:       0,
-		CritDamageMultiplier:  1.0,
+		CritDamageMultiplier:  1.5,
 		AllDamageAmplify:      0,
 	})
 }
@@ -1542,13 +1545,22 @@ func deriveCombatStats(stats CombatStats) CombatStats {
 		stats.CriticalCount = 1
 	}
 
-	stats.CriticalDamage = max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
-
 	if stats.CritDamageMultiplier < 1.0 {
 		stats.CritDamageMultiplier = 1.0
 	}
 
+	countBasedCriticalDamage := max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
+	multiplierBasedCriticalDamage := int64(float64(stats.NormalDamage) * stats.CritDamageMultiplier)
+	if multiplierBasedCriticalDamage < stats.NormalDamage {
+		multiplierBasedCriticalDamage = stats.NormalDamage
+	}
+	stats.CriticalDamage = max(countBasedCriticalDamage, multiplierBasedCriticalDamage)
+
 	return stats
+}
+
+func hasCriticalBonus(stats CombatStats) bool {
+	return stats.CriticalCount > 1 || stats.CritDamageMultiplier > 1.0
 }
 
 // CalcBossPartDamage 计算对 Boss 部位的伤害（新减法公式）。
@@ -1578,7 +1590,7 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 	// 暴击乘区
 	critMult := 1.0
 	rollLimit, threshold := criticalRollPlan(stats.CriticalChancePercent)
-	if rollLimit > 0 && stats.CriticalCount > 1 && s_roll(rollLimit) < threshold {
+	if rollLimit > 0 && hasCriticalBonus(stats) && s_roll(rollLimit) < threshold {
 		critMult = max(1.0, stats.CritDamageMultiplier)
 	}
 
@@ -2214,6 +2226,10 @@ func (s *Store) resourceKey(nickname string) string {
 	return s.namespace + "resource:" + nickname
 }
 
+func (s *Store) legacyGemKey(nickname string) string {
+	return s.namespace + "gem:" + nickname
+}
+
 type playerResources struct {
 	Gems   int64
 	Gold   int64
@@ -2221,15 +2237,62 @@ type playerResources struct {
 }
 
 func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
-	values, err := s.client.HMGet(ctx, s.resourceKey(nickname), "gems", "gold", "stones").Result()
+	resourceKey := s.resourceKey(nickname)
+	values, err := s.client.HMGet(ctx, resourceKey, "gems", "gold", "stones").Result()
 	if err != nil {
 		return playerResources{}, err
 	}
-	return playerResources{
+
+	current := playerResources{
 		Gems:   int64Value(values, 0),
 		Gold:   int64Value(values, 1),
 		Stones: int64Value(values, 2),
-	}, nil
+	}
+
+	legacyKey := s.legacyGemKey(nickname)
+	legacyValues, err := s.client.HMGet(ctx, legacyKey, "gems", "gold", "stones").Result()
+	if err != nil {
+		return playerResources{}, err
+	}
+	if !hasAnyHMGetValue(legacyValues) {
+		return current, nil
+	}
+
+	legacy := playerResources{
+		Gems:   int64Value(legacyValues, 0),
+		Gold:   int64Value(legacyValues, 1),
+		Stones: int64Value(legacyValues, 2),
+	}
+	merged := legacy
+	if hasAnyHMGetValue(values) {
+		merged = playerResources{
+			Gems:   current.Gems + legacy.Gems,
+			Gold:   current.Gold + legacy.Gold,
+			Stones: current.Stones + legacy.Stones,
+		}
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, resourceKey, map[string]any{
+		"gems":   strconv.FormatInt(merged.Gems, 10),
+		"gold":   strconv.FormatInt(merged.Gold, 10),
+		"stones": strconv.FormatInt(merged.Stones, 10),
+	})
+	pipe.Del(ctx, legacyKey)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return playerResources{}, err
+	}
+
+	return merged, nil
+}
+
+func hasAnyHMGetValue(values []any) bool {
+	for _, value := range values {
+		if value != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) equipmentSpentKey(nickname string) string {
