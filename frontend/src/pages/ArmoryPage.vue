@@ -19,6 +19,7 @@ const {
   actioningItemId,
   gold,
   stones,
+  talentPoints,
   isLoggedIn,
   myClicks,
   myRank,
@@ -251,6 +252,7 @@ onBeforeUnmount(() => {
           资源：
           金币 <span class="num-gold">{{ gold }}</span>
           · 强化石 <span class="num-stone">{{ stones }}</span>
+          · 天赋点 <span class="num-stone">{{ talentPoints }}</span>
         </p>
         <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
           <p>先去打 Boss，掉落会自动进背包。</p>

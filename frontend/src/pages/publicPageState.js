@@ -66,10 +66,9 @@ const profilePageMap = {
     loadout: 'loadout',
 }
 
-// todo后续补上天赋
 const publicPages = [
     {id: 'battle', label: '战斗', path: '/'},
-    // {id: 'talents', label: '天赋', path: '/talents'},
+    {id: 'talents', label: '天赋', path: '/talents'},
     {id: 'resources', label: '资源', path: '/profile/resources'},
     {id: 'inventory', label: '背包', path: '/profile/inventory'},
     {id: 'stats', label: '属性', path: '/profile/stats'},
@@ -84,6 +83,7 @@ const bossLeaderboard = ref([])
 const bossLoot = ref([])
 const bossGoldRange = ref({min: 0, max: 0})
 const bossStoneRange = ref({min: 0, max: 0})
+const bossTalentPointsOnKill = ref(0)
 const announcementVersion = ref('')
 const latestAnnouncement = ref(null)
 const announcements = ref([])
@@ -105,6 +105,7 @@ const actioningItemId = ref('')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
 const damageBursts = ref({})
+const talentTriggerFeed = ref([])
 const damageStageFx = ref({
     shake: false,
     flash: false,
@@ -135,6 +136,7 @@ const autoClickEnabled = ref(false)
 const autoClickTargetKey = ref('')
 const gold = ref(0)
 const stones = ref(0)
+const talentPoints = ref(0)
 const afkSettlement = ref(null)
 const rewardModal = ref(null)
 const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
@@ -271,6 +273,9 @@ function defaultCombatStats() {
         critDamageMultiplier: 0,
         bossDamagePercent: 0,
         allDamageAmplify: 0,
+        perPartDamagePercent: 0,
+        lowHpMultiplier: 1,
+        lowHpThreshold: 0,
     }
 }
 
@@ -566,6 +571,7 @@ async function loadBossResources(force = false) {
         bossLoot.value = []
         bossGoldRange.value = {min: 0, max: 0}
         bossStoneRange.value = {min: 0, max: 0}
+        bossTalentPointsOnKill.value = 0
         lastBossResourceVersion = ''
         return
     }
@@ -586,12 +592,14 @@ async function loadBossResources(force = false) {
         bossLoot.value = Array.isArray(payload?.bossLoot) ? payload.bossLoot : []
         bossGoldRange.value = payload?.goldRange ?? {min: 0, max: 0}
         bossStoneRange.value = payload?.stoneRange ?? {min: 0, max: 0}
+        bossTalentPointsOnKill.value = Math.max(0, Number(payload?.talentPointsOnKill ?? 0))
         lastBossResourceVersion = currentVersion
     } catch {
         if (force) {
             bossLoot.value = []
             bossGoldRange.value = {min: 0, max: 0}
             bossStoneRange.value = {min: 0, max: 0}
+            bossTalentPointsOnKill.value = 0
         }
     } finally {
         loadingBossResources.value = false
@@ -800,6 +808,15 @@ function applyPublicState(payload) {
     if ('bossLeaderboard' in payload) {
         bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
     }
+    if ('bossGoldRange' in payload && payload.bossGoldRange) {
+        bossGoldRange.value = payload.bossGoldRange
+    }
+    if ('bossStoneRange' in payload && payload.bossStoneRange) {
+        bossStoneRange.value = payload.bossStoneRange
+    }
+    if ('bossTalentPointsOnKill' in payload) {
+        bossTalentPointsOnKill.value = Math.max(0, Number(payload.bossTalentPointsOnKill ?? 0))
+    }
     if ('announcementVersion' in payload) {
         const nextVersion = String(payload.announcementVersion || '').trim()
         const versionChanged = announcementVersion.value !== nextVersion
@@ -842,8 +859,10 @@ function applyBattleUserState(payload) {
     }
     const hasGold = 'gold' in payload
     const hasStones = 'stones' in payload
+    const hasTalentPoints = 'talentPoints' in payload
     const nextGold = hasGold ? Number(payload.gold ?? 0) : gold.value
     const nextStones = hasStones ? Number(payload.stones ?? 0) : stones.value
+    const nextTalentPoints = hasTalentPoints ? Number(payload.talentPoints ?? 0) : talentPoints.value
 
     if ('userStats' in payload) {
         userStats.value = payload.userStats ?? null
@@ -877,6 +896,7 @@ function applyBattleUserState(payload) {
     }
     lastKnownGold = nextGold
     lastKnownStones = nextStones
+    talentPoints.value = nextTalentPoints
     syncing.value = false
     markUpdated()
 }
@@ -900,6 +920,9 @@ function applyPlayerProfileState(payload) {
     }
     if ('stones' in payload) {
         stones.value = Number(payload.stones ?? 0)
+    }
+    if ('talentPoints' in payload) {
+        talentPoints.value = Number(payload.talentPoints ?? 0)
     }
 }
 
@@ -937,6 +960,7 @@ function clearUserRealtimeState() {
     combatStats.value = defaultCombatStats()
     gold.value = 0
     stones.value = 0
+    talentPoints.value = 0
     myBossStats.value = null
     recentRewards.value = []
     lastReward.value = null
@@ -1022,6 +1046,18 @@ function ensureRealtimeTransport() {
             const key = resolveClickAckKey(payload)
             if (key) {
                 triggerDamageBurst(key, payload)
+            }
+            if (Array.isArray(payload?.talentEvents) && payload.talentEvents.length > 0) {
+                const now = Date.now()
+                talentTriggerFeed.value = [
+                    ...payload.talentEvents.map((event, index) => ({
+                        id: `${now}-${index}-${event.talentId || 'talent'}`,
+                        name: event.name || event.talentId || '天赋',
+                        message: event.message || '天赋触发',
+                        extraDamage: Number(event.extraDamage || 0),
+                    })),
+                    ...talentTriggerFeed.value,
+                ].slice(0, 6)
             }
             clearPendingClicks(key)
             if (key) {
@@ -1682,6 +1718,7 @@ function registerPublicPageLifecycle() {
         stageFxTimers.forEach((timer) => window.clearTimeout(timer))
         stageFxTimers.clear()
         burstFrameOffsets.clear()
+        talentTriggerFeed.value = []
     })
 }
 
@@ -1700,6 +1737,7 @@ export function usePublicPageState() {
         bossLoot,
         bossGoldRange,
         bossStoneRange,
+        bossTalentPointsOnKill,
         announcementVersion,
         latestAnnouncement,
         announcements,
@@ -1722,6 +1760,7 @@ export function usePublicPageState() {
         lastUpdatedAt,
         liveConnected,
         damageBursts,
+        talentTriggerFeed,
         damageStageFx,
         bossHistory,
         bossHistoryQuery,
@@ -1744,6 +1783,7 @@ export function usePublicPageState() {
         autoClickTargetKey,
         gold,
         stones,
+        talentPoints,
         afkSettlement,
         rewardModal,
         currentPublicPage,

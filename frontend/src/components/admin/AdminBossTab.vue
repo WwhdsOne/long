@@ -150,6 +150,7 @@ function openCreateTemplateDialog() {
   props.bossForm.maxHp = ''
   props.bossForm.goldOnKill = 0
   props.bossForm.stoneOnKill = 0
+  props.bossForm.talentPointsOnKill = 0
   props.bossForm.layout = []
   resetLootRows()
   selectedCell.value = null
@@ -268,7 +269,7 @@ function goNextPage() {
             <span>{{ entry.id }}</span>
           </div>
           <p>血量 {{ entry.maxHp }} · 部位 {{ entry.layout?.length || 0 }}</p>
-          <p>掉落 {{ entry.loot.length }} · 金币 {{ entry.goldOnKill || 0 }} · 强化石 {{ entry.stoneOnKill || 0 }}</p>
+          <p>掉落 {{ entry.loot.length }} · 金币 {{ entry.goldOnKill || 0 }} · 强化石 {{ entry.stoneOnKill || 0 }} · 天赋点 {{ entry.talentPointsOnKill || 0 }}</p>
           <button class="inventory-item__action" type="button" @click.stop="openEditTemplateDialog(entry)">编辑模板</button>
         </article>
       </div>
@@ -295,6 +296,7 @@ function goNextPage() {
               <input v-model="bossForm.name" class="nickname-form__input" type="text" placeholder="Boss 显示名称" />
               <input v-model.number="bossForm.goldOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀金币基准" />
               <input v-model.number="bossForm.stoneOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀强化石基准" />
+              <input v-model.number="bossForm.talentPointsOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀天赋点基准" />
               <input class="nickname-form__input" type="number" min="0" :value="bossPartTotalHp" readonly aria-label="Boss 总血量" />
             </div>
 

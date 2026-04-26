@@ -137,6 +137,7 @@ export function normalizeBossTemplate(entry) {
     maxHp: Number(entry?.maxHp ?? 0),
     goldOnKill: Number(entry?.goldOnKill ?? 0),
     stoneOnKill: Number(entry?.stoneOnKill ?? 0),
+    talentPointsOnKill: Number(entry?.talentPointsOnKill ?? 0),
     layout: Array.isArray(entry?.layout) ? entry.layout : [],
     loot: Array.isArray(entry?.loot) ? entry.loot.map(normalizeLootEntry) : [],
   }

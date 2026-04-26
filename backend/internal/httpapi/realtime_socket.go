@@ -52,11 +52,13 @@ type realtimeDeltaMessage struct {
 }
 
 type realtimeClickAckPayload struct {
-	Delta      int64  `json:"delta"`
-	Critical   bool   `json:"critical"`
-	BossDamage int64  `json:"bossDamage,omitempty"`
-	DamageType string `json:"damageType,omitempty"`
-	Button     struct {
+	Delta           int64                     `json:"delta"`
+	Critical        bool                      `json:"critical"`
+	BossDamage      int64                     `json:"bossDamage,omitempty"`
+	DamageType      string                    `json:"damageType,omitempty"`
+	TalentEvents    []vote.TalentTriggerEvent `json:"talentEvents,omitempty"`
+	PartStateDeltas []vote.BossPartStateDelta `json:"partStateDeltas,omitempty"`
+	Button          struct {
 		Key string `json:"key"`
 	} `json:"button"`
 }
@@ -245,10 +247,12 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		return send(realtimeClickAckMessage{
 			Type: realtimeMessageTypeClickAck,
 			Payload: realtimeClickAckPayload{
-				Delta:      result.Delta,
-				Critical:   result.Critical,
-				BossDamage: result.BossDamage,
-				DamageType: result.DamageType,
+				Delta:           result.Delta,
+				Critical:        result.Critical,
+				BossDamage:      result.BossDamage,
+				DamageType:      result.DamageType,
+				TalentEvents:    result.TalentEvents,
+				PartStateDeltas: result.PartStateDeltas,
 				Button: struct {
 					Key string `json:"key"`
 				}{

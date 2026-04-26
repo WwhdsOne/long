@@ -31,33 +31,36 @@ type AdminPlayerPage struct {
 
 // BossUpsert 管理后台 Boss 启动载荷
 type BossUpsert struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	MaxHP       int64      `json:"maxHp"`
-	GoldOnKill  int64      `json:"goldOnKill"`
-	StoneOnKill int64      `json:"stoneOnKill"`
-	Parts       []BossPart `json:"parts,omitempty"`
+	ID                 string     `json:"id"`
+	Name               string     `json:"name"`
+	MaxHP              int64      `json:"maxHp"`
+	GoldOnKill         int64      `json:"goldOnKill"`
+	StoneOnKill        int64      `json:"stoneOnKill"`
+	TalentPointsOnKill int64      `json:"talentPointsOnKill"`
+	Parts              []BossPart `json:"parts,omitempty"`
 }
 
 // BossTemplate Boss 池模板。
 type BossTemplate struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	MaxHP       int64           `json:"maxHp"`
-	GoldOnKill  int64           `json:"goldOnKill"`
-	StoneOnKill int64           `json:"stoneOnKill"`
-	Loot        []BossLootEntry `json:"loot"`
-	Layout      []BossPart      `json:"layout,omitempty"` // 部位布局
+	ID                 string          `json:"id"`
+	Name               string          `json:"name"`
+	MaxHP              int64           `json:"maxHp"`
+	GoldOnKill         int64           `json:"goldOnKill"`
+	StoneOnKill        int64           `json:"stoneOnKill"`
+	TalentPointsOnKill int64           `json:"talentPointsOnKill"`
+	Loot               []BossLootEntry `json:"loot"`
+	Layout             []BossPart      `json:"layout,omitempty"` // 部位布局
 }
 
 // BossTemplateUpsert 后台 Boss 模板保存载荷。
 type BossTemplateUpsert struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	MaxHP       int64      `json:"maxHp"`
-	GoldOnKill  int64      `json:"goldOnKill"`
-	StoneOnKill int64      `json:"stoneOnKill"`
-	Layout      []BossPart `json:"layout,omitempty"`
+	ID                 string     `json:"id"`
+	Name               string     `json:"name"`
+	MaxHP              int64      `json:"maxHp"`
+	GoldOnKill         int64      `json:"goldOnKill"`
+	StoneOnKill        int64      `json:"stoneOnKill"`
+	TalentPointsOnKill int64      `json:"talentPointsOnKill"`
+	Layout             []BossPart `json:"layout,omitempty"`
 }
 
 // BossHistoryEntry 历史 Boss 概览

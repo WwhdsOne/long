@@ -17,14 +17,15 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 	}
 
 	values := map[string]any{
-		"id":            boss.ID,
-		"name":          boss.Name,
-		"status":        boss.Status,
-		"max_hp":        strconv.FormatInt(boss.MaxHP, 10),
-		"current_hp":    strconv.FormatInt(boss.CurrentHP, 10),
-		"gold_on_kill":  strconv.FormatInt(maxInt64(0, boss.GoldOnKill), 10),
-		"stone_on_kill": strconv.FormatInt(maxInt64(0, boss.StoneOnKill), 10),
-		"started_at":    strconv.FormatInt(boss.StartedAt, 10),
+		"id":                    boss.ID,
+		"name":                  boss.Name,
+		"status":                boss.Status,
+		"max_hp":                strconv.FormatInt(boss.MaxHP, 10),
+		"current_hp":            strconv.FormatInt(boss.CurrentHP, 10),
+		"gold_on_kill":          strconv.FormatInt(maxInt64(0, boss.GoldOnKill), 10),
+		"stone_on_kill":         strconv.FormatInt(maxInt64(0, boss.StoneOnKill), 10),
+		"talent_points_on_kill": strconv.FormatInt(maxInt64(0, boss.TalentPointsOnKill), 10),
+		"started_at":            strconv.FormatInt(boss.StartedAt, 10),
 	}
 	if strings.TrimSpace(boss.TemplateID) != "" {
 		values["template_id"] = boss.TemplateID

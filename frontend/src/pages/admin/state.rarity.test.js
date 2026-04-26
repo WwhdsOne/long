@@ -38,10 +38,12 @@ describe('admin state rarity normalization', () => {
       maxHp: 9999,
       goldOnKill: 5000,
       stoneOnKill: 120,
+      talentPointsOnKill: 88,
     })
 
     expect(template.goldOnKill).toBe(5000)
     expect(template.stoneOnKill).toBe(120)
+    expect(template.talentPointsOnKill).toBe(88)
   })
 
   it('装备槽位使用策划案里的六部位，并把旧 armor 兼容为胸甲', () => {

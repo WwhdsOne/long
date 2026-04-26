@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -89,12 +90,19 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 		subDefs = vote.GetTreeTalents(state.SubTree)
 	}
 
+	userState, err := h.store.GetUserState(ctx, nickStr)
+	if err != nil {
+		c.JSON(consts.StatusInternalServerError, map[string]string{"error": "user state fetch failed"})
+		return
+	}
+
 	c.JSON(consts.StatusOK, map[string]any{
-		"tree":     state.Tree,
-		"subTree":  state.SubTree,
-		"talents":  state.Talents,
-		"treeDefs": treeDefs,
-		"subDefs":  subDefs,
+		"tree":         state.Tree,
+		"subTree":      state.SubTree,
+		"talents":      state.Talents,
+		"treeDefs":     treeDefs,
+		"subDefs":      subDefs,
+		"talentPoints": userState.TalentPoints,
 	})
 }
 
@@ -109,11 +117,22 @@ func (h *talentAPI) learn(ctx context.Context, c *app.RequestContext) {
 	}
 
 	if err := h.store.LearnTalent(ctx, nickStr, req.TalentID); err != nil {
-		c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
+		c.JSON(talentErrorStatus(err), map[string]string{
+			"error":   talentErrorCode(err),
+			"message": talentErrorMessage(err),
+		})
 		return
 	}
 
-	c.JSON(consts.StatusOK, map[string]string{"status": "ok"})
+	userState, err := h.store.GetUserState(ctx, nickStr)
+	if err != nil {
+		c.JSON(consts.StatusInternalServerError, map[string]string{"error": "user state fetch failed"})
+		return
+	}
+	c.JSON(consts.StatusOK, map[string]any{
+		"status":       "ok",
+		"talentPoints": userState.TalentPoints,
+	})
 }
 
 func (h *talentAPI) reset(ctx context.Context, c *app.RequestContext) {
@@ -121,11 +140,22 @@ func (h *talentAPI) reset(ctx context.Context, c *app.RequestContext) {
 	nickStr, _ := nickname.(string)
 
 	if err := h.store.ResetTalents(ctx, nickStr); err != nil {
-		c.JSON(consts.StatusInternalServerError, map[string]string{"error": err.Error()})
+		c.JSON(talentErrorStatus(err), map[string]string{
+			"error":   talentErrorCode(err),
+			"message": talentErrorMessage(err),
+		})
 		return
 	}
 
-	c.JSON(consts.StatusOK, map[string]string{"status": "ok"})
+	userState, err := h.store.GetUserState(ctx, nickStr)
+	if err != nil {
+		c.JSON(consts.StatusInternalServerError, map[string]string{"error": "user state fetch failed"})
+		return
+	}
+	c.JSON(consts.StatusOK, map[string]any{
+		"status":       "ok",
+		"talentPoints": userState.TalentPoints,
+	})
 }
 
 func (h *talentAPI) getDefs(ctx context.Context, c *app.RequestContext) {
@@ -158,8 +188,72 @@ func defsToMap(defs []vote.TalentDef) []map[string]any {
 			"name":         d.Name,
 			"effectType":   d.EffectType,
 			"effectValue":  d.EffectValue,
+			"cost":         d.Cost,
 			"prerequisite": d.Prerequisite,
 		})
 	}
 	return result
+}
+
+func talentErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, vote.ErrTalentNotFound):
+		return consts.StatusNotFound
+	case errors.Is(err, vote.ErrTalentPointsInsufficient),
+		errors.Is(err, vote.ErrTalentTreeNotSet),
+		errors.Is(err, vote.ErrTalentPrerequisite),
+		errors.Is(err, vote.ErrTalentAlreadyLearned),
+		errors.Is(err, vote.ErrTalentMaxLevel),
+		errors.Is(err, vote.ErrTalentInvalidCost),
+		errors.Is(err, vote.ErrInvalidTalentTree):
+		return consts.StatusBadRequest
+	default:
+		return consts.StatusInternalServerError
+	}
+}
+
+func talentErrorCode(err error) string {
+	switch {
+	case errors.Is(err, vote.ErrTalentPointsInsufficient):
+		return "TALENT_POINTS_INSUFFICIENT"
+	case errors.Is(err, vote.ErrTalentInvalidCost):
+		return "TALENT_INVALID_COST"
+	case errors.Is(err, vote.ErrTalentTreeNotSet):
+		return "TALENT_TREE_NOT_SET"
+	case errors.Is(err, vote.ErrTalentPrerequisite):
+		return "TALENT_PREREQUISITE_NOT_MET"
+	case errors.Is(err, vote.ErrTalentAlreadyLearned):
+		return "TALENT_ALREADY_LEARNED"
+	case errors.Is(err, vote.ErrTalentMaxLevel):
+		return "TALENT_MAX_LEVEL"
+	case errors.Is(err, vote.ErrInvalidTalentTree):
+		return "INVALID_TALENT_TREE"
+	case errors.Is(err, vote.ErrTalentNotFound):
+		return "TALENT_NOT_FOUND"
+	default:
+		return "TALENT_OPERATION_FAILED"
+	}
+}
+
+func talentErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, vote.ErrTalentPointsInsufficient):
+		return "天赋点不足，无法学习该节点。"
+	case errors.Is(err, vote.ErrTalentInvalidCost):
+		return "天赋配置异常，节点成本无效。"
+	case errors.Is(err, vote.ErrTalentTreeNotSet):
+		return "请先选择主系/副系。"
+	case errors.Is(err, vote.ErrTalentPrerequisite):
+		return "前置节点尚未学习。"
+	case errors.Is(err, vote.ErrTalentAlreadyLearned):
+		return "该天赋已学习。"
+	case errors.Is(err, vote.ErrTalentMaxLevel):
+		return "副系节点已达上限。"
+	case errors.Is(err, vote.ErrInvalidTalentTree):
+		return "天赋树选择无效。"
+	case errors.Is(err, vote.ErrTalentNotFound):
+		return "未找到该天赋节点。"
+	default:
+		return "天赋操作失败，请稍后重试。"
+	}
 }

@@ -22,7 +22,8 @@ const (
 type TalentDef struct {
 	ID           string     `json:"id"`
 	Tree         TalentTree `json:"tree"`
-	Tier         int        `json:"tier"`    // 0=基石, 1-3=中间, 4=终极
+	Tier         int        `json:"tier"` // 0=基石, 1-3=中间, 4=终极
+	Cost         int64      `json:"cost"` // 学习消耗的天赋点
 	Name         string     `json:"name"`
 	EffectType   string     `json:"effectType"`
 	EffectValue  any        `json:"effectValue"`
@@ -31,9 +32,9 @@ type TalentDef struct {
 
 // TalentState 玩家天赋状态
 type TalentState struct {
-	Tree     TalentTree `json:"tree"`
-	SubTree  TalentTree `json:"subTree,omitempty"`
-	Talents  []string   `json:"talents"`  // 已学习天赋 ID 列表
+	Tree    TalentTree `json:"tree"`
+	SubTree TalentTree `json:"subTree,omitempty"`
+	Talents []string   `json:"talents"` // 已学习天赋 ID 列表
 }
 
 // talentPlayerData Redis 中存储的原始结构
@@ -58,16 +59,16 @@ var talentDefs = map[string]TalentDef{
 	"normal_ultimate":  {ID: "normal_ultimate", Tree: TalentTreeNormal, Tier: 4, Name: "白银风暴", EffectType: "silver_storm", EffectValue: map[string]any{"triggerHits": 15, "treatAllAs": "soft"}, Prerequisite: "normal_encircle"},
 
 	// ===== 破甲：碎盾攻坚 =====
-	"armor_core":          {ID: "armor_core", Tree: TalentTreeArmor, Tier: 0, Name: "灭绝穿甲", EffectType: "permanent_armor_pen", EffectValue: map[string]any{"penPercent": 0.40, "collapseTrigger": 200, "collapseDuration": 8}},
-	"armor_pen_up":        {ID: "armor_pen_up", Tree: TalentTreeArmor, Tier: 1, Name: "穿甲强化", EffectType: "armor_pen_extra", EffectValue: map[string]any{"extraPen": 0.25}, Prerequisite: "armor_core"},
-	"armor_boss_hunter":   {ID: "armor_boss_hunter", Tree: TalentTreeArmor, Tier: 1, Name: "首领猎杀", EffectType: "boss_damage", EffectValue: map[string]any{"percent": 0.30}, Prerequisite: "armor_core"},
-	"armor_heavy_scale":   {ID: "armor_heavy_scale", Tree: TalentTreeArmor, Tier: 1, Name: "以强制强", EffectType: "armor_scaling", EffectValue: map[string]any{"damagePer100Armor": 0.02}, Prerequisite: "armor_core"},
-	"armor_heavy_atk":     {ID: "armor_heavy_atk", Tree: TalentTreeArmor, Tier: 2, Name: "重甲特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "heavy", "percent": 0.50}, Prerequisite: "armor_pen_up"},
-	"armor_collapse_ext":  {ID: "armor_collapse_ext", Tree: TalentTreeArmor, Tier: 2, Name: "崩塌延长", EffectType: "collapse_extend", EffectValue: map[string]any{"extraDuration": 7}, Prerequisite: "armor_boss_hunter"},
-	"armor_auto_strike":   {ID: "armor_auto_strike", Tree: TalentTreeArmor, Tier: 2, Name: "自动打击", EffectType: "auto_strike", EffectValue: map[string]any{"interval": 20, "damageRatio": 3.0}, Prerequisite: "armor_heavy_scale"},
-	"armor_ruin":          {ID: "armor_ruin", Tree: TalentTreeArmor, Tier: 3, Name: "废墟打击", EffectType: "collapse_damage_amp", EffectValue: map[string]any{"extraPercent": 1.0}, Prerequisite: "armor_heavy_atk"},
-	"armor_pen_convert":   {ID: "armor_pen_convert", Tree: TalentTreeArmor, Tier: 3, Name: "破甲转化", EffectType: "pen_to_amplify", EffectValue: map[string]any{"convertRatio": 0.50}, Prerequisite: "armor_collapse_ext"},
-	"armor_ultimate":      {ID: "armor_ultimate", Tree: TalentTreeArmor, Tier: 4, Name: "审判日", EffectType: "judgment_day", EffectValue: map[string]any{"triggerCount": 500, "hpCutPercent": 0.50}, Prerequisite: "armor_ruin"},
+	"armor_core":         {ID: "armor_core", Tree: TalentTreeArmor, Tier: 0, Name: "灭绝穿甲", EffectType: "permanent_armor_pen", EffectValue: map[string]any{"penPercent": 0.40, "collapseTrigger": 200, "collapseDuration": 8}},
+	"armor_pen_up":       {ID: "armor_pen_up", Tree: TalentTreeArmor, Tier: 1, Name: "穿甲强化", EffectType: "armor_pen_extra", EffectValue: map[string]any{"extraPen": 0.25}, Prerequisite: "armor_core"},
+	"armor_boss_hunter":  {ID: "armor_boss_hunter", Tree: TalentTreeArmor, Tier: 1, Name: "首领猎杀", EffectType: "boss_damage", EffectValue: map[string]any{"percent": 0.30}, Prerequisite: "armor_core"},
+	"armor_heavy_scale":  {ID: "armor_heavy_scale", Tree: TalentTreeArmor, Tier: 1, Name: "以强制强", EffectType: "armor_scaling", EffectValue: map[string]any{"damagePer100Armor": 0.02}, Prerequisite: "armor_core"},
+	"armor_heavy_atk":    {ID: "armor_heavy_atk", Tree: TalentTreeArmor, Tier: 2, Name: "重甲特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "heavy", "percent": 0.50}, Prerequisite: "armor_pen_up"},
+	"armor_collapse_ext": {ID: "armor_collapse_ext", Tree: TalentTreeArmor, Tier: 2, Name: "崩塌延长", EffectType: "collapse_extend", EffectValue: map[string]any{"extraDuration": 7}, Prerequisite: "armor_boss_hunter"},
+	"armor_auto_strike":  {ID: "armor_auto_strike", Tree: TalentTreeArmor, Tier: 2, Name: "自动打击", EffectType: "auto_strike", EffectValue: map[string]any{"interval": 20, "damageRatio": 3.0}, Prerequisite: "armor_heavy_scale"},
+	"armor_ruin":         {ID: "armor_ruin", Tree: TalentTreeArmor, Tier: 3, Name: "废墟打击", EffectType: "collapse_damage_amp", EffectValue: map[string]any{"extraPercent": 1.0}, Prerequisite: "armor_heavy_atk"},
+	"armor_pen_convert":  {ID: "armor_pen_convert", Tree: TalentTreeArmor, Tier: 3, Name: "破甲转化", EffectType: "pen_to_amplify", EffectValue: map[string]any{"convertRatio": 0.50}, Prerequisite: "armor_collapse_ext"},
+	"armor_ultimate":     {ID: "armor_ultimate", Tree: TalentTreeArmor, Tier: 4, Name: "审判日", EffectType: "judgment_day", EffectValue: map[string]any{"triggerCount": 500, "hpCutPercent": 0.50}, Prerequisite: "armor_ruin"},
 
 	// ===== 暴击：致命洞察 =====
 	"crit_core":          {ID: "crit_core", Tree: TalentTreeCrit, Tier: 0, Name: "溢杀", EffectType: "overkill", EffectValue: map[string]any{"baseCritBonus": 0.20, "overflowToCritDmg": 0.02, "omenPerWeakCrit": 1}},
@@ -80,6 +81,34 @@ var talentDefs = map[string]TalentDef{
 	"crit_death_ecstasy": {ID: "crit_death_ecstasy", Tree: TalentTreeCrit, Tier: 3, Name: "死亡狂喜", EffectType: "death_ecstasy", EffectValue: map[string]any{"omenCost": 50, "duration": 6, "critDmgBonus": 2.0}, Prerequisite: "crit_bleed"},
 	"crit_final_cut":     {ID: "crit_final_cut", Tree: TalentTreeCrit, Tier: 3, Name: "终末血斩", EffectType: "final_cut", EffectValue: map[string]any{"critCount": 120, "hpCutPercent": 0.12, "cooldown": 30}, Prerequisite: "crit_omen_kill"},
 	"crit_ultimate":      {ID: "crit_ultimate", Tree: TalentTreeCrit, Tier: 4, Name: "末日审判", EffectType: "doom_judgment", EffectValue: map[string]any{"markCount": 2, "omenReward": 100, "critDmgMult": 3, "dualKillMult": 6}, Prerequisite: "crit_death_ecstasy"},
+}
+
+var talentTierCosts = map[int]int64{
+	0: 100,
+	1: 2000,
+	2: 8000,
+	3: 30000,
+	4: 120000,
+}
+
+func init() {
+	// 统一按层级填充 cost，避免定义表重复维护。
+	for id, def := range talentDefs {
+		cost, ok := talentTierCosts[def.Tier]
+		if !ok {
+			cost = 0
+		}
+		def.Cost = cost
+		talentDefs[id] = def
+	}
+}
+
+func talentCostByTier(tier int) (int64, bool) {
+	cost, ok := talentTierCosts[tier]
+	if !ok || cost <= 0 {
+		return 0, false
+	}
+	return cost, true
 }
 
 // GetTalentDef 返回指定 ID 的天赋定义。
@@ -176,6 +205,10 @@ func (s *Store) LearnTalent(ctx context.Context, nickname string, talentID strin
 	if !ok {
 		return ErrTalentNotFound
 	}
+	cost, valid := talentCostByTier(def.Tier)
+	if !valid {
+		return ErrTalentInvalidCost
+	}
 
 	state, err := s.GetTalentState(ctx, nickname)
 	if err != nil {
@@ -235,12 +268,51 @@ func (s *Store) LearnTalent(ctx context.Context, nickname string, talentID strin
 	if err != nil {
 		return err
 	}
-	return s.client.HSet(ctx, s.talentKey(nickname), "talents", string(talentsJSON)).Err()
+	resources, err := s.resourcesForNickname(ctx, nickname)
+	if err != nil {
+		return err
+	}
+	if resources.TalentPoints < cost {
+		return ErrTalentPointsInsufficient
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.talentKey(nickname), "talents", string(talentsJSON))
+	pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", -cost)
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 // ResetTalents 重置所有已学习天赋（保留主系副系选择）。
 func (s *Store) ResetTalents(ctx context.Context, nickname string) error {
-	return s.client.HSet(ctx, s.talentKey(nickname), "talents", "[]").Err()
+	state, err := s.GetTalentState(ctx, nickname)
+	if err != nil {
+		return err
+	}
+	if state == nil || len(state.Talents) == 0 {
+		return s.client.HSet(ctx, s.talentKey(nickname), "talents", "[]").Err()
+	}
+
+	var refund int64
+	for _, id := range state.Talents {
+		def, ok := talentDefs[id]
+		if !ok {
+			continue
+		}
+		cost, valid := talentCostByTier(def.Tier)
+		if !valid {
+			return ErrTalentInvalidCost
+		}
+		refund += cost
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.talentKey(nickname), "talents", "[]")
+	if refund > 0 {
+		pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", refund)
+	}
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 // TalentModifiers 聚集所有已学习天赋的效果修改器。
@@ -251,9 +323,10 @@ type TalentModifiers struct {
 	CritDamagePercentBonus float64 `json:"critDamagePercentBonus"`
 	PerPartDamagePercent   float64 `json:"perPartDamagePercent"`
 	LowHpMultiplier        float64 `json:"lowHpMultiplier"`
+	LowHpThreshold         float64 `json:"lowHpThreshold"`
 	CollapseDuration       int     `json:"collapseDuration"`
 	// 已学习天赋 ID 列表，供具体逻辑判断
-	Learned       []string          `json:"-"`
+	Learned       []string             `json:"-"`
 	PartTypeBonus map[PartType]float64 `json:"-"`
 }
 
@@ -310,6 +383,9 @@ func (s *Store) ComputeTalentModifiers(ctx context.Context, nickname string) (*T
 		case "low_hp_bonus":
 			if m, ok := val["multiplier"].(float64); ok {
 				mods.LowHpMultiplier = m
+			}
+			if threshold, ok := val["hpThreshold"].(float64); ok {
+				mods.LowHpThreshold = threshold
 			}
 		case "collapse_extend":
 			if d, ok := val["extraDuration"].(float64); ok {
