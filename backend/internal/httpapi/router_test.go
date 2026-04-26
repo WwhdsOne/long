@@ -38,6 +38,8 @@ type mockStore struct {
 	lastCycleEnabled      bool
 	lastSalvageItemID     string
 	lastSalvageQuantity   int64
+	lastLockItemID        string
+	lastLockState         bool
 	lastClickNickname     string
 	lastAutoClickNickname string
 	lastGetStateNickname  string
@@ -186,9 +188,52 @@ func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (vot
 	}
 	return vote.SalvageResult{
 		ItemID:         itemID,
+		GoldReward:     500,
+		StoneReward:    1,
 		RefundedStones: 12,
+		Gold:           66,
 		Stones:         34,
 	}, nil
+}
+
+func (m *mockStore) BulkSalvageUnequipped(_ context.Context, _ string) (vote.BulkSalvageResult, error) {
+	if m.salvageErr != nil {
+		return vote.BulkSalvageResult{}, m.salvageErr
+	}
+	return vote.BulkSalvageResult{
+		SalvagedCount:       3,
+		SalvagedByRarity:    map[string]int{"普通": 1, "稀有": 2},
+		GoldReward:          1200,
+		StoneReward:         2,
+		RefundedStones:      4,
+		Gold:                2000,
+		Stones:              66,
+		HasEnhancedSalvaged: true,
+	}, nil
+}
+
+func (m *mockStore) LockItem(_ context.Context, _ string, itemID string) (vote.State, error) {
+	m.lastLockItemID = itemID
+	m.lastLockState = true
+	if m.equipErr != nil {
+		return vote.State{}, m.equipErr
+	}
+	if m.equipState.Loadout.Weapon == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
+func (m *mockStore) UnlockItem(_ context.Context, _ string, itemID string) (vote.State, error) {
+	m.lastLockItemID = itemID
+	m.lastLockState = false
+	if m.equipErr != nil {
+		return vote.State{}, m.equipErr
+	}
+	if m.equipState.Loadout.Weapon == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
 }
 
 func (m *mockStore) GetAdminState(_ context.Context) (vote.AdminState, error) {
@@ -548,6 +593,74 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 	}
 	if payload.CombatStats.NormalDamage != 3 || payload.CombatStats.CriticalDamage != 7 {
 		t.Fatalf("expected actual damage 3/7, got %+v", payload.CombatStats)
+	}
+}
+
+func TestLockItemForwardsInstanceID(t *testing.T) {
+	store := &mockStore{}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/lock", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastLockItemID != "instance-wood-sword" || !store.lastLockState {
+		t.Fatalf("expected lock item forwarded, got item=%q locked=%v", store.lastLockItemID, store.lastLockState)
+	}
+}
+
+func TestUnlockItemForwardsInstanceID(t *testing.T) {
+	store := &mockStore{}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/unlock", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastLockItemID != "instance-wood-sword" || store.lastLockState {
+		t.Fatalf("expected unlock item forwarded, got item=%q locked=%v", store.lastLockItemID, store.lastLockState)
+	}
+}
+
+func TestBulkSalvageUnequippedReturnsSummary(t *testing.T) {
+	store := &mockStore{}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/salvage/unequipped", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload vote.BulkSalvageResult
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.SalvagedCount != 3 || payload.GoldReward != 1200 || payload.Stones != 66 {
+		t.Fatalf("unexpected bulk salvage payload: %+v", payload)
 	}
 }
 

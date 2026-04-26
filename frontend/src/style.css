@@ -382,6 +382,18 @@ select {
   color: var(--ink);
 }
 
+.armory-inventory-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.armory-inventory-head__bulk-button {
+  min-height: 32px;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+}
+
 .armory-backpack-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));

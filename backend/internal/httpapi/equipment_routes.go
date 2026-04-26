@@ -165,6 +165,84 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, state)
 	})
 
+	router.POST("/api/equipment/:instanceId/lock", func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if !bindJSON(c, &body, map[string]string{
+			"error":   "INVALID_REQUEST",
+			"message": "昵称没有带上，先报个名再锁定装备。",
+		}) {
+			return
+		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
+
+		state, err := options.Store.LockItem(ctx, nickname, c.Param("instanceId"))
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotFound) {
+				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_OWNED",
+					"message": "这件装备还不在你的背包里。",
+				})
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "LOCK_FAILED"})
+			return
+		}
+
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, state)
+	})
+
+	router.POST("/api/equipment/:instanceId/unlock", func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if !bindJSON(c, &body, map[string]string{
+			"error":   "INVALID_REQUEST",
+			"message": "昵称没有带上，先报个名再解锁装备。",
+		}) {
+			return
+		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
+
+		state, err := options.Store.UnlockItem(ctx, nickname, c.Param("instanceId"))
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotFound) {
+				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_OWNED",
+					"message": "这件装备还不在你的背包里。",
+				})
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "UNLOCK_FAILED"})
+			return
+		}
+
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, state)
+	})
+
 	router.POST("/api/equipment/:instanceId/salvage", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
@@ -196,9 +274,44 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 				})
 				return
 			}
+			if errors.Is(err, vote.ErrEquipmentLocked) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_LOCKED",
+					"message": "这件装备已锁定，解锁后才能分解。",
+				})
+				return
+			}
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "SALVAGE_FAILED"})
 			return
 		}
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, result)
+	})
+
+	router.POST("/api/equipment/salvage/unequipped", func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if !bindJSON(c, &body, map[string]string{
+			"error":   "INVALID_REQUEST",
+			"message": "昵称没有带上，先报个名再一键分解。",
+		}) {
+			return
+		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
+
+		result, err := options.Store.BulkSalvageUnequipped(ctx, nickname)
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "SALVAGE_BULK_FAILED"})
+			return
+		}
+
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
 		writeJSON(c, consts.StatusOK, result)
 	})

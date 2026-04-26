@@ -24,6 +24,7 @@ var ErrSensitiveNickname = errors.New("sensitive nickname")
 var ErrSensitiveContent = errors.New("sensitive content")
 var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
+var ErrEquipmentLocked = errors.New("equipment locked")
 var ErrEquipmentEnhanceMaxLevel = errors.New("equipment enhance max level")
 var ErrEquipmentEnhanceInsufficientGold = errors.New("equipment enhance insufficient gold")
 var ErrEquipmentEnhanceInsufficientStones = errors.New("equipment enhance insufficient stones")
@@ -192,6 +193,7 @@ type InventoryItem struct {
 	Equipped             bool    `json:"equipped"`
 	EnhanceLevel         int     `json:"enhanceLevel,omitempty"`
 	Bound                bool    `json:"bound,omitempty"`
+	Locked               bool    `json:"locked,omitempty"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritRate             float64 `json:"critRate,omitempty"`
@@ -208,6 +210,7 @@ type ItemInstance struct {
 	EnhanceLevel int    `json:"enhanceLevel"`
 	SpentStones  int64  `json:"spentStones"`
 	Bound        bool   `json:"bound"`
+	Locked       bool   `json:"locked"`
 	CreatedAt    int64  `json:"createdAt"`
 }
 
@@ -341,8 +344,26 @@ type AfkSettlement struct {
 // SalvageResult 装备分解结果。
 type SalvageResult struct {
 	ItemID         string `json:"itemId"`
+	GoldReward     int64  `json:"goldReward"`
+	StoneReward    int64  `json:"stoneReward"`
 	RefundedStones int64  `json:"refundedStones"`
+	Gold           int64  `json:"gold"`
 	Stones         int64  `json:"stones"`
+}
+
+// BulkSalvageResult 一键分解结果。
+type BulkSalvageResult struct {
+	SalvagedCount       int            `json:"salvagedCount"`
+	SalvagedByRarity    map[string]int `json:"salvagedByRarity,omitempty"`
+	ExcludedEquipped    int            `json:"excludedEquipped"`
+	ExcludedLocked      int            `json:"excludedLocked"`
+	ExcludedTopRarity   int            `json:"excludedTopRarity"`
+	GoldReward          int64          `json:"goldReward"`
+	StoneReward         int64          `json:"stoneReward"`
+	RefundedStones      int64          `json:"refundedStones"`
+	Gold                int64          `json:"gold"`
+	Stones              int64          `json:"stones"`
+	HasEnhancedSalvaged bool           `json:"hasEnhancedSalvaged"`
 }
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
@@ -772,7 +793,52 @@ func (s *Store) EnhanceItem(ctx context.Context, nickname string, instanceID str
 	return s.GetState(ctx, normalizedNickname)
 }
 
-// SalvageItem 分解装备实例，返还已消耗强化石的 60%（向下取整）。
+// LockItem 锁定一件装备实例。
+func (s *Store) LockItem(ctx context.Context, nickname string, instanceID string) (State, error) {
+	return s.setItemLockState(ctx, nickname, instanceID, true)
+}
+
+// UnlockItem 解锁一件装备实例。
+func (s *Store) UnlockItem(ctx context.Context, nickname string, instanceID string) (State, error) {
+	return s.setItemLockState(ctx, nickname, instanceID, false)
+}
+
+func (s *Store) setItemLockState(ctx context.Context, nickname string, instanceID string, locked bool) (State, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return State{}, err
+	}
+
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return State{}, ErrEquipmentNotFound
+	}
+
+	instance, err := s.getOwnedInstance(ctx, normalizedNickname, instanceID)
+	if err != nil {
+		return State{}, err
+	}
+
+	lockedValue := "0"
+	if locked {
+		lockedValue = "1"
+	}
+
+	now := time.Now().Unix()
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.equipmentInstanceKey(instance.InstanceID), "locked", lockedValue)
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: normalizedNickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
+		return State{}, err
+	}
+
+	return s.GetState(ctx, normalizedNickname)
+}
+
+// SalvageItem 分解装备实例，按稀有度返还金币/强化石并返还已消耗强化石的 60%（向下取整）。
 func (s *Store) SalvageItem(ctx context.Context, nickname string, instanceID string) (SalvageResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
@@ -788,18 +854,26 @@ func (s *Store) SalvageItem(ctx context.Context, nickname string, instanceID str
 	if err != nil {
 		return SalvageResult{}, err
 	}
+	if instance.Locked {
+		return SalvageResult{}, ErrEquipmentLocked
+	}
 	definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
 	if err != nil {
 		return SalvageResult{}, err
 	}
 
+	goldReward, stoneReward := salvageBaseReward(definition.Rarity)
 	refund := int64(math.Floor(float64(maxInt64(0, instance.SpentStones)) * 0.6))
+	stoneGain := stoneReward + refund
 
 	pipe := s.client.TxPipeline()
 	pipe.SRem(ctx, s.playerInstancesKey(normalizedNickname), instance.InstanceID)
 	pipe.Del(ctx, s.equipmentInstanceKey(instance.InstanceID))
-	if refund > 0 {
-		pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", refund)
+	if goldReward > 0 {
+		pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "gold", goldReward)
+	}
+	if stoneGain > 0 {
+		pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", stoneGain)
 	}
 	if definition.Slot != "" {
 		equippedRef, getErr := s.client.HGet(ctx, s.loadoutKey(normalizedNickname), definition.Slot).Result()
@@ -820,9 +894,123 @@ func (s *Store) SalvageItem(ctx context.Context, nickname string, instanceID str
 	}
 	return SalvageResult{
 		ItemID:         instance.ItemID,
+		GoldReward:     goldReward,
+		StoneReward:    stoneReward,
 		RefundedStones: refund,
+		Gold:           resources.Gold,
 		Stones:         resources.Stones,
 	}, nil
+}
+
+// BulkSalvageUnequipped 一键分解所有“未穿戴、未锁定、且非至臻”的装备。
+func (s *Store) BulkSalvageUnequipped(ctx context.Context, nickname string) (BulkSalvageResult, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return BulkSalvageResult{}, err
+	}
+
+	_, equipped, err := s.loadoutForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return BulkSalvageResult{}, err
+	}
+	instances, err := s.itemInstancesByIDForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return BulkSalvageResult{}, err
+	}
+
+	type salvageCandidate struct {
+		instance ItemInstance
+		slot     string
+		rarity   string
+	}
+
+	result := BulkSalvageResult{
+		SalvagedByRarity: map[string]int{},
+	}
+	candidates := make([]salvageCandidate, 0, len(instances))
+	for _, instance := range instances {
+		if equipped[instance.InstanceID] != "" {
+			result.ExcludedEquipped++
+			continue
+		}
+		if instance.Locked {
+			result.ExcludedLocked++
+			continue
+		}
+
+		definition, defErr := s.getEquipmentDefinition(ctx, instance.ItemID)
+		if defErr != nil {
+			continue
+		}
+
+		rarity := normalizeEquipmentRarity(definition.Rarity)
+		if rarity == "至臻" {
+			result.ExcludedTopRarity++
+			continue
+		}
+
+		candidates = append(candidates, salvageCandidate{
+			instance: instance,
+			slot:     definition.Slot,
+			rarity:   rarity,
+		})
+	}
+
+	if len(candidates) == 0 {
+		resources, resourceErr := s.resourcesForNickname(ctx, normalizedNickname)
+		if resourceErr != nil {
+			return BulkSalvageResult{}, resourceErr
+		}
+		result.Gold = resources.Gold
+		result.Stones = resources.Stones
+		return result, nil
+	}
+
+	for _, candidate := range candidates {
+		goldReward, stoneReward := salvageBaseReward(candidate.rarity)
+		refund := int64(math.Floor(float64(maxInt64(0, candidate.instance.SpentStones)) * 0.6))
+		result.GoldReward += goldReward
+		result.StoneReward += stoneReward
+		result.RefundedStones += refund
+		if refund > 0 {
+			result.HasEnhancedSalvaged = true
+		}
+		result.SalvagedByRarity[candidate.rarity]++
+	}
+	result.SalvagedCount = len(candidates)
+
+	pipe := s.client.TxPipeline()
+	for _, candidate := range candidates {
+		pipe.SRem(ctx, s.playerInstancesKey(normalizedNickname), candidate.instance.InstanceID)
+		pipe.Del(ctx, s.equipmentInstanceKey(candidate.instance.InstanceID))
+		if candidate.slot != "" {
+			equippedRef, getErr := s.client.HGet(ctx, s.loadoutKey(normalizedNickname), candidate.slot).Result()
+			if getErr != nil && !errors.Is(getErr, redis.Nil) {
+				return BulkSalvageResult{}, getErr
+			}
+			if strings.TrimSpace(equippedRef) == candidate.instance.InstanceID {
+				pipe.HDel(ctx, s.loadoutKey(normalizedNickname), candidate.slot)
+			}
+		}
+	}
+	if result.GoldReward > 0 {
+		pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "gold", result.GoldReward)
+	}
+	stoneGain := result.StoneReward + result.RefundedStones
+	if stoneGain > 0 {
+		pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", stoneGain)
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return BulkSalvageResult{}, err
+	}
+
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return BulkSalvageResult{}, err
+	}
+	result.Gold = resources.Gold
+	result.Stones = resources.Stones
+	return result, nil
 }
 
 // GetCurrentBoss 返回当前世界 Boss。
@@ -1517,6 +1705,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 				"enhance_level": "0",
 				"spent_stones":  "0",
 				"bound":         "0",
+				"locked":        "0",
 				"created_at":    strconv.FormatInt(now, 10),
 			})
 			pipe.SAdd(ctx, s.playerInstancesKey(nickname), instanceID)
@@ -1932,6 +2121,7 @@ func (s *Store) itemInstancesByIDForNickname(ctx context.Context, nickname strin
 			EnhanceLevel: int(int64FromString(values["enhance_level"])),
 			SpentStones:  int64FromString(values["spent_stones"]),
 			Bound:        int64FromString(values["bound"]) > 0,
+			Locked:       int64FromString(values["locked"]) > 0,
 			CreatedAt:    int64FromString(values["created_at"]),
 		}
 		instances[instanceID] = instance
@@ -1975,6 +2165,7 @@ func (s *Store) getOwnedInstance(ctx context.Context, nickname string, ref strin
 		EnhanceLevel: int(int64FromString(values["enhance_level"])),
 		SpentStones:  int64FromString(values["spent_stones"]),
 		Bound:        int64FromString(values["bound"]) > 0,
+		Locked:       int64FromString(values["locked"]) > 0,
 		CreatedAt:    int64FromString(values["created_at"]),
 	}
 	return instance, nil
@@ -2007,7 +2198,7 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string) (Loadou
 		if defErr != nil {
 			continue
 		}
-		item := buildInventoryItem(definition, 1, true, instance.EnhanceLevel, instance.InstanceID, instance.Bound)
+		item := buildInventoryItem(definition, 1, true, instance.EnhanceLevel, instance.InstanceID, instance.Bound, instance.Locked)
 		equipped[instance.InstanceID] = slot
 		switch slot {
 		case "weapon":
@@ -2046,10 +2237,11 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equip
 				Equipped:     equipped[instance.InstanceID] != "",
 				EnhanceLevel: instance.EnhanceLevel,
 				Bound:        instance.Bound,
+				Locked:       instance.Locked,
 			})
 			continue
 		}
-		items = append(items, buildInventoryItem(definition, 1, equipped[instance.InstanceID] != "", instance.EnhanceLevel, instance.InstanceID, instance.Bound))
+		items = append(items, buildInventoryItem(definition, 1, equipped[instance.InstanceID] != "", instance.EnhanceLevel, instance.InstanceID, instance.Bound, instance.Locked))
 	}
 
 	if len(items) == 0 {
@@ -2510,7 +2702,7 @@ func int64FromString(raw string) int64 {
 	return value
 }
 
-func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool, enhanceLevel int, instanceID string, bound bool) InventoryItem {
+func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool, enhanceLevel int, instanceID string, bound bool, locked bool) InventoryItem {
 	enhanceLevel = maxInt(0, enhanceLevel)
 	multValue := math.Pow(1.12, float64(enhanceLevel))
 	multPercent := math.Pow(1.08, float64(enhanceLevel))
@@ -2536,6 +2728,7 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 		Equipped:             equipped,
 		EnhanceLevel:         enhanceLevel,
 		Bound:                bound,
+		Locked:               locked,
 		AttackPower:          attackPower,
 		ArmorPenPercent:      armorPenPercent,
 		CritRate:             critRate,
@@ -2557,6 +2750,31 @@ func enhanceStoneCost(currentLevel int) int64 {
 	level := maxInt(0, currentLevel)
 	// 公式：3 * 1.5^level，然后向上取整
 	return int64(math.Ceil(3 * math.Pow(1.5, float64(level))))
+}
+
+// salvageBaseReward 返回装备按稀有度分解得到的基础金币与强化石。
+func salvageBaseReward(rarity string) (int64, int64) {
+	switch strings.TrimSpace(rarity) {
+	case "神话":
+		return 5000, 20
+	}
+
+	switch normalizeEquipmentRarity(rarity) {
+	case "至臻":
+		return 10000, 50
+	case "传说":
+		return 2000, 8
+	case "史诗":
+		return 1000, 3
+	case "稀有":
+		return 500, 1
+	case "优秀":
+		return 300, 1
+	case "普通":
+		fallthrough
+	default:
+		return 200, 0
+	}
 }
 
 func maxEnhanceLevel(rarity string) int {

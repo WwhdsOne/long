@@ -85,6 +85,7 @@ func seedOwnedInstance(t *testing.T, store *Store, ctx context.Context, nickname
 		"enhance_level": "0",
 		"spent_stones":  "0",
 		"bound":         "0",
+		"locked":        "0",
 		"created_at":    "0",
 	}).Err(); err != nil {
 		t.Fatalf("seed instance %s: %v", instanceID, err)
