@@ -453,7 +453,6 @@ func allowedString(value string, allowed []string) bool {
 // ============================================================================
 
 func equipmentDraftSystemPromptForRarity(rarity string) string {
-	// 每个稀有度下所有部位的最终数值范围（已乘过修正系数）
 	type slotRange struct {
 		attackMin, attackMax       int
 		critRateMax                float64
@@ -481,18 +480,23 @@ func equipmentDraftSystemPromptForRarity(rarity string) string {
 
 	ranges := compute(rarity)
 
-	// 构建每个部位的文本
 	slotLines := make([]string, 0, 6)
 	for _, slot := range []string{"weapon", "gloves", "helmet", "chest", "legs", "accessory"} {
 		r := ranges[slot]
+		lower := r.attackMin + (r.attackMax-r.attackMin)/4
+		upper := r.attackMin + (r.attackMax-r.attackMin)*3/4
+
 		line := fmt.Sprintf(
 			"%s %s：attackPower %d~%d，critRate 0~%.2f，critDamageMultiplier 0~%.2f，armorPenPercent 0~%.2f，partTypeDamage 三项各 0~%.2f",
 			rarity, slot, r.attackMin, r.attackMax, r.critRateMax, r.critMax, r.armorPenMax, r.softMax,
 		)
+		line += fmt.Sprintf(
+			"；若 talentAffinity=\"\"（通用装备），则 attackPower 限制在 %d~%d，critRate不超过%.2f，critDamageMultiplier不超过%.2f，armorPenPercent不超过%.2f",
+			lower, upper, r.critRateMax*0.5, r.critMax*0.5, r.armorPenMax*0.5,
+		)
 		slotLines = append(slotLines, line)
 	}
 
-	// 拼接完整 prompt
 	prompt := strings.Join([]string{
 		"你是装备数值策划，只能输出符合 JSON Schema 的装备草稿。",
 		"三主系：normal=均衡攻势，armor=碎盾攻坚，crit=致命洞察。",
@@ -504,10 +508,9 @@ func equipmentDraftSystemPromptForRarity(rarity string) string {
 		strings.Join(slotLines, "\n"),
 		"",
 		"talentAffinity 为空字符串表示通用装备，否则必须是 normal/armor/crit 之一。",
-		"通用装备各项数值取该稀有度中位值附近。",
 		"description 是用中文描述装备外观和特点的文本。",
 		"返回必须是完整 JSON 对象，不要 Markdown，不要解释。",
-		"输出的 JSON 要求：itemId 必须是字符串（如 \"wood_sword_001\"），其余字段为 name, slot, rarity, description, attackPower, armorPenPercent, critRate, critDamageMultiplier, partTypeDamageSoft, partTypeDamageHeavy, partTypeDamageWeak, talentAffinity。",
+		"输出的 JSON 要求：itemId 必须是字符串，其余字段为 name, slot, rarity, description, attackPower, armorPenPercent, critRate, critDamageMultiplier, partTypeDamageSoft, partTypeDamageHeavy, partTypeDamageWeak, talentAffinity。",
 	}, "\n")
 
 	return prompt
