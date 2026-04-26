@@ -44,7 +44,11 @@ func TestLoadoutSupportsDesignEquipmentSlotsAndLegacyArmor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inventory quantities: %v", err)
 	}
-	loadout, equipped, err := store.loadoutForNickname(ctx, "阿明", quantities)
+	enhanceLevels, err := store.enhanceLevelsForNickname(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("enhance levels: %v", err)
+	}
+	loadout, equipped, err := store.loadoutForNickname(ctx, "阿明", quantities, enhanceLevels)
 	if err != nil {
 		t.Fatalf("loadout: %v", err)
 	}
@@ -69,7 +73,7 @@ func TestLoadoutSupportsDesignEquipmentSlotsAndLegacyArmor(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed legacy armor loadout: %v", err)
 	}
-	loadout, equipped, err = store.loadoutForNickname(ctx, "阿明", quantities)
+	loadout, equipped, err = store.loadoutForNickname(ctx, "阿明", quantities, enhanceLevels)
 	if err != nil {
 		t.Fatalf("legacy loadout: %v", err)
 	}

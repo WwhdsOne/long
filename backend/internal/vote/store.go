@@ -24,6 +24,9 @@ var ErrSensitiveNickname = errors.New("sensitive nickname")
 var ErrSensitiveContent = errors.New("sensitive content")
 var ErrEquipmentNotFound = errors.New("equipment not found")
 var ErrEquipmentNotOwned = errors.New("equipment not owned")
+var ErrEquipmentEnhanceMaxLevel = errors.New("equipment enhance max level")
+var ErrEquipmentEnhanceInsufficientGold = errors.New("equipment enhance insufficient gold")
+var ErrEquipmentEnhanceInsufficientStones = errors.New("equipment enhance insufficient stones")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
@@ -182,6 +185,7 @@ type InventoryItem struct {
 	ImageAlt             string  `json:"imageAlt,omitempty"`
 	Quantity             int64   `json:"quantity"`
 	Equipped             bool    `json:"equipped"`
+	EnhanceLevel         int     `json:"enhanceLevel,omitempty"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
 	CritRate             float64 `json:"critRate,omitempty"`
@@ -232,6 +236,8 @@ type BossLootEntry struct {
 	ItemName             string  `json:"itemName"`
 	Slot                 string  `json:"slot"`
 	Rarity               string  `json:"rarity"`
+	ImagePath            string  `json:"imagePath,omitempty"`
+	ImageAlt             string  `json:"imageAlt,omitempty"`
 	Weight               int64   `json:"weight"`
 	DropRatePercent      float64 `json:"dropRatePercent"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
@@ -305,11 +311,12 @@ type State struct {
 
 // AfkSettlement 挂机结算汇总。
 type AfkSettlement struct {
-	Kills      int64 `json:"kills"`
-	GoldTotal  int64 `json:"goldTotal"`
-	StoneTotal int64 `json:"stoneTotal"`
-	StartedAt  int64 `json:"startedAt"`
-	EndedAt    int64 `json:"endedAt"`
+	Kills      int64    `json:"kills"`
+	GoldTotal  int64    `json:"goldTotal"`
+	StoneTotal int64    `json:"stoneTotal"`
+	StartedAt  int64    `json:"startedAt"`
+	EndedAt    int64    `json:"endedAt"`
+	Rewards    []Reward `json:"rewards,omitempty"`
 }
 
 // SalvageResult 装备分解结果。
@@ -362,36 +369,37 @@ type StoreOptions struct {
 
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
 type Store struct {
-	client               redis.UniversalClient
-		namespace            string
-		equipmentIndexKey    string
-	playerIndexKey       string
-	userPrefix           string
-	leaderboardKey       string
-	bossCurrentKey       string
-	bossHistoryKey       string
-	bossHistoryPrefix    string
-	bossTemplateIndexKey string
-	bossTemplatePrefix   string
-	bossCycleKey         string
-	bossInstanceSeqKey   string
-	announcementSeqKey   string
-	announcementKey      string
-	announcementPrefix   string
-	messageSeqKey        string
-	messageKey           string
-	messagePrefix        string
-	equipmentDefPrefix   string
-	inventoryPrefix      string
-	loadoutPrefix        string
-	lastRewardPrefix     string
-	equipmentSpentPrefix string
-		critical             StoreOptions
-	luaRunner            luaScriptRunner
-	bossClickScript      *cachedLuaScript
-	roll                 func(int) int
-	now                  func() time.Time
-	validator            interface{ Validate(string) error }
+	client                 redis.UniversalClient
+	namespace              string
+	equipmentIndexKey      string
+	playerIndexKey         string
+	userPrefix             string
+	leaderboardKey         string
+	bossCurrentKey         string
+	bossHistoryKey         string
+	bossHistoryPrefix      string
+	bossTemplateIndexKey   string
+	bossTemplatePrefix     string
+	bossCycleKey           string
+	bossInstanceSeqKey     string
+	announcementSeqKey     string
+	announcementKey        string
+	announcementPrefix     string
+	messageSeqKey          string
+	messageKey             string
+	messagePrefix          string
+	equipmentDefPrefix     string
+	inventoryPrefix        string
+	loadoutPrefix          string
+	lastRewardPrefix       string
+	equipmentSpentPrefix   string
+	equipmentEnhancePrefix string
+	critical               StoreOptions
+	luaRunner              luaScriptRunner
+	bossClickScript        *cachedLuaScript
+	roll                   func(int) int
+	now                    func() time.Time
+	validator              interface{ Validate(string) error }
 }
 
 // NewStore 创建 Redis 投票存储实例
@@ -399,31 +407,32 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 	luaCache := newLuaScriptCache()
 
 	return &Store{
-		client:               client,
-		namespace:            namespace,
-		equipmentIndexKey:    namespace + "equipment:index",
-		playerIndexKey:       namespace + "players:index",
-		userPrefix:           namespace + "user:",
-		leaderboardKey:       namespace + "leaderboard",
-		bossCurrentKey:       namespace + "boss:current",
-		bossHistoryKey:       namespace + "boss:history",
-		bossHistoryPrefix:    namespace + "boss:history:",
-		bossTemplateIndexKey: namespace + "boss:pool:index",
-		bossTemplatePrefix:   namespace + "boss:pool:",
-		bossCycleKey:         namespace + "boss:cycle",
-		bossInstanceSeqKey:   namespace + "boss:instance:seq",
-		announcementSeqKey:   namespace + "announcement:seq",
-		announcementKey:      namespace + "announcements",
-		announcementPrefix:   namespace + "announcement:",
-		messageSeqKey:        namespace + "message:seq",
-		messageKey:           namespace + "messages",
-		messagePrefix:        namespace + "message:",
-		equipmentDefPrefix:   namespace + "equip:def:",
-		inventoryPrefix:      namespace + "user-inventory:",
-		loadoutPrefix:        namespace + "user-loadout:",
-		lastRewardPrefix:     namespace + "user-last-reward:",
-		equipmentSpentPrefix: namespace + "user-equipment-spent:",
-		critical: options,
+		client:                 client,
+		namespace:              namespace,
+		equipmentIndexKey:      namespace + "equipment:index",
+		playerIndexKey:         namespace + "players:index",
+		userPrefix:             namespace + "user:",
+		leaderboardKey:         namespace + "leaderboard",
+		bossCurrentKey:         namespace + "boss:current",
+		bossHistoryKey:         namespace + "boss:history",
+		bossHistoryPrefix:      namespace + "boss:history:",
+		bossTemplateIndexKey:   namespace + "boss:pool:index",
+		bossTemplatePrefix:     namespace + "boss:pool:",
+		bossCycleKey:           namespace + "boss:cycle",
+		bossInstanceSeqKey:     namespace + "boss:instance:seq",
+		announcementSeqKey:     namespace + "announcement:seq",
+		announcementKey:        namespace + "announcements",
+		announcementPrefix:     namespace + "announcement:",
+		messageSeqKey:          namespace + "message:seq",
+		messageKey:             namespace + "messages",
+		messagePrefix:          namespace + "message:",
+		equipmentDefPrefix:     namespace + "equip:def:",
+		inventoryPrefix:        namespace + "user-inventory:",
+		loadoutPrefix:          namespace + "user-loadout:",
+		lastRewardPrefix:       namespace + "user-last-reward:",
+		equipmentSpentPrefix:   namespace + "user-equipment-spent:",
+		equipmentEnhancePrefix: namespace + "user-equipment-enhance:",
+		critical:               options,
 		luaRunner: redisLuaRunner{
 			client: client,
 		},
@@ -533,14 +542,18 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	if err != nil {
 		return UserState{}, err
 	}
+	enhanceLevels, err := s.enhanceLevelsForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
 
-	loadout, equipped, err := s.loadoutForNickname(ctx, normalizedNickname, quantities)
+	loadout, equipped, err := s.loadoutForNickname(ctx, normalizedNickname, quantities, enhanceLevels)
 	if err != nil {
 		return UserState{}, err
 	}
 	userState.Loadout = loadout
 
-	inventory, err := s.inventoryForNickname(ctx, normalizedNickname, quantities, equipped)
+	inventory, err := s.inventoryForNickname(ctx, normalizedNickname, quantities, equipped, enhanceLevels)
 	if err != nil {
 		return UserState{}, err
 	}
@@ -576,19 +589,18 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	return userState, nil
 }
 
-	// ClickButton 处理 Boss 部位点击。slug 必须以 boss-part: 开头。
-	func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (ClickResult, error) {
-		normalizedNickname, err := s.validatedNickname(nickname)
-		if err != nil {
-			return ClickResult{}, err
-		}
-		slug = strings.TrimSpace(slug)
-		if !strings.HasPrefix(slug, bossPartClickSlugPrefix) {
-			return ClickResult{}, fmt.Errorf("button not available")
-		}
-		return s.clickBossPart(ctx, slug, normalizedNickname)
+// ClickButton 处理 Boss 部位点击。slug 必须以 boss-part: 开头。
+func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (ClickResult, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return ClickResult{}, err
 	}
-
+	slug = strings.TrimSpace(slug)
+	if !strings.HasPrefix(slug, bossPartClickSlugPrefix) {
+		return ClickResult{}, fmt.Errorf("button not available")
+	}
+	return s.clickBossPart(ctx, slug, normalizedNickname)
+}
 
 // ClickBossPart 处理不绑定按钮的 Boss 部位手动点击。
 func (s *Store) ClickBossPart(ctx context.Context, target string, nickname string) (ClickResult, error) {
@@ -672,6 +684,73 @@ func (s *Store) UnequipItem(ctx context.Context, nickname string, itemID string)
 	return s.GetState(ctx, normalizedNickname)
 }
 
+// EnhanceItem 强化一件装备，消耗金币和强化石并提升等级。
+func (s *Store) EnhanceItem(ctx context.Context, nickname string, itemID string) (State, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return State{}, err
+	}
+
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return State{}, ErrEquipmentNotFound
+	}
+
+	definition, err := s.getEquipmentDefinition(ctx, itemID)
+	if err != nil {
+		return State{}, err
+	}
+
+	quantity, err := s.client.HGet(ctx, s.inventoryKey(normalizedNickname), itemID).Int64()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return State{}, ErrEquipmentNotOwned
+		}
+		return State{}, err
+	}
+	if quantity <= 0 {
+		return State{}, ErrEquipmentNotOwned
+	}
+
+	currentLevel, err := s.client.HGet(ctx, s.equipmentEnhanceKey(normalizedNickname), itemID).Int()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return State{}, err
+	}
+	maxLevel := maxEnhanceLevel(definition.Rarity)
+	if currentLevel >= maxLevel {
+		return State{}, ErrEquipmentEnhanceMaxLevel
+	}
+
+	goldCost := enhanceGoldCost(currentLevel)
+	stoneCost := enhanceStoneCost(currentLevel)
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return State{}, err
+	}
+	if resources.Gold < goldCost {
+		return State{}, ErrEquipmentEnhanceInsufficientGold
+	}
+	if resources.Stones < stoneCost {
+		return State{}, ErrEquipmentEnhanceInsufficientStones
+	}
+
+	now := time.Now().Unix()
+	pipe := s.client.TxPipeline()
+	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "gold", -goldCost)
+	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", -stoneCost)
+	pipe.HIncrBy(ctx, s.equipmentSpentKey(normalizedNickname), itemID, stoneCost)
+	pipe.HSet(ctx, s.equipmentEnhanceKey(normalizedNickname), itemID, strconv.Itoa(currentLevel+1))
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: normalizedNickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
+		return State{}, err
+	}
+
+	return s.GetState(ctx, normalizedNickname)
+}
+
 // SalvageItem 分解装备，返还已消耗强化石的 60%（向下取整）。
 func (s *Store) SalvageItem(ctx context.Context, nickname string, itemID string) (SalvageResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
@@ -716,6 +795,7 @@ func (s *Store) SalvageItem(ctx context.Context, nickname string, itemID string)
 		pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", refund)
 	}
 	pipe.HDel(ctx, s.equipmentSpentKey(normalizedNickname), itemID)
+	pipe.HDel(ctx, s.equipmentEnhanceKey(normalizedNickname), itemID)
 	if definition.Slot != "" {
 		pipe.HDel(ctx, s.loadoutKey(normalizedNickname), definition.Slot)
 	}
@@ -912,7 +992,11 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 	if err != nil {
 		return ClickResult{}, nil
 	}
-	loadout, _, err := s.loadoutForNickname(ctx, normalizedNickname, quantities)
+	enhanceLevels, err := s.enhanceLevelsForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return ClickResult{}, nil
+	}
+	loadout, _, err := s.loadoutForNickname(ctx, normalizedNickname, quantities, enhanceLevels)
 	if err != nil {
 		return ClickResult{}, nil
 	}
@@ -1042,7 +1126,11 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if err != nil {
 		return result, nil
 	}
-	loadout, _, err := s.loadoutForNickname(ctx, nickname, quantities)
+	enhanceLevels, err := s.enhanceLevelsForNickname(ctx, nickname)
+	if err != nil {
+		return result, nil
+	}
+	loadout, _, err := s.loadoutForNickname(ctx, nickname, quantities, enhanceLevels)
 	if err != nil {
 		return result, nil
 	}
@@ -1347,7 +1435,11 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 	if err != nil {
 		return 0, false, err
 	}
-	loadout, _, err := s.loadoutForNickname(ctx, nickname, quantities)
+	enhanceLevels, err := s.enhanceLevelsForNickname(ctx, nickname)
+	if err != nil {
+		return 0, false, err
+	}
+	loadout, _, err := s.loadoutForNickname(ctx, nickname, quantities, enhanceLevels)
 	if err != nil {
 		return 0, false, err
 	}
@@ -1621,7 +1713,27 @@ func (s *Store) inventoryQuantities(ctx context.Context, nickname string) (map[s
 	return quantities, nil
 }
 
-func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantities map[string]int64) (Loadout, map[string]string, error) {
+func (s *Store) enhanceLevelsForNickname(ctx context.Context, nickname string) (map[string]int, error) {
+	values, err := s.client.HGetAll(ctx, s.equipmentEnhanceKey(nickname)).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(values) == 0 {
+		return map[string]int{}, nil
+	}
+
+	levels := make(map[string]int, len(values))
+	for itemID, rawLevel := range values {
+		level := int(int64FromString(rawLevel))
+		if level <= 0 {
+			continue
+		}
+		levels[itemID] = level
+	}
+	return levels, nil
+}
+
+func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantities map[string]int64, enhanceLevels map[string]int) (Loadout, map[string]string, error) {
 	values, err := s.client.HGetAll(ctx, s.loadoutKey(nickname)).Result()
 	if err != nil {
 		return Loadout{}, nil, err
@@ -1641,7 +1753,7 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantit
 			continue
 		}
 
-		item := buildInventoryItem(definition, quantities[itemID], true)
+		item := buildInventoryItem(definition, quantities[itemID], true, enhanceLevels[itemID])
 
 		equipped[itemID] = slot
 		switch slot {
@@ -1663,7 +1775,7 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string, quantit
 	return loadout, equipped, nil
 }
 
-func (s *Store) inventoryForNickname(ctx context.Context, nickname string, quantities map[string]int64, equipped map[string]string) ([]InventoryItem, error) {
+func (s *Store) inventoryForNickname(ctx context.Context, nickname string, quantities map[string]int64, equipped map[string]string, enhanceLevels map[string]int) ([]InventoryItem, error) {
 	if len(quantities) == 0 {
 		return []InventoryItem{}, nil
 	}
@@ -1681,7 +1793,7 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, quant
 			continue
 		}
 
-		items = append(items, buildInventoryItem(definition, quantity, equipped[itemID] != ""))
+		items = append(items, buildInventoryItem(definition, quantity, equipped[itemID] != "", enhanceLevels[itemID]))
 	}
 
 	slices.SortFunc(items, func(left, right InventoryItem) int {
@@ -1805,6 +1917,8 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			ItemName:        definition.Name,
 			Slot:            definition.Slot,
 			Rarity:          normalizeEquipmentRarity(definition.Rarity),
+			ImagePath:       definition.ImagePath,
+			ImageAlt:        definition.ImageAlt,
 			DropRatePercent: dropRatePercent,
 		})
 	}
@@ -1878,7 +1992,6 @@ func normalizeLootDropRate(item BossLootEntry) float64 {
 func dropRateThreshold(dropRatePercent float64) int {
 	return int(math.Round(clampFloat(dropRatePercent, 0, 100) * 100))
 }
-
 
 func (s *Store) listEquipmentIDs(ctx context.Context) ([]string, error) {
 	itemIDs, err := s.client.SMembers(ctx, s.equipmentIndexKey).Result()
@@ -2034,6 +2147,10 @@ func (s *Store) equipmentSpentKey(nickname string) string {
 	return s.equipmentSpentPrefix + nickname
 }
 
+func (s *Store) equipmentEnhanceKey(nickname string) string {
+	return s.equipmentEnhancePrefix + nickname
+}
+
 func (s *Store) lastRewardKey(nickname string) string {
 	return s.lastRewardPrefix + nickname
 }
@@ -2127,24 +2244,60 @@ func int64FromString(raw string) int64 {
 	return value
 }
 
-func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool) InventoryItem {
+func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool, enhanceLevel int) InventoryItem {
+	enhanceLevel = maxInt(0, enhanceLevel)
+	multValue := math.Pow(1.12, float64(enhanceLevel))
+	multPercent := math.Pow(1.08, float64(enhanceLevel))
+
+	name := displayItemName(definition.Name, enhanceLevel)
+	attackPower := int64(math.Round(float64(definition.AttackPower) * multValue))
+	armorPenPercent := definition.ArmorPenPercent * multPercent
+	critRate := definition.CritRate * multPercent
+	critDamageMultiplier := definition.CritDamageMultiplier * multPercent
+	partTypeDamageSoft := definition.PartTypeDamageSoft * multPercent
+	partTypeDamageHeavy := definition.PartTypeDamageHeavy * multPercent
+	partTypeDamageWeak := definition.PartTypeDamageWeak * multPercent
+
 	return InventoryItem{
 		ItemID:               definition.ItemID,
-		Name:                 definition.Name,
+		Name:                 name,
 		Slot:                 normalizeEquipmentSlot(definition.Slot),
 		Rarity:               normalizeEquipmentRarity(definition.Rarity),
 		ImagePath:            definition.ImagePath,
 		ImageAlt:             definition.ImageAlt,
 		Quantity:             quantity,
 		Equipped:             equipped,
-		AttackPower:          definition.AttackPower,
-		ArmorPenPercent:      definition.ArmorPenPercent,
-		CritRate:             definition.CritRate,
-		CritDamageMultiplier: definition.CritDamageMultiplier,
-		PartTypeDamageSoft:   definition.PartTypeDamageSoft,
-		PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
-		PartTypeDamageWeak:   definition.PartTypeDamageWeak,
+		EnhanceLevel:         enhanceLevel,
+		AttackPower:          attackPower,
+		ArmorPenPercent:      armorPenPercent,
+		CritRate:             critRate,
+		CritDamageMultiplier: critDamageMultiplier,
+		PartTypeDamageSoft:   partTypeDamageSoft,
+		PartTypeDamageHeavy:  partTypeDamageHeavy,
+		PartTypeDamageWeak:   partTypeDamageWeak,
 	}
+}
+
+func enhanceGoldCost(currentLevel int) int64 {
+	level := maxInt(0, currentLevel)
+	return int64(math.Ceil(100 * math.Pow(1.5, float64(level))))
+}
+
+func enhanceStoneCost(currentLevel int) int64 {
+	level := maxInt(0, currentLevel)
+	return int64(math.Ceil(math.Pow(1.4, float64(level))))
+}
+
+func maxEnhanceLevel(rarity string) int {
+	// 当前版本统一基础上限 + 稀有度额外上限。
+	return 5 + RarityStatsForRarity(rarity).EnhanceCapExtra
+}
+
+func maxInt(a, b int) int {
+	if a >= b {
+		return a
+	}
+	return b
 }
 
 func normalizeEquipmentSlot(slot string) string {

@@ -71,6 +71,25 @@ func decodeRealtimeMessage[T any](t *testing.T, payload []byte) T {
 	return message
 }
 
+func readHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name string) events.ServerEvent {
+	t.Helper()
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				t.Fatalf("hub channel closed while waiting for %s", name)
+			}
+			if event.Name == name {
+				return event
+			}
+		case <-timeout:
+			t.Fatalf("timed out waiting for event %s", name)
+		}
+	}
+}
+
 func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
@@ -267,20 +286,20 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 		t.Fatalf("unexpected click ack payload: %+v", ack.Payload)
 	}
 
-	publicEvent := <-sseClient
+	publicEvent := readHubEventByName(t, sseClient, events.PublicStateEventName)
 	if publicEvent.Name != events.PublicStateEventName {
 		t.Fatalf("expected public state event for SSE subscriber, got %+v", publicEvent)
 	}
-	userEvent := <-sseClient
+	userEvent := readHubEventByName(t, sseClient, events.UserStateEventName)
 	if userEvent.Name != events.UserStateEventName {
 		t.Fatalf("expected user state event for SSE subscriber, got %+v", userEvent)
 	}
 
-	publicEvent = <-wsClient
+	publicEvent = readHubEventByName(t, wsClient, events.PublicStateEventName)
 	if publicEvent.Name != events.PublicStateEventName {
 		t.Fatalf("expected public state event for realtime subscriber, got %+v", publicEvent)
 	}
-	userEvent = <-wsClient
+	userEvent = readHubEventByName(t, wsClient, events.UserStateEventName)
 	if userEvent.Name != events.UserStateEventName {
 		t.Fatalf("expected user state event for realtime subscriber, got %+v", userEvent)
 	}

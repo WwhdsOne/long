@@ -43,6 +43,7 @@ type mockStore struct {
 	getStateErr           error
 	clickErr              error
 	equipErr              error
+	enhanceErr            error
 	validateErr           error
 	messageErr            error
 	salvageErr            error
@@ -166,6 +167,16 @@ func (m *mockStore) UnequipItem(_ context.Context, _ string, _ string) (vote.Sta
 	return m.equipState, nil
 }
 
+func (m *mockStore) EnhanceItem(_ context.Context, _ string, _ string) (vote.State, error) {
+	if m.enhanceErr != nil {
+		return vote.State{}, m.enhanceErr
+	}
+	if m.equipState.Loadout.Weapon == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
 func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (vote.SalvageResult, error) {
 	m.lastSalvageItemID = itemID
 	if m.salvageErr != nil {
@@ -182,7 +193,6 @@ func (m *mockStore) GetAdminState(_ context.Context) (vote.AdminState, error) {
 	return m.adminState, nil
 }
 
-
 func (m *mockStore) ListAdminEquipmentPage(_ context.Context, _ int64, _ int64) (vote.AdminEquipmentPage, error) {
 	return m.adminEquipmentPage, nil
 }
@@ -198,7 +208,6 @@ func (m *mockStore) ListAdminPlayers(_ context.Context, _ string, _ int64) (vote
 func (m *mockStore) GetAdminPlayer(_ context.Context, _ string) (*vote.AdminPlayerOverview, error) {
 	return m.adminPlayer, nil
 }
-
 
 func (m *mockStore) SaveEquipmentDefinition(_ context.Context, definition vote.EquipmentDefinition) error {
 	m.lastEquipment = definition
@@ -477,7 +486,7 @@ func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 	if payload.ID != "7" || payload.Title != "更新公告" {
 		t.Fatalf("unexpected latest announcement payload: %+v", payload)
 	}
-	}
+}
 func TestEquipItemReturnsUpdatedState(t *testing.T) {
 	store := &mockStore{
 		equipState: vote.State{
@@ -559,7 +568,6 @@ func TestSynthesizeItemReturnsDeprecatedError(t *testing.T) {
 		t.Fatalf("expected deprecated error payload, got %+v", payload)
 	}
 }
-
 
 func TestPostMessageRejectsSensitiveContent(t *testing.T) {
 	store := &mockStore{
@@ -648,8 +656,6 @@ func TestAdminLoginCreatesSessionAndStateRequiresAuth(t *testing.T) {
 		t.Fatalf("expected playerCount 8, got %d", got)
 	}
 }
-
-
 
 func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	store := &mockStore{}

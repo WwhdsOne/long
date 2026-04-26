@@ -145,6 +145,7 @@ select {
   top: 12px;
   z-index: 20;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   width: min(1380px, 100%);
   margin: 0 auto 14px;
@@ -344,6 +345,186 @@ select {
 .player-hud--page {
   width: min(980px, 100%);
   margin: 0 auto;
+}
+
+.armory-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 20px;
+  width: min(1280px, 100%);
+  margin: 0 auto;
+}
+
+.armory-layout__left,
+.armory-layout__right {
+  display: grid;
+  gap: 16px;
+  align-self: start;
+}
+
+.armory-block {
+  padding: 22px;
+  border-radius: 28px;
+  background: rgba(255, 251, 252, 0.82);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-soft);
+}
+
+.armory-block__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.armory-block__head strong {
+  font-family: var(--display);
+  color: var(--ink);
+}
+
+.armory-backpack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.armory-backpack-cell {
+  position: relative;
+  display: grid;
+  gap: 6px;
+}
+
+.armory-backpack-cell__button {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(183, 53, 97, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 232, 239, 0.8));
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.armory-backpack-cell__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.armory-backpack-cell__icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.armory-backpack-cell__fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--primary-deep);
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.armory-backpack-cell__meta {
+  display: grid;
+  gap: 2px;
+}
+
+.armory-backpack-cell__meta strong {
+  font-size: 0.84rem;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.armory-backpack-cell__meta span {
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.armory-backpack-resources {
+  margin: 6px 0 2px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.armory-item-tooltip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 22;
+  display: grid;
+  gap: 6px;
+  width: min(220px, 70vw);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(183, 53, 97, 0.16);
+  background: rgba(255, 252, 253, 0.98);
+  box-shadow: 0 16px 24px rgba(15, 23, 42, 0.2);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.armory-item-tooltip strong {
+  font-size: 0.9rem;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.armory-item-tooltip p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.armory-item-tooltip__stats {
+  margin: 0;
+  padding-left: 14px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.armory-backpack-cell:hover .armory-item-tooltip,
+.armory-backpack-cell:focus-within .armory-item-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.inventory-context-menu {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  gap: 4px;
+  min-width: 128px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(183, 53, 97, 0.16);
+  background: rgba(255, 252, 253, 0.98);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.22);
+}
+
+.inventory-context-menu__item {
+  min-height: 34px;
+  padding: 0.4rem 0.7rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inventory-context-menu__item:hover {
+  background: rgba(225, 29, 72, 0.08);
 }
 
 .vote-stage,
@@ -1185,6 +1366,36 @@ select {
   font-size: 0.92rem;
 }
 
+.reward-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 10px;
+}
+
+.reward-grid__item {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  border: 1px solid rgba(183, 53, 97, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 232, 239, 0.84));
+  overflow: hidden;
+}
+
+.reward-grid__icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reward-grid__fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--primary-deep);
+  font-weight: 900;
+}
+
 .loadout-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -1955,6 +2166,14 @@ select {
   .inventory-item__actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .armory-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .armory-block {
+    padding: 18px;
   }
 
 }

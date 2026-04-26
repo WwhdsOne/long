@@ -23,6 +23,7 @@ const (
 	realtimeMessageTypeSnapshot    = "snapshot"
 	realtimeMessageTypePublicDelta = "public_delta"
 	realtimeMessageTypeUserDelta   = "user_delta"
+	realtimeMessageTypeOnlineCount = "online_count"
 	realtimeMessageTypeClickAck    = "click_ack"
 	realtimeMessageTypeError       = "error"
 	realtimeMessageTypePong        = "pong"
@@ -330,6 +331,11 @@ func realtimeMessageFromEvent(event events.ServerEvent) (any, bool) {
 	case events.UserStateEventName:
 		return realtimeDeltaMessage{
 			Type:    realtimeMessageTypeUserDelta,
+			Payload: event.Payload,
+		}, true
+	case events.OnlineCountEventName:
+		return realtimeDeltaMessage{
+			Type:    realtimeMessageTypeOnlineCount,
 			Payload: event.Payload,
 		}, true
 	default:

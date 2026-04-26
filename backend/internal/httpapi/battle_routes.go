@@ -33,7 +33,6 @@ func registerBattleRoutes(router route.IRouter, options Options) {
 			"inventory":           state.Inventory,
 			"loadout":             state.Loadout,
 			"combatStats":         state.CombatStats,
-			"gems":                state.Gems,
 			"gold":                state.Gold,
 			"stones":              state.Stones,
 			"recentRewards":       state.RecentRewards,

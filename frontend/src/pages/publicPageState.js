@@ -13,10 +13,20 @@ const AUTO_CLICK_RATE_LABEL = '每秒固定 3 次'
 const EQUIPMENT_ENHANCE_COST = 10
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
 
+const profilePageMap = {
+    resources: 'resources',
+    inventory: 'inventory',
+    stats: 'stats',
+    loadout: 'loadout',
+}
+
 const publicPages = [
     {id: 'battle', label: '战斗', path: '/'},
     {id: 'talents', label: '天赋', path: '/talents'},
-    {id: 'profile', label: '资料', path: '/profile'},
+    {id: 'resources', label: '资源', path: '/profile/resources'},
+    {id: 'inventory', label: '背包', path: '/profile/inventory'},
+    {id: 'stats', label: '属性', path: '/profile/stats'},
+    {id: 'loadout', label: '装备栏', path: '/profile/loadout'},
     {id: 'messages', label: '消息', path: '/messages'},
 ]
 
@@ -45,7 +55,6 @@ const syncing = ref(false)
 const errorMessage = ref('')
 const pendingKeys = ref(new Set())
 const actioningItemId = ref('')
-const activeHudTab = ref('account')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
 const criticalBursts = ref({})
@@ -69,19 +78,20 @@ const messageDraft = ref('')
 const messageError = ref('')
 const autoClickEnabled = ref(false)
 const autoClickTargetKey = ref('')
-const gems = ref(0)
 const gold = ref(0)
 const stones = ref(0)
 const afkSettlement = ref(null)
+const rewardModal = ref(null)
 const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
-const profileLoading = ref(false)
-const profileLoaded = ref(false)
-const profileNotice = ref('')
 
 let realtimeTransport
 let lastBossResourceVersion = ''
 const burstTimers = new Map()
 const pendingClickSources = new Map()
+let rewardSignatureReady = false
+let lastRewardSignature = ''
+let lastKnownGold = 0
+let lastKnownStones = 0
 
 const totalVotes = computed(() => buttonTotalVotes.value)
 const syncLabel = computed(() => {
@@ -236,12 +246,31 @@ function normalizeNickname(value) {
     return value.trim()
 }
 
+function isProfilePublicPage(page) {
+    return Boolean(profilePageMap[page])
+}
+
 function resolvePublicPage(pathname) {
     if (pathname.startsWith('/messages')) {
         return 'messages'
     }
+    if (pathname.startsWith('/talents')) {
+        return 'talents'
+    }
+    if (pathname.startsWith('/profile/resources')) {
+        return 'resources'
+    }
+    if (pathname.startsWith('/profile/inventory')) {
+        return 'inventory'
+    }
+    if (pathname.startsWith('/profile/stats')) {
+        return 'stats'
+    }
+    if (pathname.startsWith('/profile/loadout')) {
+        return 'loadout'
+    }
     if (pathname.startsWith('/profile')) {
-        return 'profile'
+        return 'resources'
     }
     return 'battle'
 }
@@ -256,15 +285,11 @@ async function navigatePublicPage(page) {
 }
 
 async function activatePublicPage(page) {
-    if (page === 'profile') {
-        if (activeHudTab.value === 'messages' || activeHudTab.value === 'info') {
-            activeHudTab.value = 'account'
-        }
-        await loadPlayerProfile(true)
+    if (isProfilePublicPage(page)) {
+        // 资料子页整合为统一页面，不再通过独立资料接口刷新。
         return
     }
     if (page === 'messages') {
-        activeHudTab.value = 'messages'
         await loadMessages()
         await loadAnnouncements()
     }
@@ -326,6 +351,84 @@ function formatPercentWithDelta(label, total, delta) {
 function dotIndexes(count) {
     const normalized = Math.max(0, Math.min(Number(count) || 0, 6))
     return Array.from({length: normalized}, (_, index) => index)
+}
+
+function rewardSignature(reward) {
+    if (!reward || typeof reward !== 'object') {
+        return ''
+    }
+    const itemID = String(reward.itemId || '').trim()
+    const grantedAt = Number(reward.grantedAt || 0)
+    const bossID = String(reward.bossId || '').trim()
+    if (!itemID) {
+        return ''
+    }
+    return `${bossID}:${itemID}:${grantedAt}`
+}
+
+function normalizeRewardList(list) {
+    if (!Array.isArray(list)) {
+        return []
+    }
+    return list
+        .filter((item) => item && typeof item === 'object' && String(item.itemId || '').trim() !== '')
+        .map((item) => ({
+            bossId: String(item.bossId || '').trim(),
+            bossName: String(item.bossName || '').trim(),
+            itemId: String(item.itemId || '').trim(),
+            itemName: String(item.itemName || item.itemId || '').trim(),
+            grantedAt: Number(item.grantedAt || 0),
+        }))
+}
+
+function rewardIconForItem(itemID) {
+    const normalized = String(itemID || '').trim()
+    if (!normalized) {
+        return ''
+    }
+    const equipped = Object.values(loadout.value || {}).find((item) => item?.itemId === normalized)
+    if (equipped?.imagePath) {
+        return equipped.imagePath
+    }
+    const inventoryItem = inventory.value.find((item) => item?.itemId === normalized)
+    return inventoryItem?.imagePath || ''
+}
+
+function buildRewardEntries(rewards) {
+    return normalizeRewardList(rewards).map((reward) => ({
+        ...reward,
+        imagePath: rewardIconForItem(reward.itemId),
+        imageAlt: reward.itemName || reward.itemId || '装备图标',
+    }))
+}
+
+function openOnlineRewardModal(lastRewardItem, rewards, goldGain, stoneGain) {
+    const rewardEntries = buildRewardEntries(rewards.length > 0 ? rewards : [lastRewardItem])
+    rewardModal.value = {
+        mode: 'online',
+        title: '本次击杀战利品',
+        bossName: lastRewardItem?.bossName || lastRewardItem?.bossId || boss.value?.name || '世界 Boss',
+        kills: 1,
+        goldTotal: Math.max(0, Number(goldGain || 0)),
+        stoneTotal: Math.max(0, Number(stoneGain || 0)),
+        rewards: rewardEntries,
+    }
+}
+
+function openAfkRewardModal(settlement) {
+    rewardModal.value = {
+        mode: 'afk',
+        title: '挂机战利品结算',
+        bossName: '挂机期间',
+        kills: Number(settlement?.kills || 0),
+        goldTotal: Math.max(0, Number(settlement?.goldTotal || 0)),
+        stoneTotal: Math.max(0, Number(settlement?.stoneTotal || 0)),
+        rewards: buildRewardEntries(settlement?.rewards || []),
+    }
+}
+
+function closeRewardModal() {
+    rewardModal.value = null
 }
 
 async function readErrorMessage(response, fallback) {
@@ -610,20 +713,9 @@ function markUpdated() {
     }).format(new Date())
 }
 
-function selectHudTab(tab) {
-    activeHudTab.value = tab
-    if (tab === 'info') {
-        loadBossHistory()
-        loadAnnouncements()
-    }
-    if (tab === 'messages') {
-        loadMessages()
-    }
-}
-
 function applyState(payload) {
     applyPublicState(payload)
-    applyBattleUserState(payload)
+    applyUserState(payload)
     pendingKeys.value = new Set()
     syncing.value = false
     markUpdated()
@@ -678,8 +770,8 @@ function applyUserState(payload) {
         return
     }
 
-    applyBattleUserState(payload)
     applyPlayerProfileState(payload)
+    applyBattleUserState(payload)
     syncing.value = false
     markUpdated()
 }
@@ -688,6 +780,10 @@ function applyBattleUserState(payload) {
     if (!payload || typeof payload !== 'object') {
         return
     }
+    const hasGold = 'gold' in payload
+    const hasStones = 'stones' in payload
+    const nextGold = hasGold ? Number(payload.gold ?? 0) : gold.value
+    const nextStones = hasStones ? Number(payload.stones ?? 0) : stones.value
 
     if ('userStats' in payload) {
         userStats.value = payload.userStats ?? null
@@ -695,7 +791,7 @@ function applyBattleUserState(payload) {
     if ('myBossStats' in payload) {
         myBossStats.value = payload.myBossStats ?? null
     }
-    if ('combatStats' in payload && !profileLoaded.value) {
+    if ('combatStats' in payload) {
         combatStats.value = payload.combatStats ?? defaultCombatStats()
     }
     if ('recentRewards' in payload) {
@@ -704,6 +800,23 @@ function applyBattleUserState(payload) {
     if ('lastReward' in payload) {
         lastReward.value = payload.lastReward ?? null
     }
+    const signature = rewardSignature(lastReward.value)
+    if (signature && rewardSignatureReady && signature !== lastRewardSignature) {
+        const goldGain = hasGold ? Math.max(0, nextGold - lastKnownGold) : 0
+        const stoneGain = hasStones ? Math.max(0, nextStones - lastKnownStones) : 0
+        const rewards = Array.isArray(payload.recentRewards) && payload.recentRewards.length > 0
+            ? payload.recentRewards
+            : [lastReward.value]
+        openOnlineRewardModal(lastReward.value, rewards, goldGain, stoneGain)
+    }
+    if (signature) {
+        lastRewardSignature = signature
+    }
+    if (!rewardSignatureReady) {
+        rewardSignatureReady = true
+    }
+    lastKnownGold = nextGold
+    lastKnownStones = nextStones
     syncing.value = false
     markUpdated()
 }
@@ -721,9 +834,6 @@ function applyPlayerProfileState(payload) {
     }
     if ('combatStats' in payload) {
         combatStats.value = payload.combatStats ?? defaultCombatStats()
-    }
-    if ('gems' in payload) {
-        gems.value = Number(payload.gems ?? 0)
     }
     if ('gold' in payload) {
         gold.value = Number(payload.gold ?? 0)
@@ -765,12 +875,16 @@ function clearUserRealtimeState() {
     inventory.value = []
     loadout.value = emptyLoadout()
     combatStats.value = defaultCombatStats()
-    gems.value = 0
     gold.value = 0
     stones.value = 0
     myBossStats.value = null
     recentRewards.value = []
     lastReward.value = null
+    rewardModal.value = null
+    rewardSignatureReady = false
+    lastRewardSignature = ''
+    lastKnownGold = 0
+    lastKnownStones = 0
 }
 
 function clearPendingClicks(key = '') {
@@ -792,7 +906,7 @@ function clearPendingClicks(key = '') {
 function applyRealtimeSnapshot(publicState, userState) {
     applyPublicState(publicState)
     if (userState) {
-        applyBattleUserState(userState)
+        applyUserState(userState)
     } else {
         clearUserRealtimeState()
     }
@@ -819,9 +933,15 @@ function ensureRealtimeTransport() {
             errorMessage.value = ''
         },
         onUserDelta(payload) {
-            applyBattleUserState(payload)
+            applyUserState(payload)
             loading.value = false
             errorMessage.value = ''
+        },
+        onOnlineCount(payload) {
+            const count = Number(payload?.count)
+            if (Number.isFinite(count) && count >= 0) {
+                onlineCount.value = count
+            }
         },
         onClickAck(payload) {
             const key = payload?.button?.key || ''
@@ -971,45 +1091,6 @@ async function loadState() {
     }
 }
 
-async function loadPlayerProfile(force = false) {
-    if (!nickname.value) {
-        profileLoaded.value = false
-        profileNotice.value = '登录后进入资料页会刷新角色资料。'
-        return
-    }
-    if (profileLoading.value || (profileLoaded.value && !force)) {
-        return
-    }
-
-    profileLoading.value = true
-    errorMessage.value = ''
-    try {
-        const response = await fetch('/api/player/profile')
-        if (!response.ok) {
-            throw new Error(await readErrorMessage(response, '资料加载失败，请稍后重试。'))
-        }
-
-        const data = await response.json()
-        applyBattleUserState(data)
-        applyPlayerProfileState(data)
-        profileLoaded.value = true
-        profileNotice.value = '进入本页已刷新资料。'
-    } catch (error) {
-        errorMessage.value = error.message || '资料加载失败，请稍后重试。'
-    } finally {
-        profileLoading.value = false
-    }
-}
-
-async function refreshProfileAfterMutation(data) {
-    applyBattleUserState(data)
-    if (currentPublicPage.value === 'profile') {
-        await loadPlayerProfile(true)
-        return
-    }
-    profileLoaded.value = false
-}
-
 async function clickButton(key, options = {}) {
     if (!nickname.value || pendingKeys.value.has(key)) {
         return
@@ -1061,9 +1142,73 @@ async function toggleItemEquip(itemId, equipped) {
         }
 
         const data = await response.json()
-        await refreshProfileAfterMutation(data)
+        applyUserState(data)
     } catch (error) {
         errorMessage.value = error.message || '装备操作失败，请稍后重试。'
+    } finally {
+        actioningItemId.value = ''
+    }
+}
+
+async function salvageItem(itemId) {
+    if (!nickname.value || !itemId) {
+        return
+    }
+
+    actioningItemId.value = itemId
+    errorMessage.value = ''
+
+    try {
+        const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/salvage`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({nickname: nickname.value}),
+        })
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, '分解失败，请稍后重试。'))
+        }
+
+        // 分解接口返回结算结果，背包与属性由实时增量刷新。
+        await response.json()
+    } catch (error) {
+        errorMessage.value = error.message || '分解失败，请稍后重试。'
+    } finally {
+        actioningItemId.value = ''
+    }
+}
+
+async function enhanceItem(itemId) {
+    if (!nickname.value || !itemId) {
+        return
+    }
+
+    actioningItemId.value = itemId
+    errorMessage.value = ''
+
+    try {
+        const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/enhance`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({nickname: nickname.value}),
+        })
+
+        if (!response.ok) {
+            const message = await readErrorMessage(response, '强化失败，请稍后重试。')
+            errorMessage.value = message
+            return {ok: false, message}
+        }
+
+        await response.json()
+        return {ok: true}
+    } catch (error) {
+        const message = error.message || '强化失败，请稍后重试。'
+        errorMessage.value = message
+        return {ok: false, message}
     } finally {
         actioningItemId.value = ''
     }
@@ -1105,9 +1250,6 @@ async function submitNickname() {
         passwordDraft.value = ''
         await reportPresence(true)
         await loadAfkSettlement()
-        if (currentPublicPage.value === 'profile') {
-            await loadPlayerProfile(true)
-        }
         connectRealtime(resolvedNickname)
     } catch (error) {
         errorMessage.value = error.message || '登录失败，请稍后重试。'
@@ -1135,8 +1277,6 @@ function clearPlayerSessionState() {
     clearUserRealtimeState()
     clearAutoClickLocalState()
     clearPendingClicks()
-    profileLoaded.value = false
-    profileNotice.value = ''
 }
 
 async function loadPlayerSession() {
@@ -1191,7 +1331,8 @@ async function loadAfkSettlement() {
         const kills = Number(payload?.kills ?? 0)
         const goldTotal = Number(payload?.goldTotal ?? 0)
         const stoneTotal = Number(payload?.stoneTotal ?? 0)
-        if (kills <= 0 && goldTotal <= 0 && stoneTotal <= 0) {
+        const rewards = normalizeRewardList(payload?.rewards)
+        if (kills <= 0 && goldTotal <= 0 && stoneTotal <= 0 && rewards.length === 0) {
             return
         }
         afkSettlement.value = {
@@ -1200,7 +1341,9 @@ async function loadAfkSettlement() {
             stoneTotal,
             startedAt: Number(payload?.startedAt ?? 0),
             endedAt: Number(payload?.endedAt ?? 0),
+            rewards,
         }
+        openAfkRewardModal(afkSettlement.value)
     } catch {
         // 忽略结算拉取失败。
     }
@@ -1208,29 +1351,15 @@ async function loadAfkSettlement() {
 
 function closeAfkSettlementModal() {
     afkSettlement.value = null
+    closeRewardModal()
 }
 
 function registerPublicPageLifecycle() {
-    let onlineCountTimer
     const handleVisibilityChange = () => {
         const visible = document.visibilityState === 'visible'
         void reportPresence(visible)
         if (visible) {
             void loadAfkSettlement()
-            void loadPlayerProfile(true)
-        }
-    }
-
-    async function fetchOnlineCount() {
-        try {
-            const response = await fetch('/api/online-count')
-            if (response.ok) {
-                const data = await response.json()
-                // 接口返回后，用真实数据（已经包含当前用户）
-                onlineCount.value = data.count
-            }
-        } catch {
-            // 接口失败时，保持本地+1的显示，不回退
         }
     }
 
@@ -1245,14 +1374,8 @@ function registerPublicPageLifecycle() {
         void reportPresence(true)
         void loadAfkSettlement()
 
-        // ✅ 先直接显示 1
+        // 实时通道建立前先给出保守值，连接后会被实时在线人数事件覆盖。
         onlineCount.value = 1
-
-        // ✅ 延迟一点再拉真实数据（避免瞬间覆盖）
-        setTimeout(fetchOnlineCount, 300)
-
-        // 5 秒轮询
-        onlineCountTimer = setInterval(fetchOnlineCount, 10000)
     })
 
     onBeforeUnmount(() => {
@@ -1261,7 +1384,6 @@ function registerPublicPageLifecycle() {
         realtimeTransport?.close()
         burstTimers.forEach((timer) => window.clearTimeout(timer))
         burstTimers.clear()
-        if (onlineCountTimer) clearInterval(onlineCountTimer)
     })
 }
 
@@ -1299,7 +1421,6 @@ export function usePublicPageState() {
         errorMessage,
         pendingKeys,
         actioningItemId,
-        activeHudTab,
         lastUpdatedAt,
         liveConnected,
         criticalBursts,
@@ -1322,14 +1443,11 @@ export function usePublicPageState() {
         messageError,
         autoClickEnabled,
         autoClickTargetKey,
-        gems,
         gold,
         stones,
         afkSettlement,
+        rewardModal,
         currentPublicPage,
-        profileLoading,
-        profileLoaded,
-        profileNotice,
         lastBossResourceVersion,
         burstTimers,
         pendingClickSources,
@@ -1367,12 +1485,14 @@ export function usePublicPageState() {
         readErrorMessage,
         closeAnnouncementModal,
         closeAfkSettlementModal,
+        closeRewardModal,
         loadMessages,
         submitMessage,
-        selectHudTab,
         toggleAutoClick,
         clickButton,
         toggleItemEquip,
+        salvageItem,
+        enhanceItem,
         submitNickname,
         resetNickname,
         registerPublicPageLifecycle,

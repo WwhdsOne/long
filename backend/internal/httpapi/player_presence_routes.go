@@ -46,6 +46,7 @@ func registerPlayerPresenceRoutes(router route.IRouter, options Options) {
 				"stoneTotal": 0,
 				"startedAt":  0,
 				"endedAt":    0,
+				"rewards":    []any{},
 			})
 			return
 		}

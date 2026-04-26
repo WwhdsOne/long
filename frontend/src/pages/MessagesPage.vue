@@ -26,24 +26,6 @@ const {
 <section class="stage-layout stage-layout--messages stage-layout--single">
       <aside class="player-hud player-hud--page">
         <section class="player-hud__shell">
-          <div class="player-hud__head">
-            <div>
-              <p class="vote-stage__eyebrow">公共消息</p>
-              <strong>{{ isLoggedIn ? nickname : '未登录角色' }}</strong>
-            </div>
-            <span class="player-hud__pill">{{ isLoggedIn ? '已上墙' : '访客' }}</span>
-          </div>
-
-          <p class="player-hud__copy">消息页保留留言、公告和规则信息；战斗实时链路继续在后台保持连接。</p>
-
-          <form class="nickname-form player-hud__form" @submit.prevent="submitNickname">
-            <input v-model="nicknameDraft" class="nickname-form__input" type="text" maxlength="20" placeholder="比如：阿明" />
-            <input v-model="passwordDraft" class="nickname-form__input" type="password" placeholder="输入密码" />
-            <button class="nickname-form__submit" type="submit">登录 / 创建</button>
-          </form>
-
-          <button v-if="isLoggedIn" class="nickname-form__ghost player-hud__reset" type="button" @click="resetNickname">退出当前账号</button>
-
           <div class="player-hud__content messages-page__grid">
             <section class="player-hud__panel messages-page__feed">
               <div class="player-hud__section-head">

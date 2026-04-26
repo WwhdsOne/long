@@ -30,8 +30,8 @@ const {
   formatItemStats,
   equipmentNameParts,
   equipmentNameClass,
-  afkSettlement,
-  closeAfkSettlementModal,
+  rewardModal,
+  closeRewardModal,
   clickButton,
 } = usePublicPageState()
 
@@ -279,6 +279,12 @@ function bossZoneAriaLabel(zone) {
                 class="boss-drop-card boss-drop-card--detail"
             >
               <span class="boss-drop-card__type">装备</span>
+              <img
+                v-if="item.imagePath"
+                class="boss-drop-card__avatar"
+                :src="item.imagePath"
+                :alt="item.imageAlt || item.itemName || item.itemId"
+              />
               <strong>
                 <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
                 <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
@@ -316,21 +322,47 @@ function bossZoneAriaLabel(zone) {
       </article>
     </section>
 
-    <section v-if="afkSettlement" class="boss-drop-modal" aria-label="挂机结算">
-      <div class="boss-drop-modal__backdrop" @click="closeAfkSettlementModal"></div>
+    <section v-if="rewardModal" class="boss-drop-modal" aria-label="战利品结算">
+      <div class="boss-drop-modal__backdrop" @click="closeRewardModal"></div>
       <article class="boss-drop-modal__card">
         <div class="boss-drop-modal__head">
           <div>
-            <p class="vote-stage__eyebrow">挂机结算</p>
-            <strong>离页挂机已结束</strong>
+            <p class="vote-stage__eyebrow">{{ rewardModal.mode === 'afk' ? '挂机结算' : '击杀结算' }}</p>
+            <strong>{{ rewardModal.title }}</strong>
           </div>
-          <button class="nickname-form__ghost" type="button" @click="closeAfkSettlementModal">关闭</button>
+          <button class="nickname-form__ghost" type="button" @click="closeRewardModal">关闭</button>
         </div>
-        <div class="leaderboard-list">
-          <p>击杀数：{{ afkSettlement.kills }}</p>
-          <p>金币：+{{ afkSettlement.goldTotal }}</p>
-          <p>强化石：+{{ afkSettlement.stoneTotal }}</p>
-        </div>
+        <section class="boss-drop-modal__section">
+          <div class="boss-drop-modal__section-head">
+            <span>资源战利品</span>
+            <strong>{{ rewardModal.bossName }}</strong>
+          </div>
+          <div class="leaderboard-list">
+            <p>击杀数：{{ rewardModal.kills }}</p>
+            <p>金币：+{{ rewardModal.goldTotal }}</p>
+            <p>强化石：+{{ rewardModal.stoneTotal }}</p>
+          </div>
+        </section>
+        <section class="boss-drop-modal__section">
+          <div class="boss-drop-modal__section-head">
+            <span>装备战利品</span>
+            <strong>{{ rewardModal.rewards.length }} 件</strong>
+          </div>
+          <div v-if="rewardModal.rewards.length === 0" class="leaderboard-list leaderboard-list--empty">
+            <p>本次未掉落装备。</p>
+          </div>
+          <div v-else class="reward-grid">
+            <article v-for="reward in rewardModal.rewards" :key="`${reward.itemId}-${reward.grantedAt}`" class="reward-grid__item">
+              <img
+                v-if="reward.imagePath"
+                class="reward-grid__icon"
+                :src="reward.imagePath"
+                :alt="reward.imageAlt || reward.itemName || reward.itemId"
+              />
+              <span v-else class="reward-grid__fallback">{{ reward.itemName?.slice(0, 1) || '?' }}</span>
+            </article>
+          </div>
+        </section>
       </article>
     </section>
 

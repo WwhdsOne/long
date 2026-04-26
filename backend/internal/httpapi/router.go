@@ -25,6 +25,7 @@ type ButtonStore interface {
 	ValidateNickname(context.Context, string) error
 	EquipItem(context.Context, string, string) (vote.State, error)
 	UnequipItem(context.Context, string, string) (vote.State, error)
+	EnhanceItem(context.Context, string, string) (vote.State, error)
 	SalvageItem(context.Context, string, string) (vote.SalvageResult, error)
 	GetAdminState(context.Context) (vote.AdminState, error)
 	ListAdminEquipmentPage(context.Context, int64, int64) (vote.AdminEquipmentPage, error)

@@ -227,11 +227,15 @@ func (s *Store) ListPlayerOverviews(ctx context.Context) ([]AdminPlayerOverview,
 		if err != nil {
 			return nil, err
 		}
-		loadout, equipped, err := s.loadoutForNickname(ctx, nickname, quantities)
+		enhanceLevels, err := s.enhanceLevelsForNickname(ctx, nickname)
 		if err != nil {
 			return nil, err
 		}
-		inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped)
+		loadout, equipped, err := s.loadoutForNickname(ctx, nickname, quantities, enhanceLevels)
+		if err != nil {
+			return nil, err
+		}
+		inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped, enhanceLevels)
 		if err != nil {
 			return nil, err
 		}
@@ -356,11 +360,15 @@ func (s *Store) adminPlayerOverview(ctx context.Context, nickname string) (*Admi
 	if err != nil {
 		return nil, err
 	}
-	loadout, equipped, err := s.loadoutForNickname(ctx, nickname, quantities)
+	enhanceLevels, err := s.enhanceLevelsForNickname(ctx, nickname)
 	if err != nil {
 		return nil, err
 	}
-	inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped)
+	loadout, equipped, err := s.loadoutForNickname(ctx, nickname, quantities, enhanceLevels)
+	if err != nil {
+		return nil, err
+	}
+	inventory, err := s.inventoryForNickname(ctx, nickname, quantities, equipped, enhanceLevels)
 	if err != nil {
 		return nil, err
 	}

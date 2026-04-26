@@ -2,6 +2,7 @@ package events
 
 import (
 	"testing"
+	"time"
 
 	"long/internal/vote"
 )
@@ -18,12 +19,12 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 		t.Fatalf("broadcast public snapshot: %v", err)
 	}
 
-	amingEvent := <-aming
+	amingEvent := readEventByName(t, aming, PublicStateEventName)
 	if amingEvent.Name != PublicStateEventName {
 		t.Fatalf("expected public_state for 阿明, got %+v", amingEvent)
 	}
 
-	xiaohongEvent := <-xiaohong
+	xiaohongEvent := readEventByName(t, xiaohong, PublicStateEventName)
 	if xiaohongEvent.Name != PublicStateEventName {
 		t.Fatalf("expected public_state for 小红, got %+v", xiaohongEvent)
 	}
@@ -35,7 +36,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 		t.Fatalf("broadcast user state: %v", err)
 	}
 
-	amingEvent = <-aming
+	amingEvent = readEventByName(t, aming, UserStateEventName)
 	if amingEvent.Name != UserStateEventName {
 		t.Fatalf("expected user_state for 阿明, got %+v", amingEvent)
 	}
@@ -44,5 +45,52 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	case unexpected := <-xiaohong:
 		t.Fatalf("expected no user event for 小红, got %+v", unexpected)
 	default:
+	}
+}
+
+func TestHubSubscribeAndUnsubscribeBroadcastOnlineCount(t *testing.T) {
+	hub := NewHub()
+
+	aming, unsubscribeAming := hub.Subscribe("阿明")
+	online := readEventByName(t, aming, OnlineCountEventName)
+	if string(online.Payload) != `{"count":1}` {
+		t.Fatalf("expected online count 1, got %s", string(online.Payload))
+	}
+
+	xiaohong, unsubscribeXiaohong := hub.Subscribe("小红")
+	online = readEventByName(t, aming, OnlineCountEventName)
+	if string(online.Payload) != `{"count":2}` {
+		t.Fatalf("expected online count 2 for 阿明, got %s", string(online.Payload))
+	}
+	online = readEventByName(t, xiaohong, OnlineCountEventName)
+	if string(online.Payload) != `{"count":2}` {
+		t.Fatalf("expected online count 2 for 小红, got %s", string(online.Payload))
+	}
+
+	unsubscribeXiaohong()
+	online = readEventByName(t, aming, OnlineCountEventName)
+	if string(online.Payload) != `{"count":1}` {
+		t.Fatalf("expected online count 1 after unsubscribe, got %s", string(online.Payload))
+	}
+
+	unsubscribeAming()
+}
+
+func readEventByName(t *testing.T, ch <-chan ServerEvent, name string) ServerEvent {
+	t.Helper()
+
+	timeout := time.After(2 * time.Second)
+	for {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				t.Fatalf("event channel closed while waiting for %s", name)
+			}
+			if event.Name == name {
+				return event
+			}
+		case <-timeout:
+			t.Fatalf("timed out waiting for event %s", name)
+		}
 	}
 }

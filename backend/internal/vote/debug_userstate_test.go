@@ -36,11 +36,15 @@ func TestDebugWwhdsUserState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inventoryQuantities: %v", err)
 	}
-	_, equipped, err := store.loadoutForNickname(ctx, nickname, quantities)
+	enhanceLevels, err := store.enhanceLevelsForNickname(ctx, nickname)
+	if err != nil {
+		t.Fatalf("enhanceLevelsForNickname: %v", err)
+	}
+	_, equipped, err := store.loadoutForNickname(ctx, nickname, quantities, enhanceLevels)
 	if err != nil {
 		t.Fatalf("loadoutForNickname: %v", err)
 	}
-	if _, err := store.inventoryForNickname(ctx, nickname, quantities, equipped); err != nil {
+	if _, err := store.inventoryForNickname(ctx, nickname, quantities, equipped, enhanceLevels); err != nil {
 		t.Fatalf("inventoryForNickname: %v", err)
 	}
 	if _, err := store.recentRewardsForNickname(ctx, nickname); err != nil {

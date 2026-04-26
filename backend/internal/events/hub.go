@@ -17,7 +17,12 @@ import (
 const (
 	PublicStateEventName = "public_state"
 	UserStateEventName   = "user_state"
+	OnlineCountEventName = "online_count"
 )
+
+type onlineCountPayload struct {
+	Count int `json:"count"`
+}
 
 // StateReader 提供 SSE 初始状态所需的公共态与个人态读取能力。
 type StateReader interface {
@@ -55,6 +60,7 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 
 	h.mu.Lock()
 	h.clients[client] = struct{}{}
+	h.broadcastOnlineCountLocked()
 	h.mu.Unlock()
 
 	unsubscribe := func() {
@@ -62,6 +68,7 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 		if _, ok := h.clients[client]; ok {
 			delete(h.clients, client)
 			close(client.ch)
+			h.broadcastOnlineCountLocked()
 		}
 		h.mu.Unlock()
 	}
@@ -130,6 +137,16 @@ func (h *Hub) ActiveNicknames() []string {
 		nicknames = append(nicknames, nickname)
 	}
 	return nicknames
+}
+
+func (h *Hub) broadcastOnlineCountLocked() {
+	payload, err := sonic.Marshal(onlineCountPayload{Count: len(h.clients)})
+	if err != nil {
+		return
+	}
+	for client := range h.clients {
+		deliverEvent(client.ch, ServerEvent{Name: OnlineCountEventName, Payload: payload})
+	}
 }
 
 // NewHandler 暴露浏览器 EventSource 使用的 Hertz 原生 SSE 入口。

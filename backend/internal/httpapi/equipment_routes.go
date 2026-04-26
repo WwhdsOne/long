@@ -106,6 +106,65 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		})
 	})
 
+	router.POST("/api/equipment/:itemId/enhance", func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if !bindJSON(c, &body, map[string]string{
+			"error":   "INVALID_REQUEST",
+			"message": "昵称没有带上，先报个名再强化。",
+		}) {
+			return
+		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
+
+		state, err := options.Store.EnhanceItem(ctx, nickname, c.Param("itemId"))
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotFound) {
+				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_OWNED",
+					"message": "这件装备还不在你的背包里。",
+				})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentEnhanceMaxLevel) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_ENHANCE_MAX_LEVEL",
+					"message": "这件装备已达到强化上限。",
+				})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentEnhanceInsufficientGold) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_ENHANCE_GOLD_NOT_ENOUGH",
+					"message": "金币不足，无法强化。",
+				})
+				return
+			}
+			if errors.Is(err, vote.ErrEquipmentEnhanceInsufficientStones) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_ENHANCE_STONE_NOT_ENOUGH",
+					"message": "强化石不足，无法强化。",
+				})
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ENHANCE_FAILED"})
+			return
+		}
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, state)
+	})
+
 	router.POST("/api/equipment/:itemId/salvage", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`

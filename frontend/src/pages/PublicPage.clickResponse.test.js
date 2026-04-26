@@ -8,7 +8,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const pageSource = [
   './PublicPage.vue',
   './BattlePage.vue',
-  './ProfilePage.vue',
+  './ArmoryPage.vue',
   './MessagesPage.vue',
   './publicPageState.js',
 ]

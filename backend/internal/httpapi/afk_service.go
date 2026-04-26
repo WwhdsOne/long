@@ -20,6 +20,7 @@ type afkPlayerState struct {
 	baselineGold   int64
 	baselineStones int64
 	kills          int64
+	rewards        []vote.Reward
 }
 
 // AfkService 负责按页面可见性托管挂机与结算。
@@ -142,6 +143,7 @@ func (s *AfkService) runOnce(ctx context.Context) {
 			state.baselineGold = userState.Gold
 			state.baselineStones = userState.Stones
 			state.kills = 0
+			state.rewards = nil
 		}
 		nicknames = append(nicknames, nickname)
 	}
@@ -160,6 +162,9 @@ func (s *AfkService) runOnce(ctx context.Context) {
 			s.mu.Lock()
 			if state := s.players[nickname]; state != nil && state.afkActive {
 				state.kills++
+				if len(result.RecentRewards) > 0 {
+					state.rewards = append(state.rewards, result.RecentRewards...)
+				}
 			}
 			s.mu.Unlock()
 			publishChange(ctx, s.changePublisher, vote.StateChange{
@@ -193,8 +198,10 @@ func (s *AfkService) stopAfk(ctx context.Context, nickname string) {
 	baselineGold := state.baselineGold
 	baselineStones := state.baselineStones
 	kills := state.kills
+	rewards := append([]vote.Reward(nil), state.rewards...)
 	state.afkActive = false
 	state.afkStartedAt = time.Time{}
+	state.rewards = nil
 	s.mu.Unlock()
 
 	userState, err := s.store.GetUserState(ctx, nickname)
@@ -222,6 +229,9 @@ func (s *AfkService) stopAfk(ctx context.Context, nickname string) {
 	existing.Kills += kills
 	existing.GoldTotal += goldDelta
 	existing.StoneTotal += stoneDelta
+	if len(rewards) > 0 {
+		existing.Rewards = append(existing.Rewards, rewards...)
+	}
 	s.settlements[nickname] = existing
 	s.mu.Unlock()
 }

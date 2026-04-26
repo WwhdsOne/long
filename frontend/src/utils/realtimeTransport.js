@@ -30,6 +30,7 @@ export function createRealtimeTransport(options = {}) {
   const onSnapshot = options.onSnapshot || (() => {})
   const onPublicDelta = options.onPublicDelta || (() => {})
   const onUserDelta = options.onUserDelta || (() => {})
+  const onOnlineCount = options.onOnlineCount || (() => {})
   const onClickAck = options.onClickAck || (() => {})
   const onTransportState = options.onTransportState || (() => {})
   const onTransportError = options.onTransportError || (() => {})
@@ -133,6 +134,15 @@ export function createRealtimeTransport(options = {}) {
           mode: 'ws',
         })
         return
+      case 'online_count':
+        clearReconnectTimer()
+        onOnlineCount(message.payload ?? {})
+        updateState({
+          connected: true,
+          degraded: false,
+          mode: 'ws',
+        })
+        return
       case 'click_ack':
         clearReconnectTimer()
         onClickAck(message.payload ?? {})
@@ -217,6 +227,7 @@ export function createRealtimeTransport(options = {}) {
 
     source.addEventListener('public_state', handleNamedEvent(onPublicDelta))
     source.addEventListener('user_state', handleNamedEvent(onUserDelta))
+    source.addEventListener('online_count', handleNamedEvent(onOnlineCount))
   }
 
   function connectWebSocket() {

@@ -128,6 +128,53 @@ func TestBossLootDropRateIsIndependentProbability(t *testing.T) {
 	}
 }
 
+func TestBossResourcesLootContainsEquipmentIcon(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, store.equipmentKey("fire-ring"), map[string]any{
+		"name":       "烈焰戒指",
+		"slot":       "accessory",
+		"rarity":     "epic",
+		"image_path": "https://cdn.example.com/items/fire-ring.png",
+		"image_alt":  "烈焰戒指图标",
+	}).Err(); err != nil {
+		t.Fatalf("seed equipment definition: %v", err)
+	}
+
+	boss := &Boss{
+		ID:        "icon-boss",
+		Name:      "图标测试 Boss",
+		Status:    bossStatusActive,
+		MaxHP:     100,
+		CurrentHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+		StartedAt: store.now().Unix(),
+	}
+	if err := store.setCurrentBoss(ctx, boss, []BossLootEntry{
+		{ItemID: "fire-ring", DropRatePercent: 30},
+	}); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+
+	resources, err := store.GetBossResources(ctx)
+	if err != nil {
+		t.Fatalf("get boss resources: %v", err)
+	}
+	if len(resources.BossLoot) != 1 {
+		t.Fatalf("expected 1 loot entry, got %+v", resources.BossLoot)
+	}
+	if resources.BossLoot[0].ImagePath != "https://cdn.example.com/items/fire-ring.png" {
+		t.Fatalf("expected loot image path to be returned, got %+v", resources.BossLoot[0])
+	}
+	if resources.BossLoot[0].ImageAlt != "烈焰戒指图标" {
+		t.Fatalf("expected loot image alt to be returned, got %+v", resources.BossLoot[0])
+	}
+}
+
 func TestRollLootDropsCanReturnMultipleItems(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

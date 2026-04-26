@@ -166,6 +166,39 @@ describe('realtimeTransport', () => {
     ])
   })
 
+  it('online_count 可通过 WebSocket 与 SSE 回调在线人数', () => {
+    const sockets = []
+    const sources = []
+    const onlineCounts = []
+    const transport = createRealtimeTransport({
+      createWebSocket(url) {
+        const socket = new FakeWebSocket(url)
+        sockets.push(socket)
+        return socket
+      },
+      createEventSource(url) {
+        const source = new FakeEventSource(url)
+        sources.push(source)
+        return source
+      },
+      onOnlineCount(payload) {
+        onlineCounts.push(payload?.count)
+      },
+    })
+
+    transport.connect({ nickname: '阿明' })
+    sockets[0].emitOpen()
+    sockets[0].emitMessage({
+      type: 'online_count',
+      payload: { count: 3 },
+    })
+
+    sockets[0].emitClose()
+    sources[0].emitEvent('online_count', { count: 4 })
+
+    expect(onlineCounts).toEqual([3, 4])
+  })
+
   it('WebSocket 断开后会自动退回 SSE 并继续消费增量事件', () => {
     const sockets = []
     const sources = []
