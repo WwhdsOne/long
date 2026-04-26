@@ -109,7 +109,7 @@ vote:user-loadout:<nickname>
 vote:user-active-hero:<nickname>
 vote:user-last-reward:<nickname>
 vote:user-last-forge-result:<nickname>
-vote:user-gems:<nickname>
+vote:resource:<nickname>
 vote:user-equip-upgrade:<nickname>:<itemId>
 vote:user-hero-upgrade:<nickname>:<heroId>
 vote:announcements
@@ -195,8 +195,10 @@ vote:message:<id>
   - `recent_rewards`：最近一次 Boss 结算奖励数组的 JSON 字符串，兼容同时掉装备和英雄
 - `vote:user-last-forge-result:<nickname>` 是 `String`
   - value = 最近一次分解/强化/觉醒结果的 JSON 字符串
-- `vote:user-gems:<nickname>` 是 `String`
-  - value = 当前原石数量
+- `vote:resource:<nickname>` 是 `Hash`
+  - `gems`：原石数量
+  - `gold`：金币数量
+  - `stones`：强化石数量
 - `vote:user-equip-upgrade:<nickname>:<itemId>` 是 `Hash`
   - `star_level`
   - `bonus_clicks`

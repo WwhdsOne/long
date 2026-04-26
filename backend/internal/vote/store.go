@@ -734,8 +734,8 @@ func (s *Store) EnhanceItem(ctx context.Context, nickname string, instanceID str
 
 	now := time.Now().Unix()
 	pipe := s.client.TxPipeline()
-	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "gold", -goldCost)
-	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", -stoneCost)
+	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "gold", -goldCost)
+	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", -stoneCost)
 	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "spent_stones", stoneCost)
 	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "enhance_level", 1)
 	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
@@ -776,7 +776,7 @@ func (s *Store) SalvageItem(ctx context.Context, nickname string, instanceID str
 	pipe.SRem(ctx, s.playerInstancesKey(normalizedNickname), instance.InstanceID)
 	pipe.Del(ctx, s.equipmentInstanceKey(instance.InstanceID))
 	if refund > 0 {
-		pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", refund)
+		pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", refund)
 	}
 	if definition.Slot != "" {
 		equippedRef, getErr := s.client.HGet(ctx, s.loadoutKey(normalizedNickname), definition.Slot).Result()
@@ -1360,10 +1360,10 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		goldDelta := rollResourceReward(s.roll, goldBase, 0.75, 1.25)
 		stoneDelta := rollResourceReward(s.roll, stoneBase, 0.67, 1.33)
 		if goldDelta > 0 {
-			pipe.HIncrBy(ctx, s.gemKey(nickname), "gold", goldDelta)
+			pipe.HIncrBy(ctx, s.resourceKey(nickname), "gold", goldDelta)
 		}
 		if stoneDelta > 0 {
-			pipe.HIncrBy(ctx, s.gemKey(nickname), "stones", stoneDelta)
+			pipe.HIncrBy(ctx, s.resourceKey(nickname), "stones", stoneDelta)
 		}
 
 		if len(lootEntries) == 0 {
@@ -2210,16 +2210,8 @@ func (s *Store) newEquipmentInstanceID(ctx context.Context) (string, error) {
 	return "inst-" + strconv.FormatInt(seq, 10), nil
 }
 
-func (s *Store) gemKey(nickname string) string {
-	return s.namespace + "gem:" + nickname
-}
-
-func (s *Store) gemsForNickname(ctx context.Context, nickname string) (int64, error) {
-	resources, err := s.resourcesForNickname(ctx, nickname)
-	if err != nil {
-		return 0, err
-	}
-	return resources.Gems, nil
+func (s *Store) resourceKey(nickname string) string {
+	return s.namespace + "resource:" + nickname
 }
 
 type playerResources struct {
@@ -2229,7 +2221,7 @@ type playerResources struct {
 }
 
 func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
-	values, err := s.client.HMGet(ctx, s.gemKey(nickname), "gems", "gold", "stones").Result()
+	values, err := s.client.HMGet(ctx, s.resourceKey(nickname), "gems", "gold", "stones").Result()
 	if err != nil {
 		return playerResources{}, err
 	}

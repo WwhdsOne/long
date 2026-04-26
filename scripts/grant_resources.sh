@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # ==========================================
-# 批量发放原石/宝石脚本
-# 使用方法: bash grant_gems.sh
+# 批量发放资源脚本
+# 使用方法: bash grant_resources.sh
 # ==========================================
 
 # ---------- 在这里修改配置 ----------
@@ -22,13 +22,13 @@ REDIS_CMD="redis-cli -a ${REDIS_PASS} -n ${REDIS_DB}"
 if [ "$TARGET_USER" = "ALL" ]; then
     echo "🚀 开始向【所有玩家】发放 ${GEMS_AMOUNT} 原石..."
     
-    # 扫描所有 vote:user:* 并提取后缀生成 vote:user-gems:xxx
+    # 扫描所有 vote:user:* 并提取后缀生成 vote:resource:xxx
     $REDIS_CMD --scan --pattern 'vote:user:*' | while read key; do
         nickname="${key#vote:user:}"
-        $REDIS_CMD SET "vote:user-gems:${nickname}" $GEMS_AMOUNT > /dev/null
+        $REDIS_CMD HSET "vote:resource:${nickname}" "gems" $GEMS_AMOUNT > /dev/null
         
         # 打印进度（避免刷屏，只打印成功状态）
-        echo "✅ 已处理: vote:user-gems:${nickname}"
+        echo "✅ 已处理: vote:resource:${nickname}"
     done
     
     echo "🎉 全部玩家发放完毕！"
@@ -44,6 +44,6 @@ else
     fi
     
     # 给指定玩家设置
-    $REDIS_CMD SET "vote:user-gems:${TARGET_USER}" $GEMS_AMOUNT
+    $REDIS_CMD HSET "vote:resource:${TARGET_USER}" "gems" $GEMS_AMOUNT
     echo "🎉 玩家 ${TARGET_USER} 发放完毕！"
 fi
