@@ -31,6 +31,7 @@ var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
 var ErrBossPoolEmpty = errors.New("boss pool empty")
+var ErrBossCycleQueueEmpty = errors.New("boss cycle queue empty")
 var ErrBossPartsRequired = errors.New("boss parts required")
 var ErrBossPartNotFound = errors.New("boss part not found")
 var ErrBossPartAlreadyDead = errors.New("boss part already dead")
@@ -1408,8 +1409,8 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		return nil, err
 	}
 	if enabled {
-		nextBoss, err := s.activateRandomBossFromPool(ctx)
-		if err != nil && !errors.Is(err, ErrBossPoolEmpty) {
+		nextBoss, err := s.activateNextBossFromCycle(ctx, boss.TemplateID)
+		if err != nil && !errors.Is(err, ErrBossPoolEmpty) && !errors.Is(err, ErrBossCycleQueueEmpty) {
 			return nil, err
 		}
 		if nextBoss != nil {

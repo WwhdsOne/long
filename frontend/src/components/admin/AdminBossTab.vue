@@ -1,5 +1,5 @@
 <script setup>
-import {computed, ref} from 'vue'
+import {computed, ref, watch} from 'vue'
 
 const props = defineProps({
   adminState: { type: Object, required: true },
@@ -19,6 +19,7 @@ const props = defineProps({
   disableBossCycle: { type: Function, required: true },
   editBossTemplate: { type: Function, required: true },
   enableBossCycle: { type: Function, required: true },
+  saveBossCycleQueue: { type: Function, required: true },
   findEquipmentTemplate: { type: Function, required: true },
   formatItemStats: { type: Function, required: true },
   removeLootRow: { type: Function, required: true },
@@ -31,6 +32,15 @@ const partTypeLabels = { soft: '软组织', heavy: '重甲', weak: '弱点' }
 const partTypeColors = { soft: '#4ade80', heavy: '#fbbf24', weak: '#f472b6' }
 
 const selectedCell = ref(null)
+const cycleQueueText = ref('')
+
+watch(
+  () => props.adminState?.bossCycleQueue,
+  (value) => {
+    cycleQueueText.value = Array.isArray(value) ? value.join('\n') : ''
+  },
+  { immediate: true },
+)
 
 const gridParts = computed(() => {
   const grid = Array.from({length: 5}, () => Array(5).fill(null))
@@ -109,6 +119,14 @@ function deleteCell() {
 function cancelCell() {
   selectedCell.value = null
 }
+
+async function submitBossCycleQueue() {
+  const templateIds = cycleQueueText.value
+    .split(/[\n,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  await props.saveBossCycleQueue(templateIds)
+}
 </script>
 
 <template>
@@ -128,6 +146,20 @@ function cancelCell() {
           <span class="boss-stage__pill">
             {{ adminState.boss?.templateId ? `来源模板 ${adminState.boss.templateId}` : '当前没有绑定模板' }}
           </span>
+        </div>
+        <div style="margin-top: 0.75rem;">
+          <p class="vote-stage__eyebrow">循环队列（按顺序，一行一个模板 ID）</p>
+          <textarea
+            v-model="cycleQueueText"
+            class="nickname-form__input"
+            rows="4"
+            placeholder="示例：\nwooden-dummy\nslime-king\nskeleton-general"
+          />
+          <div class="admin-inline-actions" style="margin-top: 0.5rem;">
+            <button class="nickname-form__ghost" type="button" :disabled="saving" @click="submitBossCycleQueue">
+              保存循环队列
+            </button>
+          </div>
         </div>
 
         <div v-if="hasBoss" class="admin-boss-summary">

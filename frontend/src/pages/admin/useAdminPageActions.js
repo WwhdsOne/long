@@ -108,6 +108,26 @@ export function createAdminPageActions(state) {
     await postAction('/api/admin/boss/cycle/disable', 'Boss 循环已停止，当前 Boss 不会自动续上。', '停止 Boss 循环失败')
   }
 
+  async function saveBossCycleQueue(templateIds) {
+    saving.value = true
+    try {
+      const response = await fetch('/api/admin/boss/cycle/queue', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateIds }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '保存 Boss 循环队列失败'))
+      }
+      setSuccess('Boss 循环队列已保存。')
+      await fetchAdminState()
+    } catch (error) {
+      errorMessage.value = error.message || '保存 Boss 循环队列失败'
+    } finally {
+      saving.value = false
+    }
+  }
+
   async function saveEquipment() {
     saving.value = true
     try {
@@ -406,6 +426,7 @@ export function createAdminPageActions(state) {
     removeLootRow,
     saveAnnouncement,
     saveBossTemplate,
+    saveBossCycleQueue,
     saveButton,
     saveEquipment,
     saveLoot,

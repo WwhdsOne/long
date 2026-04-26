@@ -194,6 +194,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 				})
 				return
 			}
+			if errors.Is(err, vote.ErrBossCycleQueueEmpty) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "BOSS_CYCLE_QUEUE_EMPTY",
+					"message": "请先在 Boss 池里配置循环队列。",
+				})
+				return
+			}
 			if errors.Is(err, vote.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_PARTS_REQUIRED",
@@ -211,6 +218,38 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			Timestamp:        time.Now().Unix(),
 		})
 		writeJSON(c, consts.StatusOK, boss)
+	})
+
+	router.PUT("/api/admin/boss/cycle/queue", func(ctx context.Context, c *app.RequestContext) {
+		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
+			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+			return
+		}
+
+		var body struct {
+			TemplateIDs []string `json:"templateIds"`
+		}
+		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
+			return
+		}
+
+		queue, err := options.Store.SetBossCycleQueue(ctx, body.TemplateIDs)
+		if err != nil {
+			if errors.Is(err, vote.ErrBossTemplateNotFound) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "BOSS_TEMPLATE_NOT_FOUND",
+					"message": "循环队列里包含不存在的 Boss 模板。",
+				})
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_CYCLE_QUEUE_SAVE_FAILED"})
+			return
+		}
+
+		writeJSON(c, consts.StatusOK, map[string]any{
+			"ok":          true,
+			"templateIds": queue,
+		})
 	})
 
 	router.POST("/api/admin/boss/cycle/disable", func(ctx context.Context, c *app.RequestContext) {

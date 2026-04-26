@@ -335,6 +335,101 @@ func TestBossPartDisplayFieldsPersist(t *testing.T) {
 	}
 }
 
+func TestBossCycleQueueAdvanceAndWrapOnKill(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "a", "新手木桩")
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "b", "史莱姆王")
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "c", "骷髅将军")
+
+	if _, err := store.SetBossCycleQueue(ctx, []string{"a", "b", "c"}); err != nil {
+		t.Fatalf("set boss cycle queue: %v", err)
+	}
+
+	first, err := store.SetBossCycleEnabled(ctx, true)
+	if err != nil {
+		t.Fatalf("enable boss cycle: %v", err)
+	}
+	if first == nil || first.TemplateID != "a" {
+		t.Fatalf("expected first boss template a, got %+v", first)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click first boss: %v", err)
+	}
+	if result.Boss == nil || result.Boss.TemplateID != "b" || result.Boss.Status != bossStatusActive {
+		t.Fatalf("expected next boss template b, got %+v", result.Boss)
+	}
+
+	result, err = store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click second boss: %v", err)
+	}
+	if result.Boss == nil || result.Boss.TemplateID != "c" || result.Boss.Status != bossStatusActive {
+		t.Fatalf("expected next boss template c, got %+v", result.Boss)
+	}
+
+	result, err = store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click third boss: %v", err)
+	}
+	if result.Boss == nil || result.Boss.TemplateID != "a" || result.Boss.Status != bossStatusActive {
+		t.Fatalf("expected wrapped boss template a, got %+v", result.Boss)
+	}
+}
+
+func TestBossCycleQueueDynamicUpdateAppliesOnCurrentBossDefeat(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "a", "新手木桩")
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "b", "史莱姆王")
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "c", "骷髅将军")
+
+	if _, err := store.SetBossCycleQueue(ctx, []string{"a", "b", "c"}); err != nil {
+		t.Fatalf("set initial boss cycle queue: %v", err)
+	}
+	if _, err := store.SetBossCycleEnabled(ctx, true); err != nil {
+		t.Fatalf("enable boss cycle: %v", err)
+	}
+
+	if _, err := store.SetBossCycleQueue(ctx, []string{"c", "b"}); err != nil {
+		t.Fatalf("set updated boss cycle queue: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click current boss after queue update: %v", err)
+	}
+	if result.Boss == nil || result.Boss.TemplateID != "c" {
+		t.Fatalf("expected next boss template c after queue update, got %+v", result.Boss)
+	}
+
+	result, err = store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click updated queue boss: %v", err)
+	}
+	if result.Boss == nil || result.Boss.TemplateID != "b" {
+		t.Fatalf("expected next boss template b after c, got %+v", result.Boss)
+	}
+}
+
+func TestEnableBossCycleRequiresConfiguredQueue(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "a", "新手木桩")
+
+	if _, err := store.SetBossCycleEnabled(ctx, true); !errors.Is(err, ErrBossCycleQueueEmpty) {
+		t.Fatalf("expected ErrBossCycleQueueEmpty, got %v", err)
+	}
+}
+
 func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -380,6 +475,20 @@ func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	}
 	if stored.CurrentHP != 95 || len(stored.Parts) != 1 || stored.Parts[0].CurrentHP != 95 {
 		t.Fatalf("expected stored boss and part health to be reduced, got %+v", stored)
+	}
+}
+
+func mustSaveBossTemplateForCycleTest(t *testing.T, store *Store, ctx context.Context, id string, name string) {
+	t.Helper()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    id,
+		Name:  name,
+		MaxHP: 1,
+		Layout: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1, CurrentHP: 1, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("save boss template %s: %v", id, err)
 	}
 }
 

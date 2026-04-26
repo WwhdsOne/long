@@ -10,6 +10,7 @@ export function emptyAdminState() {
     loot: [],
     bossCycleEnabled: false,
     bossPool: [],
+    bossCycleQueue: [],
     playerCount: 0,
     recentPlayerCount: 0,
   }
@@ -145,6 +146,7 @@ export function normalizeAdminState(payload) {
     loot: Array.isArray(payload?.loot) ? payload.loot.map(normalizeLootEntry) : [],
     bossCycleEnabled: Boolean(payload?.bossCycleEnabled),
     bossPool: Array.isArray(payload?.bossPool) ? payload.bossPool.map(normalizeBossTemplate) : [],
+    bossCycleQueue: Array.isArray(payload?.bossCycleQueue) ? payload.bossCycleQueue.filter(Boolean) : [],
     playerCount: Number(payload?.playerCount ?? 0),
     recentPlayerCount: Number(payload?.recentPlayerCount ?? 0),
   }

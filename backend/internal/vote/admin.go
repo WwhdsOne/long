@@ -24,6 +24,10 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	if err != nil {
 		return AdminState{}, err
 	}
+	bossCycleQueue, err := s.GetBossCycleQueue(ctx)
+	if err != nil {
+		return AdminState{}, err
+	}
 
 	bossLeaderboard := []BossLeaderboardEntry{}
 	loot := []BossLootEntry{}
@@ -51,6 +55,7 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 		Loot:              loot,
 		BossCycleEnabled:  bossCycleEnabled,
 		BossPool:          bossPool,
+		BossCycleQueue:    bossCycleQueue,
 		PlayerCount:       playerCount,
 		RecentPlayerCount: recentPlayerCount,
 		Players:           []AdminPlayerOverview{},
@@ -178,8 +183,12 @@ func (s *Store) DeactivateBoss(ctx context.Context) error {
 		return cycleErr
 	}
 	if enabled {
-		if _, err := s.activateRandomBossFromPool(ctx); err != nil {
-			if !errors.Is(err, ErrBossPoolEmpty) {
+		nextTemplateID := ""
+		if old != nil {
+			nextTemplateID = old.TemplateID
+		}
+		if _, err := s.activateNextBossFromCycle(ctx, nextTemplateID); err != nil {
+			if !errors.Is(err, ErrBossPoolEmpty) && !errors.Is(err, ErrBossCycleQueueEmpty) {
 				return err
 			}
 			return s.client.Del(ctx, s.bossCurrentKey).Err()
