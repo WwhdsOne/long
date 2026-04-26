@@ -263,7 +263,8 @@ function cancelEnhance() {
 }
 
 const enhanceDisplayName = computed(() => {
-  return enhanceConfirmItem.value?.name || enhanceConfirmItem.value?.itemId || ''
+  const name = enhanceConfirmItem.value?.name || enhanceConfirmItem.value?.itemId || ''
+  return String(name).replace(/\s*\+\d+$/, '')
 })
 
 const enhanceLevel = computed(() => {
