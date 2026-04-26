@@ -850,18 +850,26 @@ select {
 }
 
 .leaderboard-card--stacked {
-  display: grid;
-  gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
 }
 
 .leaderboard-card__section {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .leaderboard-card__section + .leaderboard-card__section {
+  margin-top: 20px;
   padding-top: 20px;
   border-top: 1px solid rgba(183, 53, 97, 0.14);
+  flex-shrink: 0;
 }
 
 .social-card__head {
@@ -961,6 +969,7 @@ select {
   padding: 0;
   margin: 18px 0 0;
   list-style: none;
+  min-height: 0;
 }
 
 .leaderboard-list__item {
@@ -2591,6 +2600,10 @@ select {
     max-height: none;
     overflow: visible;
     padding-right: 0;
+  }
+
+  .leaderboard-card__section {
+    overflow-y: visible;
   }
 
   .player-hud__shell,
