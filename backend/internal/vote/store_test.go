@@ -820,3 +820,20 @@ func TestEquipmentCritRateContributesToCriticalChance(t *testing.T) {
 		t.Fatalf("expected critical chance to include equipment critRate, got %+v", userState.CombatStats)
 	}
 }
+
+func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
+	stats := CombatStats{
+		AttackPower:           100,
+		CriticalChancePercent: 0,
+		CriticalCount:         5,
+		CritDamageMultiplier:  2.0,
+	}
+
+	result := CalcBossPartDamage(stats, PartTypeSoft, 0, 1)
+	if result.NormalDamage != 100 {
+		t.Fatalf("expected normal damage 100, got %+v", result)
+	}
+	if result.CriticalDamage != 200 {
+		t.Fatalf("expected critical damage 200, got %+v", result)
+	}
+}

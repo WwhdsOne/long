@@ -134,6 +134,8 @@ export function normalizeBossTemplate(entry) {
     id: entry?.id || '',
     name: entry?.name || '',
     maxHp: Number(entry?.maxHp ?? 0),
+    goldOnKill: Number(entry?.goldOnKill ?? 0),
+    stoneOnKill: Number(entry?.stoneOnKill ?? 0),
     layout: Array.isArray(entry?.layout) ? entry.layout : [],
     loot: Array.isArray(entry?.loot) ? entry.loot.map(normalizeLootEntry) : [],
   }

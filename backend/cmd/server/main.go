@@ -63,7 +63,7 @@ func run() error {
 
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
-		CriticalChancePercent: 0,
+		CriticalChancePercent: 5,
 		CriticalCount:         0,
 	}, nicknameValidator)
 	hub := events.NewHub()

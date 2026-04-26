@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { EQUIPMENT_SLOTS, emptyEquipmentForm, normalizeEquipmentPage, normalizeLoadout, normalizeLootEntry } from './state'
+import {
+  EQUIPMENT_SLOTS,
+  emptyEquipmentForm,
+  normalizeBossTemplate,
+  normalizeEquipmentPage,
+  normalizeLoadout,
+  normalizeLootEntry,
+} from './state'
 
 describe('admin state rarity normalization', () => {
   it('空装备表单默认使用普通稀有度', () => {
@@ -21,6 +28,19 @@ describe('admin state rarity normalization', () => {
     expect(entry.dropRatePercent).toBe(35)
     expect(entry.attackPower).toBe(10)
     expect(entry.bossDamagePercent).toBe(0.5)
+  })
+
+  it('boss 模板规范化会保留金币与强化石奖励字段', () => {
+    const template = normalizeBossTemplate({
+      id: 'dragon',
+      name: '火龙',
+      maxHp: 9999,
+      goldOnKill: 5000,
+      stoneOnKill: 120,
+    })
+
+    expect(template.goldOnKill).toBe(5000)
+    expect(template.stoneOnKill).toBe(120)
   })
 
   it('装备槽位使用策划案里的六部位，并把旧 armor 兼容为胸甲', () => {

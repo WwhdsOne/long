@@ -1587,12 +1587,8 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 	// 增伤乘区 = (1 + 全伤害增幅)
 	amplify := 1.0 + stats.AllDamageAmplify
 
-	// 暴击乘区
-	critMult := 1.0
-	rollLimit, threshold := criticalRollPlan(stats.CriticalChancePercent)
-	if rollLimit > 0 && hasCriticalBonus(stats) && s_roll(rollLimit) < threshold {
-		critMult = max(1.0, stats.CritDamageMultiplier)
-	}
+	// 暴击乘区（这里只计算“命中暴击时应造成多少伤害”，不在这里做第二次暴击判定）
+	critMult := max(1.0, stats.CritDamageMultiplier)
 
 	// 最终伤害
 	finalDamage := int64(float64(baseDamage) * amplify * critMult)
@@ -1620,14 +1616,6 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 		CritDamageMultiplier:  critMult,
 		AllDamageAmplify:      amplify - 1.0,
 	}
-}
-
-// s_roll returns random int in [0, n), uses nil-safe global rand.
-func s_roll(n int) int {
-	if n <= 0 {
-		return 0
-	}
-	return globalRand.IntN(n)
 }
 
 func (s *Store) currentBoss(ctx context.Context) (*Boss, error) {
@@ -2441,7 +2429,7 @@ func enhanceGoldCost(currentLevel int) int64 {
 // 获取装备的强化石消耗。
 func enhanceStoneCost(currentLevel int) int64 {
 	level := maxInt(0, currentLevel)
-	// 公式：3 * 1.4^level，然后向上取整
+	// 公式：3 * 1.5^level，然后向上取整
 	return int64(math.Ceil(3 * math.Pow(1.5, float64(level))))
 }
 

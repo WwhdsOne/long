@@ -11,9 +11,9 @@ const actionSource = readFileSync(path.resolve(currentDir, '../../pages/admin/us
 describe('AdminBossTab 部位血量口径', () => {
   it('Boss 总血量只读展示并由部位最大血量合计决定', () => {
     expect(componentSource).toContain('bossPartTotalHp')
+    expect(componentSource).toContain('sumBossPartMaxHp(props.bossForm.layout)')
     expect(componentSource).toContain(':value="bossPartTotalHp"')
     expect(componentSource).toContain('readonly')
-    expect(componentSource).toContain('由部位总血量决定')
     expect(actionSource).toContain('sumBossPartMaxHp')
     expect(actionSource).toContain('maxHp: sumBossPartMaxHp(bossForm.value.layout)')
   })
@@ -21,8 +21,8 @@ describe('AdminBossTab 部位血量口径', () => {
   it('Boss 部位编辑器支持部位名称和小图路径', () => {
     expect(componentSource).toContain('selectedCell.displayName')
     expect(componentSource).toContain('selectedCell.imagePath')
-    expect(componentSource).toContain('部位名称')
-    expect(componentSource).toContain('小图路径')
+    expect(componentSource).toContain('<span>名称</span>')
+    expect(componentSource).toContain('<span>图片</span>')
     expect(componentSource).toContain('normalizeBossPartCell')
   })
 
@@ -33,5 +33,12 @@ describe('AdminBossTab 部位血量口径', () => {
     expect(componentSource).not.toContain('权重')
     expect(actionSource).toContain('dropRatePercent: Number(entry.dropRatePercent)')
     expect(actionSource).not.toContain('weight: Number(entry.weight)')
+  })
+
+  it('保存模板时先快照掉落行，避免刷新状态覆盖后导致掉落保存丢失', () => {
+    expect(componentSource).toContain('const lootSnapshot = props.lootRows.map')
+    expect(componentSource).toContain('await props.saveLoot(lootSnapshot)')
+    expect(actionSource).toContain('async function saveLoot(lootRowsOverride = null)')
+    expect(actionSource).toContain('const rowsToSave = Array.isArray(lootRowsOverride) ? lootRowsOverride : lootRows.value')
   })
 })

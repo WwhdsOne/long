@@ -189,71 +189,90 @@ function zoneDamageBursts(zone) {
         <div v-else-if="bossZones.length === 0" class="feedback-panel feedback-panel--compact">
           <p>当前 Boss 尚未配置可攻击分区。</p>
         </div>
-        <div v-else class="boss-part-grid">
-          <div v-for="(row, yi) in bossZones" :key="yi" class="boss-part-grid__row">
-            <button
-                v-for="(zone, xi) in row"
-                :key="yi + '-' + xi"
-                class="boss-part-cell boss-zone-button"
-                :class="{
-                  'boss-part-cell--alive': zone?.alive,
-                  'boss-part-cell--dead': zone && !zone.alive,
-                  'boss-part-cell--soft': zone?.type === 'soft',
-                  'boss-part-cell--heavy': zone?.type === 'heavy',
-                  'boss-part-cell--weak': zone?.type === 'weak',
-                  'boss-part-cell--low': zone?.alive && zone.healthPercent < 25,
-                  'boss-zone-button--empty': !zone,
-                  'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
-                  'boss-zone-button--damage': zoneDamageBursts(zone).length > 0,
+        <div v-else class="boss-part-grid-container" style="display: flex; gap: 12px; align-items: flex-start;">
+          <!-- 左侧：部位系数说明（你要的位置） -->
+          <div class="boss-part-info" style="
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+              border-radius: 8px;
+              min-width: 10px;
+              font-size: 14px;
+              padding-top: 10px;
+            ">
+            <div style="font-weight: bold; margin-bottom: 4px;">部位伤害系数</div>
+            <div style="color: #4ade80;">软组织：1.0</div>
+            <div style="color: #c0c6cf;">重甲：0.4</div>
+            <div style="color: #ef4444;">弱点：2.5</div>
+          </div>
+
+          <!-- 右侧：原版 5×5 Boss 网格（完整保留） -->
+          <div class="boss-part-grid">
+            <div v-for="(row, yi) in bossZones" :key="yi" class="boss-part-grid__row">
+              <button
+                  v-for="(zone, xi) in row"
+                  :key="yi + '-' + xi"
+                  class="boss-part-cell boss-zone-button"
+                  :class="{
+            'boss-part-cell--alive': zone?.alive,
+            'boss-part-cell--dead': zone && !zone.alive,
+            'boss-part-cell--soft': zone?.type === 'soft',
+            'boss-part-cell--heavy': zone?.type === 'heavy',
+            'boss-part-cell--weak': zone?.type === 'weak',
+            'boss-part-cell--low': zone?.alive && zone.healthPercent < 25,
+            'boss-zone-button--empty': !zone,
+            'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
+            'boss-zone-button--damage': zoneDamageBursts(zone).length > 0,
+          }"
+                  :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
+                  type="button"
+                  :disabled="isBossZoneDisabled(zone)"
+                  :aria-label="bossZoneAriaLabel(zone)"
+                  @click="clickBossZone(zone)"
+              >
+                <template v-if="zone">
+                  <img
+                      v-if="zone.imagePath"
+                      class="boss-part-cell__image"
+                      :src="zone.imagePath"
+                      :alt="zone.displayName || partTypeLabels[zone.type] || zone.type"
+                  />
+                  <div class="boss-zone-button__damage-layer" aria-hidden="true">
+            <span
+                v-for="burst in zoneDamageBursts(zone)"
+                :key="burst.id"
+                class="boss-zone-button__damage-burst"
+                :class="[
+                  `boss-zone-button__damage-burst--${burst.type}`,
+                ]"
+                :style="{
+                  '--damage-offset-x': `${burst.offsetX}px`,
+                  '--damage-offset-y': `${burst.offsetY}px`,
+                  '--damage-scale': burst.scale,
+                  '--damage-ttl': `${burst.ttl}ms`,
                 }"
-                :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
-                type="button"
-                :disabled="isBossZoneDisabled(zone)"
-                :aria-label="bossZoneAriaLabel(zone)"
-                @click="clickBossZone(zone)"
             >
-              <template v-if="zone">
-                <img
-                    v-if="zone.imagePath"
-                    class="boss-part-cell__image"
-                    :src="zone.imagePath"
-                    :alt="zone.displayName || partTypeLabels[zone.type] || zone.type"
-                />
-                <div class="boss-zone-button__damage-layer" aria-hidden="true">
-                  <span
-                      v-for="burst in zoneDamageBursts(zone)"
-                      :key="burst.id"
-                      class="boss-zone-button__damage-burst"
-                      :class="[
-                        `boss-zone-button__damage-burst--${burst.type}`,
-                      ]"
-                      :style="{
-                        '--damage-offset-x': `${burst.offsetX}px`,
-                        '--damage-offset-y': `${burst.offsetY}px`,
-                        '--damage-scale': burst.scale,
-                        '--damage-ttl': `${burst.ttl}ms`,
-                      }"
-                  >
-                    {{ burst.value }}
-                  </span>
-                </div>
-                <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
-                <strong class="boss-zone-button__label">{{
-                    zone.displayName || partTypeLabels[zone.type] || zone.type
-                  }}</strong>
-                <div class="boss-part-cell__bar">
-                    <span
-                        class="boss-part-cell__fill"
-                        :style="{ width: `${zone.healthPercent}%` }"
-                    ></span>
-                </div>
-                <div class="boss-zone-button__meta">
-                  <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
-                  <span>点击 +1</span>
-                </div>
-              </template>
-              <span v-else class="boss-part-cell__empty"></span>
-            </button>
+              {{ burst.value }}
+            </span>
+                  </div>
+                  <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
+                  <strong class="boss-zone-button__label">{{
+                      zone.displayName || partTypeLabels[zone.type] || zone.type
+                    }}</strong>
+                  <div class="boss-part-cell__bar">
+              <span
+                  class="boss-part-cell__fill"
+                  :style="{ width: `${zone.healthPercent}%` }"
+              ></span>
+                  </div>
+                  <div class="boss-zone-button__meta">
+                    <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
+                    <span>点击 +1</span>
+                  </div>
+                </template>
+                <span v-else class="boss-part-cell__empty"></span>
+              </button>
+            </div>
           </div>
         </div>
         <div class="vote-stage__boss-hud-stats">

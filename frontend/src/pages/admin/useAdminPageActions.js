@@ -300,11 +300,13 @@ export function createAdminPageActions(state) {
     }, '装备图片已上传到 OSS。')
   }
 
-  async function saveLoot() {
+  async function saveLoot(lootRowsOverride = null) {
     if (!selectedBossTemplateId.value) {
       errorMessage.value = '先选一只 Boss 模板，再配置掉落池。'
       return
     }
+
+    const rowsToSave = Array.isArray(lootRowsOverride) ? lootRowsOverride : lootRows.value
 
     saving.value = true
     try {
@@ -312,7 +314,7 @@ export function createAdminPageActions(state) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          loot: lootRows.value.filter((entry) => entry.itemId).map((entry) => ({
+          loot: rowsToSave.filter((entry) => entry.itemId).map((entry) => ({
             itemId: entry.itemId,
             dropRatePercent: Number(entry.dropRatePercent),
           })),

@@ -107,12 +107,12 @@ function cancelSalvage() {
 
 function enhanceGoldCost(level) {
   const safeLevel = Math.max(0, Number(level || 0))
-  return Math.ceil(100 * (1.5 ** safeLevel))
+  return Math.ceil(500 * (1.5 ** safeLevel))
 }
 
 function enhanceStoneCost(level) {
   const safeLevel = Math.max(0, Number(level || 0))
-  return Math.ceil(1.4 ** safeLevel)
+  return Math.ceil(3 * (1.5 ** safeLevel))
 }
 
 function maxEnhanceLevel(rarity) {
