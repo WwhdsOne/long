@@ -41,14 +41,25 @@ type realtimeClientMessage struct {
 }
 
 type realtimeSnapshotMessage struct {
-	Type   string          `json:"type"`
-	Public vote.Snapshot   `json:"public"`
-	User   *vote.UserState `json:"user"`
+	Type   string        `json:"type"`
+	Public vote.Snapshot `json:"public"`
+	User   any           `json:"user"`
 }
 
 type realtimeDeltaMessage struct {
 	Type    string          `json:"type"`
 	Payload json.RawMessage `json:"payload"`
+}
+
+type realtimeSnapshotUser struct {
+	UserStats     *vote.UserStats     `json:"userStats,omitempty"`
+	MyBossStats   *vote.BossUserStats `json:"myBossStats,omitempty"`
+	Loadout       vote.Loadout        `json:"loadout"`
+	CombatStats   vote.CombatStats    `json:"combatStats"`
+	Gold          int64               `json:"gold"`
+	Stones        int64               `json:"stones"`
+	TalentPoints  int64               `json:"talentPoints"`
+	RecentRewards []vote.Reward       `json:"recentRewards,omitempty"`
 }
 
 type realtimeClickAckPayload struct {
@@ -293,13 +304,14 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(any) error
 		return send(s.protocolError(realtimeErrorCodeStateFetchFail, "实时状态同步失败，请稍后重试。"))
 	}
 
-	var userState *vote.UserState
+	var userState any
 	if s.nickname != "" {
 		state, err := s.stateView.GetUserState(ctx, s.nickname)
 		if err != nil {
 			return send(s.protocolError(realtimeErrorCodeStateFetchFail, "实时状态同步失败，请稍后重试。"))
 		}
-		userState = &state
+		payload := buildRealtimeSnapshotUser(state)
+		userState = &payload
 	}
 
 	return send(realtimeSnapshotMessage{
@@ -307,6 +319,19 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(any) error
 		Public: snapshot,
 		User:   userState,
 	})
+}
+
+func buildRealtimeSnapshotUser(state vote.UserState) realtimeSnapshotUser {
+	return realtimeSnapshotUser{
+		UserStats:     state.UserStats,
+		MyBossStats:   state.MyBossStats,
+		Loadout:       state.Loadout,
+		CombatStats:   state.CombatStats,
+		Gold:          state.Gold,
+		Stones:        state.Stones,
+		TalentPoints:  state.TalentPoints,
+		RecentRewards: state.RecentRewards,
+	}
 }
 
 func (s *realtimeSession) setNickname(nickname string) {

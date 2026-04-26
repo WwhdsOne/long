@@ -111,6 +111,53 @@ func readHubEventSet(t *testing.T, ch <-chan events.ServerEvent, expected map[st
 	}
 }
 
+func readHubPublicAndUserEvent(t *testing.T, ch <-chan events.ServerEvent) events.ServerEvent {
+	t.Helper()
+
+	timeout := time.After(2 * time.Second)
+	gotPublic := false
+	var userEvent events.ServerEvent
+	gotUser := false
+	for !gotPublic || !gotUser {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				t.Fatalf("hub channel closed while waiting public/user events")
+			}
+			if event.Name == events.PublicStateEventName {
+				gotPublic = true
+				continue
+			}
+			if event.Name == events.UserStateEventName {
+				userEvent = event
+				gotUser = true
+			}
+		case <-timeout:
+			t.Fatalf("timed out waiting for public/user events")
+		}
+	}
+	return userEvent
+}
+
+func assertNoHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name string) {
+	t.Helper()
+
+	timeout := time.After(300 * time.Millisecond)
+	for {
+		select {
+		case event, ok := <-ch:
+			if !ok {
+				return
+			}
+			if event.Name == name {
+				t.Fatalf("expected no %s event, got %+v", name, event)
+			}
+		case <-timeout:
+			return
+		}
+	}
+}
+
 func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	store := &mockStore{
 		state: vote.State{
@@ -157,6 +204,9 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	}
 	if response.User == nil || response.User.UserStats == nil || response.User.UserStats.Nickname != "阿明" {
 		t.Fatalf("expected user state for 阿明, got %+v", response.User)
+	}
+	if strings.Contains(string(messages[0]), "\"inventory\"") {
+		t.Fatalf("expected realtime snapshot user payload to omit inventory, got %s", string(messages[0]))
 	}
 }
 
@@ -308,12 +358,12 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 
 	readHubEventSet(t, sseClient, map[string]struct{}{
 		events.PublicStateEventName: {},
-		events.UserStateEventName:   {},
 	})
 	readHubEventSet(t, wsClient, map[string]struct{}{
 		events.PublicStateEventName: {},
-		events.UserStateEventName:   {},
 	})
+	assertNoHubEventByName(t, sseClient, events.UserStateEventName)
+	assertNoHubEventByName(t, wsClient, events.UserStateEventName)
 
 	if len(publisher.changes) != 1 || publisher.changes[0].Type != vote.StateChangeButtonClicked {
 		t.Fatalf("expected one click change, got %+v", publisher.changes)
@@ -360,6 +410,10 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 		authenticatorEnabled: false,
 		clientID:             "127.0.0.1",
 	})
+	sseClient, unsubscribeSSE := hub.Subscribe("阿明")
+	defer unsubscribeSSE()
+	wsClient, unsubscribeWS := hub.Subscribe("阿明")
+	defer unsubscribeWS()
 
 	_ = captureRealtimeMessages(t, func(send func(any) error) error {
 		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
@@ -383,6 +437,19 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	}
 	if ack.Payload.Delta != 1 {
 		t.Fatalf("unexpected boss click ack payload: %+v", ack.Payload)
+	}
+	sseUserEvent := readHubPublicAndUserEvent(t, sseClient)
+	wsUserEvent := readHubPublicAndUserEvent(t, wsClient)
+	for _, eventPayload := range []string{string(sseUserEvent.Payload), string(wsUserEvent.Payload)} {
+		if strings.Contains(eventPayload, "\"inventory\"") {
+			t.Fatalf("expected broadcast user_state to omit inventory, got %s", eventPayload)
+		}
+		if strings.Contains(eventPayload, "\"gems\"") {
+			t.Fatalf("expected broadcast user_state to omit gems, got %s", eventPayload)
+		}
+		if strings.Contains(eventPayload, "\"lastReward\"") {
+			t.Fatalf("expected broadcast user_state to omit lastReward, got %s", eventPayload)
+		}
 	}
 
 	if len(publisher.changes) != 1 {

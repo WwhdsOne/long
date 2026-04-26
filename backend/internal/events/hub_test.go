@@ -1,6 +1,7 @@
 package events
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -39,6 +40,13 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	amingEvent = readEventByName(t, aming, UserStateEventName)
 	if amingEvent.Name != UserStateEventName {
 		t.Fatalf("expected user_state for 阿明, got %+v", amingEvent)
+	}
+	payload := string(amingEvent.Payload)
+	if !strings.Contains(payload, `"userStats":{"nickname":"阿明","clickCount":8}`) {
+		t.Fatalf("expected user stats in slim payload, got %s", payload)
+	}
+	if strings.Contains(payload, `"inventory"`) {
+		t.Fatalf("expected slim user payload to omit inventory, got %s", payload)
 	}
 
 	select {

@@ -7,7 +7,6 @@ export function mergeClickFallbackState(currentState, payload) {
     bossLeaderboard: Array.isArray(currentState.bossLeaderboard) ? currentState.bossLeaderboard : [],
     myBossStats: currentState.myBossStats ?? null,
     recentRewards: Array.isArray(currentState.recentRewards) ? currentState.recentRewards : [],
-    lastReward: currentState.lastReward ?? null,
   }
 
   if (!payload || typeof payload !== 'object') {
@@ -27,9 +26,6 @@ export function mergeClickFallbackState(currentState, payload) {
   }
   if ('recentRewards' in payload) {
     nextState.recentRewards = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
-  }
-  if ('lastReward' in payload) {
-    nextState.lastReward = payload.lastReward ?? null
   }
 
   return nextState

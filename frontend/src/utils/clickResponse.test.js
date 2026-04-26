@@ -10,7 +10,6 @@ describe('clickResponse', () => {
       bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 60 }],
       myBossStats: { nickname: '阿明', damage: 60 },
       recentRewards: [{ itemId: 'club', itemName: '木棒' }],
-      lastReward: { itemId: 'club', itemName: '木棒' },
     }
 
     expect(
@@ -29,7 +28,6 @@ describe('clickResponse', () => {
       bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 60 }],
       myBossStats: { nickname: '阿明', damage: 60 },
       recentRewards: [{ itemId: 'club', itemName: '木棒' }],
-      lastReward: { itemId: 'club', itemName: '木棒' },
     }
 
     expect(
@@ -39,7 +37,6 @@ describe('clickResponse', () => {
         bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 61 }],
         myBossStats: { nickname: '阿明', damage: 61 },
         recentRewards: [{ itemId: 'axe', itemName: '短斧' }],
-        lastReward: { itemId: 'axe', itemName: '短斧' },
       }),
     ).toEqual({
       userStats: { nickname: '阿明', clickCount: 12 },
@@ -47,7 +44,6 @@ describe('clickResponse', () => {
       bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 61 }],
       myBossStats: { nickname: '阿明', damage: 61 },
       recentRewards: [{ itemId: 'axe', itemName: '短斧' }],
-      lastReward: { itemId: 'axe', itemName: '短斧' },
     })
   })
 })

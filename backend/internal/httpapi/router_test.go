@@ -103,12 +103,10 @@ func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	userState.Inventory = m.state.Inventory
 	userState.Loadout = m.state.Loadout
 	userState.CombatStats = m.state.CombatStats
-	userState.Gems = m.state.Gems
 	userState.Gold = m.state.Gold
 	userState.Stones = m.state.Stones
 	userState.TalentPoints = m.state.TalentPoints
 	userState.RecentRewards = m.state.RecentRewards
-	userState.LastReward = m.state.LastReward
 	return userState
 }
 

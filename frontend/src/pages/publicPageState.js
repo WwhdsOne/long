@@ -92,7 +92,6 @@ const inventory = ref([])
 const loadout = ref(emptyLoadout())
 const combatStats = ref(defaultCombatStats())
 const recentRewards = ref([])
-const lastReward = ref(null)
 const userStats = ref(null)
 const nickname = ref('')
 const nicknameDraft = ref('')
@@ -148,7 +147,7 @@ const stageFxTimers = new Map()
 const burstFrameOffsets = new Map()
 const pendingClickSources = new Map()
 let rewardSignatureReady = false
-let lastRewardSignature = ''
+let lastRecentRewardSignature = ''
 let lastKnownGold = 0
 let lastKnownStones = 0
 let presenceHeartbeatTimer = 0
@@ -214,12 +213,7 @@ const bossProgress = computed(() => {
 })
 const loadoutSlots = EQUIPMENT_SLOTS
 const equippedItems = computed(() => loadoutSlots.map((slot) => loadout.value[slot.value]).filter(Boolean))
-const displayedRecentRewards = computed(() => {
-    if (Array.isArray(recentRewards.value) && recentRewards.value.length > 0) {
-        return recentRewards.value
-    }
-    return lastReward.value ? [lastReward.value] : []
-})
+const displayedRecentRewards = computed(() => normalizeRewardList(recentRewards.value))
 const recentRewardTitle = computed(() => {
     if (displayedRecentRewards.value.length === 0) {
         return '暂无'
@@ -351,13 +345,31 @@ async function navigatePublicPage(page) {
 
 async function activatePublicPage(page) {
     if (isProfilePublicPage(page)) {
-        // 资料子页整合为统一页面，不再通过独立资料接口刷新。
+        try {
+            await loadPlayerProfile()
+        } catch (error) {
+            errorMessage.value = error.message || '资料加载失败，请稍后重试。'
+        }
         return
     }
     if (page === 'messages') {
         await loadMessages()
         await loadAnnouncements()
     }
+}
+
+async function loadPlayerProfile() {
+    if (!nickname.value) {
+        return
+    }
+
+    const response = await fetch('/api/player/profile')
+    if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '资料加载失败，请稍后重试。'))
+    }
+
+    const payload = await response.json()
+    applyPlayerProfileState(payload)
 }
 
 function handlePublicRouteChange() {
@@ -446,6 +458,14 @@ function normalizeRewardList(list) {
         }))
 }
 
+function latestRewardFromList(list) {
+    const normalized = normalizeRewardList(list)
+    if (normalized.length === 0) {
+        return null
+    }
+    return normalized[normalized.length - 1]
+}
+
 function rewardIconForItem(itemID) {
     const normalized = String(itemID || '').trim()
     if (!normalized) {
@@ -467,12 +487,13 @@ function buildRewardEntries(rewards) {
     }))
 }
 
-function openOnlineRewardModal(lastRewardItem, rewards, goldGain, stoneGain) {
-    const rewardEntries = buildRewardEntries(rewards.length > 0 ? rewards : [lastRewardItem])
+function openOnlineRewardModal(rewards, goldGain, stoneGain) {
+    const rewardEntries = buildRewardEntries(rewards)
+    const latestReward = rewardEntries.length > 0 ? rewardEntries[rewardEntries.length - 1] : null
     rewardModal.value = {
         mode: 'online',
         title: '本次击杀战利品',
-        bossName: lastRewardItem?.bossName || lastRewardItem?.bossId || boss.value?.name || '世界 Boss',
+        bossName: latestReward?.bossName || latestReward?.bossId || boss.value?.name || '世界 Boss',
         kills: 1,
         goldTotal: Math.max(0, Number(goldGain || 0)),
         stoneTotal: Math.max(0, Number(stoneGain || 0)),
@@ -876,20 +897,16 @@ function applyBattleUserState(payload) {
     if ('recentRewards' in payload) {
         recentRewards.value = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
     }
-    if ('lastReward' in payload) {
-        lastReward.value = payload.lastReward ?? null
-    }
-    const signature = rewardSignature(lastReward.value)
-    if (signature && rewardSignatureReady && signature !== lastRewardSignature) {
+    const latestReward = latestRewardFromList(recentRewards.value)
+    const signature = rewardSignature(latestReward)
+    if (signature && rewardSignatureReady && signature !== lastRecentRewardSignature) {
         const goldGain = hasGold ? Math.max(0, nextGold - lastKnownGold) : 0
         const stoneGain = hasStones ? Math.max(0, nextStones - lastKnownStones) : 0
-        const rewards = Array.isArray(payload.recentRewards) && payload.recentRewards.length > 0
-            ? payload.recentRewards
-            : [lastReward.value]
-        openOnlineRewardModal(lastReward.value, rewards, goldGain, stoneGain)
+        const rewards = normalizeRewardList(recentRewards.value)
+        openOnlineRewardModal(rewards, goldGain, stoneGain)
     }
     if (signature) {
-        lastRewardSignature = signature
+        lastRecentRewardSignature = signature
     }
     if (!rewardSignatureReady) {
         rewardSignatureReady = true
@@ -950,7 +967,6 @@ function applyClickResult(payload) {
             bossLeaderboard: bossLeaderboard.value,
             myBossStats: myBossStats.value,
             recentRewards: recentRewards.value,
-            lastReward: lastReward.value,
         },
         payload,
     )
@@ -959,7 +975,6 @@ function applyClickResult(payload) {
     bossLeaderboard.value = nextClickState.bossLeaderboard
     myBossStats.value = nextClickState.myBossStats
     recentRewards.value = nextClickState.recentRewards
-    lastReward.value = nextClickState.lastReward
     syncing.value = false
     markUpdated()
 }
@@ -974,10 +989,9 @@ function clearUserRealtimeState() {
     talentPoints.value = 0
     myBossStats.value = null
     recentRewards.value = []
-    lastReward.value = null
     rewardModal.value = null
     rewardSignatureReady = false
-    lastRewardSignature = ''
+    lastRecentRewardSignature = ''
     lastKnownGold = 0
     lastKnownStones = 0
 }
@@ -1455,8 +1469,8 @@ async function toggleItemEquip(instanceId, equipped) {
             throw new Error(await readErrorMessage(response, '装备操作失败，请稍后重试。'))
         }
 
-        const data = await response.json()
-        applyUserState(data)
+        await response.json()
+        await loadPlayerProfile()
     } catch (error) {
         errorMessage.value = error.message || '装备操作失败，请稍后重试。'
     } finally {
@@ -1485,8 +1499,8 @@ async function salvageItem(instanceId) {
             throw new Error(await readErrorMessage(response, '分解失败，请稍后重试。'))
         }
 
-        // 分解接口返回结算结果，背包与属性由实时增量刷新。
         await response.json()
+        await loadPlayerProfile()
     } catch (error) {
         errorMessage.value = error.message || '分解失败，请稍后重试。'
     } finally {
@@ -1518,6 +1532,7 @@ async function enhanceItem(instanceId) {
         }
 
         await response.json()
+        await loadPlayerProfile()
         return {ok: true}
     } catch (error) {
         const message = error.message || '强化失败，请稍后重试。'
@@ -1758,7 +1773,6 @@ export function usePublicPageState() {
         loadoutSlots,
         combatStats,
         recentRewards,
-        lastReward,
         userStats,
         nickname,
         nicknameDraft,

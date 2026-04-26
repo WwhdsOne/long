@@ -143,8 +143,7 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 			Loadout: vote.Loadout{
 				Weapon: &vote.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
 			},
-			CombatStats:     vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
-			Gems:            11,
+			CombatStats: vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
 		},
 	}
 	authenticator := &mockPlayerAuthenticator{verifyNickname: "阿明"}
@@ -170,17 +169,26 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 		t.Fatalf("expected 200 from profile endpoint, got %d", response.Code)
 	}
 
-	var payload struct {
-		UserStats       *vote.UserStats          `json:"userStats"`
-		Inventory       []vote.InventoryItem     `json:"inventory"`
-		Loadout         vote.Loadout             `json:"loadout"`
-		CombatStats     vote.CombatStats         `json:"combatStats"`
-		Gems            int64                    `json:"gems"`
-		RecentRewards   []vote.Reward            `json:"recentRewards"`
-		LastReward      *vote.Reward             `json:"lastReward"`
-		Leaderboard     []vote.LeaderboardEntry  `json:"leaderboard"`
+	var rawPayload map[string]any
+	if err := json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&rawPayload); err != nil {
+		t.Fatalf("decode raw profile response: %v", err)
 	}
-	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+	if _, ok := rawPayload["gems"]; ok {
+		t.Fatalf("profile endpoint should not include gems, got %+v", rawPayload)
+	}
+	if _, ok := rawPayload["lastReward"]; ok {
+		t.Fatalf("profile endpoint should not include lastReward, got %+v", rawPayload)
+	}
+
+	var payload struct {
+		UserStats     *vote.UserStats         `json:"userStats"`
+		Inventory     []vote.InventoryItem    `json:"inventory"`
+		Loadout       vote.Loadout            `json:"loadout"`
+		CombatStats   vote.CombatStats        `json:"combatStats"`
+		RecentRewards []vote.Reward           `json:"recentRewards"`
+		Leaderboard   []vote.LeaderboardEntry `json:"leaderboard"`
+	}
+	if err := json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&payload); err != nil {
 		t.Fatalf("decode profile response: %v", err)
 	}
 	if payload.UserStats == nil || payload.UserStats.Nickname != "阿明" {
@@ -189,9 +197,55 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 	if len(payload.Inventory) != 1 {
 		t.Fatalf("expected inventory, heroes and active hero in profile, got %+v", payload)
 	}
-		if len(payload.Leaderboard) != 0 {
-			t.Fatalf("profile endpoint should not include public battle fields, got leaderboard=%d", len(payload.Leaderboard))
-		}
+	if len(payload.Leaderboard) != 0 {
+		t.Fatalf("profile endpoint should not include public battle fields, got leaderboard=%d", len(payload.Leaderboard))
+	}
+}
+
+func TestBattleStateOmitsInventoryAndLegacyRewardFields(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 7},
+			Inventory: []vote.InventoryItem{
+				{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
+			},
+			Loadout:       vote.Loadout{Weapon: &vote.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"}},
+			CombatStats:   vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
+			RecentRewards: []vote.Reward{{ItemID: "sword-1", ItemName: "短剑"}},
+			Gold:          12,
+			Stones:        34,
+			TalentPoints:  56,
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/battle/state?nickname=%E9%98%BF%E6%98%8E", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from battle state endpoint, got %d", response.Code)
+	}
+
+	var payload map[string]any
+	if err := json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&payload); err != nil {
+		t.Fatalf("decode battle state response: %v", err)
+	}
+	if _, ok := payload["inventory"]; ok {
+		t.Fatalf("battle state should not include inventory, got %+v", payload)
+	}
+	if _, ok := payload["gems"]; ok {
+		t.Fatalf("battle state should not include gems, got %+v", payload)
+	}
+	if _, ok := payload["lastReward"]; ok {
+		t.Fatalf("battle state should not include lastReward, got %+v", payload)
+	}
+	if _, ok := payload["recentRewards"]; !ok {
+		t.Fatalf("battle state should include recentRewards, got %+v", payload)
+	}
 }
 
 func TestAdminCanResetPlayerPassword(t *testing.T) {

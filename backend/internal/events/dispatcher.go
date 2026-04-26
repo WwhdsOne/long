@@ -103,6 +103,9 @@ func userTargetsForChange(change vote.StateChange, activeNicknames []string) []s
 	if change.BroadcastUserAll {
 		return activeNicknames
 	}
+	if change.Type == vote.StateChangeButtonClicked {
+		return nil
+	}
 	if change.Nickname == "" {
 		return nil
 	}

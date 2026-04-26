@@ -30,9 +30,9 @@ describe('PublicPage 三合一边界', () => {
     expect(pageSource).toContain("currentPublicPage.value = 'battle'")
   })
 
-  it('旧资料页接口已删除，不再请求 /api/player/profile', () => {
-    expect(pageSource).not.toContain("fetch('/api/player/profile'")
-    expect(pageSource).not.toContain('loadPlayerProfile')
+  it('资料页按需请求 /api/player/profile 并在装备操作后刷新', () => {
+    expect(pageSource).toContain("fetch('/api/player/profile'")
+    expect(pageSource).toContain('loadPlayerProfile')
     expect(pageSource).not.toContain('refreshProfileAfterMutation')
   })
 

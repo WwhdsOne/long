@@ -302,12 +302,10 @@ type UserState struct {
 	Inventory     []InventoryItem `json:"inventory"`
 	Loadout       Loadout         `json:"loadout"`
 	CombatStats   CombatStats     `json:"combatStats"`
-	Gems          int64           `json:"gems"`
 	Gold          int64           `json:"gold"`
 	Stones        int64           `json:"stones"`
 	TalentPoints  int64           `json:"talentPoints"`
 	RecentRewards []Reward        `json:"recentRewards,omitempty"`
-	LastReward    *Reward         `json:"lastReward,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -324,12 +322,10 @@ type State struct {
 	Inventory           []InventoryItem        `json:"inventory"`
 	Loadout             Loadout                `json:"loadout"`
 	CombatStats         CombatStats            `json:"combatStats"`
-	Gems                int64                  `json:"gems"`
 	Gold                int64                  `json:"gold"`
 	Stones              int64                  `json:"stones"`
 	TalentPoints        int64                  `json:"talentPoints"`
 	RecentRewards       []Reward               `json:"recentRewards,omitempty"`
-	LastReward          *Reward                `json:"lastReward,omitempty"`
 }
 
 // AfkSettlement 挂机结算汇总。
@@ -360,7 +356,6 @@ type ClickResult struct {
 	BossLeaderboard  []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
 	MyBossStats      *BossUserStats         `json:"myBossStats,omitempty"`
 	RecentRewards    []Reward               `json:"recentRewards,omitempty"`
-	LastReward       *Reward                `json:"lastReward,omitempty"`
 	TalentEvents     []TalentTriggerEvent   `json:"talentEvents,omitempty"`
 	PartStateDeltas  []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
 	BroadcastUserAll bool                   `json:"-"`
@@ -579,7 +574,6 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	if err != nil {
 		return UserState{}, err
 	}
-	userState.Gems = resources.Gems
 	userState.Gold = resources.Gold
 	userState.Stones = resources.Stones
 	userState.TalentPoints = resources.TalentPoints
@@ -613,9 +607,6 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		return UserState{}, err
 	}
 	userState.RecentRewards = recentRewards
-	if len(recentRewards) > 0 {
-		userState.LastReward = new(recentRewards[len(recentRewards)-1])
-	}
 
 	boss, err := s.currentBoss(ctx)
 	if err != nil {
@@ -954,12 +945,10 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Inventory:           userState.Inventory,
 		Loadout:             userState.Loadout,
 		CombatStats:         userState.CombatStats,
-		Gems:                userState.Gems,
 		Gold:                userState.Gold,
 		Stones:              userState.Stones,
 		TalentPoints:        userState.TalentPoints,
 		RecentRewards:       userState.RecentRewards,
-		LastReward:          userState.LastReward,
 	}
 }
 
@@ -2077,18 +2066,6 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equip
 	return items, nil
 }
 
-func (s *Store) lastRewardForNickname(ctx context.Context, nickname string) (*Reward, error) {
-	recentRewards, err := s.recentRewardsForNickname(ctx, nickname)
-	if err != nil {
-		return nil, err
-	}
-	if len(recentRewards) == 0 {
-		return nil, nil
-	}
-
-	return new(recentRewards[len(recentRewards)-1]), nil
-}
-
 func (s *Store) recentRewardsForNickname(ctx context.Context, nickname string) ([]Reward, error) {
 	values, err := s.client.HGetAll(ctx, s.lastRewardKey(nickname)).Result()
 	if err != nil {
@@ -2412,12 +2389,7 @@ func (s *Store) resourceKey(nickname string) string {
 	return s.namespace + "resource:" + nickname
 }
 
-func (s *Store) legacyGemKey(nickname string) string {
-	return s.namespace + "gem:" + nickname
-}
-
 type playerResources struct {
-	Gems         int64
 	Gold         int64
 	Stones       int64
 	TalentPoints int64
@@ -2425,64 +2397,16 @@ type playerResources struct {
 
 func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
 	resourceKey := s.resourceKey(nickname)
-	values, err := s.client.HMGet(ctx, resourceKey, "gems", "gold", "stones", "talent_points").Result()
+	values, err := s.client.HMGet(ctx, resourceKey, "gold", "stones", "talent_points").Result()
 	if err != nil {
 		return playerResources{}, err
 	}
 
-	current := playerResources{
-		Gems:         int64Value(values, 0),
-		Gold:         int64Value(values, 1),
-		Stones:       int64Value(values, 2),
-		TalentPoints: int64Value(values, 3),
-	}
-
-	legacyKey := s.legacyGemKey(nickname)
-	legacyValues, err := s.client.HMGet(ctx, legacyKey, "gems", "gold", "stones").Result()
-	if err != nil {
-		return playerResources{}, err
-	}
-	if !hasAnyHMGetValue(legacyValues) {
-		return current, nil
-	}
-
-	legacy := playerResources{
-		Gems:   int64Value(legacyValues, 0),
-		Gold:   int64Value(legacyValues, 1),
-		Stones: int64Value(legacyValues, 2),
-	}
-	merged := legacy
-	if hasAnyHMGetValue(values) {
-		merged = playerResources{
-			Gems:         current.Gems + legacy.Gems,
-			Gold:         current.Gold + legacy.Gold,
-			Stones:       current.Stones + legacy.Stones,
-			TalentPoints: current.TalentPoints + legacy.TalentPoints,
-		}
-	}
-
-	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, resourceKey, map[string]any{
-		"gems":          strconv.FormatInt(merged.Gems, 10),
-		"gold":          strconv.FormatInt(merged.Gold, 10),
-		"stones":        strconv.FormatInt(merged.Stones, 10),
-		"talent_points": strconv.FormatInt(merged.TalentPoints, 10),
-	})
-	pipe.Del(ctx, legacyKey)
-	if _, err := pipe.Exec(ctx); err != nil {
-		return playerResources{}, err
-	}
-
-	return merged, nil
-}
-
-func hasAnyHMGetValue(values []any) bool {
-	for _, value := range values {
-		if value != nil {
-			return true
-		}
-	}
-	return false
+	return playerResources{
+		Gold:         int64Value(values, 0),
+		Stones:       int64Value(values, 1),
+		TalentPoints: int64Value(values, 2),
+	}, nil
 }
 
 func (s *Store) equipmentSpentKey(nickname string) string {

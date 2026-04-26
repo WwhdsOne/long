@@ -92,54 +92,37 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 	}
 }
 
-func TestGetUserStateMigratesLegacyGemKeyToResourceKey(t *testing.T) {
+func TestGetUserStateReadsResourceKeyWithoutGems(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	nickname := "阿明"
-	legacyKey := store.legacyGemKey(nickname)
-	if err := store.client.HSet(ctx, legacyKey, map[string]any{
-		"gems":   "12",
-		"gold":   "345",
-		"stones": "67",
+	resourceKey := store.resourceKey(nickname)
+	if err := store.client.HSet(ctx, resourceKey, map[string]any{
+		"gold":          "345",
+		"stones":        "67",
+		"talent_points": "89",
 	}).Err(); err != nil {
-		t.Fatalf("seed legacy gem key: %v", err)
+		t.Fatalf("seed resource key: %v", err)
 	}
 
 	state, err := store.GetUserState(ctx, nickname)
 	if err != nil {
 		t.Fatalf("get user state: %v", err)
 	}
-	if state.Gems != 12 || state.Gold != 345 || state.Stones != 67 {
-		t.Fatalf("expected migrated resources from legacy gem key, got gems=%d gold=%d stones=%d", state.Gems, state.Gold, state.Stones)
-	}
-
-	newKey := store.resourceKey(nickname)
-	values, err := store.client.HMGet(ctx, newKey, "gems", "gold", "stones").Result()
-	if err != nil {
-		t.Fatalf("read new resource key: %v", err)
-	}
-	if int64Value(values, 0) != 12 || int64Value(values, 1) != 345 || int64Value(values, 2) != 67 {
-		t.Fatalf("expected new resource key to be backfilled, got %+v", values)
-	}
-
-	exists, err := store.client.Exists(ctx, legacyKey).Result()
-	if err != nil {
-		t.Fatalf("check legacy key exists: %v", err)
-	}
-	if exists != 0 {
-		t.Fatalf("expected legacy key deleted after migration, exists=%d", exists)
+	if state.Gold != 345 || state.Stones != 67 || state.TalentPoints != 89 {
+		t.Fatalf("expected resources from resource key, got gold=%d stones=%d talentPoints=%d", state.Gold, state.Stones, state.TalentPoints)
 	}
 }
 
-func TestGetUserStateMergesLegacyGemAndResourceKey(t *testing.T) {
+func TestGetUserStateIgnoresLegacyGemKey(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
 	ctx := context.Background()
 	nickname := "阿明"
-	legacyKey := store.legacyGemKey(nickname)
+	legacyKey := store.namespace + "gem:" + nickname
 	if err := store.client.HSet(ctx, legacyKey, map[string]any{
 		"gems":   "10",
 		"gold":   "100",
@@ -148,35 +131,20 @@ func TestGetUserStateMergesLegacyGemAndResourceKey(t *testing.T) {
 		t.Fatalf("seed legacy gem key: %v", err)
 	}
 
-	newKey := store.resourceKey(nickname)
-	if err := store.client.HSet(ctx, newKey, map[string]any{
-		"gold": "20",
-	}).Err(); err != nil {
-		t.Fatalf("seed new resource key: %v", err)
-	}
-
 	state, err := store.GetUserState(ctx, nickname)
 	if err != nil {
 		t.Fatalf("get user state: %v", err)
 	}
-	if state.Gems != 10 || state.Gold != 120 || state.Stones != 40 {
-		t.Fatalf("expected merged resources from legacy and new key, got gems=%d gold=%d stones=%d", state.Gems, state.Gold, state.Stones)
-	}
-
-	values, err := store.client.HMGet(ctx, newKey, "gems", "gold", "stones").Result()
-	if err != nil {
-		t.Fatalf("read new resource key: %v", err)
-	}
-	if int64Value(values, 0) != 10 || int64Value(values, 1) != 120 || int64Value(values, 2) != 40 {
-		t.Fatalf("expected new resource key to contain merged value, got %+v", values)
+	if state.Gold != 0 || state.Stones != 0 || state.TalentPoints != 0 {
+		t.Fatalf("expected legacy gem key to be ignored, got gold=%d stones=%d talentPoints=%d", state.Gold, state.Stones, state.TalentPoints)
 	}
 
 	exists, err := store.client.Exists(ctx, legacyKey).Result()
 	if err != nil {
 		t.Fatalf("check legacy key exists: %v", err)
 	}
-	if exists != 0 {
-		t.Fatalf("expected legacy key deleted after merge migration, exists=%d", exists)
+	if exists != 1 {
+		t.Fatalf("expected legacy key to remain untouched, exists=%d", exists)
 	}
 }
 

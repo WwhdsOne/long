@@ -24,6 +24,17 @@ type onlineCountPayload struct {
 	Count int `json:"count"`
 }
 
+type realtimeUserStatePayload struct {
+	UserStats     *vote.UserStats     `json:"userStats,omitempty"`
+	MyBossStats   *vote.BossUserStats `json:"myBossStats,omitempty"`
+	Loadout       vote.Loadout        `json:"loadout"`
+	CombatStats   vote.CombatStats    `json:"combatStats"`
+	Gold          int64               `json:"gold"`
+	Stones        int64               `json:"stones"`
+	TalentPoints  int64               `json:"talentPoints"`
+	RecentRewards []vote.Reward       `json:"recentRewards,omitempty"`
+}
+
 // StateReader 提供 SSE 初始状态所需的公共态与个人态读取能力。
 type StateReader interface {
 	GetSnapshot(context.Context) (vote.Snapshot, error)
@@ -97,7 +108,7 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 		return nil
 	}
 
-	payload, err := sonic.Marshal(state)
+	payload, err := sonic.Marshal(buildRealtimeUserStatePayload(state))
 	if err != nil {
 		return err
 	}
@@ -112,6 +123,19 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 	}
 
 	return nil
+}
+
+func buildRealtimeUserStatePayload(state vote.UserState) realtimeUserStatePayload {
+	return realtimeUserStatePayload{
+		UserStats:     state.UserStats,
+		MyBossStats:   state.MyBossStats,
+		Loadout:       state.Loadout,
+		CombatStats:   state.CombatStats,
+		Gold:          state.Gold,
+		Stones:        state.Stones,
+		TalentPoints:  state.TalentPoints,
+		RecentRewards: state.RecentRewards,
+	}
 }
 
 func (h *Hub) SubscriberCount() int {
@@ -176,7 +200,7 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 				return
 			}
-			if err := writeEvent(writer, UserStateEventName, userState); err != nil {
+			if err := writeEvent(writer, UserStateEventName, buildRealtimeUserStatePayload(userState)); err != nil {
 				return
 			}
 		}
