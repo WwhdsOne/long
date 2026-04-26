@@ -221,11 +221,18 @@ func TestBossResourcesLootContainsEquipmentIcon(t *testing.T) {
 
 	ctx := context.Background()
 	if err := store.client.HSet(ctx, store.equipmentKey("fire-ring"), map[string]any{
-		"name":       "烈焰戒指",
-		"slot":       "accessory",
-		"rarity":     "epic",
-		"image_path": "https://cdn.example.com/items/fire-ring.png",
-		"image_alt":  "烈焰戒指图标",
+		"name":                   "烈焰戒指",
+		"slot":                   "accessory",
+		"rarity":                 "epic",
+		"image_path":             "https://cdn.example.com/items/fire-ring.png",
+		"image_alt":              "烈焰戒指图标",
+		"attack_power":           "18",
+		"armor_pen_percent":      "12.5",
+		"crit_damage_multiplier": "1.8",
+		"part_type_damage_soft":  "0.2",
+		"part_type_damage_heavy": "0.3",
+		"part_type_damage_weak":  "0.4",
+		"talent_affinity":        "flame",
 	}).Err(); err != nil {
 		t.Fatalf("seed equipment definition: %v", err)
 	}
@@ -259,6 +266,21 @@ func TestBossResourcesLootContainsEquipmentIcon(t *testing.T) {
 	}
 	if resources.BossLoot[0].ImageAlt != "烈焰戒指图标" {
 		t.Fatalf("expected loot image alt to be returned, got %+v", resources.BossLoot[0])
+	}
+	if resources.BossLoot[0].AttackPower != 18 {
+		t.Fatalf("expected loot attack power to be returned, got %+v", resources.BossLoot[0])
+	}
+	if resources.BossLoot[0].ArmorPenPercent != 12.5 {
+		t.Fatalf("expected loot armor penetration to be returned, got %+v", resources.BossLoot[0])
+	}
+	if resources.BossLoot[0].CritDamageMultiplier != 1.8 {
+		t.Fatalf("expected loot crit damage multiplier to be returned, got %+v", resources.BossLoot[0])
+	}
+	if resources.BossLoot[0].PartTypeDamageSoft != 0.2 || resources.BossLoot[0].PartTypeDamageHeavy != 0.3 || resources.BossLoot[0].PartTypeDamageWeak != 0.4 {
+		t.Fatalf("expected loot part type damage to be returned, got %+v", resources.BossLoot[0])
+	}
+	if resources.BossLoot[0].TalentAffinity != "flame" {
+		t.Fatalf("expected loot talent affinity to be returned, got %+v", resources.BossLoot[0])
 	}
 }
 
