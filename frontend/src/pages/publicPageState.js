@@ -12,6 +12,52 @@ const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
 const AUTO_CLICK_RATE_LABEL = '每秒固定 3 次'
 const EQUIPMENT_ENHANCE_COST = 10
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
+const AFK_HEARTBEAT_INTERVAL_MS = 15000
+const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'pursuit', 'normal']
+const DAMAGE_VARIANTS = {
+    normal: {
+        scale: 1,
+        ttl: 1250,
+        shake: 0,
+        stageFx: [],
+    },
+    pursuit: {
+        scale: 1,
+        ttl: 1300,
+        shake: 0,
+        stageFx: ['flash'],
+    },
+    trueDamage: {
+        scale: 1,
+        ttl: 1420,
+        shake: 0,
+        stageFx: ['flash'],
+    },
+    critical: {
+        scale: 1.5,
+        ttl: 1500,
+        shake: 100,
+        stageFx: ['shake'],
+    },
+    weakCritical: {
+        scale: 2,
+        ttl: 1600,
+        shake: 150,
+        stageFx: ['shake', 'flash'],
+    },
+    doomsday: {
+        scale: 2.8,
+        ttl: 1900,
+        shake: 240,
+        stageFx: ['shake', 'doom', 'blade'],
+    },
+    judgement: {
+        scale: 4,
+        ttl: 2200,
+        shake: 180,
+        stageFx: ['shake', 'slowMo', 'vignette'],
+    },
+}
 
 const profilePageMap = {
     resources: 'resources',
@@ -57,7 +103,15 @@ const pendingKeys = ref(new Set())
 const actioningItemId = ref('')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
-const criticalBursts = ref({})
+const damageBursts = ref({})
+const damageStageFx = ref({
+    shake: false,
+    flash: false,
+    doom: false,
+    blade: false,
+    slowMo: false,
+    vignette: false,
+})
 const onlineCount = ref(null)
 const bossHistory = ref([])
 const bossHistoryQuery = ref('')
@@ -87,11 +141,14 @@ const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
 let realtimeTransport
 let lastBossResourceVersion = ''
 const burstTimers = new Map()
+const stageFxTimers = new Map()
+const burstFrameOffsets = new Map()
 const pendingClickSources = new Map()
 let rewardSignatureReady = false
 let lastRewardSignature = ''
 let lastKnownGold = 0
 let lastKnownStones = 0
+let presenceHeartbeatTimer = 0
 
 const totalVotes = computed(() => buttonTotalVotes.value)
 const syncLabel = computed(() => {
@@ -903,6 +960,21 @@ function clearPendingClicks(key = '') {
     return source
 }
 
+function resolveClickAckKey(payload) {
+    const directKey = String(payload?.button?.key || payload?.key || '').trim()
+    if (directKey) {
+        return directKey
+    }
+    if (pendingKeys.value.size === 1) {
+        return pendingKeys.value.values().next().value || ''
+    }
+    if (autoClickTargetKey.value && pendingKeys.value.has(autoClickTargetKey.value)) {
+        return autoClickTargetKey.value
+    }
+    const firstPending = pendingKeys.value.values().next()
+    return firstPending.done ? '' : String(firstPending.value || '').trim()
+}
+
 function applyRealtimeSnapshot(publicState, userState) {
     applyPublicState(publicState)
     if (userState) {
@@ -944,11 +1016,11 @@ function ensureRealtimeTransport() {
             }
         },
         onClickAck(payload) {
-            const key = payload?.button?.key || ''
-            if (payload?.critical && key) {
-                triggerCriticalBurst(key, payload.delta)
+            const key = resolveClickAckKey(payload)
+            if (key) {
+                triggerDamageBurst(key, payload)
             }
-            const source = clearPendingClicks(key)
+            clearPendingClicks(key)
             if (key) {
                 autoClickTargetKey.value = key
                 if (autoClickEnabled.value) {
@@ -986,38 +1058,230 @@ function connectRealtime(nextNickname = nickname.value) {
     realtimeTransport.reconnect({nickname: nextNickname})
 }
 
-function clearCriticalBurst(key) {
-    const timer = burstTimers.get(key)
+function clearDamageBurstTimer(id) {
+    const timer = burstTimers.get(id)
     if (timer) {
         window.clearTimeout(timer)
-        burstTimers.delete(key)
+        burstTimers.delete(id)
     }
+}
 
-    if (!criticalBursts.value[key]) {
+function clearDamageBurst(key, burstID = '') {
+    const normalizedKey = String(key || '').trim()
+    if (!normalizedKey || !damageBursts.value[normalizedKey]) {
+        return
+    }
+    if (!burstID) {
+        damageBursts.value[normalizedKey].forEach((entry) => clearDamageBurstTimer(entry.id))
+        const nextBursts = {...damageBursts.value}
+        delete nextBursts[normalizedKey]
+        damageBursts.value = nextBursts
         return
     }
 
-    const nextBursts = {...criticalBursts.value}
-    delete nextBursts[key]
-    criticalBursts.value = nextBursts
+    const remained = damageBursts.value[normalizedKey].filter((entry) => entry.id !== burstID)
+    clearDamageBurstTimer(burstID)
+    const nextBursts = {...damageBursts.value}
+    if (remained.length === 0) {
+        delete nextBursts[normalizedKey]
+    } else {
+        nextBursts[normalizedKey] = remained
+    }
+    damageBursts.value = nextBursts
 }
 
-function triggerCriticalBurst(key, delta) {
-    clearCriticalBurst(key)
+function clearStageEffect(name) {
+    const timer = stageFxTimers.get(name)
+    if (timer) {
+        window.clearTimeout(timer)
+        stageFxTimers.delete(name)
+    }
+}
 
-    criticalBursts.value = {
-        ...criticalBursts.value,
-        [key]: {
-            label: `暴击伤害 ${delta}`,
-            nonce: `${key}-${Date.now()}`,
-        },
+function triggerStageEffect(name, duration) {
+    if (!Object.prototype.hasOwnProperty.call(damageStageFx.value, name)) {
+        return
+    }
+    clearStageEffect(name)
+    damageStageFx.value = {
+        ...damageStageFx.value,
+        [name]: true,
+    }
+    stageFxTimers.set(
+        name,
+        window.setTimeout(() => {
+            damageStageFx.value = {
+                ...damageStageFx.value,
+                [name]: false,
+            }
+            stageFxTimers.delete(name)
+        }, Math.max(80, Number(duration) || 0)),
+    )
+}
+
+function parseButtonKey(key) {
+    const matched = String(key || '').trim().match(/^boss-part:(\d+)-(\d+)$/)
+    if (!matched) {
+        return null
+    }
+    return {
+        x: Number(matched[1]),
+        y: Number(matched[2]),
+    }
+}
+
+function findBossPartByKey(key) {
+    const point = parseButtonKey(key)
+    if (!point || !boss.value?.parts || !Array.isArray(boss.value.parts)) {
+        return null
+    }
+    return boss.value.parts.find((part) => Number(part.x) === point.x && Number(part.y) === point.y) || null
+}
+
+function normalizeDamageVariant(rawType) {
+    const normalized = String(rawType || '').trim().toLowerCase()
+    if (!normalized) {
+        return ''
+    }
+    const alias = {
+        doomsday: 'doomsday',
+        apocalypse: 'doomsday',
+        maxhpcut: 'doomsday',
+        max_hp_cut: 'doomsday',
+        judgement: 'judgement',
+        judgment: 'judgement',
+        ultimate_critical: 'judgement',
+        weak_critical: 'weakCritical',
+        weakcritical: 'weakCritical',
+        critical: 'critical',
+        crit: 'critical',
+        true: 'trueDamage',
+        true_damage: 'trueDamage',
+        truedamage: 'trueDamage',
+        pursuit: 'pursuit',
+        followup: 'pursuit',
+        normal: 'normal',
+    }
+    return alias[normalized] || ''
+}
+
+function rankDamageVariant(variant) {
+    const index = DAMAGE_PRIORITY.indexOf(variant)
+    return index < 0 ? DAMAGE_PRIORITY.length : index
+}
+
+function resolveDamageVariant(payload, part, damageValue, source) {
+    const explicit = normalizeDamageVariant(payload?.damageType || payload?.hitType || payload?.effectType)
+    if (explicit) {
+        return explicit
     }
 
+    const critical = Boolean(payload?.critical)
+    const weakCritical = critical && part?.type === 'weak'
+    if (weakCritical) {
+        return 'weakCritical'
+    }
+    if (critical) {
+        return 'critical'
+    }
+    if (source === 'auto' || source === 'afk') {
+        return 'pursuit'
+    }
+    void damageValue
+    return 'normal'
+}
+
+function estimateBossDamage(payload, part) {
+    const fromPayload = Number(payload?.bossDamage)
+    if (Number.isFinite(fromPayload) && fromPayload > 0) {
+        return Math.round(fromPayload)
+    }
+    const base = payload?.critical ? criticalDamage.value : normalDamage.value
+    const partRatio = part?.type === 'weak' ? 2 : part?.type === 'heavy' ? 0.55 : 1
+    return Math.max(1, Math.round((Number(base) || 1) * partRatio))
+}
+
+function nextBurstOffset(key, variant) {
+    const now = Date.now()
+    const frame = Math.floor(now / 90)
+    const frameKey = `${key}:${frame}`
+    const currentIndex = burstFrameOffsets.get(frameKey) || 0
+    burstFrameOffsets.set(frameKey, currentIndex + 1)
+    window.setTimeout(() => {
+        if (burstFrameOffsets.get(frameKey) === currentIndex + 1) {
+            burstFrameOffsets.delete(frameKey)
+        }
+    }, 260)
+
+    const pattern = [
+        [-66, -52],
+        [58, -72],
+        [-84, -98],
+        [76, -118],
+        [0, -136],
+        [-104, -152],
+        [95, -170],
+    ]
+    const base = pattern[currentIndex % pattern.length]
+    const lane = Math.floor(currentIndex / pattern.length)
+    const shift = lane * 22
+    const variantBias = variant === 'doomsday' ? 16 : variant === 'judgement' ? 28 : 0
+    return {
+        x: base[0] + (currentIndex % 2 === 0 ? -shift : shift),
+        y: base[1] - shift - variantBias,
+    }
+}
+
+function buildDamageBurst(key, payload, part, source) {
+    const damageValue = estimateBossDamage(payload, part)
+    const variant = resolveDamageVariant(payload, part, damageValue, source)
+    const config = DAMAGE_VARIANTS[variant] || DAMAGE_VARIANTS.normal
+    const offset = nextBurstOffset(key, variant)
+    return {
+        id: `${key}-${variant}-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        type: variant,
+        priority: rankDamageVariant(variant),
+        value: formatNumber(damageValue),
+        scale: config.scale,
+        ttl: config.ttl,
+        offsetX: offset.x,
+        offsetY: offset.y,
+    }
+}
+
+function triggerDamageBurst(key, payload = {}) {
+    const normalizedKey = String(key || '').trim()
+    if (!normalizedKey) {
+        return
+    }
+
+    const source = pendingClickSources.get(normalizedKey) || 'normal'
+    const part = findBossPartByKey(normalizedKey)
+    const burst = buildDamageBurst(normalizedKey, payload, part, source)
+    const config = DAMAGE_VARIANTS[burst.type] || DAMAGE_VARIANTS.normal
+    const currentBursts = damageBursts.value[normalizedKey] || []
+    const nextBursts = [...currentBursts, burst]
+        .sort((left, right) => left.priority - right.priority)
+        .slice(0, 6)
+    damageBursts.value = {
+        ...damageBursts.value,
+        [normalizedKey]: nextBursts,
+    }
+
+    config.stageFx.forEach((fxName) => {
+        const duration = fxName === 'slowMo' || fxName === 'vignette' ? 360 : 180
+        triggerStageEffect(fxName, duration)
+    })
+    if (config.shake > 0) {
+        triggerStageEffect('shake', config.shake)
+    }
+
+    clearDamageBurstTimer(burst.id)
     burstTimers.set(
-        key,
+        burst.id,
         window.setTimeout(() => {
-            clearCriticalBurst(key)
-        }, 1600),
+            clearDamageBurst(normalizedKey, burst.id)
+        }, config.ttl),
     )
 }
 
@@ -1119,17 +1383,17 @@ async function clickButton(key, options = {}) {
     }
 }
 
-async function toggleItemEquip(itemId, equipped) {
-    if (!nickname.value || !itemId) {
+async function toggleItemEquip(instanceId, equipped) {
+    if (!nickname.value || !instanceId) {
         return
     }
 
     const action = equipped ? 'unequip' : 'equip'
-    actioningItemId.value = itemId
+    actioningItemId.value = instanceId
     errorMessage.value = ''
 
     try {
-        const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/${action}`, {
+        const response = await fetch(`/api/equipment/${encodeURIComponent(instanceId)}/${action}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1150,16 +1414,16 @@ async function toggleItemEquip(itemId, equipped) {
     }
 }
 
-async function salvageItem(itemId) {
-    if (!nickname.value || !itemId) {
+async function salvageItem(instanceId) {
+    if (!nickname.value || !instanceId) {
         return
     }
 
-    actioningItemId.value = itemId
+    actioningItemId.value = instanceId
     errorMessage.value = ''
 
     try {
-        const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/salvage`, {
+        const response = await fetch(`/api/equipment/${encodeURIComponent(instanceId)}/salvage`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1180,16 +1444,16 @@ async function salvageItem(itemId) {
     }
 }
 
-async function enhanceItem(itemId) {
-    if (!nickname.value || !itemId) {
+async function enhanceItem(instanceId) {
+    if (!nickname.value || !instanceId) {
         return
     }
 
-    actioningItemId.value = itemId
+    actioningItemId.value = instanceId
     errorMessage.value = ''
 
     try {
-        const response = await fetch(`/api/equipment/${encodeURIComponent(itemId)}/enhance`, {
+        const response = await fetch(`/api/equipment/${encodeURIComponent(instanceId)}/enhance`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1250,6 +1514,7 @@ async function submitNickname() {
         passwordDraft.value = ''
         await reportPresence(true)
         await loadAfkSettlement()
+        startPresenceHeartbeat()
         connectRealtime(resolvedNickname)
     } catch (error) {
         errorMessage.value = error.message || '登录失败，请稍后重试。'
@@ -1265,12 +1530,14 @@ async function resetNickname() {
         // 忽略异常，继续清理本地状态。
     }
 
+    stopPresenceHeartbeat()
     await reportPresence(false)
     clearPlayerSessionState()
     connectRealtime('')
 }
 
 function clearPlayerSessionState() {
+    stopPresenceHeartbeat()
     nickname.value = ''
     nicknameDraft.value = ''
     passwordDraft.value = ''
@@ -1298,6 +1565,7 @@ async function loadPlayerSession() {
         nicknameDraft.value = resolvedNickname
         await reportPresence(true)
         await loadAfkSettlement()
+        startPresenceHeartbeat()
     } catch {
         clearPlayerSessionState()
     }
@@ -1316,6 +1584,23 @@ async function reportPresence(visible) {
     } catch {
         // Presence 上报失败不阻断主流程。
     }
+}
+
+function stopPresenceHeartbeat() {
+    if (!presenceHeartbeatTimer) {
+        return
+    }
+    window.clearInterval(presenceHeartbeatTimer)
+    presenceHeartbeatTimer = 0
+}
+
+function startPresenceHeartbeat() {
+    if (!nickname.value || document.visibilityState !== 'visible' || presenceHeartbeatTimer) {
+        return
+    }
+    presenceHeartbeatTimer = window.setInterval(() => {
+        void reportPresence(true)
+    }, AFK_HEARTBEAT_INTERVAL_MS)
 }
 
 async function loadAfkSettlement() {
@@ -1357,6 +1642,11 @@ function closeAfkSettlementModal() {
 function registerPublicPageLifecycle() {
     const handleVisibilityChange = () => {
         const visible = document.visibilityState === 'visible'
+        if (visible) {
+            startPresenceHeartbeat()
+        } else {
+            stopPresenceHeartbeat()
+        }
         void reportPresence(visible)
         if (visible) {
             void loadAfkSettlement()
@@ -1371,6 +1661,7 @@ function registerPublicPageLifecycle() {
         await activatePublicPage(currentPublicPage.value)
         connectRealtime(nickname.value)
         document.addEventListener('visibilitychange', handleVisibilityChange)
+        startPresenceHeartbeat()
         void reportPresence(true)
         void loadAfkSettlement()
 
@@ -1381,9 +1672,13 @@ function registerPublicPageLifecycle() {
     onBeforeUnmount(() => {
         window.removeEventListener('popstate', handlePublicRouteChange)
         document.removeEventListener('visibilitychange', handleVisibilityChange)
+        stopPresenceHeartbeat()
         realtimeTransport?.close()
         burstTimers.forEach((timer) => window.clearTimeout(timer))
         burstTimers.clear()
+        stageFxTimers.forEach((timer) => window.clearTimeout(timer))
+        stageFxTimers.clear()
+        burstFrameOffsets.clear()
     })
 }
 
@@ -1423,7 +1718,8 @@ export function usePublicPageState() {
         actioningItemId,
         lastUpdatedAt,
         liveConnected,
-        criticalBursts,
+        damageBursts,
+        damageStageFx,
         bossHistory,
         bossHistoryQuery,
         loadingBossHistory,

@@ -14,7 +14,7 @@ import (
 )
 
 func registerEquipmentRoutes(router route.IRouter, options Options) {
-	router.POST("/api/equipment/:itemId/equip", func(ctx context.Context, c *app.RequestContext) {
+	router.POST("/api/equipment/:instanceId/equip", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
@@ -29,7 +29,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		state, err := options.Store.EquipItem(ctx, nickname, c.Param("itemId"))
+		state, err := options.Store.EquipItem(ctx, nickname, c.Param("instanceId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -53,7 +53,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, state)
 	})
 
-	router.POST("/api/equipment/:itemId/unequip", func(ctx context.Context, c *app.RequestContext) {
+	router.POST("/api/equipment/:instanceId/unequip", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
@@ -68,7 +68,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		state, err := options.Store.UnequipItem(ctx, nickname, c.Param("itemId"))
+		state, err := options.Store.UnequipItem(ctx, nickname, c.Param("instanceId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -85,7 +85,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, state)
 	})
 
-	router.POST("/api/equipment/:itemId/synthesize", func(ctx context.Context, c *app.RequestContext) {
+	router.POST("/api/equipment/:instanceId/synthesize", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
@@ -106,7 +106,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		})
 	})
 
-	router.POST("/api/equipment/:itemId/enhance", func(ctx context.Context, c *app.RequestContext) {
+	router.POST("/api/equipment/:instanceId/enhance", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
@@ -121,7 +121,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		state, err := options.Store.EnhanceItem(ctx, nickname, c.Param("itemId"))
+		state, err := options.Store.EnhanceItem(ctx, nickname, c.Param("instanceId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -165,7 +165,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, state)
 	})
 
-	router.POST("/api/equipment/:itemId/salvage", func(ctx context.Context, c *app.RequestContext) {
+	router.POST("/api/equipment/:instanceId/salvage", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
 		}
@@ -180,7 +180,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		result, err := options.Store.SalvageItem(ctx, nickname, c.Param("itemId"))
+		result, err := options.Store.SalvageItem(ctx, nickname, c.Param("instanceId"))
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return

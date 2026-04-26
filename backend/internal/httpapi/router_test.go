@@ -513,7 +513,7 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 		Broadcaster: &mockBroadcaster{},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/equip", strings.NewReader(`{"nickname":"阿明"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/equip", strings.NewReader(`{"nickname":"阿明"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 
@@ -550,7 +550,7 @@ func TestSynthesizeItemReturnsDeprecatedError(t *testing.T) {
 		Broadcaster: &mockBroadcaster{},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/synthesize", strings.NewReader(`{"nickname":"阿明"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/synthesize", strings.NewReader(`{"nickname":"阿明"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 

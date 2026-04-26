@@ -87,7 +87,7 @@ func TestPlayerLoginCreatesCookieAndSessionUsesAuthenticatedNickname(t *testing.
 		t.Fatalf("expected 200 from player session, got %d", sessionResponse.Code)
 	}
 
-	clickRequest := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/equip", strings.NewReader(`{"nickname":"别人"}`))
+	clickRequest := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/equip", strings.NewReader(`{"nickname":"别人"}`))
 	clickRequest.Header.Set("Content-Type", "application/json")
 	clickRequest.AddCookie(cookies[0])
 	clickResponse := httptest.NewRecorder()
@@ -122,7 +122,7 @@ func TestPlayerWriteRoutesRequireAuthenticatedSession(t *testing.T) {
 		PlayerAuthenticator: &mockPlayerAuthenticator{verifyErr: errors.New("missing")},
 	})
 
-	request := httptest.NewRequest(http.MethodPost, "/api/equipment/wood-sword/equip", strings.NewReader(`{"nickname":"阿明"}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/equip", strings.NewReader(`{"nickname":"阿明"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 

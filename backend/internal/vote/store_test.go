@@ -77,7 +77,6 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 		t.Fatalf("get snapshot: %v", err)
 	}
 
-
 	resources, err := store.GetBossResources(ctx)
 	if err != nil {
 		t.Fatalf("get boss resources: %v", err)
@@ -448,10 +447,8 @@ func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
 		t.Fatalf("seed button: %v", err)
 	}
 	seedEquipmentDefinition(t, store, ctx, "strong-sword", "weapon", 7)
-	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "strong-sword", "1").Err(); err != nil {
-		t.Fatalf("seed inventory: %v", err)
-	}
-	if _, err := store.EquipItem(ctx, "阿明", "strong-sword"); err != nil {
+	strongSwordInst := seedOwnedInstance(t, store, ctx, "阿明", "strong-sword")
+	if _, err := store.EquipItem(ctx, "阿明", strongSwordInst); err != nil {
 		t.Fatalf("equip item: %v", err)
 	}
 	if _, err := store.ActivateBoss(ctx, BossUpsert{
@@ -536,10 +533,8 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 
 	ctx := context.Background()
 	seedEquipmentDefinition(t, store, ctx, "strong-sword", "weapon", 7)
-	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "strong-sword", "1").Err(); err != nil {
-		t.Fatalf("seed inventory: %v", err)
-	}
-	if _, err := store.EquipItem(ctx, "阿明", "strong-sword"); err != nil {
+	strongSwordInst := seedOwnedInstance(t, store, ctx, "阿明", "strong-sword")
+	if _, err := store.EquipItem(ctx, "阿明", strongSwordInst); err != nil {
 		t.Fatalf("equip item: %v", err)
 	}
 	if _, err := store.ActivateBoss(ctx, BossUpsert{
@@ -593,10 +588,8 @@ func TestEquipmentCritRateContributesToCriticalChance(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("save equipment definition: %v", err)
 	}
-	if err := store.client.HSet(ctx, store.inventoryKey("阿明"), "crit-ring", "1").Err(); err != nil {
-		t.Fatalf("seed inventory: %v", err)
-	}
-	if _, err := store.EquipItem(ctx, "阿明", "crit-ring"); err != nil {
+	critRingInst := seedOwnedInstance(t, store, ctx, "阿明", "crit-ring")
+	if _, err := store.EquipItem(ctx, "阿明", critRingInst); err != nil {
 		t.Fatalf("equip item: %v", err)
 	}
 

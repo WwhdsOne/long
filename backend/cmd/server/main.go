@@ -83,7 +83,7 @@ func run() error {
 		Window:            cfg.RateLimit.Window,
 		BlacklistDuration: cfg.RateLimit.BlacklistDuration,
 	})
-	afkService := httpapi.NewAfkService(store, changeBus)
+	afkService := httpapi.NewAfkService(store, changeBus, redisClient, cfg.RedisPrefix)
 	defer afkService.Close()
 	var ossSigner *ossupload.Signer
 	if cfg.OSS.Enabled() {

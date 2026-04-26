@@ -123,7 +123,6 @@ defineProps({
             <label class="admin-labeled-field">
               <span>暴击率:</span>
               <label class="admin-labeled-field">
-                <span>暴击率:</span>
                 <input v-model="equipmentForm.critRate" class="nickname-form__input" type="number" min="0" max="0.35"
                        step="0.01"/>
               </label>

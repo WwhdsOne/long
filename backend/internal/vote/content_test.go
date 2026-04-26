@@ -82,11 +82,7 @@ func TestGetStateIgnoresLegacyEquipmentUpgradeFields(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed equipment definition: %v", err)
 	}
-	if err := store.client.HSet(ctx, "vote:user-inventory:阿明", map[string]any{
-		"wood-sword": "1",
-	}).Err(); err != nil {
-		t.Fatalf("seed inventory: %v", err)
-	}
+	_ = seedOwnedInstance(t, store, ctx, "阿明", "wood-sword")
 	if err := store.client.HSet(ctx, "vote:user-equip-upgrade:阿明:wood-sword", map[string]any{
 		"star_level":                    "9",
 		"bonus_clicks":                  "99",
@@ -101,6 +97,10 @@ func TestGetStateIgnoresLegacyEquipmentUpgradeFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get state: %v", err)
 	}
-
-		_ = state.Inventory[0]
+	if len(state.Inventory) != 1 {
+		t.Fatalf("expected one instance inventory item, got %+v", state.Inventory)
 	}
+	if state.Inventory[0].EnhanceLevel != 0 {
+		t.Fatalf("expected legacy upgrade hash to be ignored, got %+v", state.Inventory[0])
+	}
+}

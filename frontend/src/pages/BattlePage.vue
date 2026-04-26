@@ -13,7 +13,8 @@ const {
   loading,
   errorMessage,
   pendingKeys,
-  criticalBursts,
+  damageBursts,
+  damageStageFx,
   totalVotes,
   isLoggedIn,
   myClicks,
@@ -112,6 +113,12 @@ function bossZoneAriaLabel(zone) {
   const label = zone.displayName || partTypeLabels[zone.type] || zone.type
   return `${label} 分区，血量 ${zone.currentHp}/${zone.maxHp}`
 }
+
+function zoneDamageBursts(zone) {
+  const key = getBossZoneButtonKey(zone)
+  if (!key) return []
+  return damageBursts.value?.[key] || []
+}
 </script>
 
 <template>
@@ -143,7 +150,17 @@ function bossZoneAriaLabel(zone) {
 
       <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
 
-      <section class="vote-stage__boss-hud vote-stage__boss-hud--merged">
+      <section
+          class="vote-stage__boss-hud vote-stage__boss-hud--merged"
+          :class="{
+            'damage-stage--shake': damageStageFx.shake,
+            'damage-stage--flash': damageStageFx.flash,
+            'damage-stage--doom': damageStageFx.doom,
+            'damage-stage--blade': damageStageFx.blade,
+            'damage-stage--slowmo': damageStageFx.slowMo,
+            'damage-stage--vignette': damageStageFx.vignette,
+          }"
+      >
         <div class="vote-stage__boss-hud-head">
           <div>
             <div class="vote-stage__head">
@@ -187,7 +204,7 @@ function bossZoneAriaLabel(zone) {
                   'boss-part-cell--low': zone?.alive && zone.healthPercent < 25,
                   'boss-zone-button--empty': !zone,
                   'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
-                  'boss-zone-button--critical': Boolean(criticalBursts[getBossZoneButtonKey(zone)]),
+                  'boss-zone-button--damage': zoneDamageBursts(zone).length > 0,
                 }"
                 :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
                 type="button"
@@ -202,14 +219,24 @@ function bossZoneAriaLabel(zone) {
                     :src="zone.imagePath"
                     :alt="zone.displayName || partTypeLabels[zone.type] || zone.type"
                 />
-                <span
-                    v-if="criticalBursts[getBossZoneButtonKey(zone)]"
-                    :key="criticalBursts[getBossZoneButtonKey(zone)].nonce"
-                    class="boss-zone-button__critical-text"
-                    aria-hidden="true"
-                >
-                    {{ criticalBursts[getBossZoneButtonKey(zone)].label }}
+                <div class="boss-zone-button__damage-layer" aria-hidden="true">
+                  <span
+                      v-for="burst in zoneDamageBursts(zone)"
+                      :key="burst.id"
+                      class="boss-zone-button__damage-burst"
+                      :class="[
+                        `boss-zone-button__damage-burst--${burst.type}`,
+                      ]"
+                      :style="{
+                        '--damage-offset-x': `${burst.offsetX}px`,
+                        '--damage-offset-y': `${burst.offsetY}px`,
+                        '--damage-scale': burst.scale,
+                        '--damage-ttl': `${burst.ttl}ms`,
+                      }"
+                  >
+                    {{ burst.value }}
                   </span>
+                </div>
                 <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
                 <strong class="boss-zone-button__label">{{
                     zone.displayName || partTypeLabels[zone.type] || zone.type
@@ -243,6 +270,14 @@ function bossZoneAriaLabel(zone) {
               </button>
               <span>{{ bossDropPool.length }} 件掉落物</span>
             </span>
+        </div>
+        <div class="vote-stage__boss-note vote-stage__boss-note--rules">
+          <strong>挂机规则</strong>
+          <span>开启条件：离开页面 60 秒后自动开始挂机。</span>
+          <span>战斗效果：每秒自动攻击 1 次，挂机效率约为手动操作四分之一。</span>
+          <span>奖励说明：金币和强化石基础值减半，结算时保留随机浮动。</span>
+          <span>结算方式：回到页面后自动弹出结算窗口，显示击杀数与收益。</span>
+          <span>温馨提示：挂机时长无上限；关闭页面后挂机仍会继续，服务器重启后不会丢失挂机状态。</span>
         </div>
       </section>
 

@@ -18,6 +18,10 @@ import (
 
 var ErrInvalidEquipmentDraft = errors.New("invalid equipment draft")
 
+// ============================================================================
+// 配置与生成器
+// ============================================================================
+
 type EquipmentDraftGeneratorConfig struct {
 	APIKey  string
 	BaseURL string
@@ -37,7 +41,6 @@ func NewOpenAIEquipmentDraftGenerator(config EquipmentDraftGeneratorConfig) *Ope
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
-
 	return &OpenAIEquipmentDraftGenerator{
 		apiKey:  strings.TrimSpace(config.APIKey),
 		baseURL: strings.TrimRight(strings.TrimSpace(config.BaseURL), "/"),
@@ -46,16 +49,28 @@ func NewOpenAIEquipmentDraftGenerator(config EquipmentDraftGeneratorConfig) *Ope
 	}
 }
 
+// ============================================================================
+// 核心流程：先定稀有度，再生成装备
+// ============================================================================
+
 func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Context, prompt string) (vote.EquipmentDefinition, error) {
 	if strings.TrimSpace(prompt) == "" {
 		return vote.EquipmentDefinition{}, fmt.Errorf("%w: prompt is required", ErrInvalidEquipmentDraft)
 	}
 
+	// 第一步：由 AI 决定稀有度
+	rarity, err := g.determineRarity(ctx, prompt)
+	if err != nil {
+		return vote.EquipmentDefinition{}, fmt.Errorf("determine rarity: %w", err)
+	}
+
+	// 第二步：根据稀有度拼接详细规则，生成装备草稿
+	systemPrompt := equipmentDraftSystemPromptForRarity(rarity)
 	body, err := sonic.Marshal(chatCompletionRequest{
 		Model: g.model,
 		Store: false,
 		Messages: []chatMessage{
-			{Role: "system", Content: equipmentDraftSystemPrompt()},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: strings.TrimSpace(prompt)},
 		},
 		ResponseFormat: jsonObjectFormat{Type: "json_object"},
@@ -69,36 +84,97 @@ func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Conte
 		return vote.EquipmentDefinition{}, fmt.Errorf("encode llm request: %w", err)
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, g.baseURL+"/chat/completions", bytes.NewReader(body))
+	content, err := g.chatOnce(ctx, body)
 	if err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("build llm request: %w", err)
+		return vote.EquipmentDefinition{}, err
 	}
-	request.Header.Set("Authorization", "Bearer "+g.apiKey)
-	request.Header.Set("Content-Type", "application/json")
+	return parseEquipmentDraftJSON([]byte(content))
+}
 
-	response, err := g.client.Do(request)
-	if err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("call llm provider: %w", err)
-	}
-	defer response.Body.Close()
+// ---------------------------------------------------------------------------
+// 第一阶段：判定稀有度
+// ---------------------------------------------------------------------------
 
-	responseBody, err := io.ReadAll(response.Body)
+type rarityResponse struct {
+	Rarity string `json:"rarity"`
+}
+
+func (g *OpenAIEquipmentDraftGenerator) determineRarity(ctx context.Context, userPrompt string) (string, error) {
+	sysPrompt := strings.Join([]string{
+		"根据用户输入，确定装备稀有度。",
+		"只允许返回 普通、优秀、稀有、史诗、传说、至臻 之一。",
+		"如果用户没有明确指定，可以从列表中随机选择一个。",
+		"直接返回 JSON，不要多余内容。",
+	}, "\n")
+
+	body, err := sonic.Marshal(chatCompletionRequest{
+		Model: g.model,
+		Store: false,
+		Messages: []chatMessage{
+			{Role: "system", Content: sysPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+		ResponseFormat: jsonObjectFormat{Type: "json_object"},
+		Thinking: struct {
+			Type string `json:"type"`
+		}{
+			Type: "disabled",
+		},
+	})
 	if err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("read llm response: %w", err)
+		return "", err
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return vote.EquipmentDefinition{}, fmt.Errorf("llm provider returned status %d: %s", response.StatusCode, string(responseBody))
+
+	content, err := g.chatOnce(ctx, body)
+	if err != nil {
+		return "", err
+	}
+
+	var rr rarityResponse
+	if err := sonic.Unmarshal([]byte(content), &rr); err != nil {
+		return "", fmt.Errorf("%w: decode rarity response", ErrInvalidEquipmentDraft)
+	}
+	rr.Rarity = strings.TrimSpace(rr.Rarity)
+	if !allowedString(rr.Rarity, []string{"普通", "优秀", "稀有", "史诗", "传说", "至臻"}) {
+		return "", fmt.Errorf("%w: invalid rarity %q", ErrInvalidEquipmentDraft, rr.Rarity)
+	}
+	return rr.Rarity, nil
+}
+
+// ---------------------------------------------------------------------------
+// 通用 HTTP 调用封装
+// ---------------------------------------------------------------------------
+
+func (g *OpenAIEquipmentDraftGenerator) chatOnce(ctx context.Context, body []byte) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.baseURL+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("build llm request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+g.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := g.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("call llm provider: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read llm response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("llm provider returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var payload chatCompletionResponse
-	if err := sonic.Unmarshal(responseBody, &payload); err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("%w: decode llm response", ErrInvalidEquipmentDraft)
+	if err := sonic.Unmarshal(respBody, &payload); err != nil {
+		return "", fmt.Errorf("%w: decode llm response", ErrInvalidEquipmentDraft)
 	}
 	if len(payload.Choices) == 0 {
-		return vote.EquipmentDefinition{}, fmt.Errorf("%w: empty llm choices", ErrInvalidEquipmentDraft)
+		return "", fmt.Errorf("%w: empty llm choices", ErrInvalidEquipmentDraft)
 	}
-
-	return parseEquipmentDraftJSON([]byte(payload.Choices[0].Message.Content))
+	return payload.Choices[0].Message.Content, nil
 }
 
 // ============================================================================
@@ -229,7 +305,7 @@ var rarityBaseBounds = map[string]rarityBounds{
 type slotModifiers struct {
 	attackMinRatio float64
 	attackMaxRatio float64
-	critRateRatio  float64 // 新增
+	critRateRatio  float64
 	critRatio      float64
 	armorPenRatio  float64
 	partDmgRatio   float64
@@ -263,7 +339,7 @@ func getSlotBounds(rarity string, slot string) (rarityBounds, error) {
 	return rarityBounds{
 		attackMin:      int64(attackMin),
 		attackMax:      int64(attackMax),
-		critRateMax:    base.critRateMax * mod.critRateRatio, // 新增
+		critRateMax:    base.critRateMax * mod.critRateRatio,
 		critMax:        base.critMax * mod.critRatio,
 		armorPenMax:    base.armorPenMax * mod.armorPenRatio,
 		partTypeDmgMax: base.partTypeDmgMax * mod.partDmgRatio,
@@ -373,55 +449,66 @@ func allowedString(value string, allowed []string) bool {
 }
 
 // ============================================================================
-// System Prompt
+// 按稀有度预计算的详细 prompt（AI 无需再做乘法）
 // ============================================================================
 
-func equipmentDraftSystemPrompt() string {
-	return strings.Join([]string{
+func equipmentDraftSystemPromptForRarity(rarity string) string {
+	// 每个稀有度下所有部位的最终数值范围（已乘过修正系数）
+	type slotRange struct {
+		attackMin, attackMax       int
+		critRateMax                float64
+		critMax                    float64
+		armorPenMax                float64
+		softMax, heavyMax, weakMax float64
+	}
+	compute := func(r string) map[string]slotRange {
+		m := make(map[string]slotRange)
+		for _, slot := range []string{"weapon", "gloves", "helmet", "chest", "legs", "accessory"} {
+			b, _ := getSlotBounds(r, slot)
+			m[slot] = slotRange{
+				attackMin:   int(b.attackMin),
+				attackMax:   int(b.attackMax),
+				critRateMax: b.critRateMax,
+				critMax:     b.critMax,
+				armorPenMax: b.armorPenMax,
+				softMax:     b.partTypeDmgMax,
+				heavyMax:    b.partTypeDmgMax,
+				weakMax:     b.partTypeDmgMax,
+			}
+		}
+		return m
+	}
+
+	ranges := compute(rarity)
+
+	// 构建每个部位的文本
+	slotLines := make([]string, 0, 6)
+	for _, slot := range []string{"weapon", "gloves", "helmet", "chest", "legs", "accessory"} {
+		r := ranges[slot]
+		line := fmt.Sprintf(
+			"%s %s：attackPower %d~%d，critRate 0~%.2f，critDamageMultiplier 0~%.2f，armorPenPercent 0~%.2f，partTypeDamage 三项各 0~%.2f",
+			rarity, slot, r.attackMin, r.attackMax, r.critRateMax, r.critMax, r.armorPenMax, r.softMax,
+		)
+		slotLines = append(slotLines, line)
+	}
+
+	// 拼接完整 prompt
+	prompt := strings.Join([]string{
 		"你是装备数值策划，只能输出符合 JSON Schema 的装备草稿。",
 		"三主系：normal=均衡攻势，armor=碎盾攻坚，crit=致命洞察。",
 		"部位类型只允许 weapon、helmet、chest、gloves、legs、accessory。",
-		"稀有度只允许 普通、优秀、稀有、史诗、传说、至臻。",
-		"armorPenPercent 不得超过 0.8；所有百分比用 0.2 这类小数表示。",
+		fmt.Sprintf("本次只生成 %s 稀有度的装备，最终数值必须严格遵守下方给出的范围。", rarity),
+		"所有百分比用 0.2 这类小数表示。",
 		"",
-		"【稀有度数值规则 必须遵守】",
-		"以下为基础范围，具体数值还需根据部位乘以修正系数：",
-		"普通：attackPower 5~30，critRate 0，无 critDamageMultiplier，无 armorPenPercent，partTypeDamage 三项均为 0",
-		"优秀：attackPower 20~60，critRate 0~0.05，critDamageMultiplier 0~0.3，armorPenPercent 0~0.1，partTypeDamage 三项 0~0.05",
-		"稀有：attackPower 50~120，critRate 0~0.08，critDamageMultiplier 0~0.6，armorPenPercent 0~0.25，partTypeDamage 三项 0~0.1",
-		"史诗：attackPower 100~250，critRate 0~0.12，critDamageMultiplier 0~1.0，armorPenPercent 0~0.4，partTypeDamage 三项 0~0.2",
-		"传说：attackPower 200~500，critRate 0~0.18，critDamageMultiplier 0~1.5，armorPenPercent 0~0.6，partTypeDamage 三项 0~0.35",
-		"至臻：attackPower 400~1000，critRate 0~0.35，critDamageMultiplier 0~2.0，armorPenPercent 0~0.8，partTypeDamage 三项 0~0.5",
-		"",
-		"【部位修正系数 必须遵守】",
-		"不同部位对 attackPower 的修正：",
-		"weapon：取基础范围的 100%（全额）",
-		"gloves：取基础范围的 55~70%",
-		"helmet：取基础范围的 30~45%",
-		"chest：取基础范围的 20~35%",
-		"legs：取基础范围的 30~45%",
-		"accessory：取基础范围的 10~25%",
-		"",
-		"不同部位对 critDamageMultiplier 的修正：",
-		"weapon、gloves、accessory：可达到稀有度上限的 100%",
-		"helmet、chest、legs：不得超过稀有度上限的 30%",
-		"",
-		"不同部位对 armorPenPercent 的修正：",
-		"weapon、gloves、accessory：可达到稀有度上限的 100%",
-		"helmet、chest、legs：不得超过稀有度上限的 30%",
-		"",
-		"不同部位对 partTypeDamage 的修正：",
-		"weapon、gloves：可达到稀有度上限的 100%",
-		"helmet、chest、legs、accessory：不得超过稀有度上限的 40%",
-		"",
-		"不同部位对 critRate 的修正：",
-		"weapon、gloves、accessory：可达到稀有度上限的 100%",
-		"helmet、chest、legs：不得超过稀有度上限的 30%",
+		"【所有部位最终数值范围（已含修正，直接使用，禁止自行乘法）】",
+		strings.Join(slotLines, "\n"),
 		"",
 		"talentAffinity 为空字符串表示通用装备，否则必须是 normal/armor/crit 之一。",
-		"通用装备各项数值取该稀有度中位值附近（attackPower 取基础范围中间值，critDamageMultiplier 和 armorPenPercent 取基础范围中间值）。",
+		"通用装备各项数值取该稀有度中位值附近。",
 		"description 是用中文描述装备外观和特点的文本。",
 		"返回必须是完整 JSON 对象，不要 Markdown，不要解释。",
 		"输出的 JSON 要求：itemId 必须是字符串（如 \"wood_sword_001\"），其余字段为 name, slot, rarity, description, attackPower, armorPenPercent, critRate, critDamageMultiplier, partTypeDamageSoft, partTypeDamageHeavy, partTypeDamageWeak, talentAffinity。",
 	}, "\n")
+
+	return prompt
 }

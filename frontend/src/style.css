@@ -452,6 +452,28 @@ select {
   line-height: 1.4;
 }
 
+/* 金币数字框 - 游戏经典金色 */
+.armory-backpack-resources .num-gold {
+  display: inline-block;
+  background: #3d2f1a;
+  color: #ffd966;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin: 0 3px;
+  font-weight: 500;
+}
+
+/* 强化石数字框 - 深色质感框 */
+.armory-backpack-resources .num-stone {
+  display: inline-block;
+  background: #2a2a2a;
+  color: #e0e0e0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin: 0 3px;
+  font-weight: 500;
+}
+
 .armory-item-tooltip {
   position: absolute;
   left: 0;
@@ -1211,6 +1233,25 @@ select {
   margin: 0;
   color: var(--ink-soft);
   font-size: 0.9rem;
+}
+
+.vote-stage__boss-note--rules {
+  display: grid;
+  justify-content: stretch;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.vote-stage__boss-note--rules strong {
+  color: var(--ink);
+  font-size: 0.94rem;
+}
+
+.vote-stage__boss-note--rules span {
+  line-height: 1.45;
 }
 
 .boss-drop-link {
@@ -2715,7 +2756,7 @@ select {
   position: relative;
   border-style: solid;
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
   text-align: center;
 }
 
@@ -2738,7 +2779,7 @@ select {
   animation: boss-part-hit-flash 0.08s ease-out;
 }
 
-.boss-zone-button--critical {
+.boss-zone-button--damage {
   border-color: #f59e0b;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2), 0 14px 24px rgba(245, 158, 11, 0.18);
 }
@@ -2852,19 +2893,216 @@ select {
   white-space: nowrap;
 }
 
-.boss-zone-button__critical-text {
+.boss-zone-button__damage-layer {
   position: absolute;
-  inset: 8px auto auto 50%;
-  z-index: 2;
-  max-width: calc(100% - 12px);
-  padding: 0.22rem 0.42rem;
-  border-radius: 999px;
-  background: #fef3c7;
-  color: #92400e;
-  font-size: 0.62rem;
-  font-weight: 900;
-  transform: translateX(-50%);
+  inset: 0;
   pointer-events: none;
+  z-index: 4;
+  overflow: visible;
+}
+
+.boss-zone-button__damage-burst {
+  --damage-offset-x: 0px;
+  --damage-offset-y: -64px;
+  --damage-scale: 1;
+  --damage-ttl: 1200ms;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
+    scale(var(--damage-scale));
+  transform-origin: center;
+  font-size: clamp(0.92rem, 1.6vw, 1.32rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-shadow: 0 4px 14px rgba(15, 23, 42, 0.65);
+  white-space: nowrap;
+  animation: boss-damage-float var(--damage-ttl) cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.boss-zone-button__damage-burst--normal {
+  color: #f8fafc;
+}
+
+.boss-zone-button__damage-burst--critical {
+  color: #facc15;
+  animation:
+    boss-damage-float var(--damage-ttl) cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    boss-damage-shake 100ms ease-in-out 0s 1;
+}
+
+.boss-zone-button__damage-burst--weakCritical {
+  color: #facc15;
+  -webkit-text-stroke: 1.5px #b91c1c;
+  animation:
+    boss-damage-float var(--damage-ttl) cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    boss-damage-shake 150ms ease-in-out 0s 1;
+}
+
+.boss-zone-button__damage-burst--pursuit {
+  color: #60a5fa;
+}
+
+.boss-zone-button__damage-burst--trueDamage {
+  color: #c084fc;
+  text-shadow: 0 0 12px rgba(168, 85, 247, 0.55), 0 4px 14px rgba(15, 23, 42, 0.65);
+}
+
+.boss-zone-button__damage-burst--doomsday {
+  color: #c084fc;
+  font-size: clamp(1.4rem, 3vw, 2.8rem);
+  text-shadow: 0 0 18px rgba(167, 139, 250, 0.7), 0 8px 18px rgba(15, 23, 42, 0.68);
+}
+
+.boss-zone-button__damage-burst--judgement {
+  color: #fde047;
+  font-size: clamp(1.56rem, 3.6vw, 3.2rem);
+  text-shadow: 0 0 22px rgba(234, 179, 8, 0.8), 0 10px 20px rgba(15, 23, 42, 0.72);
+}
+
+.vote-stage__boss-hud--merged {
+  position: relative;
+  overflow: visible;
+}
+
+.vote-stage__boss-hud--merged::after {
+  content: '';
+  position: absolute;
+  inset: -18px;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 22px;
+  z-index: 1;
+}
+
+.damage-stage--flash::after {
+  background: radial-gradient(circle at 50% 45%, rgba(125, 211, 252, 0.32), rgba(15, 23, 42, 0.06) 58%, transparent 72%);
+  animation: boss-stage-flash 180ms ease-out forwards;
+}
+
+.damage-stage--doom::after {
+  background: radial-gradient(circle at 50% 40%, rgba(192, 132, 252, 0.42), rgba(30, 41, 59, 0.16) 56%, transparent 74%);
+  animation: boss-stage-doom 240ms ease-out forwards;
+}
+
+.damage-stage--blade::before {
+  content: '';
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: 42%;
+  height: 8px;
+  background: linear-gradient(90deg, transparent 0%, rgba(244, 114, 182, 0.1) 28%, rgba(249, 115, 22, 0.65) 45%, rgba(244, 114, 182, 0.1) 72%, transparent 100%);
+  filter: blur(0.4px);
+  transform: rotate(-5deg) scaleX(0.4);
+  transform-origin: center;
+  pointer-events: none;
+  z-index: 3;
+  animation: boss-stage-blade 260ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+}
+
+.damage-stage--vignette::after {
+  background: radial-gradient(circle at 50% 45%, rgba(2, 6, 23, 0) 38%, rgba(2, 6, 23, 0.52) 100%);
+  animation: boss-stage-vignette 360ms ease-out forwards;
+}
+
+.damage-stage--shake {
+  animation: boss-stage-shake 180ms linear;
+}
+
+.damage-stage--slowmo .boss-part-grid {
+  animation: boss-stage-slowmo 360ms ease-out;
+}
+
+@keyframes boss-damage-float {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
+      scale(calc(var(--damage-scale) * 0.84));
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 10px))
+      scale(var(--damage-scale));
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 36px))
+      scale(calc(var(--damage-scale) * 1.03));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 74px))
+      scale(calc(var(--damage-scale) * 0.9));
+  }
+}
+
+@keyframes boss-damage-shake {
+  0% { transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  25% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  50% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) + 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  75% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 1px), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  100% { transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
+}
+
+@keyframes boss-stage-flash {
+  0% { opacity: 0.58; }
+  100% { opacity: 0; }
+}
+
+@keyframes boss-stage-doom {
+  0% {
+    opacity: 0.74;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes boss-stage-blade {
+  0% {
+    opacity: 0;
+    transform: rotate(-10deg) scaleX(0.2);
+  }
+  18% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(2deg) scaleX(1.08);
+  }
+}
+
+@keyframes boss-stage-vignette {
+  0% { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
+@keyframes boss-stage-shake {
+  0% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-2px, 0, 0); }
+  40% { transform: translate3d(2px, 0, 0); }
+  60% { transform: translate3d(-1px, 0, 0); }
+  80% { transform: translate3d(1px, 0, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes boss-stage-slowmo {
+  0% {
+    filter: brightness(0.72) saturate(0.6);
+    transform: scale(0.97);
+  }
+  68% {
+    filter: brightness(1.06) saturate(1.1);
+    transform: scale(1.008);
+  }
+  100% {
+    filter: brightness(1) saturate(1);
+    transform: scale(1);
+  }
 }
 
 .boss-part-cell__empty {

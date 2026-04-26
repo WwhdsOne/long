@@ -52,8 +52,13 @@ type realtimeDeltaMessage struct {
 }
 
 type realtimeClickAckPayload struct {
-	Delta    int64       `json:"delta"`
-	Critical bool        `json:"critical"`
+	Delta      int64  `json:"delta"`
+	Critical   bool   `json:"critical"`
+	BossDamage int64  `json:"bossDamage,omitempty"`
+	DamageType string `json:"damageType,omitempty"`
+	Button     struct {
+		Key string `json:"key"`
+	} `json:"button"`
 }
 
 type realtimeClickAckMessage struct {
@@ -240,8 +245,15 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		return send(realtimeClickAckMessage{
 			Type: realtimeMessageTypeClickAck,
 			Payload: realtimeClickAckPayload{
-				Delta:    result.Delta,
-				Critical: result.Critical,
+				Delta:      result.Delta,
+				Critical:   result.Critical,
+				BossDamage: result.BossDamage,
+				DamageType: result.DamageType,
+				Button: struct {
+					Key string `json:"key"`
+				}{
+					Key: slug,
+				},
 			},
 		})
 	default:

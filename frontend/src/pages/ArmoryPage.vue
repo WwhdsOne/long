@@ -76,7 +76,7 @@ async function handleContextToggleEquip() {
   const item = contextMenu.value.item
   if (!item) return
   closeContextMenu()
-  await toggleItemEquip(item.itemId, item.equipped)
+  await toggleItemEquip(item.instanceId || item.itemId, item.equipped)
 }
 
 function handleContextSalvage() {
@@ -97,7 +97,7 @@ function handleContextEnhance() {
 async function confirmSalvage() {
   const item = salvageConfirmItem.value
   if (!item) return
-  await salvageItem(item.itemId)
+  await salvageItem(item.instanceId || item.itemId)
   salvageConfirmItem.value = null
 }
 
@@ -145,7 +145,7 @@ async function confirmEnhance() {
     enhanceFeedback.value = '无法继续强化，强化已达上限'
     return
   }
-  const result = await enhanceItem(item.itemId)
+  const result = await enhanceItem(item.instanceId || item.itemId)
   if (result?.ok === false) {
     enhanceFeedback.value = result.message || '强化失败，请稍后重试。'
     return
@@ -248,7 +248,9 @@ onBeforeUnmount(() => {
           <strong>{{ inventory.length }} 件</strong>
         </div>
         <p :id="sectionID('resources')" class="armory-backpack-resources">
-          资源：金币 {{ gold }} · 强化石 {{ stones }}
+          资源：
+          金币 <span class="num-gold">{{ gold }}</span>
+          · 强化石 <span class="num-stone">{{ stones }}</span>
         </p>
         <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
           <p>先去打 Boss，掉落会自动进背包。</p>
@@ -262,8 +264,8 @@ onBeforeUnmount(() => {
             <button
               class="armory-backpack-cell__button"
               type="button"
-              :disabled="!isLoggedIn || actioningItemId === item.itemId"
-              @click="toggleItemEquip(item.itemId, item.equipped)"
+              :disabled="!isLoggedIn || actioningItemId === (item.instanceId || item.itemId)"
+              @click="toggleItemEquip(item.instanceId || item.itemId, item.equipped)"
               @contextmenu="openItemContextMenu($event, item)"
             >
               <img
