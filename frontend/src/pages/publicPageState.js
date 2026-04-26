@@ -1508,6 +1508,66 @@ async function salvageItem(instanceId) {
     }
 }
 
+async function toggleItemLock(instanceId, locked) {
+    if (!nickname.value || !instanceId) {
+        return
+    }
+
+    const action = locked ? 'unlock' : 'lock'
+    actioningItemId.value = instanceId
+    errorMessage.value = ''
+
+    try {
+        const response = await fetch(`/api/equipment/${encodeURIComponent(instanceId)}/${action}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({nickname: nickname.value}),
+        })
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, '锁定状态更新失败，请稍后重试。'))
+        }
+
+        await response.json()
+        await loadPlayerProfile()
+    } catch (error) {
+        errorMessage.value = error.message || '锁定状态更新失败，请稍后重试。'
+    } finally {
+        actioningItemId.value = ''
+    }
+}
+
+async function salvageUnequippedItems() {
+    if (!nickname.value) {
+        return null
+    }
+
+    errorMessage.value = ''
+
+    try {
+        const response = await fetch('/api/equipment/salvage/unequipped', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({nickname: nickname.value}),
+        })
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, '一键分解失败，请稍后重试。'))
+        }
+
+        const payload = await response.json()
+        await loadPlayerProfile()
+        return payload
+    } catch (error) {
+        errorMessage.value = error.message || '一键分解失败，请稍后重试。'
+        return null
+    }
+}
+
 async function enhanceItem(instanceId) {
     if (!nickname.value || !instanceId) {
         return
@@ -1856,6 +1916,8 @@ export function usePublicPageState() {
         clickButton,
         toggleItemEquip,
         salvageItem,
+        toggleItemLock,
+        salvageUnequippedItems,
         enhanceItem,
         submitNickname,
         resetNickname,

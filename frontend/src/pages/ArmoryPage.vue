@@ -1,5 +1,5 @@
 <script setup>
-import {nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 
 import {usePublicPageState} from './publicPageState'
 
@@ -34,6 +34,8 @@ const {
   equipmentNameClass,
   toggleItemEquip,
   salvageItem,
+  toggleItemLock,
+  salvageUnequippedItems,
   enhanceItem,
 } = usePublicPageState()
 
@@ -46,6 +48,10 @@ const contextMenu = ref({
 const salvageConfirmItem = ref(null)
 const enhanceConfirmItem = ref(null)
 const enhanceFeedback = ref('')
+const bulkSalvageConfirmData = ref(null)
+const bulkSalvageFeedback = ref('')
+const bulkSalvaging = ref(false)
+const salvageRuleModalOpen = ref(false)
 
 function sectionID(section) {
   return `armory-${section}`
@@ -83,8 +89,19 @@ async function handleContextToggleEquip() {
 function handleContextSalvage() {
   const item = contextMenu.value.item
   if (!item) return
+  if (item.locked) {
+    closeContextMenu()
+    return
+  }
   salvageConfirmItem.value = item
   closeContextMenu()
+}
+
+async function handleContextToggleLock() {
+  const item = contextMenu.value.item
+  if (!item) return
+  closeContextMenu()
+  await toggleItemLock(item.instanceId || item.itemId, item.locked)
 }
 
 function handleContextEnhance() {
@@ -93,6 +110,91 @@ function handleContextEnhance() {
   enhanceConfirmItem.value = item
   enhanceFeedback.value = ''
   closeContextMenu()
+}
+
+function salvageBaseReward(rarity) {
+  switch (String(rarity || '').trim()) {
+    case '至臻':
+      return {gold: 10000, stones: 50}
+    case '传说':
+      return {gold: 2000, stones: 8}
+    case '史诗':
+      return {gold: 1000, stones: 3}
+    case '稀有':
+      return {gold: 500, stones: 1}
+    case '优秀':
+      return {gold: 300, stones: 1}
+    case '神话':
+      return {gold: 5000, stones: 20}
+    case '普通':
+    default:
+      return {gold: 200, stones: 0}
+  }
+}
+
+function salvagePreview(item) {
+  return salvageBaseReward(item?.rarity)
+}
+
+function estimateBulkSalvage() {
+  const candidates = inventory.value.filter((item) => !item.equipped && !item.locked && String(item.rarity || '').trim() !== '至臻')
+  const byRarity = {}
+  let gold = 0
+  let stones = 0
+  let hasEnhanced = false
+  for (const item of candidates) {
+    const rarity = String(item.rarity || '').trim() || '普通'
+    const reward = salvageBaseReward(rarity)
+    gold += reward.gold
+    stones += reward.stones
+    byRarity[rarity] = (byRarity[rarity] || 0) + 1
+    if (Number(item.enhanceLevel || 0) > 0) {
+      hasEnhanced = true
+    }
+  }
+  return {
+    total: candidates.length,
+    byRarity,
+    gold,
+    stones,
+    hasEnhanced,
+    excludedEquipped: inventory.value.filter((item) => item.equipped).length,
+    excludedLocked: inventory.value.filter((item) => item.locked).length,
+    excludedTopRarity: inventory.value.filter((item) => String(item.rarity || '').trim() === '至臻').length,
+  }
+}
+
+const canBulkSalvage = computed(() => estimateBulkSalvage().total > 0)
+
+function openBulkSalvageConfirm() {
+  bulkSalvageConfirmData.value = estimateBulkSalvage()
+  bulkSalvageFeedback.value = ''
+}
+
+function openSalvageRuleModal() {
+  salvageRuleModalOpen.value = true
+}
+
+function closeSalvageRuleModal() {
+  salvageRuleModalOpen.value = false
+}
+
+function cancelBulkSalvage() {
+  bulkSalvageConfirmData.value = null
+  bulkSalvageFeedback.value = ''
+}
+
+async function confirmBulkSalvage() {
+  if (!bulkSalvageConfirmData.value) return
+  bulkSalvageFeedback.value = ''
+  bulkSalvaging.value = true
+  const result = await salvageUnequippedItems()
+  bulkSalvaging.value = false
+  if (!result) {
+    bulkSalvageFeedback.value = '一键分解失败，请稍后重试。'
+    return
+  }
+  cancelBulkSalvage()
 }
 
 async function confirmSalvage() {
@@ -246,7 +348,24 @@ onBeforeUnmount(() => {
       <section :id="sectionID('inventory')" class="armory-layout__right armory-block">
         <div class="armory-block__head">
           <p class="vote-stage__eyebrow">背包</p>
-          <strong>{{ inventory.length }} 件</strong>
+          <div class="armory-inventory-head__actions">
+            <strong>{{ inventory.length }} 件</strong>
+            <button
+              class="nickname-form__ghost armory-inventory-head__bulk-button"
+              type="button"
+              @click="openSalvageRuleModal"
+            >
+              分解规则
+            </button>
+            <button
+              class="nickname-form__ghost armory-inventory-head__bulk-button"
+              type="button"
+              :disabled="!isLoggedIn || !canBulkSalvage || bulkSalvaging"
+              @click="openBulkSalvageConfirm"
+            >
+              一键分解未穿戴
+            </button>
+          </div>
         </div>
         <p :id="sectionID('resources')" class="armory-backpack-resources">
           资源：
@@ -294,6 +413,7 @@ onBeforeUnmount(() => {
               </strong>
               <span>{{ formatRarityLabel(item.rarity) }} · {{ item.slot || '未分类' }}</span>
               <span>强化 +{{ item.enhanceLevel || 0 }} · {{ item.equipped ? '已装备' : '点击穿戴' }}</span>
+              <span>{{ item.locked ? '已锁定（不参与一键分解）' : '未锁定' }}</span>
             </div>
           </article>
         </div>
@@ -311,6 +431,9 @@ onBeforeUnmount(() => {
       </button>
       <button class="inventory-context-menu__item" type="button" @click="handleContextEnhance">
         强化
+      </button>
+      <button class="inventory-context-menu__item" type="button" @click="handleContextToggleLock">
+        {{ contextMenu.item.locked ? '解锁' : '锁定' }}
       </button>
       <button class="inventory-context-menu__item" type="button" @click="handleContextSalvage">
         分解
@@ -344,6 +467,98 @@ onBeforeUnmount(() => {
       </article>
     </section>
 
+    <section v-if="bulkSalvageConfirmData" class="boss-drop-modal" aria-label="一键分解确认">
+      <div class="boss-drop-modal__backdrop" @click="cancelBulkSalvage"></div>
+      <article class="boss-drop-modal__card">
+        <div class="boss-drop-modal__head">
+          <div>
+            <p class="vote-stage__eyebrow">一键分解确认</p>
+            <strong>即将分解 {{ bulkSalvageConfirmData.total }} 件未穿戴装备</strong>
+          </div>
+          <button class="nickname-form__ghost" type="button" @click="cancelBulkSalvage">关闭</button>
+        </div>
+        <div class="leaderboard-list">
+          <p>预计金币：{{ bulkSalvageConfirmData.gold }}</p>
+          <p>预计强化石：{{ bulkSalvageConfirmData.stones }}</p>
+          <p v-if="bulkSalvageConfirmData.hasEnhanced">已强化装备会额外返还 60% 已消耗强化石（向下取整）。</p>
+          <p>自动排除：穿戴中 {{ bulkSalvageConfirmData.excludedEquipped }} 件、已锁定 {{ bulkSalvageConfirmData.excludedLocked }} 件、至臻 {{ bulkSalvageConfirmData.excludedTopRarity }} 件。</p>
+          <p v-if="Object.keys(bulkSalvageConfirmData.byRarity).length > 0">
+            分解明细：
+            <span v-for="(count, rarity) in bulkSalvageConfirmData.byRarity" :key="rarity">
+              {{ rarity }}×{{ count }}
+            </span>
+          </p>
+        </div>
+        <p v-if="bulkSalvageFeedback" class="feedback feedback--error">{{ bulkSalvageFeedback }}</p>
+        <div class="announcement-modal__actions">
+          <button class="nickname-form__ghost" type="button" @click="cancelBulkSalvage">取消</button>
+          <button class="nickname-form__submit" type="button" :disabled="bulkSalvaging" @click="confirmBulkSalvage">
+            {{ bulkSalvaging ? '分解中...' : '确认分解' }}
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <section v-if="salvageRuleModalOpen" class="boss-drop-modal" aria-label="分解规则">
+      <div class="boss-drop-modal__backdrop" @click="closeSalvageRuleModal"></div>
+      <article class="boss-drop-modal__card">
+        <div class="boss-drop-modal__head">
+          <div>
+            <p class="vote-stage__eyebrow">装备分解规则</p>
+            <strong>当前版本分解说明</strong>
+          </div>
+          <button class="nickname-form__ghost" type="button" @click="closeSalvageRuleModal">关闭</button>
+        </div>
+        <div class="leaderboard-list" style="line-height: 1.4; margin: 10px 0;">
+          <p style="margin: 4px 0;">1. 一键分解仅处理未穿戴、未锁定、且非至臻装备。</p>
+          <p style="margin: 4px 0;">2. 至臻装备默认不参与一键分解。</p>
+          <p style="margin: 4px 0;">3. 已强化装备会额外返还 60% 已消耗强化石（向下取整）。</p>
+          <p style="margin: 8px 0 6px;">4. 分解基础收益：</p>
+
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+            <tr>
+              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">装备品质</th>
+              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">金币</th>
+              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">强化石</th>
+            </tr>
+            <tr>
+              <td style="border:1px solid #ccc; padding:6px;">普通</td>
+              <td style="border:1px solid #ccc; padding:6px;">200</td>
+              <td style="border:1px solid #ccc; padding:6px;">0</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #ccc; padding:6px;">优秀</td>
+              <td style="border:1px solid #ccc; padding:6px;">300</td>
+              <td style="border:1px solid #ccc; padding:6px;">1</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #ccc; padding:6px;">稀有</td>
+              <td style="border:1px solid #ccc; padding:6px;">500</td>
+              <td style="border:1px solid #ccc; padding:6px;">1</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #ccc; padding:6px;">史诗</td>
+              <td style="border:1px solid #ccc; padding:6px;">1000</td>
+              <td style="border:1px solid #ccc; padding:6px;">3</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #ccc; padding:6px;">传说</td>
+              <td style="border:1px solid #ccc; padding:6px;">2000</td>
+              <td style="border:1px solid #ccc; padding:6px;">8</td>
+            </tr>
+            <tr>
+              <td style="border:1px solid #ccc; padding:6px;">至臻</td>
+              <td style="border:1px solid #ccc; padding:6px;">10000</td>
+              <td style="border:1px solid #ccc; padding:6px;">50</td>
+            </tr>
+          </table>
+        </div>
+        <div class="announcement-modal__actions">
+          <button class="nickname-form__submit" type="button" @click="closeSalvageRuleModal">我知道了</button>
+        </div>
+      </article>
+    </section>
+
     <section v-if="salvageConfirmItem" class="boss-drop-modal" aria-label="分解确认">
       <div class="boss-drop-modal__backdrop" @click="cancelSalvage"></div>
       <article class="boss-drop-modal__card">
@@ -358,7 +573,9 @@ onBeforeUnmount(() => {
           <p>
             {{ salvageConfirmItem.name || salvageConfirmItem.itemId }}
           </p>
-          <p>分解后会返还部分强化石。</p>
+          <p>基础金币：{{ salvagePreview(salvageConfirmItem).gold }}</p>
+          <p>基础强化石：{{ salvagePreview(salvageConfirmItem).stones }}</p>
+          <p>若已强化，将额外返还 60% 已消耗强化石（向下取整）。</p>
         </div>
         <div class="announcement-modal__actions">
           <button class="nickname-form__ghost" type="button" @click="cancelSalvage">取消</button>
