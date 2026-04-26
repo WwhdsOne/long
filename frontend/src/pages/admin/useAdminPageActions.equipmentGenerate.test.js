@@ -82,4 +82,35 @@ describe('装备草稿生成动作', () => {
     expect(state.fetchEquipmentPage).not.toHaveBeenCalled()
     expect(state.showEquipmentEditor.value).toBe(true)
   })
+
+  it('保存装备时会提交 critRate 数值字段', async () => {
+    const state = makeState()
+    state.equipmentForm.value = {
+      ...emptyEquipmentForm(),
+      itemId: 'soft-blade',
+      name: '软组织切割刃',
+      slot: 'weapon',
+      rarity: '史诗',
+      attackPower: '12',
+      armorPenPercent: '0.2',
+      critRate: '0.22',
+      critDamageMultiplier: '1.5',
+    }
+
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({}),
+    }))
+
+    const actions = createAdminPageActions(state)
+    await actions.saveEquipment()
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/admin/equipment', expect.objectContaining({
+      method: 'POST',
+      body: expect.any(String),
+    }))
+
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body)
+    expect(body.critRate).toBe(0.22)
+  })
 })

@@ -255,6 +255,7 @@ type BossLootEntry struct {
 	DropRatePercent      float64 `json:"dropRatePercent"`
 	AttackPower          int64   `json:"attackPower,omitempty"`
 	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
+	CritRate             float64 `json:"critRate,omitempty"`
 	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
@@ -2003,6 +2004,7 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			DropRatePercent:      dropRatePercent,
 			AttackPower:          definition.AttackPower,
 			ArmorPenPercent:      definition.ArmorPenPercent,
+			CritRate:             definition.CritRate,
 			CritDamageMultiplier: definition.CritDamageMultiplier,
 			PartTypeDamageSoft:   definition.PartTypeDamageSoft,
 			PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
