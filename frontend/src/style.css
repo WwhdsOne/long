@@ -2149,9 +2149,15 @@ select {
 }
 
 .login-modal__note {
-  margin-bottom: 16px;
+  margin-bottom: 4px;
   color: rgba(255, 255, 255, 0.56);
   font-size: 14px;
+}
+
+.login-modal__hint {
+  margin-bottom: 12px;
+  color: rgba(255, 255, 255, 0.36);
+  font-size: 12px;
 }
 
 .login-modal__form {
@@ -2728,13 +2734,87 @@ select {
   }
 }
 
+/* Boss part info sidebar */
+.boss-part-grid-container {
+  position: relative;
+}
+
+.boss-part-info {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  min-width: 0;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.boss-part-info__title {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.boss-part-info__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.boss-part-info__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.boss-part-info__label {
+  color: var(--ink);
+}
+
+.boss-part-info__value {
+  font-family: var(--display);
+  font-weight: 900;
+  margin-left: auto;
+}
+
+.boss-part-info__item--soft .boss-part-info__dot { background: #4ade80; box-shadow: 0 0 6px rgba(74, 222, 128, 0.4); }
+.boss-part-info__item--soft .boss-part-info__value { color: #4ade80; }
+
+.boss-part-info__item--heavy .boss-part-info__dot { background: #94a3b8; box-shadow: 0 0 6px rgba(148, 163, 184, 0.3); }
+.boss-part-info__item--heavy .boss-part-info__value { color: #94a3b8; }
+
+.boss-part-info__item--weak .boss-part-info__dot { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.4); }
+.boss-part-info__item--weak .boss-part-info__value { color: #ef4444; }
+
+.boss-part-info__divider {
+  height: 1px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.boss-part-info__item--armor .boss-part-info__dot { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.4); }
+.boss-part-info__item--armor .boss-part-info__value { color: #f59e0b; }
+
 /* Boss part grid */
 .boss-part-grid {
   display: flex;
   flex-direction: column;
   gap: 6px;
   width: 100%;
-  max-width: min(100%, 560px);
+  max-width: min(100%, 720px);
   padding: 10px;
   background: #0f172a;
   border-radius: 16px;
@@ -3140,5 +3220,20 @@ select {
   }
   .boss-zone-button__meta {
     font-size: 0.46rem;
+  }
+  .boss-part-info {
+    padding: 8px 6px;
+    gap: 4px;
+  }
+  .boss-part-info__title {
+    font-size: 0.6rem;
+  }
+  .boss-part-info__item {
+    font-size: 0.68rem;
+    gap: 4px;
+  }
+  .boss-part-info__dot {
+    width: 6px;
+    height: 6px;
   }
 }

@@ -516,12 +516,15 @@ onBeforeUnmount(() => {
           <p style="margin: 8px 0 6px;">4. 分解基础收益：</p>
 
           <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
-            <tr>
-              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">装备品质</th>
-              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">金币</th>
-              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">强化石</th>
-            </tr>
-            <tr>
+            <thead>
+              <tr>
+                <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">装备品质</th>
+                <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">金币</th>
+                <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">强化石</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
               <td style="border:1px solid #ccc; padding:6px;">普通</td>
               <td style="border:1px solid #ccc; padding:6px;">200</td>
               <td style="border:1px solid #ccc; padding:6px;">0</td>
@@ -550,7 +553,8 @@ onBeforeUnmount(() => {
               <td style="border:1px solid #ccc; padding:6px;">至臻</td>
               <td style="border:1px solid #ccc; padding:6px;">10000</td>
               <td style="border:1px solid #ccc; padding:6px;">50</td>
-            </tr>
+              </tr>
+            </tbody>
           </table>
         </div>
         <div class="announcement-modal__actions">

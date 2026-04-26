@@ -33,3 +33,17 @@ func TestSensitiveLexiconValidatorLoadsTermsFromVendoredRepository(t *testing.T)
 		t.Fatalf("expected vendored repository terms to be loaded, got %v", err)
 	}
 }
+
+func TestValidatorAllowsAtRiptideNickname(t *testing.T) {
+	validator := NewSensitiveLexiconValidator()
+
+	cases := []string{
+		"@riptide.激流",
+		"@Riptide.激流",
+	}
+	for _, nickname := range cases {
+		if err := validator.Validate(nickname); err != nil {
+			t.Errorf("expected %q to pass, got %v", nickname, err)
+		}
+	}
+}

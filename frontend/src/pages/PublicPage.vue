@@ -119,6 +119,7 @@ async function handleLoginSubmit() {
           <strong>登录 / 注册</strong>
         </div>
         <p class="login-modal__note">输入昵称和密码，首次输入自动注册</p>
+        <p class="login-modal__hint">昵称规则：最多 20 字，不得包含敏感词（不区分大小写）。</p>
         <form class="nickname-form login-modal__form" @submit.prevent="handleLoginSubmit">
           <input
               v-model="nicknameDraft"

@@ -196,21 +196,31 @@ function zoneDamageBursts(zone) {
         <div v-else-if="bossZones.length === 0" class="feedback-panel feedback-panel--compact">
           <p>当前 Boss 尚未配置可攻击分区。</p>
         </div>
-        <div v-else class="boss-part-grid-container" style="display: flex; gap: 12px; align-items: flex-start;">
-          <!-- 左侧：部位系数说明（你要的位置） -->
-          <div class="boss-part-info" style="
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-              border-radius: 8px;
-              min-width: 10px;
-              font-size: 14px;
-              padding-top: 10px;
-            ">
-            <div style="font-weight: bold; margin-bottom: 4px;">部位伤害系数</div>
-            <div style="color: #4ade80;">软组织：1.0</div>
-            <div style="color: #c0c6cf;">重甲：0.4</div>
-            <div style="color: #ef4444;">弱点：2.5</div>
+        <div v-else class="boss-part-grid-container">
+          <!-- 左侧：部位系数说明 -->
+          <div class="boss-part-info">
+            <div class="boss-part-info__title">部位系数</div>
+            <div class="boss-part-info__item boss-part-info__item--soft">
+              <span class="boss-part-info__dot"></span>
+              <span class="boss-part-info__label">软组织</span>
+              <span class="boss-part-info__value">×1.0</span>
+            </div>
+            <div class="boss-part-info__item boss-part-info__item--heavy">
+              <span class="boss-part-info__dot"></span>
+              <span class="boss-part-info__label">重甲</span>
+              <span class="boss-part-info__value">×0.4</span>
+            </div>
+            <div class="boss-part-info__item boss-part-info__item--weak">
+              <span class="boss-part-info__dot"></span>
+              <span class="boss-part-info__label">弱点</span>
+              <span class="boss-part-info__value">×2.5</span>
+            </div>
+            <div class="boss-part-info__divider"></div>
+            <div class="boss-part-info__item boss-part-info__item--armor">
+              <span class="boss-part-info__dot"></span>
+              <span class="boss-part-info__label">护甲</span>
+              <span class="boss-part-info__value">减伤</span>
+            </div>
           </div>
 
           <!-- 右侧：原版 5×5 Boss 网格（完整保留） -->
@@ -274,6 +284,7 @@ function zoneDamageBursts(zone) {
                   </div>
                   <div class="boss-zone-button__meta">
                     <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
+                    <span>护甲 : {{zone.armor}}</span>
                   </div>
                 </template>
                 <span v-else class="boss-part-cell__empty"></span>

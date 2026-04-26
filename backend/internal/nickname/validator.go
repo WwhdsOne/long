@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 var ErrSensitiveNickname = errors.New("sensitive nickname")
@@ -26,7 +27,10 @@ func NewValidator(terms []string) *Validator {
 
 	for _, term := range terms {
 		cleaned := strings.ToLower(strings.TrimSpace(term))
-		if cleaned == "" {
+		if cleaned == "" || len(cleaned) < 2 {
+			continue
+		}
+		if isDigitsOnly(cleaned) {
 			continue
 		}
 		if _, exists := seen[cleaned]; exists {
@@ -92,4 +96,13 @@ func (v *Validator) Validate(value string) error {
 	}
 
 	return nil
+}
+
+func isDigitsOnly(s string) bool {
+	for _, r := range s {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return len(s) > 0
 }
