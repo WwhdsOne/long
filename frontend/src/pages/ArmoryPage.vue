@@ -447,9 +447,9 @@ onBeforeUnmount(() => {
           <div>
             <p class="vote-stage__eyebrow">装备强化</p>
             <strong>
-              {{ enhanceConfirmItem.name || enhanceConfirmItem.itemId }} +{{ enhanceConfirmItem.enhanceLevel || 0 }}
+              {{ enhanceConfirmItem.name || enhanceConfirmItem.itemId }} {{ enhanceConfirmItem.enhanceLevel || '+0' }}
               →
-              +{{ (enhanceConfirmItem.enhanceLevel || 0) + 1 }}
+              {{ '+' + ((enhanceConfirmItem.enhanceLevel || 0) + 1) }}
             </strong>
           </div>
           <button class="nickname-form__ghost" type="button" @click="cancelEnhance">关闭</button>
