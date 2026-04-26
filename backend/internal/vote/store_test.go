@@ -544,6 +544,14 @@ func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
+	store.roll = func(limit int) int {
+		if limit <= 0 {
+			return 0
+		}
+		// 固定返回上界，避免测试命中随机暴击导致断言不稳定。
+		return limit - 1
+	}
+
 	store.now = func() time.Time {
 		return time.Unix(1713744000, 0)
 	}
