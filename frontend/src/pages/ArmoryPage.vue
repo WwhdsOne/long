@@ -262,6 +262,15 @@ function cancelEnhance() {
   enhanceFeedback.value = ''
 }
 
+const enhanceDisplayName = computed(() => {
+  return enhanceConfirmItem.value?.name || enhanceConfirmItem.value?.itemId || ''
+})
+
+const enhanceLevel = computed(() => {
+  const n = Number(enhanceConfirmItem.value?.enhanceLevel ?? 0)
+  return Number.isFinite(n) ? n : 0
+})
+
 onMounted(() => {
   nextTick(() => scrollToSection(props.focusSection))
   window.addEventListener('click', closeContextMenu)
@@ -447,9 +456,9 @@ onBeforeUnmount(() => {
           <div>
             <p class="vote-stage__eyebrow">装备强化</p>
             <strong>
-              {{ enhanceConfirmItem.name || enhanceConfirmItem.itemId }} {{ enhanceConfirmItem.enhanceLevel || '+0' }}
+              {{ enhanceDisplayName }} +{{ enhanceLevel }}
               →
-              {{ '+' + ((enhanceConfirmItem.enhanceLevel || 0) + 1) }}
+              {{ enhanceDisplayName }} +{{ enhanceLevel + 1 }}
             </strong>
           </div>
           <button class="nickname-form__ghost" type="button" @click="cancelEnhance">关闭</button>
