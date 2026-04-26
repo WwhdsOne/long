@@ -1994,13 +1994,20 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 		}
 
 		loot = append(loot, BossLootEntry{
-			ItemID:          itemID,
-			ItemName:        definition.Name,
-			Slot:            definition.Slot,
-			Rarity:          normalizeEquipmentRarity(definition.Rarity),
-			ImagePath:       definition.ImagePath,
-			ImageAlt:        definition.ImageAlt,
-			DropRatePercent: dropRatePercent,
+			ItemID:               itemID,
+			ItemName:             definition.Name,
+			Slot:                 definition.Slot,
+			Rarity:               normalizeEquipmentRarity(definition.Rarity),
+			ImagePath:            definition.ImagePath,
+			ImageAlt:             definition.ImageAlt,
+			DropRatePercent:      dropRatePercent,
+			AttackPower:          definition.AttackPower,
+			ArmorPenPercent:      definition.ArmorPenPercent,
+			CritDamageMultiplier: definition.CritDamageMultiplier,
+			PartTypeDamageSoft:   definition.PartTypeDamageSoft,
+			PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
+			PartTypeDamageWeak:   definition.PartTypeDamageWeak,
+			TalentAffinity:       definition.TalentAffinity,
 		})
 	}
 
