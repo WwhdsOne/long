@@ -11,19 +11,21 @@ const treeDefs = ref(null)
 const talentState = ref(null)
 const selectedTree = ref('normal')
 const selectedSubTree = ref('')
-const selectedTalentID = ref('')
+const selectedMarker = ref({ panel: '', id: '' })
 
 const treeConfig = {
-  normal: { name: '均衡攻势', color: '#2ab06f' },
-  armor: { name: '碎盾攻坚', color: '#c08a2e' },
-  crit: { name: '致命洞察', color: '#c73b58' },
+  normal: { name: '均衡攻势', color: '#2bb873' },
+  armor: { name: '碎盾攻坚', color: '#c48a33' },
+  crit: { name: '致命洞察', color: '#ca3e59' },
 }
 
 const tierLabels = { 0: '基石', 1: '一阶', 2: '二阶', 3: '三阶', 4: '终极' }
-const tierRadius = { 0: 60, 1: 112, 2: 164, 3: 216, 4: 270 }
+const tierRadiusPercent = { 0: 14, 1: 28, 2: 42, 3: 56, 4: 70 }
+const trees = ['normal', 'armor', 'crit']
+const arcStartAngle = 135
+const arcEndAngle = 45
 
 const learnedSet = computed(() => new Set(talentState.value?.talents || []))
-const trees = ['normal', 'armor', 'crit']
 
 const availableTalentPoints = computed(() => {
   if (typeof talentState.value?.talentPoints === 'number') {
@@ -42,16 +44,9 @@ const subTreeDefs = computed(() => {
   return treeDefs.value.trees[selectedSubTree.value]?.talents || []
 })
 
-const allCurrentNodes = computed(() => {
-  const list = []
-  list.push(...currentTreeDefs.value.map((item) => ({ ...item, panel: 'main' })))
-  if (selectedSubTree.value) {
-    list.push(...subTreeDefs.value.map((item) => ({ ...item, panel: 'sub' })))
-  }
-  return list
-})
-
-const selectedNode = computed(() => allCurrentNodes.value.find((item) => item.id === selectedTalentID.value) || null)
+function safeJSON(response) {
+  return response.json().catch(() => null)
+}
 
 function findDef(id) {
   if (!treeDefs.value?.trees) return null
@@ -74,8 +69,8 @@ function isPrerequisiteMet(def) {
 function subTreeLearnedCount() {
   if (!talentState.value?.subTree) return 0
   return (talentState.value.talents || []).filter((id) => {
-    const d = findDef(id)
-    return d && d.tree === talentState.value.subTree
+    const def = findDef(id)
+    return def && def.tree === talentState.value.subTree
   }).length
 }
 
@@ -83,8 +78,9 @@ function canLearn(def) {
   if (!def || !talentState.value?.tree) return false
   if (isLearned(def.id)) return false
   if (!isPrerequisiteMet(def)) return false
-  if (Number(def.cost || 0) <= 0) return false
-  if (availableTalentPoints.value < Number(def.cost || 0)) return false
+
+  const cost = Number(def.cost || 0)
+  if (cost <= 0 || availableTalentPoints.value < cost) return false
 
   if (def.tree === talentState.value.tree) return true
   if (def.tree === talentState.value.subTree) {
@@ -99,9 +95,11 @@ function nodeState(def) {
   if (isLearned(def.id)) return 'learned'
   if (!talentState.value?.tree) return 'locked'
   if (!isPrerequisiteMet(def)) return 'locked'
+
   if (def.tree !== talentState.value.tree && def.tree !== talentState.value.subTree) return 'locked'
   if (def.tree === talentState.value.subTree && (def.tier === 0 || def.tier === 4)) return 'locked'
   if (def.tree === talentState.value.subTree && subTreeLearnedCount() >= 2) return 'locked'
+
   if (availableTalentPoints.value < Number(def.cost || 0)) return 'insufficient'
   return 'available'
 }
@@ -114,65 +112,143 @@ function stateLabel(def) {
   return '锁定'
 }
 
+function prerequisiteLabel(def) {
+  if (def?.prerequisiteName) return def.prerequisiteName
+  if (!def?.prerequisite) return '无'
+  const pre = findDef(def.prerequisite)
+  return pre?.name || def.prerequisite
+}
+
+function effectDescription(def) {
+  if (def?.effectDescription) return def.effectDescription
+  return '效果说明待配置'
+}
+
 function stateReason(def) {
   if (!def) return ''
   const state = nodeState(def)
   if (state === 'learned') return '该节点已学习。'
   if (state === 'available') return '满足条件，点击即可学习。'
-  if (state === 'insufficient') return '当前天赋点不足。'
+  if (state === 'insufficient') return `当前天赋点不足，需要 ${def.cost} 点。`
   if (!talentState.value?.tree) return '请先选择主系。'
-  if (!isPrerequisiteMet(def)) return `需要先学习前置节点：${def.prerequisite}`
+  if (!isPrerequisiteMet(def)) return `前置未满足：${prerequisiteLabel(def)}`
   return '当前条件不满足。'
 }
 
-function nodeCoordinatesByTier(defs, tier) {
-  const points = []
-  const total = defs.length
-  if (total <= 0) return points
-  const start = 195
-  const end = -15
-  const step = total === 1 ? 0 : (start - end) / (total - 1)
-  const radius = tierRadius[tier] || 120
-  for (let i = 0; i < total; i += 1) {
-    const angle = start - step * i
-    points.push({
-      radius,
-      angle,
+function coordinatesForTierNodes(nodes, tier) {
+  if (nodes.length === 0) return []
+  const radius = tierRadiusPercent[tier] || 20
+  const centerAngle = (arcStartAngle + arcEndAngle) / 2
+
+  // 基石层和终极层强制居中，满足“第一层中间”和“最后一层中间”布局要求。
+  if (tier === 0 || tier === 4) {
+    const gap = 10
+    const middle = (nodes.length - 1) / 2
+    return nodes.map((_, index) => {
+      const angle = centerAngle + (middle - index) * gap
+      const radian = (angle * Math.PI) / 180
+      const x = Number((Math.cos(radian) * radius).toFixed(2))
+      const y = Number((Math.sin(radian) * radius).toFixed(2))
+      return {
+        leftPercent: 50 + x,
+        topPercent: 90 - y,
+      }
     })
   }
-  return points
+
+  const step = nodes.length === 1 ? 0 : (arcStartAngle - arcEndAngle) / (nodes.length - 1)
+
+  return nodes.map((_, index) => {
+    const angle = arcStartAngle - step * index
+    const radian = (angle * Math.PI) / 180
+    const x = Number((Math.cos(radian) * radius).toFixed(2))
+    const y = Number((Math.sin(radian) * radius).toFixed(2))
+    return {
+      leftPercent: 50 + x,
+      topPercent: 90 - y,
+    }
+  })
 }
 
-function mapRingNodes(defs) {
+function toPolarPoint(radius, angle) {
+  const radian = (angle * Math.PI) / 180
+  return {
+    x: Number((50 + Math.cos(radian) * radius).toFixed(3)),
+    y: Number((90 - Math.sin(radian) * radius).toFixed(3)),
+  }
+}
+
+function arcPolylinePath(radius, segments = 30) {
+  const points = []
+  const step = (arcStartAngle - arcEndAngle) / segments
+  for (let i = 0; i <= segments; i += 1) {
+    const angle = arcStartAngle - step * i
+    points.push(toPolarPoint(radius, angle))
+  }
+  if (points.length === 0) return ''
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+}
+
+const arcGridPaths = computed(() => [0, 1, 2, 3, 4].map((tier) => ({
+  tier,
+  path: arcPolylinePath(tierRadiusPercent[tier] || 20),
+})))
+
+function mapRingNodes(defs, panel) {
   const byTier = new Map()
   for (const def of defs) {
     const tier = Number(def.tier || 0)
     if (!byTier.has(tier)) byTier.set(tier, [])
     byTier.get(tier).push(def)
   }
+
   const result = []
   for (const tier of [0, 1, 2, 3, 4]) {
     const tierDefs = byTier.get(tier) || []
-    const points = nodeCoordinatesByTier(tierDefs, tier)
-    tierDefs.forEach((def, idx) => {
+    const coords = coordinatesForTierNodes(tierDefs, tier)
+    tierDefs.forEach((def, index) => {
       result.push({
         ...def,
-        angle: points[idx]?.angle || 0,
-        radius: points[idx]?.radius || 120,
+        panel,
+        leftPercent: coords[index]?.leftPercent || 50,
+        topPercent: coords[index]?.topPercent || 90,
       })
     })
   }
   return result
 }
 
-const mainRingNodes = computed(() => mapRingNodes(currentTreeDefs.value))
-const subRingNodes = computed(() => mapRingNodes(subTreeDefs.value))
+const mainRingNodes = computed(() => mapRingNodes(currentTreeDefs.value, 'main'))
+const subRingNodes = computed(() => mapRingNodes(subTreeDefs.value, 'sub'))
 
-function nodeStyle(item) {
+const selectedNode = computed(() => {
+  const targetPanel = selectedMarker.value.panel
+  const targetID = selectedMarker.value.id
+  if (!targetPanel || !targetID) return null
+
+  const list = targetPanel === 'sub' ? subRingNodes.value : mainRingNodes.value
+  return list.find((item) => item.id === targetID) || null
+})
+
+function ringNodeStyle(item) {
   return {
-    '--node-angle': `${item.angle}deg`,
-    '--node-radius': `${item.radius}px`,
+    left: `${item.leftPercent}%`,
+    top: `${item.topPercent}%`,
   }
+}
+
+function detailFloatStyle(panel) {
+  if (!selectedNode.value || selectedNode.value.panel !== panel) return {}
+  const left = Math.max(8, Math.min(66, selectedNode.value.leftPercent + 8))
+  const top = Math.max(6, Math.min(68, selectedNode.value.topPercent - 20))
+  return {
+    left: `${left}%`,
+    top: `${top}%`,
+  }
+}
+
+function selectNode(def) {
+  selectedMarker.value = { panel: def.panel, id: def.id }
 }
 
 async function loadDefs() {
@@ -196,6 +272,7 @@ async function loadState() {
       }
       return
     }
+
     talentState.value = await res.json()
     if (talentState.value?.tree) selectedTree.value = talentState.value.tree
     if (talentState.value?.subTree) selectedSubTree.value = talentState.value.subTree
@@ -213,17 +290,21 @@ async function selectTree(tree) {
     if (selectedSubTree.value && selectedSubTree.value !== tree) {
       body.subTree = selectedSubTree.value
     }
+
     const res = await fetch('/api/talents/select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify(body),
     })
+
     if (!res.ok) {
       const payload = await safeJSON(res)
       throw new Error(payload?.message || '选择主系失败')
     }
+
     selectedTree.value = tree
+    selectedMarker.value = { panel: '', id: '' }
     await loadState()
   } catch (error) {
     errorMsg.value = error.message || '选择主系失败'
@@ -238,17 +319,23 @@ async function selectSubTree(tree) {
   errorMsg.value = ''
   try {
     const subTree = tree === selectedTree.value ? '' : tree
+
     const res = await fetch('/api/talents/select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ tree: selectedTree.value, subTree }),
     })
+
     if (!res.ok) {
       const payload = await safeJSON(res)
       throw new Error(payload?.message || '选择副系失败')
     }
+
     selectedSubTree.value = subTree
+    if (!subTree && selectedMarker.value.panel === 'sub') {
+      selectedMarker.value = { panel: '', id: '' }
+    }
     await loadState()
   } catch (error) {
     errorMsg.value = error.message || '选择副系失败'
@@ -259,7 +346,6 @@ async function selectSubTree(tree) {
 
 async function learnTalent(def) {
   if (!isLoggedIn.value || learnLoading.value || !def || !canLearn(def)) return
-  selectedTalentID.value = def.id
   learnLoading.value = true
   errorMsg.value = ''
   try {
@@ -269,21 +355,31 @@ async function learnTalent(def) {
       credentials: 'include',
       body: JSON.stringify({ talentId: def.id }),
     })
+
     if (!res.ok) {
       const payload = await safeJSON(res)
-      throw new Error(payload?.message || '学习失败')
+      throw new Error(payload?.message || '学习天赋失败')
     }
+
     await loadState()
   } catch (error) {
-    errorMsg.value = error.message || '学习失败'
+    errorMsg.value = error.message || '学习天赋失败'
   } finally {
     learnLoading.value = false
+  }
+}
+
+function clickNode(def) {
+  selectNode(def)
+  if (canLearn(def)) {
+    void learnTalent(def)
   }
 }
 
 async function resetTalents() {
   if (!isLoggedIn.value) return
   if (!window.confirm('确定洗点并返还已消耗天赋点吗？')) return
+
   loading.value = true
   errorMsg.value = ''
   try {
@@ -291,27 +387,18 @@ async function resetTalents() {
       method: 'POST',
       credentials: 'include',
     })
+
     if (!res.ok) {
       const payload = await safeJSON(res)
       throw new Error(payload?.message || '洗点失败')
     }
+
     await loadState()
   } catch (error) {
     errorMsg.value = error.message || '洗点失败'
   } finally {
     loading.value = false
   }
-}
-
-function handleNodeClick(def) {
-  selectedTalentID.value = def.id
-  if (canLearn(def)) {
-    void learnTalent(def)
-  }
-}
-
-function safeJSON(response) {
-  return response.json().catch(() => null)
 }
 
 onMounted(() => {
@@ -327,9 +414,12 @@ onMounted(() => {
         <p class="vote-stage__eyebrow">天赋系统</p>
         <h2>半圆盘天赋树</h2>
       </div>
-      <div class="talent-points">
-        <span>当前天赋点</span>
-        <strong>{{ availableTalentPoints }}</strong>
+      <div class="talent-head__actions">
+        <div class="talent-points">
+          <span>当前天赋点</span>
+          <strong>{{ availableTalentPoints }}</strong>
+        </div>
+        <button class="nickname-form__ghost" :disabled="loading" @click="resetTalents">洗点返还</button>
       </div>
     </header>
 
@@ -364,7 +454,7 @@ onMounted(() => {
             <button
               v-for="tree in trees"
               :key="`sub-${tree}`"
-              class="talent-select__btn talent-select__btn--sub"
+              class="talent-select__btn"
               :class="{ 'talent-select__btn--active': selectedSubTree === tree }"
               :style="{ '--tree-color': treeConfig[tree].color }"
               :disabled="loading || tree === selectedTree"
@@ -373,7 +463,7 @@ onMounted(() => {
               {{ treeConfig[tree].name }}
             </button>
             <button
-              class="talent-select__btn talent-select__btn--sub"
+              class="talent-select__btn"
               :class="{ 'talent-select__btn--active': selectedSubTree === '' }"
               :disabled="loading"
               @click="selectSubTree('')"
@@ -384,79 +474,104 @@ onMounted(() => {
         </div>
       </section>
 
-      <section class="talent-layout">
-        <article class="talent-plate">
-          <header class="talent-plate__head">
-            <strong>主系：{{ treeConfig[selectedTree]?.name }}</strong>
-          </header>
-          <div class="talent-half-ring" :style="{ '--active-color': treeConfig[selectedTree]?.color }">
-            <div
-              v-for="item in mainRingNodes"
-              :key="`main-${item.id}`"
-              class="talent-dot"
-              :class="`talent-dot--${nodeState(item)}`"
-              :style="nodeStyle(item)"
-              @click="handleNodeClick(item)"
-            >
-              <span class="talent-dot__name">{{ item.name }}</span>
-              <span class="talent-dot__cost">{{ item.cost }}</span>
-            </div>
-            <div class="talent-tier-legend">
-              <span v-for="tier in [0, 1, 2, 3, 4]" :key="`main-tier-${tier}`">
-                {{ tierLabels[tier] }}
-              </span>
-            </div>
-          </div>
-        </article>
+      <article class="talent-plate">
+        <header class="talent-plate__head">
+          <strong>主系：{{ treeConfig[selectedTree]?.name }}</strong>
+          <span>点击节点可学习，或查看浮层说明</span>
+        </header>
 
-        <article v-if="selectedSubTree" class="talent-plate talent-plate--sub">
-          <header class="talent-plate__head">
-            <strong>副系：{{ treeConfig[selectedSubTree]?.name }}</strong>
-          </header>
-          <div class="talent-half-ring" :style="{ '--active-color': treeConfig[selectedSubTree]?.color }">
-            <div
-              v-for="item in subRingNodes"
-              :key="`sub-${item.id}`"
-              class="talent-dot"
-              :class="`talent-dot--${nodeState(item)}`"
-              :style="nodeStyle(item)"
-              @click="handleNodeClick(item)"
-            >
-              <span class="talent-dot__name">{{ item.name }}</span>
-              <span class="talent-dot__cost">{{ item.cost }}</span>
-            </div>
-            <div class="talent-tier-legend">
-              <span v-for="tier in [0, 1, 2, 3, 4]" :key="`sub-tier-${tier}`">
-                {{ tierLabels[tier] }}
-              </span>
-            </div>
-          </div>
-        </article>
+        <div class="talent-half-ring" :style="{ '--active-color': treeConfig[selectedTree]?.color }">
+          <svg class="talent-arc-grid" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path
+              v-for="entry in arcGridPaths"
+              :key="`main-path-${entry.tier}`"
+              :d="entry.path"
+              class="talent-arc-grid__path"
+            />
+          </svg>
 
-        <aside class="talent-detail">
-          <header class="talent-detail__head">
-            <strong>节点详情</strong>
-            <button class="nickname-form__ghost" :disabled="loading" @click="resetTalents">洗点返还</button>
-          </header>
-          <div v-if="!selectedNode" class="talent-detail__empty">点击节点查看详情与消耗。</div>
-          <div v-else class="talent-detail__body">
-            <h3>{{ selectedNode.name }}</h3>
-            <p>层级：{{ tierLabels[selectedNode.tier] }}</p>
-            <p>消耗：{{ selectedNode.cost }} 天赋点</p>
-            <p>前置：{{ selectedNode.prerequisite || '无' }}</p>
-            <p>效果：{{ selectedNode.effectType }}</p>
+          <button
+            v-for="item in mainRingNodes"
+            :key="`main-${item.id}`"
+            class="talent-dot"
+            :class="[
+              `talent-dot--${nodeState(item)}`,
+              { 'talent-dot--selected': selectedMarker.panel === 'main' && selectedMarker.id === item.id },
+            ]"
+            :style="ringNodeStyle(item)"
+            @click="clickNode(item)"
+          >
+            <span class="talent-dot__name">{{ item.name }}</span>
+            <span class="talent-dot__meta">{{ tierLabels[item.tier] }} · {{ item.cost }}</span>
+          </button>
+
+          <div v-if="selectedNode && selectedNode.panel === 'main'" class="talent-float" :style="detailFloatStyle('main')">
+            <strong>{{ selectedNode.name }}</strong>
             <p>状态：{{ stateLabel(selectedNode) }}</p>
-            <p class="talent-detail__hint">{{ stateReason(selectedNode) }}</p>
+            <p>消耗：{{ selectedNode.cost }} 天赋点</p>
+            <p>前置：{{ prerequisiteLabel(selectedNode) }}</p>
+            <p>效果：{{ effectDescription(selectedNode) }}</p>
+            <p class="talent-float__hint">{{ stateReason(selectedNode) }}</p>
           </div>
-        </aside>
-      </section>
+
+          <div class="talent-tier-legend">
+            <span v-for="tier in [0, 1, 2, 3, 4]" :key="`legend-main-${tier}`">{{ tierLabels[tier] }}</span>
+          </div>
+        </div>
+      </article>
+
+      <article v-if="selectedSubTree" class="talent-plate talent-plate--sub">
+        <header class="talent-plate__head">
+          <strong>副系：{{ treeConfig[selectedSubTree]?.name }}</strong>
+          <span>副系最多学习 2 个中层节点</span>
+        </header>
+
+        <div class="talent-half-ring" :style="{ '--active-color': treeConfig[selectedSubTree]?.color }">
+          <svg class="talent-arc-grid" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path
+              v-for="entry in arcGridPaths"
+              :key="`sub-path-${entry.tier}`"
+              :d="entry.path"
+              class="talent-arc-grid__path"
+            />
+          </svg>
+
+          <button
+            v-for="item in subRingNodes"
+            :key="`sub-${item.id}`"
+            class="talent-dot"
+            :class="[
+              `talent-dot--${nodeState(item)}`,
+              { 'talent-dot--selected': selectedMarker.panel === 'sub' && selectedMarker.id === item.id },
+            ]"
+            :style="ringNodeStyle(item)"
+            @click="clickNode(item)"
+          >
+            <span class="talent-dot__name">{{ item.name }}</span>
+            <span class="talent-dot__meta">{{ tierLabels[item.tier] }} · {{ item.cost }}</span>
+          </button>
+
+          <div v-if="selectedNode && selectedNode.panel === 'sub'" class="talent-float" :style="detailFloatStyle('sub')">
+            <strong>{{ selectedNode.name }}</strong>
+            <p>状态：{{ stateLabel(selectedNode) }}</p>
+            <p>消耗：{{ selectedNode.cost }} 天赋点</p>
+            <p>前置：{{ prerequisiteLabel(selectedNode) }}</p>
+            <p>效果：{{ effectDescription(selectedNode) }}</p>
+            <p class="talent-float__hint">{{ stateReason(selectedNode) }}</p>
+          </div>
+
+          <div class="talent-tier-legend">
+            <span v-for="tier in [0, 1, 2, 3, 4]" :key="`legend-sub-${tier}`">{{ tierLabels[tier] }}</span>
+          </div>
+        </div>
+      </article>
     </template>
   </section>
 </template>
 
 <style scoped>
 .talent-page {
-  max-width: 1180px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 1rem;
 }
@@ -468,25 +583,31 @@ onMounted(() => {
   gap: 1rem;
 }
 
+.talent-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .talent-points {
+  min-width: 150px;
   padding: 0.75rem 1rem;
-  border: 1px solid #31434f;
+  border: 1px solid #2f454f;
   border-radius: 0.75rem;
-  background: #112029;
+  background: #102029;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  min-width: 140px;
 }
 
 .talent-points span {
-  color: #8ba8b9;
+  color: #8ea6b6;
   font-size: 0.8rem;
 }
 
 .talent-points strong {
-  color: #f8f2d6;
-  font-size: 1.35rem;
+  color: #f9efcd;
+  font-size: 1.4rem;
 }
 
 .talent-select {
@@ -497,18 +618,18 @@ onMounted(() => {
 }
 
 .talent-select__group {
-  border: 1px solid #2c3e47;
+  border: 1px solid #2d3f48;
   border-radius: 0.75rem;
+  background: #0f1c23;
   padding: 0.75rem;
-  background: #0f1b22;
 }
 
 .talent-select__label {
   display: block;
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  color: #7c95a4;
   margin-bottom: 0.5rem;
+  color: #7f99aa;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
 }
 
 .talent-select__buttons {
@@ -518,18 +639,18 @@ onMounted(() => {
 }
 
 .talent-select__btn {
-  border: 1px solid #35505c;
+  border: 1px solid #35515d;
   border-radius: 999px;
-  background: #132833;
-  color: #d7e7ef;
-  padding: 0.35rem 0.8rem;
+  background: #132933;
+  color: #dbe9f1;
   cursor: pointer;
+  padding: 0.38rem 0.9rem;
+  transition: border-color 0.2s ease;
 }
 
 .talent-select__btn--active {
-  border-color: var(--tree-color, #2ab06f);
-  color: #fff;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tree-color, #2ab06f) 40%, transparent);
+  border-color: var(--tree-color, #2bb873);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tree-color, #2bb873) 40%, transparent);
 }
 
 .talent-select__btn:disabled {
@@ -537,149 +658,159 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.talent-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr 300px;
-  gap: 0.75rem;
-}
-
 .talent-plate {
-  border: 1px solid #2c3d48;
+  border: 1px solid #2c404a;
   border-radius: 0.9rem;
-  background: linear-gradient(180deg, #14252f 0%, #101b22 100%);
+  background: linear-gradient(180deg, #142630 0%, #101b22 100%);
   overflow: hidden;
+  margin-bottom: 0.75rem;
 }
 
 .talent-plate__head {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #24333c;
-  color: #d9edf8;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #243640;
+  color: #d5ebf7;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
 }
 
 .talent-half-ring {
   position: relative;
-  height: 360px;
+  min-height: 760px;
   padding: 1rem;
 }
 
-.talent-half-ring::before {
-  content: '';
+.talent-arc-grid {
   position: absolute;
-  left: 50%;
-  bottom: 1rem;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--active-color, #2ab06f);
-  transform: translateX(-50%);
-  box-shadow: 0 0 0 8px color-mix(in srgb, var(--active-color, #2ab06f) 20%, transparent);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.talent-arc-grid__path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--active-color, #2bb873) 50%, #304752);
+  stroke-width: 0.25;
+  stroke-dasharray: 1.2 0.9;
+  opacity: 0.5;
 }
 
 .talent-dot {
   position: absolute;
-  left: 50%;
-  bottom: 1rem;
-  transform:
-    rotate(var(--node-angle))
-    translateY(calc(var(--node-radius) * -1))
-    rotate(calc(var(--node-angle) * -1));
   width: 92px;
-  min-height: 56px;
-  border-radius: 0.6rem;
-  border: 1px solid #344854;
-  background: #0f1820;
+  height: 92px;
+  transform: translate(-50%, -50%);
+  border: 1px solid #36505b;
+  border-radius: 50%;
+  background: #0f1a22;
+  padding: 0.35rem;
+  text-align: center;
   cursor: pointer;
-  padding: 0.35rem 0.4rem;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 0.12rem;
-  text-align: center;
+  gap: 0.2rem;
 }
 
 .talent-dot__name {
-  font-size: 0.7rem;
-  color: #dbe8ef;
-  line-height: 1.2;
+  color: #e6f2f8;
+  font-size: 0.66rem;
+  line-height: 1.25;
+  max-width: 78px;
 }
 
-.talent-dot__cost {
-  font-size: 0.66rem;
-  color: #85a4b6;
+.talent-dot__meta {
+  color: #8faabb;
+  font-size: 0.6rem;
 }
 
 .talent-dot--learned {
-  border-color: #4fcf8c;
-  background: #1b3a2d;
+  border-color: #4ece8e;
+  background: #1a3d2d;
 }
 
 .talent-dot--available {
-  border-color: var(--active-color, #2ab06f);
+  border-color: var(--active-color, #2bb873);
 }
 
 .talent-dot--insufficient {
-  border-color: #b67c35;
-  background: #2a2015;
+  border-color: #b7813c;
+  background: #2a1f16;
 }
 
 .talent-dot--locked {
-  opacity: 0.55;
-  cursor: default;
+  opacity: 0.52;
+}
+
+.talent-dot--selected {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--active-color, #2bb873) 45%, transparent);
+}
+
+.talent-float {
+  position: absolute;
+  width: min(340px, 82vw);
+  border: 1px solid #3a505d;
+  border-radius: 0.8rem;
+  background: #0c1319;
+  padding: 0.75rem;
+  z-index: 3;
+}
+
+.talent-float strong {
+  color: #f4f9fc;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.talent-float p {
+  margin: 0.2rem 0;
+  color: #bdd1de;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.talent-float__hint {
+  color: #f0cd92 !important;
 }
 
 .talent-tier-legend {
   position: absolute;
-  right: 0.6rem;
-  top: 0.8rem;
+  right: 0.8rem;
+  top: 0.9rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  color: #88a3b3;
-  font-size: 0.7rem;
+  gap: 0.38rem;
+  font-size: 0.74rem;
+  color: #91abbb;
 }
 
-.talent-detail {
-  border: 1px solid #2c3e49;
-  border-radius: 0.9rem;
-  background: #0f1920;
-  padding: 0.9rem;
-}
-
-.talent-detail__head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.85rem;
-}
-
-.talent-detail__empty {
-  color: #88a4b4;
-  font-size: 0.9rem;
-}
-
-.talent-detail__body h3 {
-  margin: 0 0 0.55rem 0;
-  color: #f2f7fa;
-}
-
-.talent-detail__body p {
-  margin: 0.35rem 0;
-  color: #b8d0dd;
-  font-size: 0.85rem;
-}
-
-.talent-detail__hint {
-  color: #f1cf8e;
-}
-
-@media (max-width: 1100px) {
-  .talent-layout {
+@media (max-width: 980px) {
+  .talent-select {
     grid-template-columns: 1fr;
   }
 
-  .talent-select {
-    grid-template-columns: 1fr;
+  .talent-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .talent-head__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .talent-half-ring {
+    min-height: 620px;
+  }
+
+  .talent-dot {
+    width: 82px;
+    height: 82px;
   }
 }
 </style>

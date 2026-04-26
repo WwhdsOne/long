@@ -2,7 +2,9 @@ package vote
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -16,6 +18,34 @@ const (
 	TalentTreeNormal TalentTree = "normal" // 普攻 - 均衡攻势
 	TalentTreeArmor  TalentTree = "armor"  // 破甲 - 碎盾攻坚
 	TalentTreeCrit   TalentTree = "crit"   // 暴击 - 致命洞察
+)
+
+const (
+	// ===== 天赋点经济参数（可直接调）=====
+	// tier0: 基石层成本
+	TalentCostTier0 int64 = 100
+	// tier1: 第一层成本
+	TalentCostTier1 int64 = 2000
+	// tier2: 第二层成本
+	TalentCostTier2 int64 = 8000
+	// tier3: 第三层成本
+	TalentCostTier3 int64 = 30000
+	// tier4: 终极层成本
+	TalentCostTier4 int64 = 120000
+
+	// ===== 普攻系关键参数（可直接调）=====
+	// 暴风连击：触发所需点击次数
+	TalentNormalStormTriggerCount = 200.0
+	// 暴风连击：基础追加段数
+	TalentNormalStormExtraHits = 15.0
+	// 暴风连击：单段追击倍率
+	TalentNormalStormChaseRatio = 0.50
+	// 暴风连击：追击倍率上限（预留）
+	TalentNormalStormMaxChaseRatio = 0.80
+	// 追击强化：追击倍率提升后的目标值
+	TalentNormalChaseUpgradeRatio = 0.80
+	// 连击扩展：额外追加段数
+	TalentNormalComboExtendHits = 10.0
 )
 
 // TalentDef 天赋节点定义
@@ -47,13 +77,13 @@ type talentPlayerData struct {
 // 三系天赋定义表
 var talentDefs = map[string]TalentDef{
 	// ===== 普攻：均衡攻势 =====
-	"normal_core":      {ID: "normal_core", Tree: TalentTreeNormal, Tier: 0, Name: "暴风连击", EffectType: "storm_combo", EffectValue: map[string]any{"triggerCount": 200, "extraHits": 15, "chaseRatio": 0.5, "maxChaseRatio": 0.8}},
+	"normal_core":      {ID: "normal_core", Tree: TalentTreeNormal, Tier: 0, Name: "暴风连击", EffectType: "storm_combo", EffectValue: map[string]any{"triggerCount": TalentNormalStormTriggerCount, "extraHits": TalentNormalStormExtraHits, "chaseRatio": TalentNormalStormChaseRatio, "maxChaseRatio": TalentNormalStormMaxChaseRatio}},
 	"normal_atk_up":    {ID: "normal_atk_up", Tree: TalentTreeNormal, Tier: 1, Name: "攻击强化", EffectType: "attack_power_percent", EffectValue: map[string]any{"percent": 0.25}, Prerequisite: "normal_core"},
 	"normal_dmg_amp":   {ID: "normal_dmg_amp", Tree: TalentTreeNormal, Tier: 1, Name: "伤害增幅", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.20}, Prerequisite: "normal_core"},
 	"normal_soft_atk":  {ID: "normal_soft_atk", Tree: TalentTreeNormal, Tier: 1, Name: "软组织特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "soft", "percent": 0.40}, Prerequisite: "normal_core"},
 	"normal_charge":    {ID: "normal_charge", Tree: TalentTreeNormal, Tier: 2, Name: "蓄力返还", EffectType: "charge_retain", EffectValue: map[string]any{"retainPercent": 0.30}, Prerequisite: "normal_atk_up"},
-	"normal_chase_up":  {ID: "normal_chase_up", Tree: TalentTreeNormal, Tier: 2, Name: "追击强化", EffectType: "chase_upgrade", EffectValue: map[string]any{"chaseRatio": 0.80}, Prerequisite: "normal_dmg_amp"},
-	"normal_combo_ext": {ID: "normal_combo_ext", Tree: TalentTreeNormal, Tier: 2, Name: "连击扩展", EffectType: "combo_extend", EffectValue: map[string]any{"extraHits": 10}, Prerequisite: "normal_soft_atk"},
+	"normal_chase_up":  {ID: "normal_chase_up", Tree: TalentTreeNormal, Tier: 2, Name: "追击强化", EffectType: "chase_upgrade", EffectValue: map[string]any{"chaseRatio": TalentNormalChaseUpgradeRatio}, Prerequisite: "normal_dmg_amp"},
+	"normal_combo_ext": {ID: "normal_combo_ext", Tree: TalentTreeNormal, Tier: 2, Name: "连击扩展", EffectType: "combo_extend", EffectValue: map[string]any{"extraHits": TalentNormalComboExtendHits}, Prerequisite: "normal_soft_atk"},
 	"normal_encircle":  {ID: "normal_encircle", Tree: TalentTreeNormal, Tier: 3, Name: "围剿", EffectType: "per_part_damage", EffectValue: map[string]any{"percentPerPart": 0.12}, Prerequisite: "normal_charge"},
 	"normal_low_hp":    {ID: "normal_low_hp", Tree: TalentTreeNormal, Tier: 3, Name: "残血收割", EffectType: "low_hp_bonus", EffectValue: map[string]any{"hpThreshold": 0.25, "multiplier": 2.0}, Prerequisite: "normal_chase_up"},
 	"normal_ultimate":  {ID: "normal_ultimate", Tree: TalentTreeNormal, Tier: 4, Name: "白银风暴", EffectType: "silver_storm", EffectValue: map[string]any{"triggerHits": 15, "treatAllAs": "soft"}, Prerequisite: "normal_encircle"},
@@ -84,11 +114,11 @@ var talentDefs = map[string]TalentDef{
 }
 
 var talentTierCosts = map[int]int64{
-	0: 100,
-	1: 2000,
-	2: 8000,
-	3: 30000,
-	4: 120000,
+	0: TalentCostTier0,
+	1: TalentCostTier1,
+	2: TalentCostTier2,
+	3: TalentCostTier3,
+	4: TalentCostTier4,
 }
 
 func init() {
@@ -109,6 +139,164 @@ func talentCostByTier(tier int) (int64, bool) {
 		return 0, false
 	}
 	return cost, true
+}
+
+// TalentPrerequisiteName 返回前置天赋名称，未配置则返回“无”。
+func TalentPrerequisiteName(def TalentDef) string {
+	prerequisite := strings.TrimSpace(def.Prerequisite)
+	if prerequisite == "" {
+		return "无"
+	}
+	preDef, ok := talentDefs[prerequisite]
+	if !ok || strings.TrimSpace(preDef.Name) == "" {
+		return prerequisite
+	}
+	return preDef.Name
+}
+
+// TalentEffectDescription 返回天赋效果中文描述，供前端直接展示。
+func TalentEffectDescription(def TalentDef) string {
+	effectType := strings.TrimSpace(def.EffectType)
+	value, _ := def.EffectValue.(map[string]any)
+	switch effectType {
+	case "storm_combo":
+		return fmt.Sprintf("每 %d 次点击触发，追加 %d 段追击（单段 %s）",
+			talentInt(value["triggerCount"]),
+			talentInt(value["extraHits"]),
+			talentPercent(value["chaseRatio"]),
+		)
+	case "attack_power_percent":
+		return fmt.Sprintf("攻击力提升 %s", talentPercent(value["percent"]))
+	case "all_damage_amplify":
+		return fmt.Sprintf("所有伤害提升 %s", talentPercent(value["percent"]))
+	case "part_type_damage":
+		return fmt.Sprintf("%s伤害提升 %s", talentPartTypeLabel(value["partType"]), talentPercent(value["percent"]))
+	case "charge_retain":
+		return fmt.Sprintf("连击中断后保留 %s 蓄力进度", talentPercent(value["retainPercent"]))
+	case "chase_upgrade":
+		return fmt.Sprintf("追击单段倍率提升到 %s", talentPercent(value["chaseRatio"]))
+	case "combo_extend":
+		return fmt.Sprintf("追击段数额外 +%d", talentInt(value["extraHits"]))
+	case "per_part_damage":
+		return fmt.Sprintf("每个存活部位额外增伤 %s", talentPercent(value["percentPerPart"]))
+	case "low_hp_bonus":
+		return fmt.Sprintf("Boss 血量低于 %s 时，伤害倍率 %.2f 倍", talentPercent(value["hpThreshold"]), talentFloat(value["multiplier"]))
+	case "silver_storm":
+		return fmt.Sprintf("触发后连续 %d 次攻击按%s系数结算", talentInt(value["triggerHits"]), talentPartTypeLabel(value["treatAllAs"]))
+	case "permanent_armor_pen":
+		return fmt.Sprintf("常驻穿透 %s，%d 次命中后触发 %d 秒崩塌", talentPercent(value["penPercent"]), talentInt(value["collapseTrigger"]), talentInt(value["collapseDuration"]))
+	case "armor_pen_extra":
+		return fmt.Sprintf("额外护甲穿透 %s", talentPercent(value["extraPen"]))
+	case "boss_damage":
+		return fmt.Sprintf("对首领额外伤害 +%s", talentPercent(value["percent"]))
+	case "armor_scaling":
+		return fmt.Sprintf("每 100 护甲额外获得 %s 伤害增幅", talentPercent(value["damagePer100Armor"]))
+	case "collapse_extend":
+		return fmt.Sprintf("崩塌状态持续时间 +%d 秒", talentInt(value["extraDuration"]))
+	case "auto_strike":
+		return fmt.Sprintf("每 %d 秒自动打击一次，造成 %.1f 倍伤害", talentInt(value["interval"]), talentFloat(value["damageRatio"]))
+	case "collapse_damage_amp":
+		return fmt.Sprintf("目标处于崩塌时，额外增伤 %s", talentPercent(value["extraPercent"]))
+	case "pen_to_amplify":
+		return fmt.Sprintf("将破甲转化为增伤（转化率 %s）", talentPercent(value["convertRatio"]))
+	case "judgment_day":
+		return fmt.Sprintf("每 %d 次命中触发生命切割（%s）", talentInt(value["triggerCount"]), talentPercent(value["hpCutPercent"]))
+	case "overkill":
+		return fmt.Sprintf("基础暴击率 +%s，溢出暴击按 %s 转化为暴伤", talentPercent(value["baseCritBonus"]), talentPercent(value["overflowToCritDmg"]))
+	case "omen_crit_damage":
+		return fmt.Sprintf("每层死兆额外提高 %s 暴击伤害", talentPercent(value["critDmgPerOmen"]))
+	case "crit_damage_bonus":
+		return fmt.Sprintf("暴击伤害额外提升 %s", talentPercent(value["percent"]))
+	case "force_weak":
+		return fmt.Sprintf("有 %s 概率强制命中弱点，持续 %d 秒", talentPercent(value["chance"]), talentInt(value["duration"]))
+	case "bleed":
+		return fmt.Sprintf("附加 %d 秒流血，总伤害为本次的 %s", talentInt(value["duration"]), talentPercent(value["damageRatio"]))
+	case "omen_low_hp":
+		return fmt.Sprintf("目标血量低于 %s 时，每层死兆额外增伤 %s", talentPercent(value["hpThreshold"]), talentPercent(value["dmgPerOmen"]))
+	case "omen_harvest":
+		return fmt.Sprintf("消耗 %d 层死兆触发一次高额收割", talentInt(value["omenCost"]))
+	case "death_ecstasy":
+		return fmt.Sprintf("消耗 %d 层死兆，获得 %d 秒 %s 暴伤", talentInt(value["omenCost"]), talentInt(value["duration"]), talentPercent(value["critDmgBonus"]))
+	case "final_cut":
+		return fmt.Sprintf("每 %d 次暴击触发，切割目标 %s 当前生命，冷却 %d 秒", talentInt(value["critCount"]), talentPercent(value["hpCutPercent"]), talentInt(value["cooldown"]))
+	case "doom_judgment":
+		return fmt.Sprintf("叠满 %d 层标记触发终结，返还 %d 死兆并提升终结倍率", talentInt(value["markCount"]), talentInt(value["omenReward"]))
+	default:
+		return "该天赋效果说明暂未配置"
+	}
+}
+
+func talentFloat(v any) float64 {
+	switch value := v.(type) {
+	case float64:
+		return value
+	case float32:
+		return float64(value)
+	case int:
+		return float64(value)
+	case int64:
+		return float64(value)
+	case int32:
+		return float64(value)
+	case int16:
+		return float64(value)
+	case int8:
+		return float64(value)
+	case uint:
+		return float64(value)
+	case uint64:
+		return float64(value)
+	case uint32:
+		return float64(value)
+	case uint16:
+		return float64(value)
+	case uint8:
+		return float64(value)
+	case json.Number:
+		f, err := value.Float64()
+		if err != nil {
+			return 0
+		}
+		return f
+	default:
+		return 0
+	}
+}
+
+func talentInt(v any) int {
+	return int(talentFloat(v))
+}
+
+func talentPercent(v any) string {
+	pct := talentFloat(v) * 100
+	abs := pct
+	if abs < 0 {
+		abs = -abs
+	}
+	if abs > 0 && abs < 1 {
+		return fmt.Sprintf("%.2f%%", pct)
+	}
+	if abs >= 1 && abs < 10 {
+		return fmt.Sprintf("%.1f%%", pct)
+	}
+	return fmt.Sprintf("%.0f%%", pct)
+}
+
+func talentPartTypeLabel(v any) string {
+	part, _ := v.(string)
+	switch strings.TrimSpace(part) {
+	case "soft":
+		return "软组织"
+	case "heavy":
+		return "重甲"
+	case "weak":
+		return "弱点"
+	default:
+		if part == "" {
+			return "未知部位"
+		}
+		return part
+	}
 }
 
 // GetTalentDef 返回指定 ID 的天赋定义。

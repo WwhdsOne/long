@@ -182,14 +182,16 @@ func defsToMap(defs []vote.TalentDef) []map[string]any {
 	result := make([]map[string]any, 0, len(defs))
 	for _, d := range defs {
 		result = append(result, map[string]any{
-			"id":           d.ID,
-			"tree":         d.Tree,
-			"tier":         d.Tier,
-			"name":         d.Name,
-			"effectType":   d.EffectType,
-			"effectValue":  d.EffectValue,
-			"cost":         d.Cost,
-			"prerequisite": d.Prerequisite,
+			"id":                d.ID,
+			"tree":              d.Tree,
+			"tier":              d.Tier,
+			"name":              d.Name,
+			"effectType":        d.EffectType,
+			"effectValue":       d.EffectValue,
+			"effectDescription": vote.TalentEffectDescription(d),
+			"cost":              d.Cost,
+			"prerequisite":      d.Prerequisite,
+			"prerequisiteName":  vote.TalentPrerequisiteName(d),
 		})
 	}
 	return result
