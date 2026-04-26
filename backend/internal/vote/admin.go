@@ -154,15 +154,16 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 	maxHP = sumBossPartMaxHP(parts)
 
 	current := &Boss{
-		ID:          bossID,
-		Name:        firstNonEmpty(strings.TrimSpace(boss.Name), bossID),
-		Status:      bossStatusActive,
-		MaxHP:       maxHP,
-		CurrentHP:   maxHP,
-		GoldOnKill:  maxInt64(0, boss.GoldOnKill),
-		StoneOnKill: maxInt64(0, boss.StoneOnKill),
-		Parts:       parts,
-		StartedAt:   time.Now().Unix(),
+		ID:                 bossID,
+		Name:               firstNonEmpty(strings.TrimSpace(boss.Name), bossID),
+		Status:             bossStatusActive,
+		MaxHP:              maxHP,
+		CurrentHP:          maxHP,
+		GoldOnKill:         maxInt64(0, boss.GoldOnKill),
+		StoneOnKill:        maxInt64(0, boss.StoneOnKill),
+		TalentPointsOnKill: maxInt64(0, boss.TalentPointsOnKill),
+		Parts:              parts,
+		StartedAt:          time.Now().Unix(),
 	}
 
 	if err := s.setCurrentBoss(ctx, current, nil); err != nil {

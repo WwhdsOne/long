@@ -37,7 +37,8 @@ func (s *Store) GetBossResources(ctx context.Context) (BossResources, error) {
 			Min: int64(math.Floor(float64(maxInt64(0, boss.StoneOnKill)) * 0.67)),
 			Max: int64(math.Floor(float64(maxInt64(0, boss.StoneOnKill)) * 1.33)),
 		},
-		BossLoot: loot,
+		TalentPointsOnKill: maxInt64(0, boss.TalentPointsOnKill),
+		BossLoot:           loot,
 	}, nil
 }
 

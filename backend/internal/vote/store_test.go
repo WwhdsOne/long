@@ -180,6 +180,91 @@ func TestGetUserStateMergesLegacyGemAndResourceKey(t *testing.T) {
 	}
 }
 
+func TestLearnTalentConsumesTalentPointsAndResetRefunds(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	if err := store.SelectTalentTree(ctx, nickname, TalentTreeNormal, TalentTreeArmor); err != nil {
+		t.Fatalf("select talent tree: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed talent points: %v", err)
+	}
+
+	if err := store.LearnTalent(ctx, nickname, "normal_core"); err != nil {
+		t.Fatalf("learn normal_core: %v", err)
+	}
+	userState, err := store.GetUserState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+	if userState.TalentPoints != 4900 {
+		t.Fatalf("expected talent points to be deducted to 4900, got %d", userState.TalentPoints)
+	}
+
+	if err := store.ResetTalents(ctx, nickname); err != nil {
+		t.Fatalf("reset talents: %v", err)
+	}
+	userState, err = store.GetUserState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get user state after reset: %v", err)
+	}
+	if userState.TalentPoints != 5000 {
+		t.Fatalf("expected refund after reset to 5000, got %d", userState.TalentPoints)
+	}
+}
+
+func TestLearnTalentRejectsWhenTalentPointsInsufficient(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	if err := store.SelectTalentTree(ctx, nickname, TalentTreeNormal, TalentTreeArmor); err != nil {
+		t.Fatalf("select talent tree: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "50").Err(); err != nil {
+		t.Fatalf("seed talent points: %v", err)
+	}
+
+	if err := store.LearnTalent(ctx, nickname, "normal_core"); !errors.Is(err, ErrTalentPointsInsufficient) {
+		t.Fatalf("expected ErrTalentPointsInsufficient, got %v", err)
+	}
+}
+
+func TestBossKillAwardsFixedTalentPoints(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	ctx := context.Background()
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:                 "talent-boss",
+		Name:               "天赋点 Boss",
+		MaxHP:              1,
+		TalentPointsOnKill: 321,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1, CurrentHP: 1, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	if _, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明"); err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+
+	userState, err := store.GetUserState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+	if userState.TalentPoints != 321 {
+		t.Fatalf("expected fixed talent points reward 321, got %d", userState.TalentPoints)
+	}
+}
+
 func TestBossLootDropRateIsIndependentProbability(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -863,7 +948,7 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 		CritDamageMultiplier:  2.0,
 	}
 
-	result := CalcBossPartDamage(stats, PartTypeSoft, 0, 1)
+	result := CalcBossPartDamage(stats, PartTypeSoft, 0, 1, 100, 100)
 	if result.NormalDamage != 100 {
 		t.Fatalf("expected normal damage 100, got %+v", result)
 	}

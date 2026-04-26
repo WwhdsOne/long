@@ -36,7 +36,7 @@ export function useAdminPage() {
   const uploadingImage = ref(false)
 
   const loginForm = ref({ username: 'admin', password: '' })
-  const bossForm = ref({ id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, layout: [] })
+  const bossForm = ref({ id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, talentPointsOnKill: 0, layout: [] })
   const equipmentForm = ref(emptyEquipmentForm())
   const equipmentPrompt = ref('')
   const showEquipmentEditor = ref(false)
@@ -334,7 +334,7 @@ export function useAdminPage() {
     announcements.value = []
     checkingSession.value = false
     successMessage.value = ''
-    bossForm.value = { id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, layout: [] }
+    bossForm.value = { id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, talentPointsOnKill: 0, layout: [] }
   }
 
   async function resetPlayerPassword(nickname) {

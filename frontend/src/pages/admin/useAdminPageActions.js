@@ -80,6 +80,7 @@ export function createAdminPageActions(state) {
           maxHp: sumBossPartMaxHp(bossForm.value.layout),
           goldOnKill: Number(bossForm.value.goldOnKill || 0),
           stoneOnKill: Number(bossForm.value.stoneOnKill || 0),
+          talentPointsOnKill: Number(bossForm.value.talentPointsOnKill || 0),
           layout: bossForm.value.layout || [],
         }),
       })
@@ -346,7 +347,7 @@ export function createAdminPageActions(state) {
         selectedBossTemplateId.value = ''
       }
       if (bossForm.value.id === templateId) {
-        bossForm.value = { id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, layout: [] }
+        bossForm.value = { id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, talentPointsOnKill: 0, layout: [] }
       }
       setSuccess('Boss 模板已删除。')
       await fetchAdminState()
@@ -385,6 +386,7 @@ export function createAdminPageActions(state) {
       maxHp: entry.maxHp,
       goldOnKill: Number(entry.goldOnKill || 0),
       stoneOnKill: Number(entry.stoneOnKill || 0),
+      talentPointsOnKill: Number(entry.talentPointsOnKill || 0),
       layout: entry.layout || [],
     }
     selectedBossTemplateId.value = entry.id

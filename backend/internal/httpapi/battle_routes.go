@@ -35,11 +35,15 @@ func registerBattleRoutes(router route.IRouter, options Options) {
 			"combatStats":         state.CombatStats,
 			"gold":                state.Gold,
 			"stones":              state.Stones,
+			"talentPoints":        state.TalentPoints,
 			"recentRewards":       state.RecentRewards,
 			"lastReward":          state.LastReward,
 		}
 		if resources, err := options.Store.GetBossResources(ctx); err == nil {
 			payload["bossLoot"] = resources.BossLoot
+			payload["bossGoldRange"] = resources.GoldRange
+			payload["bossStoneRange"] = resources.StoneRange
+			payload["bossTalentPointsOnKill"] = resources.TalentPointsOnKill
 		}
 		writeJSON(c, consts.StatusOK, payload)
 	})

@@ -8,18 +8,21 @@ const {
   bossLoot,
   bossGoldRange,
   bossStoneRange,
+  bossTalentPointsOnKill,
   leaderboard,
   nickname,
   loading,
   errorMessage,
   pendingKeys,
   damageBursts,
+  talentTriggerFeed,
   damageStageFx,
   totalVotes,
   isLoggedIn,
   myClicks,
   myRank,
   myBossDamage,
+  talentPoints,
   myBossRank,
   effectiveIncrement,
   bossStatusLabel,
@@ -142,6 +145,10 @@ function zoneDamageBursts(zone) {
     <article class="stats-band__card">
       <span class="stats-band__label">Boss 排名</span>
       <strong>{{ isLoggedIn ? (myBossRank ? `#${myBossRank}` : '未上榜') : '先登录' }}</strong>
+    </article>
+    <article class="stats-band__card">
+      <span class="stats-band__label">天赋点</span>
+      <strong>{{ isLoggedIn ? talentPoints : '--' }}</strong>
     </article>
   </section>
 
@@ -298,6 +305,12 @@ function zoneDamageBursts(zone) {
           <span>结算方式：回到页面后自动弹出结算窗口，显示击杀数与收益。</span>
           <span>温馨提示：挂机时长无上限；关闭页面后挂机仍会继续，服务器重启后不会丢失挂机状态。</span>
         </div>
+        <div v-if="talentTriggerFeed.length > 0" class="vote-stage__boss-note vote-stage__boss-note--rules">
+          <strong>天赋触发</strong>
+          <span v-for="entry in talentTriggerFeed.slice(0, 3)" :key="entry.id">
+            {{ entry.name }}：{{ entry.message }} <template v-if="entry.extraDamage > 0">（+{{ entry.extraDamage }}）</template>
+          </span>
+        </div>
       </section>
 
     </section>
@@ -367,6 +380,13 @@ function zoneDamageBursts(zone) {
             <article class="boss-drop-card boss-drop-card--detail">
               <span class="boss-drop-card__type">强化石</span>
               <strong>可获取强化石量 : {{ bossStoneRange.min }} ~ {{ bossStoneRange.max }}</strong>
+              <ul class="boss-drop-card__details">
+                <li>按击杀结算</li>
+              </ul>
+            </article>
+            <article class="boss-drop-card boss-drop-card--detail">
+              <span class="boss-drop-card__type">天赋点</span>
+              <strong>可获取天赋点 : {{ bossTalentPointsOnKill }}（固定）</strong>
               <ul class="boss-drop-card__details">
                 <li>按击杀结算</li>
               </ul>

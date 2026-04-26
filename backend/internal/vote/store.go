@@ -41,6 +41,8 @@ var ErrTalentPrerequisite = errors.New("talent prerequisite not met")
 var ErrTalentNotFound = errors.New("talent not found")
 var ErrTalentMaxLevel = errors.New("talent max level reached")
 var ErrInvalidTalentTree = errors.New("invalid talent tree")
+var ErrTalentPointsInsufficient = errors.New("talent points insufficient")
+var ErrTalentInvalidCost = errors.New("talent invalid cost")
 
 const (
 	bossStatusActive   = "active"
@@ -100,17 +102,18 @@ type BossPart struct {
 
 // Boss 世界 Boss 状态
 type Boss struct {
-	ID          string     `json:"id"`
-	TemplateID  string     `json:"templateId,omitempty"`
-	Name        string     `json:"name"`
-	Status      string     `json:"status"`
-	MaxHP       int64      `json:"maxHp"`
-	CurrentHP   int64      `json:"currentHp"`
-	GoldOnKill  int64      `json:"goldOnKill"`
-	StoneOnKill int64      `json:"stoneOnKill"`
-	Parts       []BossPart `json:"parts,omitempty"`
-	StartedAt   int64      `json:"startedAt,omitempty"`
-	DefeatedAt  int64      `json:"defeatedAt,omitempty"`
+	ID                 string     `json:"id"`
+	TemplateID         string     `json:"templateId,omitempty"`
+	Name               string     `json:"name"`
+	Status             string     `json:"status"`
+	MaxHP              int64      `json:"maxHp"`
+	CurrentHP          int64      `json:"currentHp"`
+	GoldOnKill         int64      `json:"goldOnKill"`
+	StoneOnKill        int64      `json:"stoneOnKill"`
+	TalentPointsOnKill int64      `json:"talentPointsOnKill"`
+	Parts              []BossPart `json:"parts,omitempty"`
+	StartedAt          int64      `json:"startedAt,omitempty"`
+	DefeatedAt         int64      `json:"defeatedAt,omitempty"`
 }
 
 // BossLeaderboardEntry Boss 伤害榜
@@ -232,6 +235,9 @@ type CombatStats struct {
 	PartTypeDamageSoft    float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy   float64 `json:"partTypeDamageHeavy,omitempty"`
 	PartTypeDamageWeak    float64 `json:"partTypeDamageWeak,omitempty"`
+	PerPartDamagePercent  float64 `json:"perPartDamagePercent,omitempty"`
+	LowHpMultiplier       float64 `json:"lowHpMultiplier,omitempty"`
+	LowHpThreshold        float64 `json:"lowHpThreshold,omitempty"`
 }
 
 // Reward 最近一次掉落
@@ -265,12 +271,13 @@ type BossLootEntry struct {
 
 // BossResources 描述当前 Boss 的低频公共资源。
 type BossResources struct {
-	BossID     string          `json:"bossId,omitempty"`
-	TemplateID string          `json:"templateId,omitempty"`
-	Status     string          `json:"status,omitempty"`
-	GoldRange  ResourceRange   `json:"goldRange"`
-	StoneRange ResourceRange   `json:"stoneRange"`
-	BossLoot   []BossLootEntry `json:"bossLoot"`
+	BossID             string          `json:"bossId,omitempty"`
+	TemplateID         string          `json:"templateId,omitempty"`
+	Status             string          `json:"status,omitempty"`
+	GoldRange          ResourceRange   `json:"goldRange"`
+	StoneRange         ResourceRange   `json:"stoneRange"`
+	TalentPointsOnKill int64           `json:"talentPointsOnKill"`
+	BossLoot           []BossLootEntry `json:"bossLoot"`
 }
 
 // ResourceRange 掉落资源显示区间。
@@ -298,6 +305,7 @@ type UserState struct {
 	Gems          int64           `json:"gems"`
 	Gold          int64           `json:"gold"`
 	Stones        int64           `json:"stones"`
+	TalentPoints  int64           `json:"talentPoints"`
 	RecentRewards []Reward        `json:"recentRewards,omitempty"`
 	LastReward    *Reward         `json:"lastReward,omitempty"`
 }
@@ -319,6 +327,7 @@ type State struct {
 	Gems                int64                  `json:"gems"`
 	Gold                int64                  `json:"gold"`
 	Stones              int64                  `json:"stones"`
+	TalentPoints        int64                  `json:"talentPoints"`
 	RecentRewards       []Reward               `json:"recentRewards,omitempty"`
 	LastReward          *Reward                `json:"lastReward,omitempty"`
 }
@@ -352,7 +361,28 @@ type ClickResult struct {
 	MyBossStats      *BossUserStats         `json:"myBossStats,omitempty"`
 	RecentRewards    []Reward               `json:"recentRewards,omitempty"`
 	LastReward       *Reward                `json:"lastReward,omitempty"`
+	TalentEvents     []TalentTriggerEvent   `json:"talentEvents,omitempty"`
+	PartStateDeltas  []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
 	BroadcastUserAll bool                   `json:"-"`
+}
+
+// TalentTriggerEvent 描述一次天赋触发事件，供前端战斗反馈显示。
+type TalentTriggerEvent struct {
+	TalentID    string `json:"talentId"`
+	Name        string `json:"name"`
+	EffectType  string `json:"effectType"`
+	ExtraDamage int64  `json:"extraDamage,omitempty"`
+	Message     string `json:"message,omitempty"`
+}
+
+// BossPartStateDelta 描述单次点击造成的部位变化增量。
+type BossPartStateDelta struct {
+	X        int    `json:"x"`
+	Y        int    `json:"y"`
+	Damage   int64  `json:"damage"`
+	BeforeHP int64  `json:"beforeHp"`
+	AfterHP  int64  `json:"afterHp"`
+	PartType string `json:"partType"`
 }
 
 // StateChangeType 实时状态变更类型
@@ -552,6 +582,7 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	userState.Gems = resources.Gems
 	userState.Gold = resources.Gold
 	userState.Stones = resources.Stones
+	userState.TalentPoints = resources.TalentPoints
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
 	if err != nil {
@@ -926,6 +957,7 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Gems:                userState.Gems,
 		Gold:                userState.Gold,
 		Stones:              userState.Stones,
+		TalentPoints:        userState.TalentPoints,
 		RecentRewards:       userState.RecentRewards,
 		LastReward:          userState.LastReward,
 	}
@@ -1138,12 +1170,13 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		}
 	}
 
-	damageStats := CalcBossPartDamage(combatStats, part.Type, part.Armor, aliveCount)
+	damageStats := CalcBossPartDamage(combatStats, part.Type, part.Armor, aliveCount, boss.CurrentHP, boss.MaxHP)
 	partDamage := damageStats.NormalDamage
 	if critical {
 		partDamage = damageStats.CriticalDamage
 	}
 
+	beforeHP := part.CurrentHP
 	actualDamage := partDamage
 	if actualDamage > part.CurrentHP {
 		actualDamage = part.CurrentHP
@@ -1160,12 +1193,38 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
-	result.BossDamage = actualDamage
+	totalDamage := actualDamage
+	result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
+		X:        part.X,
+		Y:        part.Y,
+		Damage:   actualDamage,
+		BeforeHP: beforeHP,
+		AfterHP:  part.CurrentHP,
+		PartType: string(part.Type),
+	})
+
+	extraDamage, talentEvents := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage)
+	if extraDamage > 0 {
+		totalDamage += extraDamage
+		result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
+			X:        part.X,
+			Y:        part.Y,
+			Damage:   extraDamage,
+			BeforeHP: part.CurrentHP + extraDamage,
+			AfterHP:  part.CurrentHP,
+			PartType: string(part.Type),
+		})
+	}
+	if len(talentEvents) > 0 {
+		result.TalentEvents = append(result.TalentEvents, talentEvents...)
+	}
+
+	result.BossDamage = totalDamage
 	result.Critical = critical
 	result.DamageType = resolveBossDamageType(resolveBossDamageTypeInput{
 		PartType:    part.Type,
 		Critical:    critical,
-		BossDamage:  actualDamage,
+		BossDamage:  totalDamage,
 		BossMaxHP:   boss.MaxHP,
 		IsAfkAttack: false,
 	})
@@ -1199,8 +1258,8 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	pipe := s.client.TxPipeline()
 	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
-	if actualDamage > 0 {
-		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(actualDamage), nickname)
+	if totalDamage > 0 {
+		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
 	if _, execErr := pipe.Exec(ctx); execErr != nil {
 		return result, nil
@@ -1220,6 +1279,90 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	return result, nil
+}
+
+func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64) (int64, []TalentTriggerEvent) {
+	if boss == nil || part == nil || strings.TrimSpace(nickname) == "" || clickCount <= 0 {
+		return 0, nil
+	}
+
+	state, err := s.GetTalentState(ctx, nickname)
+	if err != nil || state == nil || len(state.Talents) == 0 {
+		return 0, nil
+	}
+	learned := make(map[string]struct{}, len(state.Talents))
+	for _, id := range state.Talents {
+		learned[id] = struct{}{}
+	}
+
+	// normal_core: 每 200 次点击触发一次追击伤害，作为触发型天赋的落地实现。
+	if _, ok := learned["normal_core"]; !ok {
+		return 0, nil
+	}
+	def, ok := talentDefs["normal_core"]
+	if !ok {
+		return 0, nil
+	}
+
+	triggerCount := int64(200)
+	extraHits := int64(15)
+	chaseRatio := 0.5
+	val, _ := def.EffectValue.(map[string]any)
+	if v, ok := val["triggerCount"].(float64); ok && v > 0 {
+		triggerCount = int64(v)
+	}
+	if v, ok := val["extraHits"].(float64); ok && v > 0 {
+		extraHits = int64(v)
+	}
+	if v, ok := val["chaseRatio"].(float64); ok && v > 0 {
+		chaseRatio = v
+	}
+	if _, ok := learned["normal_chase_up"]; ok {
+		if def2, ok2 := talentDefs["normal_chase_up"]; ok2 {
+			if val2, ok3 := def2.EffectValue.(map[string]any); ok3 {
+				if v, ok4 := val2["chaseRatio"].(float64); ok4 && v > chaseRatio {
+					chaseRatio = v
+				}
+			}
+		}
+	}
+	if _, ok := learned["normal_combo_ext"]; ok {
+		if def2, ok2 := talentDefs["normal_combo_ext"]; ok2 {
+			if val2, ok3 := def2.EffectValue.(map[string]any); ok3 {
+				if v, ok4 := val2["extraHits"].(float64); ok4 && v > 0 {
+					extraHits += int64(v)
+				}
+			}
+		}
+	}
+	if triggerCount <= 0 || clickCount%triggerCount != 0 {
+		return 0, nil
+	}
+
+	burst := int64(math.Floor(float64(maxInt64(1, baseDamage)) * chaseRatio * float64(maxInt64(1, extraHits))))
+	if burst <= 0 {
+		return 0, nil
+	}
+	if burst > part.CurrentHP {
+		burst = part.CurrentHP
+	}
+
+	part.CurrentHP -= burst
+	if part.CurrentHP <= 0 {
+		part.CurrentHP = 0
+		part.Alive = false
+	}
+	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+
+	return burst, []TalentTriggerEvent{
+		{
+			TalentID:    "normal_core",
+			Name:        def.Name,
+			EffectType:  def.EffectType,
+			ExtraDamage: burst,
+			Message:     "暴风连击触发，追加追击伤害",
+		},
+	}
 }
 
 func (s *Store) selectTargetPart(parts []BossPart, nickname string) int {
@@ -1348,6 +1491,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 	minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
 	goldBase := boss.GoldOnKill
 	stoneBase := boss.StoneOnKill
+	talentPointBase := maxInt64(0, boss.TalentPointsOnKill)
 	if afkMode {
 		goldBase = int64(math.Floor(float64(goldBase) * 0.5))
 		stoneBase = int64(math.Floor(float64(stoneBase) * 0.5))
@@ -1365,6 +1509,9 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		}
 		if stoneDelta > 0 {
 			pipe.HIncrBy(ctx, s.resourceKey(nickname), "stones", stoneDelta)
+		}
+		if talentPointBase > 0 {
+			pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", talentPointBase)
 		}
 
 		if len(lootEntries) == 0 {
@@ -1502,6 +1649,23 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+critRate*100, 0, 100)
 	stats.CritDamageMultiplier += critDmgMult
 
+	mods, err := s.ComputeTalentModifiers(ctx, nickname)
+	if err != nil {
+		return CombatStats{}, err
+	}
+	if mods != nil {
+		stats.AttackPower = int64(float64(stats.AttackPower) * (1 + max(0.0, mods.AttackPowerPercent)))
+		stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+mods.ArmorPenExtra, 0, 0.80)
+		stats.AllDamageAmplify += mods.AllDamageAmplify
+		stats.CritDamageMultiplier += mods.CritDamagePercentBonus
+		stats.PerPartDamagePercent = max(0.0, mods.PerPartDamagePercent)
+		stats.LowHpMultiplier = max(1.0, mods.LowHpMultiplier)
+		stats.LowHpThreshold = clampFloat(mods.LowHpThreshold, 0, 1)
+		stats.PartTypeDamageSoft += max(0.0, mods.PartTypeBonus[PartTypeSoft])
+		stats.PartTypeDamageHeavy += max(0.0, mods.PartTypeBonus[PartTypeHeavy])
+		stats.PartTypeDamageWeak += max(0.0, mods.PartTypeBonus[PartTypeWeak])
+	}
+
 	result := deriveCombatStats(stats)
 	return result, nil
 }
@@ -1514,6 +1678,7 @@ func (s *Store) baseCombatStats() CombatStats {
 		ArmorPenPercent:       0,
 		CritDamageMultiplier:  1.5,
 		AllDamageAmplify:      0,
+		LowHpMultiplier:       1,
 	})
 }
 
@@ -1569,7 +1734,7 @@ func hasCriticalBonus(stats CombatStats) bool {
 //	partType: 部位类型
 //	partArmor: 部位护甲值
 //	alivePartCount: 存活的部位数量（围剿技能用）
-func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, alivePartCount int) CombatStats {
+func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, alivePartCount int, bossCurrentHP int64, bossMaxHP int64) CombatStats {
 	// 基础攻击力
 	atk := max(1, stats.AttackPower)
 
@@ -1585,18 +1750,35 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 	// 基础伤害 = max(攻击力 * 系数 - 护甲, 1)
 	baseDamage := max(atk*int64(coeff*100)/100-effectiveArmor, 1)
 
-	// 增伤乘区 = (1 + 全伤害增幅)
-	amplify := 1.0 + stats.AllDamageAmplify
+	// 增伤乘区 = 1 + 全局增伤 + 部位增伤 + 每存活部位增伤
+	amplifyBonus := stats.AllDamageAmplify
+	switch partType {
+	case PartTypeSoft:
+		amplifyBonus += stats.PartTypeDamageSoft
+	case PartTypeHeavy:
+		amplifyBonus += stats.PartTypeDamageHeavy
+	case PartTypeWeak:
+		amplifyBonus += stats.PartTypeDamageWeak
+	}
+	amplifyBonus += float64(max(0, alivePartCount)) * max(0, stats.PerPartDamagePercent)
+
+	// 低血斩杀增伤
+	if stats.LowHpMultiplier > 1 && stats.LowHpThreshold > 0 {
+		hpRatio := 1.0
+		if bossMaxHP > 0 {
+			hpRatio = float64(max(0, bossCurrentHP)) / float64(max(1, bossMaxHP))
+		}
+		if hpRatio <= stats.LowHpThreshold {
+			amplifyBonus += (stats.LowHpMultiplier - 1)
+		}
+	}
+
+	amplify := 1.0 + amplifyBonus
 
 	// 暴击乘区（这里只计算“命中暴击时应造成多少伤害”，不在这里做第二次暴击判定）
 	critMult := max(1.0, stats.CritDamageMultiplier)
 
 	// 最终伤害
-	finalDamage := int64(float64(baseDamage) * amplify * critMult)
-	if finalDamage < 1 {
-		finalDamage = 1
-	}
-
 	normalDamage := int64(float64(baseDamage) * amplify)
 	if normalDamage < 1 {
 		normalDamage = 1
@@ -1616,6 +1798,12 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 		ArmorPenPercent:       stats.ArmorPenPercent,
 		CritDamageMultiplier:  critMult,
 		AllDamageAmplify:      amplify - 1.0,
+		PartTypeDamageSoft:    stats.PartTypeDamageSoft,
+		PartTypeDamageHeavy:   stats.PartTypeDamageHeavy,
+		PartTypeDamageWeak:    stats.PartTypeDamageWeak,
+		PerPartDamagePercent:  stats.PerPartDamagePercent,
+		LowHpMultiplier:       stats.LowHpMultiplier,
+		LowHpThreshold:        stats.LowHpThreshold,
 	}
 }
 
@@ -1648,17 +1836,18 @@ func normalizeBoss(values map[string]string) *Boss {
 	}
 
 	return &Boss{
-		ID:          id,
-		TemplateID:  strings.TrimSpace(values["template_id"]),
-		Name:        name,
-		Status:      strings.TrimSpace(values["status"]),
-		MaxHP:       int64FromString(values["max_hp"]),
-		CurrentHP:   int64FromString(values["current_hp"]),
-		GoldOnKill:  int64FromString(values["gold_on_kill"]),
-		StoneOnKill: int64FromString(values["stone_on_kill"]),
-		Parts:       parts,
-		StartedAt:   int64FromString(values["started_at"]),
-		DefeatedAt:  int64FromString(values["defeated_at"]),
+		ID:                 id,
+		TemplateID:         strings.TrimSpace(values["template_id"]),
+		Name:               name,
+		Status:             strings.TrimSpace(values["status"]),
+		MaxHP:              int64FromString(values["max_hp"]),
+		CurrentHP:          int64FromString(values["current_hp"]),
+		GoldOnKill:         int64FromString(values["gold_on_kill"]),
+		StoneOnKill:        int64FromString(values["stone_on_kill"]),
+		TalentPointsOnKill: int64FromString(values["talent_points_on_kill"]),
+		Parts:              parts,
+		StartedAt:          int64FromString(values["started_at"]),
+		DefeatedAt:         int64FromString(values["defeated_at"]),
 	}
 }
 
@@ -2228,22 +2417,24 @@ func (s *Store) legacyGemKey(nickname string) string {
 }
 
 type playerResources struct {
-	Gems   int64
-	Gold   int64
-	Stones int64
+	Gems         int64
+	Gold         int64
+	Stones       int64
+	TalentPoints int64
 }
 
 func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
 	resourceKey := s.resourceKey(nickname)
-	values, err := s.client.HMGet(ctx, resourceKey, "gems", "gold", "stones").Result()
+	values, err := s.client.HMGet(ctx, resourceKey, "gems", "gold", "stones", "talent_points").Result()
 	if err != nil {
 		return playerResources{}, err
 	}
 
 	current := playerResources{
-		Gems:   int64Value(values, 0),
-		Gold:   int64Value(values, 1),
-		Stones: int64Value(values, 2),
+		Gems:         int64Value(values, 0),
+		Gold:         int64Value(values, 1),
+		Stones:       int64Value(values, 2),
+		TalentPoints: int64Value(values, 3),
 	}
 
 	legacyKey := s.legacyGemKey(nickname)
@@ -2263,17 +2454,19 @@ func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (play
 	merged := legacy
 	if hasAnyHMGetValue(values) {
 		merged = playerResources{
-			Gems:   current.Gems + legacy.Gems,
-			Gold:   current.Gold + legacy.Gold,
-			Stones: current.Stones + legacy.Stones,
+			Gems:         current.Gems + legacy.Gems,
+			Gold:         current.Gold + legacy.Gold,
+			Stones:       current.Stones + legacy.Stones,
+			TalentPoints: current.TalentPoints + legacy.TalentPoints,
 		}
 	}
 
 	pipe := s.client.TxPipeline()
 	pipe.HSet(ctx, resourceKey, map[string]any{
-		"gems":   strconv.FormatInt(merged.Gems, 10),
-		"gold":   strconv.FormatInt(merged.Gold, 10),
-		"stones": strconv.FormatInt(merged.Stones, 10),
+		"gems":          strconv.FormatInt(merged.Gems, 10),
+		"gold":          strconv.FormatInt(merged.Gold, 10),
+		"stones":        strconv.FormatInt(merged.Stones, 10),
+		"talent_points": strconv.FormatInt(merged.TalentPoints, 10),
 	})
 	pipe.Del(ctx, legacyKey)
 	if _, err := pipe.Exec(ctx); err != nil {
