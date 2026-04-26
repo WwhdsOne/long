@@ -852,6 +852,54 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	}
 }
 
+func TestBossAutoClickKillReturnsRecentRewards(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.now = func() time.Time {
+		return time.Unix(1713744000, 0)
+	}
+
+	ctx := context.Background()
+	seedEquipmentDefinition(t, store, ctx, "strong-sword", "weapon", 7)
+	seedEquipmentDefinition(t, store, ctx, "loot-ring", "accessory", 0)
+	strongSwordInst := seedOwnedInstance(t, store, ctx, "阿明", "strong-sword")
+	if _, err := store.EquipItem(ctx, "阿明", strongSwordInst); err != nil {
+		t.Fatalf("equip item: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "auto-reward-boss",
+		Name:  "挂机掉落 Boss",
+		MaxHP: 1,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1, CurrentHP: 1, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+	if err := store.SetBossLoot(ctx, "auto-reward-boss", []BossLootEntry{
+		{ItemID: "loot-ring", DropRatePercent: 100},
+	}); err != nil {
+		t.Fatalf("set boss loot: %v", err)
+	}
+
+	result, err := store.AutoClickBossPart(ctx, "0-0", "阿明")
+	if err != nil {
+		t.Fatalf("auto click boss part: %v", err)
+	}
+	if !result.BroadcastUserAll {
+		t.Fatalf("expected auto click to trigger boss kill broadcast, got %+v", result)
+	}
+	if len(result.RecentRewards) != 1 {
+		t.Fatalf("expected one recent reward on afk kill, got %+v", result.RecentRewards)
+	}
+	if result.RecentRewards[0].ItemID != "loot-ring" {
+		t.Fatalf("expected afk reward item loot-ring, got %+v", result.RecentRewards[0])
+	}
+}
+
 func TestEquipmentCritRateContributesToCriticalChance(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

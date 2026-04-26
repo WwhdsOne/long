@@ -1273,9 +1273,12 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 
 	if allDead {
 		result.BroadcastUserAll = true
-		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss, true)
+		nextBoss, earnedRewards, finalizeErr := s.finalizeBossKill(ctx, boss, true, normalizedNickname)
 		if finalizeErr != nil {
 			return result, nil
+		}
+		if len(earnedRewards) > 0 {
+			result.RecentRewards = earnedRewards
 		}
 		if nextBoss != nil {
 			result.Boss = nextBoss
@@ -1446,7 +1449,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	if allDead {
 		result.BroadcastUserAll = true
-		nextBoss, finalizeErr := s.finalizeBossKill(ctx, boss, false)
+		nextBoss, _, finalizeErr := s.finalizeBossKill(ctx, boss, false, "")
 		if finalizeErr != nil {
 			return result, nil
 		}
@@ -1639,28 +1642,30 @@ func resolveBossDamageType(input resolveBossDamageTypeInput) string {
 	return "normal"
 }
 
-func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) (*Boss, error) {
+func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, rewardNickname string) (*Boss, []Reward, error) {
 	if boss == nil || strings.TrimSpace(boss.ID) == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	bossID := strings.TrimSpace(boss.ID)
 	bossName := strings.TrimSpace(boss.Name)
+	rewardNickname = strings.TrimSpace(rewardNickname)
 
 	acquired, err := s.client.SetNX(ctx, s.bossRewardLockKey(bossID), "1", 0).Result()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if !acquired {
-		return s.currentBoss(ctx)
+		current, currentErr := s.currentBoss(ctx)
+		return current, nil, currentErr
 	}
 
 	lootEntries, err := s.loadBossLoot(ctx, bossID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	participants, err := s.client.ZRevRangeWithScores(ctx, s.bossDamageKey(bossID), 0, -1).Result()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	pipe := s.client.Pipeline()
@@ -1673,6 +1678,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		goldBase = int64(math.Floor(float64(goldBase) * 0.5))
 		stoneBase = int64(math.Floor(float64(stoneBase) * 0.5))
 	}
+	rewardForNickname := make([]Reward, 0, len(lootEntries))
 	for _, participant := range participants {
 		nickname, ok := participant.Member.(string)
 		if !ok || nickname == "" || participant.Score < float64(minDamage) {
@@ -1698,7 +1704,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		for _, reward := range s.rollLootDrops(lootEntries) {
 			instanceID, createErr := s.newEquipmentInstanceID(ctx)
 			if createErr != nil {
-				return nil, createErr
+				return nil, nil, createErr
 			}
 			pipe.HSet(ctx, s.equipmentInstanceKey(instanceID), map[string]any{
 				"item_id":       reward.ItemID,
@@ -1719,32 +1725,36 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		}
 		if len(rewards) > 0 {
 			pipe.HSet(ctx, s.lastRewardKey(nickname), rewardRecordValues(rewards))
+			if rewardNickname != "" && nickname == rewardNickname {
+				rewardForNickname = append(rewardForNickname, rewards...)
+			}
 		}
 	}
 
 	if _, err = pipe.Exec(ctx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := s.SaveBossToHistory(ctx, boss); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	enabled, err := s.bossCycleEnabled(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if enabled {
 		nextBoss, err := s.activateNextBossFromCycle(ctx, boss.TemplateID)
 		if err != nil && !errors.Is(err, ErrBossPoolEmpty) && !errors.Is(err, ErrBossCycleQueueEmpty) {
-			return nil, err
+			return nil, nil, err
 		}
 		if nextBoss != nil {
-			return nextBoss, nil
+			return nextBoss, rewardForNickname, nil
 		}
 	}
 
-	return s.currentBoss(ctx)
+	current, currentErr := s.currentBoss(ctx)
+	return current, rewardForNickname, currentErr
 }
 
 func rollResourceReward(roller func(int) int, base int64, minMultiplier float64, maxMultiplier float64) int64 {
