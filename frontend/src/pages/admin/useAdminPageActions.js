@@ -141,6 +141,7 @@ export function createAdminPageActions(state) {
           rarity: equipmentForm.value.rarity,
           attackPower: Number(equipmentForm.value.attackPower),
           armorPenPercent: Number(equipmentForm.value.armorPenPercent),
+          critRate: Number(equipmentForm.value.critRate),
           critDamageMultiplier: Number(equipmentForm.value.critDamageMultiplier),
           bossDamagePercent: Number(equipmentForm.value.bossDamagePercent),
           partTypeDamageSoft: Number(equipmentForm.value.partTypeDamageSoft),

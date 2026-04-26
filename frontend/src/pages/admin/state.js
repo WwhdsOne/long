@@ -120,6 +120,7 @@ export function normalizeLootEntry(entry) {
     dropRatePercent: Number(entry?.dropRatePercent ?? entry?.weight ?? 0),
     attackPower: Number(entry?.attackPower ?? 0),
     armorPenPercent: Number(entry?.armorPenPercent ?? 0),
+    critRate: Number(entry?.critRate ?? 0),
     critDamageMultiplier: Number(entry?.critDamageMultiplier ?? 0),
     bossDamagePercent: Number(entry?.bossDamagePercent ?? 0),
     partTypeDamageSoft: Number(entry?.partTypeDamageSoft ?? 0),
@@ -241,6 +242,7 @@ export function formatItemStats(item) {
   const parts = []
   if (item.attackPower != null) parts.push(`攻击力 +${item.attackPower}`)
   if (item.armorPenPercent != null) parts.push(`破甲 +${(item.armorPenPercent * 100).toFixed(0)}%`)
+  if (item.critRate != null) parts.push(`暴击率 +${(item.critRate * 100).toFixed(0)}%`)
   if (item.critDamageMultiplier != null) parts.push(`暴伤 +${item.critDamageMultiplier.toFixed(1)}`)
   if (item.partTypeDamageSoft != null) parts.push(`软组织 +${(item.partTypeDamageSoft * 100).toFixed(0)}%`)
   if (item.partTypeDamageHeavy != null) parts.push(`重甲 +${(item.partTypeDamageHeavy * 100).toFixed(0)}%`)

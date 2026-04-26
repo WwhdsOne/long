@@ -228,6 +228,7 @@ func TestBossResourcesLootContainsEquipmentIcon(t *testing.T) {
 		"image_alt":              "烈焰戒指图标",
 		"attack_power":           "18",
 		"armor_pen_percent":      "12.5",
+		"crit_rate":              "0.22",
 		"crit_damage_multiplier": "1.8",
 		"part_type_damage_soft":  "0.2",
 		"part_type_damage_heavy": "0.3",
@@ -272,6 +273,9 @@ func TestBossResourcesLootContainsEquipmentIcon(t *testing.T) {
 	}
 	if resources.BossLoot[0].ArmorPenPercent != 12.5 {
 		t.Fatalf("expected loot armor penetration to be returned, got %+v", resources.BossLoot[0])
+	}
+	if resources.BossLoot[0].CritRate != 0.22 {
+		t.Fatalf("expected loot crit rate to be returned, got %+v", resources.BossLoot[0])
 	}
 	if resources.BossLoot[0].CritDamageMultiplier != 1.8 {
 		t.Fatalf("expected loot crit damage multiplier to be returned, got %+v", resources.BossLoot[0])

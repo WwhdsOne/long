@@ -39,7 +39,6 @@ func TestGetAdminStateOmitsHeavyCollections(t *testing.T) {
 	}
 }
 
-
 func TestListAdminEquipmentPageReturnsStablePagination(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -76,6 +75,7 @@ func TestListAdminEquipmentPageReadsMediaAndTalentFields(t *testing.T) {
 		ImageAlt:             "软组织切割刃",
 		AttackPower:          12,
 		ArmorPenPercent:      0.2,
+		CritRate:             0.22,
 		CritDamageMultiplier: 1.5,
 		PartTypeDamageSoft:   0.35,
 		PartTypeDamageHeavy:  0.05,
@@ -103,6 +103,9 @@ func TestListAdminEquipmentPageReadsMediaAndTalentFields(t *testing.T) {
 	if item.TalentAffinity != "normal" {
 		t.Fatalf("expected talent affinity normal, got %q", item.TalentAffinity)
 	}
+	if item.CritRate != 0.22 {
+		t.Fatalf("expected crit rate to round trip, got %v", item.CritRate)
+	}
 }
 
 func TestListAdminBossHistoryPageReturnsStablePagination(t *testing.T) {
@@ -126,7 +129,6 @@ func TestListAdminBossHistoryPageReturnsStablePagination(t *testing.T) {
 		t.Fatalf("unexpected boss history page items: %+v", page.Items)
 	}
 }
-
 
 func seedEquipmentDefinitionForPage(t *testing.T, store *Store, ctx context.Context, itemID string, name string, slot string) {
 	t.Helper()

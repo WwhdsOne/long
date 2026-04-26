@@ -470,6 +470,7 @@ func (s *Store) loadBossTemplateLoot(ctx context.Context, templateID string) ([]
 			DropRatePercent:      clampFloat(entry.Score, 0, 100),
 			AttackPower:          definition.AttackPower,
 			ArmorPenPercent:      definition.ArmorPenPercent,
+			CritRate:             definition.CritRate,
 			CritDamageMultiplier: definition.CritDamageMultiplier,
 			PartTypeDamageSoft:   definition.PartTypeDamageSoft,
 			PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
