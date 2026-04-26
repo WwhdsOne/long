@@ -8,6 +8,7 @@ type AdminState struct {
 	Loot              []BossLootEntry        `json:"loot"`
 	BossCycleEnabled  bool                   `json:"bossCycleEnabled"`
 	BossPool          []BossTemplate         `json:"bossPool"`
+	BossCycleQueue    []string               `json:"bossCycleQueue"`
 	PlayerCount       int64                  `json:"playerCount"`
 	RecentPlayerCount int64                  `json:"recentPlayerCount"`
 	Players           []AdminPlayerOverview  `json:"players,omitempty"`

@@ -102,6 +102,7 @@ const admin = reactive(useAdminPage())
           :disable-boss-cycle="admin.disableBossCycle"
           :edit-boss-template="admin.editBossTemplate"
           :enable-boss-cycle="admin.enableBossCycle"
+          :save-boss-cycle-queue="admin.saveBossCycleQueue"
           :find-equipment-template="admin.findEquipmentTemplate"
           :format-item-stats="admin.formatItemStats"
           :remove-loot-row="admin.removeLootRow"

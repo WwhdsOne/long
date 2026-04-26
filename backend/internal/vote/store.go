@@ -31,6 +31,7 @@ var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
 var ErrBossPoolEmpty = errors.New("boss pool empty")
+var ErrBossCycleQueueEmpty = errors.New("boss cycle queue empty")
 var ErrBossPartsRequired = errors.New("boss parts required")
 var ErrBossPartNotFound = errors.New("boss part not found")
 var ErrBossPartAlreadyDead = errors.New("boss part already dead")
@@ -733,8 +734,8 @@ func (s *Store) EnhanceItem(ctx context.Context, nickname string, instanceID str
 
 	now := time.Now().Unix()
 	pipe := s.client.TxPipeline()
-	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "gold", -goldCost)
-	pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", -stoneCost)
+	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "gold", -goldCost)
+	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", -stoneCost)
 	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "spent_stones", stoneCost)
 	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "enhance_level", 1)
 	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
@@ -775,7 +776,7 @@ func (s *Store) SalvageItem(ctx context.Context, nickname string, instanceID str
 	pipe.SRem(ctx, s.playerInstancesKey(normalizedNickname), instance.InstanceID)
 	pipe.Del(ctx, s.equipmentInstanceKey(instance.InstanceID))
 	if refund > 0 {
-		pipe.HIncrBy(ctx, s.gemKey(normalizedNickname), "stones", refund)
+		pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", refund)
 	}
 	if definition.Slot != "" {
 		equippedRef, getErr := s.client.HGet(ctx, s.loadoutKey(normalizedNickname), definition.Slot).Result()
@@ -1359,10 +1360,10 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		goldDelta := rollResourceReward(s.roll, goldBase, 0.75, 1.25)
 		stoneDelta := rollResourceReward(s.roll, stoneBase, 0.67, 1.33)
 		if goldDelta > 0 {
-			pipe.HIncrBy(ctx, s.gemKey(nickname), "gold", goldDelta)
+			pipe.HIncrBy(ctx, s.resourceKey(nickname), "gold", goldDelta)
 		}
 		if stoneDelta > 0 {
-			pipe.HIncrBy(ctx, s.gemKey(nickname), "stones", stoneDelta)
+			pipe.HIncrBy(ctx, s.resourceKey(nickname), "stones", stoneDelta)
 		}
 
 		if len(lootEntries) == 0 {
@@ -1408,8 +1409,8 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool) 
 		return nil, err
 	}
 	if enabled {
-		nextBoss, err := s.activateRandomBossFromPool(ctx)
-		if err != nil && !errors.Is(err, ErrBossPoolEmpty) {
+		nextBoss, err := s.activateNextBossFromCycle(ctx, boss.TemplateID)
+		if err != nil && !errors.Is(err, ErrBossPoolEmpty) && !errors.Is(err, ErrBossCycleQueueEmpty) {
 			return nil, err
 		}
 		if nextBoss != nil {
@@ -1476,11 +1477,14 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 		delta = 1
 	}
 
-	if combatStats.CriticalChancePercent <= 0 || combatStats.CriticalCount <= 1 {
+	if combatStats.CriticalChancePercent <= 0 || !hasCriticalBonus(combatStats) {
 		return delta, false, nil
 	}
 
 	rollLimit, threshold := criticalRollPlan(combatStats.CriticalChancePercent)
+	if rollLimit <= 0 {
+		return delta, false, nil
+	}
 	if s.roll(rollLimit) < threshold {
 		return combatStats.CriticalDamage, true, nil
 	}
@@ -1507,7 +1511,7 @@ func (s *Store) baseCombatStats() CombatStats {
 		CriticalCount:         s.critical.CriticalCount,
 		AttackPower:           5,
 		ArmorPenPercent:       0,
-		CritDamageMultiplier:  1.0,
+		CritDamageMultiplier:  1.5,
 		AllDamageAmplify:      0,
 	})
 }
@@ -1541,13 +1545,22 @@ func deriveCombatStats(stats CombatStats) CombatStats {
 		stats.CriticalCount = 1
 	}
 
-	stats.CriticalDamage = max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
-
 	if stats.CritDamageMultiplier < 1.0 {
 		stats.CritDamageMultiplier = 1.0
 	}
 
+	countBasedCriticalDamage := max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
+	multiplierBasedCriticalDamage := int64(float64(stats.NormalDamage) * stats.CritDamageMultiplier)
+	if multiplierBasedCriticalDamage < stats.NormalDamage {
+		multiplierBasedCriticalDamage = stats.NormalDamage
+	}
+	stats.CriticalDamage = max(countBasedCriticalDamage, multiplierBasedCriticalDamage)
+
 	return stats
+}
+
+func hasCriticalBonus(stats CombatStats) bool {
+	return stats.CriticalCount > 1 || stats.CritDamageMultiplier > 1.0
 }
 
 // CalcBossPartDamage 计算对 Boss 部位的伤害（新减法公式）。
@@ -1574,12 +1587,8 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 	// 增伤乘区 = (1 + 全伤害增幅)
 	amplify := 1.0 + stats.AllDamageAmplify
 
-	// 暴击乘区
-	critMult := 1.0
-	rollLimit, threshold := criticalRollPlan(stats.CriticalChancePercent)
-	if rollLimit > 0 && stats.CriticalCount > 1 && s_roll(rollLimit) < threshold {
-		critMult = max(1.0, stats.CritDamageMultiplier)
-	}
+	// 暴击乘区（这里只计算“命中暴击时应造成多少伤害”，不在这里做第二次暴击判定）
+	critMult := max(1.0, stats.CritDamageMultiplier)
 
 	// 最终伤害
 	finalDamage := int64(float64(baseDamage) * amplify * critMult)
@@ -1607,14 +1616,6 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 		CritDamageMultiplier:  critMult,
 		AllDamageAmplify:      amplify - 1.0,
 	}
-}
-
-// s_roll returns random int in [0, n), uses nil-safe global rand.
-func s_roll(n int) int {
-	if n <= 0 {
-		return 0
-	}
-	return globalRand.IntN(n)
 }
 
 func (s *Store) currentBoss(ctx context.Context) (*Boss, error) {
@@ -2209,16 +2210,12 @@ func (s *Store) newEquipmentInstanceID(ctx context.Context) (string, error) {
 	return "inst-" + strconv.FormatInt(seq, 10), nil
 }
 
-func (s *Store) gemKey(nickname string) string {
-	return s.namespace + "gem:" + nickname
+func (s *Store) resourceKey(nickname string) string {
+	return s.namespace + "resource:" + nickname
 }
 
-func (s *Store) gemsForNickname(ctx context.Context, nickname string) (int64, error) {
-	resources, err := s.resourcesForNickname(ctx, nickname)
-	if err != nil {
-		return 0, err
-	}
-	return resources.Gems, nil
+func (s *Store) legacyGemKey(nickname string) string {
+	return s.namespace + "gem:" + nickname
 }
 
 type playerResources struct {
@@ -2228,15 +2225,62 @@ type playerResources struct {
 }
 
 func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
-	values, err := s.client.HMGet(ctx, s.gemKey(nickname), "gems", "gold", "stones").Result()
+	resourceKey := s.resourceKey(nickname)
+	values, err := s.client.HMGet(ctx, resourceKey, "gems", "gold", "stones").Result()
 	if err != nil {
 		return playerResources{}, err
 	}
-	return playerResources{
+
+	current := playerResources{
 		Gems:   int64Value(values, 0),
 		Gold:   int64Value(values, 1),
 		Stones: int64Value(values, 2),
-	}, nil
+	}
+
+	legacyKey := s.legacyGemKey(nickname)
+	legacyValues, err := s.client.HMGet(ctx, legacyKey, "gems", "gold", "stones").Result()
+	if err != nil {
+		return playerResources{}, err
+	}
+	if !hasAnyHMGetValue(legacyValues) {
+		return current, nil
+	}
+
+	legacy := playerResources{
+		Gems:   int64Value(legacyValues, 0),
+		Gold:   int64Value(legacyValues, 1),
+		Stones: int64Value(legacyValues, 2),
+	}
+	merged := legacy
+	if hasAnyHMGetValue(values) {
+		merged = playerResources{
+			Gems:   current.Gems + legacy.Gems,
+			Gold:   current.Gold + legacy.Gold,
+			Stones: current.Stones + legacy.Stones,
+		}
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, resourceKey, map[string]any{
+		"gems":   strconv.FormatInt(merged.Gems, 10),
+		"gold":   strconv.FormatInt(merged.Gold, 10),
+		"stones": strconv.FormatInt(merged.Stones, 10),
+	})
+	pipe.Del(ctx, legacyKey)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return playerResources{}, err
+	}
+
+	return merged, nil
+}
+
+func hasAnyHMGetValue(values []any) bool {
+	for _, value := range values {
+		if value != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) equipmentSpentKey(nickname string) string {
@@ -2385,7 +2429,7 @@ func enhanceGoldCost(currentLevel int) int64 {
 // 获取装备的强化石消耗。
 func enhanceStoneCost(currentLevel int) int64 {
 	level := maxInt(0, currentLevel)
-	// 公式：3 * 1.4^level，然后向上取整
+	// 公式：3 * 1.5^level，然后向上取整
 	return int64(math.Ceil(3 * math.Pow(1.5, float64(level))))
 }
 

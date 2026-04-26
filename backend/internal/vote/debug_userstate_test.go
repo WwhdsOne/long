@@ -26,8 +26,8 @@ func TestDebugWwhdsUserState(t *testing.T) {
 	ctx := context.Background()
 	nickname := "Wwhds"
 
-	if _, err := store.gemsForNickname(ctx, nickname); err != nil {
-		t.Fatalf("gemsForNickname: %v", err)
+	if _, err := store.resourcesForNickname(ctx, nickname); err != nil {
+		t.Fatalf("resourcesForNickname: %v", err)
 	}
 	if _, err := store.GetUserStats(ctx, nickname); err != nil {
 		t.Fatalf("GetUserStats: %v", err)

@@ -34,6 +34,7 @@ type mockStore struct {
 	lastEquipment         vote.EquipmentDefinition
 	lastTemplateLootID    string
 	lastTemplateLoot      []vote.BossLootEntry
+	lastCycleQueue        []string
 	lastCycleEnabled      bool
 	lastSalvageItemID     string
 	lastSalvageQuantity   int64
@@ -256,6 +257,11 @@ func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, lo
 	m.lastTemplateLootID = templateID
 	m.lastTemplateLoot = loot
 	return nil
+}
+
+func (m *mockStore) SetBossCycleQueue(_ context.Context, templateIDs []string) ([]string, error) {
+	m.lastCycleQueue = append([]string(nil), templateIDs...)
+	return append([]string(nil), templateIDs...), nil
 }
 
 func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.Boss, error) {
@@ -704,6 +710,19 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	}
 	if store.lastTemplateLootID != "dragon" || len(store.lastTemplateLoot) != 1 || store.lastTemplateLoot[0].ItemID != "fire-ring" || store.lastTemplateLoot[0].DropRatePercent != 35 {
 		t.Fatalf("expected template loot payload to be forwarded, got id=%s loot=%+v", store.lastTemplateLootID, store.lastTemplateLoot)
+	}
+
+	saveQueueRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/cycle/queue", strings.NewReader(`{"templateIds":["dragon","slime-king"]}`))
+	saveQueueRequest.Header.Set("Content-Type", "application/json")
+	saveQueueRequest.AddCookie(cookies[0])
+	saveQueueResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveQueueResponse, saveQueueRequest)
+
+	if saveQueueResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from cycle queue save, got %d", saveQueueResponse.Code)
+	}
+	if len(store.lastCycleQueue) != 2 || store.lastCycleQueue[0] != "dragon" || store.lastCycleQueue[1] != "slime-king" {
+		t.Fatalf("expected cycle queue payload to be forwarded, got %+v", store.lastCycleQueue)
 	}
 
 	enableCycleRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/cycle/enable", nil)

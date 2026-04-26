@@ -40,6 +40,7 @@ type ButtonStore interface {
 	SaveBossTemplate(context.Context, vote.BossTemplateUpsert) error
 	DeleteBossTemplate(context.Context, string) error
 	SetBossTemplateLoot(context.Context, string, []vote.BossLootEntry) error
+	SetBossCycleQueue(context.Context, []string) ([]string, error)
 	SetBossCycleEnabled(context.Context, bool) (*vote.Boss, error)
 	ListBossHistory(context.Context) ([]vote.BossHistoryEntry, error)
 	GetBossResources(context.Context) (vote.BossResources, error)

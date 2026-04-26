@@ -66,9 +66,10 @@ const profilePageMap = {
     loadout: 'loadout',
 }
 
+// todo后续补上天赋
 const publicPages = [
     {id: 'battle', label: '战斗', path: '/'},
-    {id: 'talents', label: '天赋', path: '/talents'},
+    // {id: 'talents', label: '天赋', path: '/talents'},
     {id: 'resources', label: '资源', path: '/profile/resources'},
     {id: 'inventory', label: '背包', path: '/profile/inventory'},
     {id: 'stats', label: '属性', path: '/profile/stats'},

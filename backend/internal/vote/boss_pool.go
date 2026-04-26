@@ -12,6 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const bossCycleQueueField = "queue"
+
 // ListBossTemplates 返回后台 Boss 池模板。
 func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 	templateIDs, err := s.client.SMembers(ctx, s.bossTemplateIndexKey).Result()
@@ -110,6 +112,25 @@ func (s *Store) DeleteBossTemplate(ctx context.Context, templateID string) error
 	pipe.Del(ctx, s.bossTemplateLootKey(templateID))
 	pipe.SRem(ctx, s.bossTemplateIndexKey, templateID)
 	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return err
+	}
+
+	queue, queueErr := s.GetBossCycleQueue(ctx)
+	if queueErr != nil {
+		return queueErr
+	}
+	nextQueue := make([]string, 0, len(queue))
+	for _, id := range queue {
+		if id == templateID {
+			continue
+		}
+		nextQueue = append(nextQueue, id)
+	}
+	if len(nextQueue) == len(queue) {
+		return nil
+	}
+	_, err = s.SetBossCycleQueue(ctx, nextQueue)
 	return err
 }
 
@@ -121,12 +142,8 @@ func (s *Store) SetBossTemplateLoot(ctx context.Context, templateID string, loot
 // SetBossCycleEnabled 设置 Boss 循环开关；开启时如果当前没有活动 Boss 会立即补位。
 func (s *Store) SetBossCycleEnabled(ctx context.Context, enabled bool) (*Boss, error) {
 	if enabled {
-		templates, err := s.ListBossTemplates(ctx)
-		if err != nil {
+		if _, err := s.loadBossTemplateQueue(ctx); err != nil {
 			return nil, err
-		}
-		if len(templates) == 0 {
-			return nil, ErrBossPoolEmpty
 		}
 	}
 
@@ -148,7 +165,7 @@ func (s *Store) SetBossCycleEnabled(ctx context.Context, enabled bool) (*Boss, e
 		_ = s.SaveBossToHistory(ctx, current)
 	}
 
-	return s.activateRandomBossFromPool(ctx)
+	return s.activateNextBossFromCycle(ctx, "")
 }
 
 func (s *Store) bossCycleEnabled(ctx context.Context) (bool, error) {
@@ -181,6 +198,144 @@ func (s *Store) activateRandomBossFromPool(ctx context.Context) (*Boss, error) {
 	}
 
 	return s.activateBossTemplateInstance(ctx, templates[index])
+}
+
+// SetBossCycleQueue 保存后台配置的 Boss 循环队列。
+func (s *Store) SetBossCycleQueue(ctx context.Context, templateIDs []string) ([]string, error) {
+	queue, err := s.normalizeBossCycleQueue(ctx, templateIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	queueRaw, _ := sonic.Marshal(queue)
+	if err := s.client.HSet(ctx, s.bossCycleKey, bossCycleQueueField, string(queueRaw)).Err(); err != nil {
+		return nil, err
+	}
+
+	return queue, nil
+}
+
+// GetBossCycleQueue 返回后台配置的 Boss 循环队列。
+func (s *Store) GetBossCycleQueue(ctx context.Context) ([]string, error) {
+	queueRaw, err := s.client.HGet(ctx, s.bossCycleKey, bossCycleQueueField).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+	if strings.TrimSpace(queueRaw) == "" {
+		return []string{}, nil
+	}
+
+	var queue []string
+	if err := sonic.Unmarshal([]byte(queueRaw), &queue); err != nil {
+		return []string{}, nil
+	}
+	cleaned := make([]string, 0, len(queue))
+	seen := make(map[string]struct{}, len(queue))
+	for _, templateID := range queue {
+		templateID = strings.TrimSpace(templateID)
+		if templateID == "" {
+			continue
+		}
+		if _, exists := seen[templateID]; exists {
+			continue
+		}
+		seen[templateID] = struct{}{}
+		cleaned = append(cleaned, templateID)
+	}
+	return cleaned, nil
+}
+
+func (s *Store) normalizeBossCycleQueue(ctx context.Context, templateIDs []string) ([]string, error) {
+	queue := make([]string, 0, len(templateIDs))
+	seen := make(map[string]struct{}, len(templateIDs))
+	for _, templateID := range templateIDs {
+		templateID = strings.TrimSpace(templateID)
+		if templateID == "" {
+			continue
+		}
+		if _, exists := seen[templateID]; exists {
+			continue
+		}
+		seen[templateID] = struct{}{}
+		queue = append(queue, templateID)
+	}
+
+	templates, err := s.ListBossTemplates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	templateSet := make(map[string]struct{}, len(templates))
+	for _, template := range templates {
+		templateSet[template.ID] = struct{}{}
+	}
+	for _, templateID := range queue {
+		if _, ok := templateSet[templateID]; !ok {
+			return nil, ErrBossTemplateNotFound
+		}
+	}
+
+	return queue, nil
+}
+
+func (s *Store) loadBossTemplateQueue(ctx context.Context) ([]BossTemplate, error) {
+	queueIDs, err := s.GetBossCycleQueue(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(queueIDs) == 0 {
+		return nil, ErrBossCycleQueueEmpty
+	}
+
+	templates, err := s.ListBossTemplates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(templates) == 0 {
+		return nil, ErrBossPoolEmpty
+	}
+
+	templateByID := make(map[string]BossTemplate, len(templates))
+	for _, template := range templates {
+		templateByID[template.ID] = template
+	}
+
+	queue := make([]BossTemplate, 0, len(queueIDs))
+	for _, templateID := range queueIDs {
+		template, ok := templateByID[templateID]
+		if !ok {
+			continue
+		}
+		queue = append(queue, template)
+	}
+	if len(queue) == 0 {
+		return nil, ErrBossCycleQueueEmpty
+	}
+
+	return queue, nil
+}
+
+func (s *Store) activateNextBossFromCycle(ctx context.Context, defeatedTemplateID string) (*Boss, error) {
+	queue, err := s.loadBossTemplateQueue(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	nextIndex := 0
+	defeatedTemplateID = strings.TrimSpace(defeatedTemplateID)
+	if defeatedTemplateID != "" {
+		for idx, template := range queue {
+			if template.ID != defeatedTemplateID {
+				continue
+			}
+			nextIndex = (idx + 1) % len(queue)
+			break
+		}
+	}
+
+	return s.activateBossTemplateInstance(ctx, queue[nextIndex])
 }
 
 func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossTemplate) (*Boss, error) {
