@@ -274,7 +274,6 @@ function zoneDamageBursts(zone) {
                   </div>
                   <div class="boss-zone-button__meta">
                     <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
-                    <span>点击 +1</span>
                   </div>
                 </template>
                 <span v-else class="boss-part-cell__empty"></span>
