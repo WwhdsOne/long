@@ -450,7 +450,7 @@ const deathEcstasyRemaining = computed(() => {
                   `boss-zone-button__damage-burst--${burst.type}`,
                 ]"
                 :style="{
-                  '--damage-offset-x': `${burst.offsetX}px`,
+                  '--damage-left': `${burst.damageLeft}%`,
                   '--damage-offset-y': `${burst.offsetY}px`,
                   '--damage-scale': burst.scale,
                   '--damage-ttl': `${burst.ttl}ms`,

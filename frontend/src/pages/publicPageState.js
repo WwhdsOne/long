@@ -1512,22 +1512,14 @@ function nextBurstOffset(key, variant) {
         }
     }, 260)
 
-    const pattern = [
-        [-66, -52],
-        [58, -72],
-        [-84, -98],
-        [76, -118],
-        [0, -136],
-        [-104, -152],
-        [95, -170],
-    ]
-    const base = pattern[currentIndex % pattern.length]
-    const lane = Math.floor(currentIndex / pattern.length)
-    const shift = lane * 22
-    const variantBias = variant === 'doomsday' ? 16 : variant === 'judgement' ? 28 : 0
+    // 随机水平位置 5% ~ 95%，垂直方向向上偏移
+    const leftPct = 5 + Math.random() * 90
+    const yOffsets = [-56, -72, -88, -104, -120]
+    const baseY = yOffsets[currentIndex % yOffsets.length]
+    const variantBias = variant === 'doomsday' ? 20 : variant === 'judgement' ? 32 : 0
     return {
-        x: base[0] + (currentIndex % 2 === 0 ? -shift : shift),
-        y: base[1] - shift - variantBias,
+        left: leftPct,
+        y: baseY - variantBias,
     }
 }
 
@@ -1543,7 +1535,7 @@ function buildDamageBurst(key, payload, part, source) {
         value: formatNumber(damageValue),
         scale: config.scale,
         ttl: config.ttl,
-        offsetX: offset.x,
+        damageLeft: offset.left,
         offsetY: offset.y,
     }
 }

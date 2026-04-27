@@ -2994,14 +2994,14 @@ select {
 }
 
 .boss-zone-button__damage-burst {
-  --damage-offset-x: 0px;
+  --damage-left: 50%;
   --damage-offset-y: -64px;
   --damage-scale: 1;
   --damage-ttl: 1200ms;
   position: absolute;
-  left: 50%;
+  left: var(--damage-left);
   top: 50%;
-  transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
+  transform: translate(-50%, -50%) translate(0, var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
   font-size: clamp(0.92rem, 1.6vw, 1.32rem);
@@ -3119,7 +3119,7 @@ select {
 @keyframes boss-damage-float {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
+    transform: translate(-50%, -50%) translate(0, var(--damage-offset-y))
       scale(calc(var(--damage-scale) * 0.3));
     filter: brightness(1);
   }
@@ -3151,7 +3151,7 @@ select {
 /* 伤害粒子 */
 .boss-zone-button__damage-particle {
   position: absolute;
-  left: 50%;
+  left: var(--damage-left, 50%);
   top: 50%;
   pointer-events: none;
   z-index: 8;
@@ -3171,11 +3171,11 @@ select {
 }
 
 @keyframes boss-damage-shake {
-  0% { transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  25% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  50% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) + 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  0% { transform: translate(-50%, -50%) translate(0, var(--damage-offset-y)) scale(var(--damage-scale)); }
+  25% { transform: translate(-50%, -50%) translate(-2px, var(--damage-offset-y)) scale(var(--damage-scale)); }
+  50% { transform: translate(-50%, -50%) translate(2px, var(--damage-offset-y)) scale(var(--damage-scale)); }
   75% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 1px), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  100% { transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  100% { transform: translate(-50%, -50%) translate(0, var(--damage-offset-y)) scale(var(--damage-scale)); }
 }
 
 @keyframes boss-stage-flash {
