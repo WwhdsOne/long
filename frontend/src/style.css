@@ -4009,7 +4009,7 @@ select {
   flex-direction: column;
   gap: 8px;
   z-index: 1;
-  max-width: 180px;
+  width: 170px;
 }
 
 /* 连击框 */
@@ -4030,6 +4030,14 @@ select {
   font-weight: 900;
   color: #f0fdf4;
   text-shadow: 0 0 14px rgba(74, 222, 128, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.combo-box__bonus {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
 }
 
 .combo-box__count--idle {
@@ -4140,6 +4148,7 @@ select {
   font-size: 0.6rem;
   color: #cbd5e1;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .part-progress-panel__bar {

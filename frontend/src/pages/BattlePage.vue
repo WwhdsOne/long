@@ -370,6 +370,7 @@ const deathEcstasyRemaining = computed(() => {
             <div class="combo-box">
               <template v-if="comboCount > 0">
                 <span class="combo-box__count">连击 x{{ comboCount }}</span>
+                <span v-if="Math.floor(comboCount / 50) > 0" class="combo-box__bonus">+{{ Math.floor(comboCount / 50) * 5 }}%</span>
                 <span class="combo-box__timeout-bar">
                   <span class="combo-box__timeout-fill" :style="{ width: comboTimeoutPercent + '%' }"></span>
                 </span>
