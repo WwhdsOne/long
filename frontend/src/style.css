@@ -2995,13 +2995,13 @@ select {
 
 .boss-zone-button__damage-burst {
   --damage-offset-x: 0px;
-  --damage-offset-y: -64px;
+  --damage-offset-y: -10px;
   --damage-scale: 1;
   --damage-ttl: 1200ms;
   position: absolute;
   left: 50%;
-  top: -18px;
-  transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y))
+  top: 0;
+  transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
   font-size: clamp(1.15rem, 2.2vw, 1.7rem);
@@ -3119,30 +3119,30 @@ select {
 @keyframes boss-damage-float {
   0% {
     opacity: 0;
-    transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y))
+    transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y))
       scale(calc(var(--damage-scale) * 0.3));
     filter: brightness(1);
   }
   10% {
     opacity: 1;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 12px))
+    transform: translateX(-50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 12px))
       scale(calc(var(--damage-scale) * 1.2));
     filter: brightness(1.5);
   }
   22% {
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 28px))
+    transform: translateX(-50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 28px))
       scale(var(--damage-scale));
     filter: brightness(1.2);
   }
   60% {
     opacity: 0.9;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 50px))
+    transform: translateX(-50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 50px))
       scale(var(--damage-scale));
     filter: brightness(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 82px))
+    transform: translateX(-50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 82px))
       scale(calc(var(--damage-scale) * 0.85));
     filter: brightness(0.8);
   }
@@ -3152,7 +3152,7 @@ select {
 .boss-zone-button__damage-particle {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: 0;
   pointer-events: none;
   z-index: 8;
   border-radius: 50%;
@@ -3171,11 +3171,11 @@ select {
 }
 
 @keyframes boss-damage-shake {
-  0% { transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  25% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  50% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) + 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  75% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 1px), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  100% { transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  0% { transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  25% { transform: translateX(-50%) translate(calc(var(--damage-offset-x) - 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  50% { transform: translateX(-50%) translate(calc(var(--damage-offset-x) + 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  75% { transform: translateX(-50%) translate(calc(var(--damage-offset-x) - 1px), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  100% { transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
 }
 
 @keyframes boss-stage-flash {
@@ -3721,7 +3721,7 @@ select {
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   font-size: 0.55rem;
   font-weight: 700;
   color: #c0d8e4;
