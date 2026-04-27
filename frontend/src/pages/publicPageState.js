@@ -128,87 +128,110 @@ const damageStageFx = ref({
     vignette: false,
 })
 const talentVisualState = ref(defaultTalentVisualState())
+const talentCombatState = ref(null)
 
 // 连击计数系统
-const comboCount = ref(0)
-const comboPartKey = ref('')
-const comboLastClickAt = ref(0)
-const comboMilestone = ref(0) // 0, 50, 100, 150, 200
-const comboTriggerFlash = ref(false)
-const COMBO_TIMEOUT_MS = 3000 // 3 秒无点击重置连击
+const COMBO_TIMEOUT_MS = 5000
 const STORM_TRIGGER = 100
+const ARMOR_TRIGGER = 100
+const comboCount = ref(0)
+const stormCombo = ref(0)
+const armorCombo = ref(0)
+const comboLastClickAt = ref(0)
+const comboTriggerFlash = ref(false)
+const comboTimeoutPercent = ref(100)
+let comboTimer = 0
+let comboTickTimer = 0
 
-function advanceCombo(key) {
+function partTypeForKey(key) {
+  if (!key || !boss.value?.parts) return ''
+  const m = String(key).match(/boss-part:(\d+)-(\d+)/)
+  if (!m) return ''
+  const x = parseInt(m[1]), y = parseInt(m[2])
+  const part = boss.value.parts.find(p => p.x === x && p.y === y)
+  return part?.type || ''
+}
+
+function advanceCombo(key, partType) {
   const now = Date.now()
-  if (now - comboLastClickAt.value > COMBO_TIMEOUT_MS) {
-    // 超时重置
-    comboCount.value = 0
-    comboMilestone.value = 0
-  }
+  if (now - comboLastClickAt.value > COMBO_TIMEOUT_MS) { comboCount.value = 0 }
   comboCount.value++
-  comboPartKey.value = key
+  stormCombo.value++
+  if (partType === 'heavy') armorCombo.value++
   comboLastClickAt.value = now
   scheduleComboClear()
-
-  // 检测里程碑
-  const prev = comboMilestone.value
-  if (comboCount.value >= 100 && prev < 100) comboMilestone.value = 100
-  else if (comboCount.value >= 75 && prev < 75) comboMilestone.value = 75
-  else if (comboCount.value >= 50 && prev < 50) comboMilestone.value = 50
-  else if (comboCount.value >= 25 && prev < 25) comboMilestone.value = 25
+  startComboTick()
 }
 
 function onStormComboTrigger() {
   comboTriggerFlash.value = true
   setTimeout(() => { comboTriggerFlash.value = false }, 800)
-  // 蓄力返还：保留 30%
-  comboCount.value = Math.floor(comboCount.value * 0.3)
-  comboMilestone.value = 0
+  stormCombo.value = 0
+}
+
+function onArmorTrigger() {
+  armorCombo.value = 0
 }
 
 function clearComboState() {
   clearTimeout(comboTimer)
   clearInterval(comboTickTimer)
-  comboResetSeconds.value = 0
+  comboTimeoutPercent.value = 100
   comboCount.value = 0
-  comboMilestone.value = 0
-  comboPartKey.value = ''
   comboLastClickAt.value = 0
   comboTriggerFlash.value = false
 }
 
-let comboTimer = 0
-let comboTickTimer = 0
-const comboResetSeconds = ref(0)
-
 function startComboTick() {
   clearInterval(comboTickTimer)
   comboTickTimer = setInterval(() => {
-    if (comboCount.value <= 0) {
-      comboResetSeconds.value = 0
-      clearInterval(comboTickTimer)
-      return
-    }
+    if (comboCount.value <= 0) { comboTimeoutPercent.value = 100; clearInterval(comboTickTimer); return }
     const elapsed = Date.now() - comboLastClickAt.value
-    const remaining = Math.max(0, COMBO_TIMEOUT_MS - elapsed)
-    comboResetSeconds.value = Math.ceil(remaining / 1000)
+    comboTimeoutPercent.value = Math.round(Math.max(0, 100 - (elapsed / COMBO_TIMEOUT_MS) * 100))
   }, 200)
 }
 
-const comboProgress = computed(() => {
-  return Math.min(100, Math.round((comboCount.value / STORM_TRIGGER) * 100))
-})
-
 function scheduleComboClear() {
   clearTimeout(comboTimer)
-  startComboTick()
-  comboTimer = setTimeout(() => {
-    if (Date.now() - comboLastClickAt.value >= COMBO_TIMEOUT_MS) {
-      clearComboState()
-      clearInterval(comboTickTimer)
-    }
-  }, COMBO_TIMEOUT_MS + 300)
+  comboTimer = setTimeout(() => { if (Date.now() - comboLastClickAt.value >= COMBO_TIMEOUT_MS) clearComboState() }, COMBO_TIMEOUT_MS + 300)
 }
+
+const stormProgress = computed(() => Math.min(100, Math.round((stormCombo.value / STORM_TRIGGER) * 100)))
+const armorProgress = computed(() => Math.min(100, Math.round((armorCombo.value / ARMOR_TRIGGER) * 100)))
+
+const partProgressList = computed(() => {
+  const parts = boss.value?.parts
+  const cs = talentCombatState.value
+  if (!Array.isArray(parts) || parts.length === 0) return []
+  const stormMap = cs?.partStormComboCount || {}
+  const heavyMap = cs?.partHeavyClickCount || {}
+  const result = []
+  for (const part of parts) {
+    const key = `${part.x}-${part.y}`
+    const storm = Number(stormMap[key]) || 0
+    const armor = Number(heavyMap[key]) || 0
+    if (storm <= 0 && armor <= 0) continue
+    result.push({
+      key,
+      name: part.displayName || partTypeLabel(part.type),
+      type: part.type,
+      x: part.x,
+      y: part.y,
+      storm,
+      stormProgress: Math.min(100, Math.round((storm / 100) * 100)),
+      armor,
+      armorProgress: Math.min(100, Math.round((armor / 100) * 100)),
+      alive: part.alive,
+    })
+  }
+  return result
+})
+
+function partTypeLabel(type) {
+  const labels = { soft: '软组织', heavy: '重甲', weak: '弱点' }
+  return labels[type] || type || '未知'
+}
+
 const onlineCount = ref(null)
 const bossHistory = ref([])
 const bossHistoryQuery = ref('')
@@ -1091,6 +1114,7 @@ function indexToPartKey(index) {
 
 function applyTalentCombatState(state) {
   if (!state || typeof state !== 'object') return
+  talentCombatState.value = state
   const vs = talentVisualState.value
   vs.omenStacks = Number(state.omenStacks) || 0
 
@@ -1123,6 +1147,9 @@ function applyTalentVisualState(events) {
             case 'storm_combo':
                 onStormComboTrigger()
                 break
+            case 'storm_combo':
+                onStormComboTrigger()
+                break
             case 'silver_storm':
                 vs.silverStormActive = true
                 vs.silverStormRemaining = 15
@@ -1132,6 +1159,7 @@ function applyTalentVisualState(events) {
                 vs.deathEcstasyActive = true
                 break
             case 'collapse_trigger':
+                onArmorTrigger()
                 if (event.partX !== undefined && event.partY !== undefined) {
                     const key = `${event.partX}-${event.partY}`
                     if (!vs.collapsePartKeys.includes(key)) {
@@ -1270,7 +1298,7 @@ function ensureRealtimeTransport() {
             const key = resolveClickAckKey(payload)
             if (key) {
                 triggerDamageBurst(key, payload)
-                advanceCombo(key)
+                advanceCombo(key, partTypeForKey(key))
             }
             clearPendingClicks(key)
             if (key) {
@@ -2036,11 +2064,14 @@ export function usePublicPageState() {
         talentTriggerFeed,
         talentVisualState,
         comboCount,
-        comboProgress,
-        comboMilestone,
+        stormCombo,
+        armorCombo,
+        stormProgress,
+        armorProgress,
+        partProgressList,
+        talentCombatState,
         comboTriggerFlash,
-        comboPartKey,
-        comboResetSeconds,
+        comboTimeoutPercent,
         damageStageFx,
         bossHistory,
         bossHistoryQuery,
