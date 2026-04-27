@@ -19,11 +19,12 @@ const {
   talentTriggerFeed,
   talentVisualState,
   comboCount,
-  comboProgress,
-  comboMilestone,
+  stormCombo,
+  armorCombo,
+  stormProgress,
+  armorProgress,
   comboTriggerFlash,
-  comboPartKey,
-  comboResetSeconds,
+  comboTimeoutPercent,
   damageStageFx,
   totalVotes,
   isLoggedIn,
@@ -43,6 +44,7 @@ const {
   rewardModal,
   closeRewardModal,
   clickButton,
+  partProgressList,
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
@@ -329,29 +331,63 @@ const omenRingProgress = computed(() => {
           <p>当前 Boss 尚未配置可攻击分区。</p>
         </div>
         <div v-else class="boss-part-grid-container">
-          <!-- 左侧：部位系数说明 -->
-          <div class="boss-part-info">
-            <div class="boss-part-info__title">部位系数</div>
-            <div class="boss-part-info__item boss-part-info__item--soft">
-              <span class="boss-part-info__dot"></span>
-              <span class="boss-part-info__label">软组织</span>
-              <span class="boss-part-info__value">×1.0</span>
+          <!-- 左侧面板列 -->
+          <div class="boss-left-panels">
+            <!-- 1. 部位系数 -->
+            <div class="boss-part-info">
+              <div class="boss-part-info__title">部位系数</div>
+              <div class="boss-part-info__item boss-part-info__item--soft">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">软组织</span>
+                <span class="boss-part-info__value">x1.0</span>
+              </div>
+              <div class="boss-part-info__item boss-part-info__item--heavy">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">重甲</span>
+                <span class="boss-part-info__value">x0.4</span>
+              </div>
+              <div class="boss-part-info__item boss-part-info__item--weak">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">弱点</span>
+                <span class="boss-part-info__value">x2.5</span>
+              </div>
+              <div class="boss-part-info__divider"></div>
+              <div class="boss-part-info__item boss-part-info__item--armor">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">护甲</span>
+                <span class="boss-part-info__value">减伤</span>
+              </div>
             </div>
-            <div class="boss-part-info__item boss-part-info__item--heavy">
-              <span class="boss-part-info__dot"></span>
-              <span class="boss-part-info__label">重甲</span>
-              <span class="boss-part-info__value">×0.4</span>
+
+            <!-- 2. 连击框：始终可见 -->
+            <div class="combo-box">
+              <template v-if="comboCount > 0">
+                <span class="combo-box__count">连击 x{{ comboCount }}</span>
+                <span class="combo-box__timeout-bar">
+                  <span class="combo-box__timeout-fill" :style="{ width: comboTimeoutPercent + '%' }"></span>
+                </span>
+                <span class="combo-box__timeout-text">{{ Math.ceil(comboTimeoutPercent / 20) }}s</span>
+              </template>
+              <template v-else>
+                <span class="combo-box__count combo-box__count--idle">x 0</span>
+                <span class="combo-box__timeout-bar combo-box__timeout-bar--empty"></span>
+              </template>
             </div>
-            <div class="boss-part-info__item boss-part-info__item--weak">
-              <span class="boss-part-info__dot"></span>
-              <span class="boss-part-info__label">弱点</span>
-              <span class="boss-part-info__value">×2.5</span>
-            </div>
-            <div class="boss-part-info__divider"></div>
-            <div class="boss-part-info__item boss-part-info__item--armor">
-              <span class="boss-part-info__dot"></span>
-              <span class="boss-part-info__label">护甲</span>
-              <span class="boss-part-info__value">减伤</span>
+
+            <!-- 3. 部位累计进度列表：仅当有进度时显示 -->
+            <div v-if="partProgressList.length > 0" class="part-progress-panel">
+              <div class="part-progress-panel__title">部位累计进度</div>
+              <div v-for="p in partProgressList" :key="p.key" class="part-progress-panel__item">
+                <span class="part-progress-panel__name" :class="`part-progress-panel__name--${p.type}`">{{ p.name }}</span>
+                <span class="part-progress-panel__track part-progress-panel__track--storm">
+                  追击 {{ p.storm }}/100
+                  <span class="part-progress-panel__bar"><span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--storm" :style="{ width: p.stormProgress + '%' }"></span></span>
+                </span>
+                <span v-if="p.type === 'heavy'" class="part-progress-panel__track part-progress-panel__track--armor">
+                  破甲 {{ p.armor }}/100
+                  <span class="part-progress-panel__bar"><span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor" :style="{ width: p.armorProgress + '%' }"></span></span>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -440,23 +476,7 @@ const omenRingProgress = computed(() => {
             </div>
           </div>
           </div>
-          <div v-if="comboCount > 0" class="combo-counter" :class="{ 'combo-counter--flash': comboTriggerFlash }">
-          <span class="combo-counter__label">连击</span>
-          <span class="combo-counter__count" :class="{ 'combo-counter__count--burst': comboTriggerFlash }">x{{ comboCount }}</span>
-          <span v-if="comboResetSeconds > 0" class="combo-counter__reset">{{ comboResetSeconds }}s</span>
-          <div class="combo-counter__bar">
-          <span class="combo-counter__bar-fill" :style="{ width: `${comboProgress}%` }"
-          :class="{
-          'combo-counter__bar-fill--m25': comboMilestone >= 25 && comboMilestone < 50,
-          'combo-counter__bar-fill--m50': comboMilestone >= 50 && comboMilestone < 75,
-          'combo-counter__bar-fill--m75': comboMilestone >= 75 && comboMilestone < 100,
-          'combo-counter__bar-fill--m100': comboMilestone >= 100,
-          }"></span>
-          </div>
-          <span v-if="comboMilestone >= 50" class="combo-counter__milestone">
-          {{ comboMilestone >= 100 ? '追击爆发!' : comboMilestone >= 75 ? '即将触发' : comboMilestone >= 50 ? '过半' : '热身' }}
-          </span>
-          </div>
+          
         </div>
         <!-- 天赋瞬发特效覆盖层 -->
         <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">

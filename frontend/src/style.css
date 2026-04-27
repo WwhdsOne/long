@@ -2744,9 +2744,6 @@ select {
 }
 
 .boss-part-info {
-  position: absolute;
-  left: 0;
-  top: 10px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2756,7 +2753,6 @@ select {
   border: 1px solid rgba(15, 23, 42, 0.08);
   min-width: 0;
   flex-shrink: 0;
-  z-index: 1;
 }
 
 .boss-part-info__title {
@@ -3519,9 +3515,10 @@ select {
   padding: 6px 16px;
   border-radius: 8px;
   background: rgba(10, 18, 24, 0.85);
-  border: 1px solid rgba(74, 138, 106, 0.4);
+  border: 1px solid rgba(74, 138, 106, 0.3);
   flex-wrap: wrap;
   justify-content: center;
+  transition: border-color 0.3s, box-shadow 0.3s;
 }
 
 .combo-counter__label {
@@ -3546,12 +3543,69 @@ select {
   animation: combo-burst 0.3s ease-out;
 }
 
-.combo-counter__reset {
-  font-size: 0.75rem;
+.combo-counter__timeout-bar {
+  width: 60px;
+  height: 4px;
+  border-radius: 2px;
+  background: #253b44;
+  overflow: hidden;
+}
+
+.combo-counter__timeout-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: #5a8a9a;
+  transition: width 0.2s linear;
+}
+
+.combo-counter__timeout-text {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.55rem;
   font-weight: 700;
-  color: #94a3b8;
-  min-width: 28px;
-  text-align: center;
+  color: #c0d8e4;
+  pointer-events: none;
+}
+
+.combo-counter__timeout-bar {
+  position: relative;
+}
+
+/* 左侧面板内连击 */
+.combo-counter--panel {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 8px;
+  margin-top: 6px;
+  border-radius: 6px;
+  background: rgba(10, 18, 24, 0.6);
+  border: 1px solid rgba(47, 69, 79, 0.4);
+}
+
+.combo-counter--panel .combo-counter__total {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #c0dce8;
+}
+
+.combo-counter--panel .combo-counter__track {
+  font-size: 0.65rem;
+  padding: 2px 4px;
+}
+
+.combo-counter--panel .combo-counter__timeout-bar {
+  width: 100%;
+  height: 3px;
+  margin-top: 2px;
+}
+
+.combo-counter--panel .combo-counter__timeout-text {
+  font-size: 0.5rem;
+  color: #7898a8;
 }
 
 @keyframes combo-burst {
@@ -3606,9 +3660,57 @@ select {
   100% { transform: scale(1); opacity: 1; }
 }
 
-.combo-counter--flash .combo-counter__bar-fill {
+.combo-counter--flash {
+  border-color: #4ade80;
+  box-shadow: 0 0 16px rgba(74,222,128,0.4);
+}
+
+.combo-counter__total {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #f4f9fc;
+  text-shadow: 0 0 8px rgba(43,184,115,0.4);
+  line-height: 1;
+}
+
+.combo-counter__track {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  position: relative;
+}
+
+.combo-counter__track--storm {
+  color: #4ade80;
+  background: rgba(43,184,115,0.15);
+  border: 1px solid rgba(43,184,115,0.3);
+}
+
+.combo-counter__track--armor {
+  color: #fbbf24;
+  background: rgba(196,138,51,0.15);
+  border: 1px solid rgba(196,138,51,0.3);
+}
+
+.combo-counter__track-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  transition: width 0.15s ease;
+}
+
+.combo-counter__track--storm .combo-counter__track-bar {
   background: #4ade80;
-  box-shadow: 0 0 16px rgba(74,222,128,1);
+}
+
+.combo-counter__track--armor .combo-counter__track-bar {
+  background: #fbbf24;
 }
 
 .boss-part-grid-container {
@@ -3738,4 +3840,135 @@ select {
   width: 320px;
   height: 320px;
   animation-name: talent-spritesheet-hammer-crack;
+}
+
+/* 左侧面板列容器 */
+.boss-left-panels {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1;
+  max-width: 180px;
+}
+
+/* 连击框 */
+.combo-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.combo-box__count {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #c0dce8;
+  text-shadow: 0 0 10px rgba(43, 184, 115, 0.4);
+}
+
+.combo-box__count--idle {
+  color: #5a6a7a;
+  text-shadow: none;
+}
+
+.combo-box__timeout-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #253b44;
+  overflow: hidden;
+}
+
+.combo-box__timeout-bar--empty {
+  background: #1a2a30;
+}
+
+.combo-box__timeout-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: #5a8a9a;
+  transition: width 0.2s linear;
+}
+
+.combo-box__timeout-text {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #7898a8;
+}
+
+/* 部位累计进度面板 */
+.part-progress-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.part-progress-panel__title {
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.part-progress-panel__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.part-progress-panel__name {
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.part-progress-panel__name--soft { color: #4ade80; }
+.part-progress-panel__name--heavy { color: #94a3b8; }
+.part-progress-panel__name--weak { color: #ef4444; }
+
+.part-progress-panel__track {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.part-progress-panel__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #253b44;
+  overflow: hidden;
+  min-width: 40px;
+}
+
+.part-progress-panel__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.part-progress-panel__bar-fill--storm {
+  background: linear-gradient(90deg, #2bb873, #4ade80);
+}
+
+.part-progress-panel__bar-fill--armor {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
 }
