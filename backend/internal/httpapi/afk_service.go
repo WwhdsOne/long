@@ -207,7 +207,6 @@ func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix
 	}
 
 	if state.AfkStartedAt > 0 && nowUnix-state.AfkStartedAt >= int64(afkMaxDuration.Seconds()) {
-		s.stopAfk(ctx, nickname)
 		return
 	}
 

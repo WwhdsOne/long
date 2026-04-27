@@ -4072,6 +4072,34 @@ select {
   color: #86efac;
 }
 
+/* 崩塌倒计时 */
+.collapse-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  backdrop-filter: blur(6px);
+}
+
+.collapse-timer__label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.collapse-timer__count {
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #fde68a;
+  margin-left: auto;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
 /* 死亡狂喜倒计时 */
 .death-ecstasy-timer {
   display: flex;

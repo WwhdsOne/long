@@ -260,6 +260,13 @@ const deathEcstasyRemaining = computed(() => {
   if (!endsAt) return 0
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
 })
+
+const collapseActive = computed(() => talentVisualState.value.collapsePartKeys.length > 0)
+const collapseRemaining = computed(() => {
+  const endsAt = talentVisualState.value.collapseEndsAt
+  if (!endsAt) return 0
+  return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
+})
 </script>
 
 <template>
@@ -387,6 +394,12 @@ const deathEcstasyRemaining = computed(() => {
               <span class="death-ecstasy-timer__icon">💀</span>
               <span class="death-ecstasy-timer__label">死亡狂喜</span>
               <span class="death-ecstasy-timer__count">{{ deathEcstasyRemaining }}s</span>
+            </div>
+
+            <!-- 崩塌倒计时 -->
+            <div v-if="collapseActive" class="collapse-timer">
+              <span class="collapse-timer__label">护甲崩塌</span>
+              <span class="collapse-timer__count">{{ collapseRemaining }}s</span>
             </div>
 
             <!-- 3. 部位累计进度列表：仅当有进度时显示 -->

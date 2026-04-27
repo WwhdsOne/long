@@ -138,6 +138,7 @@ function defaultTalentVisualState() {
     deathEcstasyActive: false,
     deathEcstasyEndsAt: 0,
     collapsePartKeys: [],
+    collapseEndsAt: 0,
     doomMarks: [],
     doomDestroyed: 0,
     doomCritBuff: false,
@@ -1158,17 +1159,14 @@ function applyTalentCombatState(state) {
   vs.doomCritBuff = Boolean(state.doomCritBuff)
 
   // doomMarks: indices → "x-y" keys
-  if (Array.isArray(state.doomMarks)) {
-    vs.doomMarks = state.doomMarks
-      .map(indexToPartKey)
-      .filter(Boolean)
-  }
+  vs.doomMarks = Array.isArray(state.doomMarks)
+    ? state.doomMarks.map(indexToPartKey).filter(Boolean)
+    : []
   // collapsePartKeys: indices → "x-y" keys
-  if (Array.isArray(state.collapseParts)) {
-    vs.collapsePartKeys = state.collapseParts
-      .map(indexToPartKey)
-      .filter(Boolean)
-  }
+  vs.collapsePartKeys = Array.isArray(state.collapseParts)
+    ? state.collapseParts.map(indexToPartKey).filter(Boolean)
+    : []
+  vs.collapseEndsAt = Number(state.collapseEndsAt) || 0
 }
 
 function applyTalentVisualState(events) {
