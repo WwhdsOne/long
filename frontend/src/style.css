@@ -3000,7 +3000,7 @@ select {
   --damage-ttl: 1200ms;
   position: absolute;
   left: 50%;
-  top: -20px;
+  top: -15px;
   transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
@@ -3152,7 +3152,7 @@ select {
 .boss-zone-button__damage-particle {
   position: absolute;
   left: 50%;
-  top: 0;
+  top: 5px;
   pointer-events: none;
   z-index: 8;
   border-radius: 50%;
