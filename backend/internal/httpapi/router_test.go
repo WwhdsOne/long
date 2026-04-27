@@ -112,7 +112,7 @@ func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	return userState
 }
 
-func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string, comboCount int64) (vote.ClickResult, error) {
 	m.lastClickNickname = nickname
 	if m.clickErr != nil {
 		return vote.ClickResult{}, m.clickErr
@@ -126,11 +126,11 @@ func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string)
 
 func (m *mockStore) AutoClickBossPart(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
 	m.lastAutoClickNickname = nickname
-	return m.ClickButton(context.Background(), slug, nickname)
+	return m.ClickButton(context.Background(), slug, nickname, 0)
 }
 
 func (m *mockStore) ClickBossPart(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
-	return m.ClickButton(context.Background(), slug, nickname)
+	return m.ClickButton(context.Background(), slug, nickname, 0)
 }
 
 func (m *mockStore) AttackBossPartAFK(_ context.Context, nickname string) (vote.ClickResult, error) {
@@ -374,9 +374,6 @@ func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockStore) SelectTalentTree(_ context.Context, _ string, _ vote.TalentTree, _ vote.TalentTree) error {
-	return nil
-}
 
 func (m *mockStore) GetTalentState(_ context.Context, _ string) (*vote.TalentState, error) {
 	return nil, nil

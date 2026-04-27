@@ -28,6 +28,7 @@ type clickRequestContext struct {
 	AuthenticatedNickname string
 	AuthenticatorEnabled  bool
 	ClientID              string
+	ComboCount            int64
 }
 
 func (e *apiResponseError) writeTo(c *app.RequestContext) {
@@ -152,7 +153,7 @@ func executeButtonClick(ctx context.Context, options Options, request clickReque
 		return "", vote.ClickResult{}, apiErr
 	}
 
-	result, err := options.Store.ClickButton(ctx, request.Slug, nickname)
+	result, err := options.Store.ClickButton(ctx, request.Slug, nickname, request.ComboCount)
 	if err != nil {
 		return "", vote.ClickResult{}, clickRequestError(err)
 	}

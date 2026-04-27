@@ -650,7 +650,7 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 }
 
 // ClickButton 处理 Boss 部位点击。slug 必须以 boss-part: 开头。
-func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (ClickResult, error) {
+func (s *Store) ClickButton(ctx context.Context, slug string, nickname string, comboCount int64) (ClickResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return ClickResult{}, err
@@ -659,7 +659,7 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string) (
 	if !strings.HasPrefix(slug, bossPartClickSlugPrefix) {
 		return ClickResult{}, fmt.Errorf("button not available")
 	}
-	return s.clickBossPart(ctx, slug, normalizedNickname)
+	return s.clickBossPart(ctx, slug, normalizedNickname, comboCount)
 }
 
 // ClickBossPart 处理不绑定按钮的 Boss 部位手动点击。
@@ -668,7 +668,7 @@ func (s *Store) ClickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
-	return s.clickBossPart(ctx, target, normalizedNickname)
+	return s.clickBossPart(ctx, target, normalizedNickname, 0)
 }
 
 // EquipItem 穿戴一件装备实例。装备效果会影响平时点击与 Boss 伤害。
@@ -1292,7 +1292,7 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 	return result, nil
 }
 
-func (s *Store) clickBossPart(ctx context.Context, target string, nickname string) (ClickResult, error) {
+func (s *Store) clickBossPart(ctx context.Context, target string, nickname string, comboCount int64) (ClickResult, error) {
 	x, y, ok := parseBossPartClickTarget(target)
 	if !ok {
 		return ClickResult{}, ErrBossPartNotFound
@@ -1323,10 +1323,10 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
-	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx)
+	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx, comboCount)
 }
 
-func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult, targetIdx int) (ClickResult, error) {
+func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult, targetIdx int, comboCount int64) (ClickResult, error) {
 	loadout, _, err := s.loadoutForNickname(ctx, nickname)
 	if err != nil {
 		return result, nil
@@ -1394,6 +1394,10 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	damageStats := CalcBossPartDamage(combatStats, effectivePartType, effectiveArmor, aliveCount, boss.CurrentHP, boss.MaxHP)
 	partDamage := damageStats.NormalDamage
+	if comboCount >= 50 {
+		comboAmplify := float64(comboCount/50) * 0.05
+		partDamage = int64(float64(partDamage) * (1.0 + comboAmplify))
+	}
 	if critical {
 		partDamage = damageStats.CriticalDamage
 		if combatState.DeathEcstasyEndsAt > now {

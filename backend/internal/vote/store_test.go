@@ -154,9 +154,6 @@ func TestLearnTalentConsumesTalentPointsAndResetRefunds(t *testing.T) {
 
 	ctx := context.Background()
 	nickname := "阿明"
-	if err := store.SelectTalentTree(ctx, nickname, TalentTreeNormal, TalentTreeArmor); err != nil {
-		t.Fatalf("select talent tree: %v", err)
-	}
 	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
 		t.Fatalf("seed talent points: %v", err)
 	}
@@ -190,9 +187,6 @@ func TestLearnTalentRejectsWhenTalentPointsInsufficient(t *testing.T) {
 
 	ctx := context.Background()
 	nickname := "阿明"
-	if err := store.SelectTalentTree(ctx, nickname, TalentTreeNormal, TalentTreeArmor); err != nil {
-		t.Fatalf("select talent tree: %v", err)
-	}
 	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "50").Err(); err != nil {
 		t.Fatalf("seed talent points: %v", err)
 	}
@@ -783,7 +777,7 @@ func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	result, err := store.ClickButton(ctx, "boss-part:1-0", "阿明")
+	result, err := store.ClickButton(ctx, "boss-part:1-0", "阿明", 0)
 	if err != nil {
 		t.Fatalf("click boss part: %v", err)
 	}
@@ -971,4 +965,73 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 	if result.CriticalDamage != 200 {
 		t.Fatalf("expected critical damage 200, got %+v", result)
 	}
+}
+
+func TestArmorCoreCollapseTrigger(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	ctx := context.Background()
+	nickname := "测试破甲"
+
+	// 1. 给天赋点，学 armor_core
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed points: %v", err)
+	}
+	if err := store.LearnTalent(ctx, nickname, "armor_core"); err != nil {
+		t.Fatalf("learn armor_core: %v", err)
+	}
+
+	// 2. 创建一个有重甲部位的 Boss
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:      "collapse-test",
+		Name:    "崩塌测试Boss",
+		MaxHP:   100000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeHeavy, MaxHP: 10000, CurrentHP: 10000, Alive: true, Armor: 100},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	// 3. 点击重甲 100 次，第 100 次应该触发崩塌
+	var collapseEvent *TalentTriggerEvent
+	for i := 1; i <= 100; i++ {
+		clickKey := "boss-part:0-0"
+		result, err := store.ClickBossPart(ctx, clickKey, nickname)
+		if err != nil {
+			t.Fatalf("click %d: %v", i, err)
+		}
+		if i == 100 {
+			for _, ev := range result.TalentEvents {
+				if ev.EffectType == "collapse_trigger" {
+					collapseEvent = &ev
+					break
+				}
+			}
+		}
+	}
+
+	// 4. 验证
+	if collapseEvent == nil {
+		t.Fatal("第100次点击应该触发崩塌事件，但未收到 collapse_trigger")
+	}
+	if collapseEvent.PartX != 0 || collapseEvent.PartY != 0 {
+		t.Fatalf("崩塌事件的 PartX/Y 应为 (0,0)，实际 (%d,%d)", collapseEvent.PartX, collapseEvent.PartY)
+	}
+	t.Logf("崩塌触发成功: %s (PartX=%d, PartY=%d)", collapseEvent.Message, collapseEvent.PartX, collapseEvent.PartY)
+
+	// 5. 确认作战状态中崩塌部位已记录
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "collapse-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if len(combatState.CollapseParts) != 1 || combatState.CollapseParts[0] != 0 {
+		t.Fatalf("预期 CollapseParts = [0]，实际 %v", combatState.CollapseParts)
+	}
+	if combatState.CollapseEndsAt <= store.now().Unix() {
+		t.Fatal("崩塌结束时间应在未来")
+	}
+	t.Logf("崩塌状态正确: parts=%v, endsAt=%d", combatState.CollapseParts, combatState.CollapseEndsAt)
 }

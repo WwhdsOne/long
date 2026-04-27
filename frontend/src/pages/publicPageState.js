@@ -1700,7 +1700,7 @@ async function clickButton(key, options = {}) {
     errorMessage.value = ''
 
     try {
-        const sent = ensureRealtimeTransport().sendClick(bossPartKey)
+        const sent = ensureRealtimeTransport().sendClick(bossPartKey, comboCount.value)
         if (!sent) {
             throw new Error('实时连接尚未建立，正在重连，请稍后再试。')
         }

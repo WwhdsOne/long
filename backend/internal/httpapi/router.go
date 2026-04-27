@@ -18,7 +18,7 @@ type ButtonStore interface {
 	GetState(context.Context, string) (vote.State, error)
 	GetSnapshot(context.Context) (vote.Snapshot, error)
 	GetUserState(context.Context, string) (vote.UserState, error)
-	ClickButton(context.Context, string, string) (vote.ClickResult, error)
+	ClickButton(context.Context, string, string, int64) (vote.ClickResult, error)
 	ClickBossPart(context.Context, string, string) (vote.ClickResult, error)
 	AttackBossPartAFK(context.Context, string) (vote.ClickResult, error)
 	AutoClickBossPart(context.Context, string, string) (vote.ClickResult, error)
@@ -55,7 +55,6 @@ type ButtonStore interface {
 	ListMessages(context.Context, string, int64) (vote.MessagePage, error)
 	DeleteMessage(context.Context, string) error
 	// 天赋系统
-	SelectTalentTree(context.Context, string, vote.TalentTree, vote.TalentTree) error
 	GetTalentState(context.Context, string) (*vote.TalentState, error)
 	LearnTalent(context.Context, string, string) error
 	ResetTalents(context.Context, string) error

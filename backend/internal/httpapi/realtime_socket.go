@@ -37,7 +37,8 @@ type realtimeClientMessage struct {
 	Type      string `json:"type"`
 	RequestID string `json:"requestId"`
 	Nickname  string `json:"nickname"`
-	Slug      string `json:"slug"`
+	Slug       string `json:"slug"`
+	ComboCount int64  `json:"comboCount"`
 }
 
 type realtimeSnapshotMessage struct {
@@ -247,6 +248,7 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 			AuthenticatedNickname: s.authenticatedNickname,
 			AuthenticatorEnabled:  s.authenticatorEnabled,
 			ClientID:              s.clientID,
+			ComboCount:            message.ComboCount,
 		})
 		if apiErr != nil {
 			return send(s.protocolError(apiErr.Code, apiErr.Message))
