@@ -2881,24 +2881,26 @@ select {
 }
 
 .boss-part-cell--soft {
-  border: 2px solid #4ade80;
-  background: rgba(74, 222, 128, 0.15);
+  border: 2px solid #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.25), inset 0 0 8px rgba(74, 222, 128, 0.06);
   animation: boss-soft-breathe 2s ease-in-out infinite;
 }
 
 .boss-part-cell--heavy {
-  border: 3px solid #9ca3af;
+  border: 3px solid #6b7280;
   background:
-    linear-gradient(105deg, transparent 0 36%, rgba(255, 255, 255, 0.22) 46%, transparent 58%),
-    rgba(156, 163, 175, 0.2);
+    linear-gradient(105deg, transparent 0 36%, rgba(200, 200, 210, 0.25) 46%, transparent 58%),
+    rgba(107, 114, 128, 0.18);
   background-size: 220% 100%, auto;
-  box-shadow: inset 0 3px 8px rgba(255, 255, 255, 0.12), inset 0 -8px 16px rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 3px 8px rgba(200, 200, 210, 0.15), inset 0 -6px 14px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(156, 163, 175, 0.3);
   animation: boss-heavy-sheen 4s linear infinite;
 }
 
 .boss-part-cell--weak {
-  border: 2px solid #ef4444;
-  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid #dc2626;
+  background: radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.18), rgba(127, 29, 29, 0.08));
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.3), inset 0 0 12px rgba(239, 68, 68, 0.05);
   animation: boss-weak-pulse 0.8s ease-in-out infinite;
 }
 
@@ -3000,7 +3002,7 @@ select {
   --damage-ttl: 1200ms;
   position: absolute;
   left: 50%;
-  top: -15px;
+  top: 30px;
   transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
@@ -3152,7 +3154,7 @@ select {
 .boss-zone-button__damage-particle {
   position: absolute;
   left: 50%;
-  top: 5px;
+  top: 50px;
   pointer-events: none;
   z-index: 8;
   border-radius: 50%;
@@ -3256,9 +3258,9 @@ select {
   border-color: #a78bfa;
   box-shadow: 0 0 18px rgba(168, 85, 247, 0.2), inset 0 0 18px rgba(168, 85, 247, 0.04);
 }
-.boss-theme--cyberpunk .boss-part-cell--soft { border-color: rgba(74, 222, 128, 0.3); box-shadow: 0 0 10px rgba(74, 222, 128, 0.06); }
-.boss-theme--cyberpunk .boss-part-cell--heavy { border-color: rgba(148, 163, 184, 0.25); }
-.boss-theme--cyberpunk .boss-part-cell--weak { border-color: rgba(239, 68, 68, 0.35); box-shadow: 0 0 12px rgba(239, 68, 68, 0.08); }
+.boss-theme--cyberpunk .boss-part-cell--soft { border-color: #22c55e; box-shadow: 0 0 16px rgba(74, 222, 128, 0.4), inset 0 0 10px rgba(74, 222, 128, 0.08); }
+.boss-theme--cyberpunk .boss-part-cell--heavy { border-color: #6b7280; box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.4), inset 0 2px 8px rgba(200, 200, 220, 0.1), inset 0 -4px 10px rgba(0, 0, 0, 0.3); }
+.boss-theme--cyberpunk .boss-part-cell--weak { border-color: #ef4444; box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), inset 0 0 14px rgba(239, 68, 68, 0.06); }
 .boss-theme--cyberpunk .boss-part-cell__bar { background: rgba(255,255,255,0.06); }
 .boss-theme--cyberpunk .boss-part-cell__fill { background: linear-gradient(90deg, #8b5cf6, #a78bfa); box-shadow: 0 0 6px rgba(168,85,247,0.5); }
 
@@ -3276,69 +3278,16 @@ select {
   border-color: #fbbf24;
   box-shadow: 0 0 20px rgba(251, 191, 36, 0.15), inset 0 0 20px rgba(251, 191, 36, 0.03);
 }
-.boss-theme--arcane .boss-part-cell--soft { border-color: rgba(52, 211, 153, 0.2); }
-.boss-theme--arcane .boss-part-cell--heavy { border-color: rgba(203, 213, 225, 0.2); }
-.boss-theme--arcane .boss-part-cell--weak { border-color: rgba(248, 113, 113, 0.25); }
+.boss-theme--arcane .boss-part-cell--soft { border-color: #22c55e; box-shadow: 0 0 14px rgba(52, 211, 153, 0.35), inset 0 0 8px rgba(52, 211, 153, 0.06); }
+.boss-theme--arcane .boss-part-cell--heavy { border-color: #6b7280; box-shadow: 0 0 0 1px rgba(180, 180, 200, 0.35), inset 0 2px 6px rgba(200, 200, 220, 0.1); }
+.boss-theme--arcane .boss-part-cell--weak { border-color: #dc2626; box-shadow: 0 0 18px rgba(248, 113, 113, 0.35), inset 0 0 10px rgba(248, 113, 113, 0.05); }
 .boss-theme--arcane .boss-part-cell__fill { background: linear-gradient(90deg, #d97706, #fbbf24); }
 
-.boss-theme--organic .boss-part-grid {
-  background: radial-gradient(ellipse at 50% 50%, rgba(120, 20, 20, 0.12), rgba(15, 5, 5, 0.9));
-  border: 1px solid rgba(239, 68, 68, 0.1);
-}
-.boss-theme--organic .boss-zone-button {
-  background: radial-gradient(ellipse at 50% 50%, rgba(80, 20, 20, 0.3), rgba(20, 5, 5, 0.5));
-  border-color: rgba(239, 68, 68, 0.15);
-  color: #fecaca;
-}
-.boss-theme--organic .boss-zone-button:not(:disabled):hover {
-  border-color: #ef4444;
-  box-shadow: 0 0 24px rgba(239, 68, 68, 0.15), inset 0 0 24px rgba(239, 68, 68, 0.04);
-}
-.boss-theme--organic .boss-part-cell--soft { border-color: rgba(74, 222, 128, 0.2); }
-.boss-theme--organic .boss-part-cell--heavy { border-color: rgba(148, 163, 184, 0.15); }
-.boss-theme--organic .boss-part-cell--weak { border-color: rgba(251, 191, 36, 0.3); box-shadow: 0 0 14px rgba(251, 191, 36, 0.06); }
-.boss-theme--organic .boss-part-cell__fill { background: linear-gradient(90deg, #dc2626, #f87171); }
 
-.boss-theme--glass .boss-part-grid {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
-}
-.boss-theme--glass .boss-zone-button {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
-  backdrop-filter: blur(4px);
-  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.boss-theme--glass .boss-zone-button:not(:disabled):hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-.boss-theme--glass .boss-part-cell--soft { border-color: rgba(74, 222, 128, 0.25); }
-.boss-theme--glass .boss-part-cell--weak { border-color: rgba(239, 68, 68, 0.25); }
-.boss-theme--glass .boss-part-cell__bar { background: rgba(255,255,255,0.06); }
-.boss-theme--glass .boss-part-cell__fill { background: rgba(255,255,255,0.5); }
 
-.boss-theme--forge .boss-part-grid {
-  background: linear-gradient(180deg, #1c1917, #292524);
-  border: 1px solid rgba(120, 113, 108, 0.2);
-}
-.boss-theme--forge .boss-zone-button {
-  background: linear-gradient(180deg, #292524, #1c1917);
-  border: 2px solid #44403c;
-  color: #d6d3d1;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 4px rgba(0,0,0,0.4);
-}
-.boss-theme--forge .boss-zone-button:not(:disabled):hover {
-  border-color: #f59e0b;
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.25), inset 0 1px 0 rgba(255,255,255,0.06);
-}
-.boss-theme--forge .boss-part-cell--soft { border-color: #22c55e; }
-.boss-theme--forge .boss-part-cell--heavy { border-color: #78716c; }
-.boss-theme--forge .boss-part-cell--weak { border-color: #dc2626; }
-.boss-theme--forge .boss-part-cell__fill { background: linear-gradient(90deg, #d97706, #f59e0b); box-shadow: 0 0 8px rgba(245,158,11,0.4); }
+
+
+
 
 .boss-theme--cosmic .boss-part-grid {
   background: radial-gradient(ellipse at 30% 20%, rgba(99, 102, 241, 0.1), rgba(5, 5, 20, 0.9));
@@ -3353,9 +3302,9 @@ select {
   border-color: #a5b4fc;
   box-shadow: 0 0 28px rgba(129, 140, 248, 0.2), inset 0 0 24px rgba(99, 102, 241, 0.05);
 }
-.boss-theme--cosmic .boss-part-cell--soft { border-color: rgba(52, 211, 153, 0.25); }
-.boss-theme--cosmic .boss-part-cell--heavy { border-color: rgba(148, 163, 184, 0.2); }
-.boss-theme--cosmic .boss-part-cell--weak { border-color: rgba(244, 114, 182, 0.3); box-shadow: 0 0 14px rgba(244, 114, 182, 0.06); }
+.boss-theme--cosmic .boss-part-cell--soft { border-color: #22c55e; box-shadow: 0 0 16px rgba(52, 211, 153, 0.4), inset 0 0 10px rgba(52, 211, 153, 0.08); }
+.boss-theme--cosmic .boss-part-cell--heavy { border-color: #6b7280; box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.4), inset 0 2px 6px rgba(160, 160, 200, 0.1); }
+.boss-theme--cosmic .boss-part-cell--weak { border-color: #f472b6; box-shadow: 0 0 20px rgba(244, 114, 182, 0.4), inset 0 0 12px rgba(244, 114, 182, 0.08); }
 .boss-theme--cosmic .boss-part-cell__fill { background: linear-gradient(90deg, #6366f1, #818cf8); box-shadow: 0 0 10px rgba(99,102,241,0.5); }
 
 /* ===== 天赋特效 ===== */

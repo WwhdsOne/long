@@ -95,7 +95,7 @@ const leaderboard = ref([])
 const boss = ref(null)
 const bossTheme = ref('cyberpunk')
 
-const BOSS_THEMES = ['cyberpunk', 'arcane', 'organic', 'glass', 'forge', 'cosmic']
+const BOSS_THEMES = ['cyberpunk', 'arcane', 'cosmic']
 
 function pickBossTheme() {
   const idx = Math.floor(Math.random() * BOSS_THEMES.length)
