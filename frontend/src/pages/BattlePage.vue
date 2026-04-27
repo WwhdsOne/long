@@ -267,6 +267,16 @@ const collapseRemaining = computed(() => {
   if (!endsAt) return 0
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
 })
+const collapsePartNames = computed(() => {
+  const parts = boss.value?.parts
+  if (!Array.isArray(parts)) return []
+  return talentVisualState.value.collapsePartKeys
+    .map(key => {
+      const [x, y] = key.split('-').map(Number)
+      const part = parts.find(p => p.x === x && p.y === y)
+      return part?.displayName || partTypeLabels[part?.type] || key
+    })
+})
 </script>
 
 <template>
@@ -396,12 +406,6 @@ const collapseRemaining = computed(() => {
               <span class="death-ecstasy-timer__count">{{ deathEcstasyRemaining }}s</span>
             </div>
 
-            <!-- 崩塌倒计时 -->
-            <div v-if="collapseActive" class="collapse-timer">
-              <span class="collapse-timer__label">护甲崩塌</span>
-              <span class="collapse-timer__count">{{ collapseRemaining }}s</span>
-            </div>
-
             <!-- 3. 部位累计进度列表：仅当有进度时显示 -->
             <div v-if="partProgressList.length > 0" class="part-progress-panel">
               <div class="part-progress-panel__title">部位累计进度</div>
@@ -416,6 +420,16 @@ const collapseRemaining = computed(() => {
                   <span class="part-progress-panel__bar"><span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor" :style="{ width: p.armorProgress + '%' }"></span></span>
                 </span>
               </div>
+            </div>
+
+            <!-- 崩塌倒计时 -->
+            <div v-if="collapseActive" class="collapse-panel">
+              <div class="collapse-panel__title">护甲崩塌</div>
+              <div v-for="name in collapsePartNames" :key="name" class="collapse-panel__part">{{ name }}</div>
+              <span class="collapse-panel__bar">
+                <span class="collapse-panel__bar-fill" :style="{ width: Math.min(100, Math.round((collapseRemaining / 8) * 100)) + '%' }"></span>
+              </span>
+              <span class="collapse-panel__count">{{ collapseRemaining }}s</span>
             </div>
           </div>
 

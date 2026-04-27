@@ -4072,31 +4072,54 @@ select {
   color: #86efac;
 }
 
-/* 崩塌倒计时 */
-.collapse-timer {
+/* 崩塌面板 */
+.collapse-panel {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(245, 158, 11, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.15);
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(245, 158, 11, 0.18);
   backdrop-filter: blur(6px);
 }
 
-.collapse-timer__label {
-  font-size: 0.65rem;
+.collapse-panel__title {
+  font-size: 0.64rem;
   font-weight: 800;
   color: #d97706;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.1);
 }
 
-.collapse-timer__count {
-  font-size: 0.9rem;
+.collapse-panel__part {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.collapse-panel__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.collapse-panel__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+  transition: width 0.3s linear;
+}
+
+.collapse-panel__count {
+  font-size: 0.75rem;
   font-weight: 900;
   color: #f59e0b;
-  margin-left: auto;
+  text-align: right;
 }
 
 /* 死亡狂喜倒计时 */
