@@ -54,8 +54,14 @@ const talentEffectOverlayRef = ref(null)
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
 let tickTimer = 0
-onMounted(() => { tickTimer = setInterval(() => { nowTick.value++ }, 250) })
-onBeforeUnmount(() => { clearInterval(tickTimer) })
+onMounted(() => {
+  tickTimer = setInterval(() => {
+    nowTick.value++
+  }, 250)
+})
+onBeforeUnmount(() => {
+  clearInterval(tickTimer)
+})
 
 const bossZones = computed(() => {
   if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return []
@@ -124,7 +130,7 @@ function clickBossZone(zone) {
 
 function isBossZoneDisabled(zone) {
   const key = getBossZoneButtonKey(zone)
-  return !key || !isLoggedIn.value || pendingKeys.value.has(key)
+  return !key || !isLoggedIn.value || !zone?.alive || pendingKeys.value.has(key)
 }
 
 function bossZoneAriaLabel(zone) {
@@ -279,11 +285,11 @@ const collapsePartNames = computed(() => {
   const parts = boss.value?.parts
   if (!Array.isArray(parts)) return []
   return talentVisualState.value.collapsePartKeys
-    .map(key => {
-      const [x, y] = key.split('-').map(Number)
-      const part = parts.find(p => p.x === x && p.y === y)
-      return part?.displayName || partTypeLabels[part?.type] || key
-    })
+      .map(key => {
+        const [x, y] = key.split('-').map(Number)
+        const part = parts.find(p => p.x === x && p.y === y)
+        return part?.displayName || partTypeLabels[part?.type] || key
+      })
 })
 </script>
 
@@ -395,62 +401,83 @@ const collapsePartNames = computed(() => {
             <div class="combo-box">
               <template v-if="comboCount > 0">
                 <span class="combo-box__count">连击 x{{ comboCount }}</span>
-                <span v-if="Math.floor(comboCount / 50) > 0" class="combo-box__bonus">+{{ Math.floor(comboCount / 50) * 5 }}%</span>
-                <span class="combo-box__timeout-bar">
-                  <span class="combo-box__timeout-fill" :style="{ width: comboTimeoutPercent + '%' }"></span>
+                <span v-if="Math.floor(comboCount / 50) > 0" class="combo-box__bonus">
+                  +{{ Math.floor(comboCount / 50) * 5 }}%
                 </span>
-                <span class="combo-box__timeout-text">{{ Math.ceil(comboTimeoutPercent / 20) }}s</span>
+                <span class="combo-box__timeout-bar">
+                  <span
+                      class="combo-box__timeout-fill"
+                      :style="{ width: comboTimeoutPercent + '%' }"
+                  ></span>
+                </span>
+                <span class="combo-box__timeout-text">
+                  {{ Math.ceil(comboTimeoutPercent / 20) }}s
+                </span>
               </template>
               <template v-else>
-                <span class="combo-box__count combo-box__count--idle">x 0</span>
-                <span class="combo-box__timeout-bar combo-box__timeout-bar--empty"></span>
+                <span class="combo-box__count combo-box__count--idle">
+                  连击 x️ 0
+                </span>
+                <span class="combo-box__timeout-bar combo-box__timeout-bar--empty">
+                  <span class="combo-box__timeout-fill"></span>
+                </span>
               </template>
             </div>
 
-            <!-- 死亡狂喜倒计时 -->
+            <!-- 5. 死亡狂喜倒计时 -->
             <div v-if="talentVisualState.deathEcstasyActive" class="death-ecstasy-timer">
               <span class="death-ecstasy-timer__icon">💀</span>
               <span class="death-ecstasy-timer__label">死亡狂喜</span>
               <span class="death-ecstasy-timer__count">{{ deathEcstasyRemaining }}s</span>
             </div>
 
+
             <!-- 3. 部位累计进度列表：仅当有进度时显示 -->
             <div v-if="partProgressList.length > 0" class="part-progress-panel">
               <div class="part-progress-panel__title">部位累计进度</div>
               <div v-for="p in partProgressList" :key="p.key" class="part-progress-panel__item">
-                <span class="part-progress-panel__name" :class="`part-progress-panel__name--${p.type}`">{{ p.name }}</span>
+                <span class="part-progress-panel__name" :class="`part-progress-panel__name--${p.type}`">{{
+                    p.name
+                  }}</span>
                 <span class="part-progress-panel__track part-progress-panel__track--storm">
                   追击 {{ p.storm }}/100
-                  <span class="part-progress-panel__bar"><span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--storm" :style="{ width: p.stormProgress + '%' }"></span></span>
+                  <span class="part-progress-panel__bar"><span
+                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--storm"
+                      :style="{ width: p.stormProgress + '%' }"></span></span>
                 </span>
                 <span v-if="p.type === 'heavy'" class="part-progress-panel__track part-progress-panel__track--armor">
                   破甲 {{ p.armor }}/100
-                  <span class="part-progress-panel__bar"><span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor" :style="{ width: p.armorProgress + '%' }"></span></span>
+                  <span class="part-progress-panel__bar"><span
+                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor"
+                      :style="{ width: p.armorProgress + '%' }"></span></span>
                 </span>
               </div>
             </div>
 
-            <!-- 崩塌倒计时 -->
+            <!-- 4. 崩塌倒计时 -->
             <div v-if="collapseActive" class="collapse-panel">
               <div class="collapse-panel__title">护甲崩塌</div>
               <div v-for="name in collapsePartNames" :key="name" class="collapse-panel__part">{{ name }}</div>
               <span class="collapse-panel__bar">
-                <span class="collapse-panel__bar-fill" :style="{ width: Math.min(100, Math.round((collapseRemaining / 8) * 100)) + '%' }"></span>
+                <span class="collapse-panel__bar-fill"
+                      :style="{ width: Math.min(100, Math.round((collapseRemaining / 8) * 100)) + '%' }"></span>
               </span>
               <span class="collapse-panel__count">{{ collapseRemaining }}s</span>
             </div>
           </div>
 
+
+
           <!-- 右侧：5×5 Boss 网格 + 连击计数 -->
           <div class="boss-part-grid-with-combo">
-          <div class="boss-part-grid">
-            <div v-for="(row, yi) in bossZones" :key="yi" class="boss-part-grid__row">
-              <button
-                  v-for="(zone, xi) in row"
-                  :key="yi + '-' + xi"
-                  class="boss-part-cell boss-zone-button"
-                  :data-zone-key="zone ? `${zone.x}-${zone.y}` : ''"
-                  :class="{
+            <div class="boss-part-grid">
+              <div v-for="(row, yi) in bossZones" :key="yi" class="boss-part-grid__row">
+                <button
+                    v-for="(zone, xi) in row"
+                    :key="yi + '-' + xi"
+                    class="boss-part-cell boss-zone-button"
+                    :data-zone-key="zone ? `${zone.x}-${zone.y}` : ''"
+                    :class="{
             'boss-part-cell--alive': zone?.alive,
             'boss-part-cell--dead': zone && !zone.alive,
             'boss-part-cell--soft': zone?.type === 'soft',
@@ -463,30 +490,30 @@ const collapsePartNames = computed(() => {
             'boss-part-cell--fracture': zone && isPartFractured(zone),
             'talent-hammer-strike': zone && isPartCollapsed(zone),
           }"
-                  :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
-                  type="button"
-                  :disabled="isBossZoneDisabled(zone)"
-                  :aria-label="bossZoneAriaLabel(zone)"
-                  @click="clickBossZone(zone)"
-              >
-                <template v-if="zone">
-                  <img
-                      v-if="zone.imagePath"
-                      class="boss-part-cell__image"
-                      :src="zone.imagePath"
-                      :alt="zone.displayName || partTypeLabels[zone.type] || zone.type"
-                  />
-                  <div class="boss-zone-button__damage-layer" aria-hidden="true">
-            <template
-                v-for="burst in zoneDamageBursts(zone)"
-                :key="burst.id"
-            >
+                    :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
+                    type="button"
+                    :disabled="isBossZoneDisabled(zone)"
+                    :aria-label="bossZoneAriaLabel(zone)"
+                    @click="clickBossZone(zone)"
+                >
+                  <template v-if="zone">
+                    <img
+                        v-if="zone.imagePath"
+                        class="boss-part-cell__image"
+                        :src="zone.imagePath"
+                        :alt="zone.displayName || partTypeLabels[zone.type] || zone.type"
+                    />
+                    <div class="boss-zone-button__damage-layer" aria-hidden="true">
+                      <template
+                          v-for="burst in zoneDamageBursts(zone)"
+                          :key="burst.id"
+                      >
               <span
-                class="boss-zone-button__damage-burst"
-                :class="[
+                  class="boss-zone-button__damage-burst"
+                  :class="[
                   `boss-zone-button__damage-burst--${burst.type}`,
                 ]"
-                :style="{
+                  :style="{
                   '--damage-offset-x': `${burst.offsetX}px`,
                   '--damage-offset-y': `${burst.offsetY}px`,
                   '--damage-scale': burst.scale,
@@ -495,53 +522,53 @@ const collapsePartNames = computed(() => {
               >
                 {{ burst.value }}
               </span>
-              <span
-                v-for="p in (burst.particles || [])"
-                :key="p.id"
-                class="boss-zone-button__damage-particle"
-                :style="{
+                        <span
+                            v-for="p in (burst.particles || [])"
+                            :key="p.id"
+                            class="boss-zone-button__damage-particle"
+                            :style="{
                   '--px': `${p.x}px`,
                   '--py': `${p.y}px`,
                   width: `${p.size}px`,
                   height: `${p.size}px`,
                   background: p.color,
                 }"
-              ></span>
-            </template>
-                  </div>
-                  <img
-                      v-if="isPartCollapsed(zone)"
-                      class="boss-part-cell__crack"
-                      :src="effectSrc('crack-pattern-1.png')"
-                      alt="结构崩塌"
-                  />
-                  <img
-                      v-if="isPartDoomMarked(zone)"
-                      class="boss-part-cell__crosshair"
-                      :src="effectSrc('crosshair-mark.png')"
-                      alt="末日审判标记"
-                  />
-                  <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
-                  <strong class="boss-zone-button__label">{{
-                      zone.displayName || partTypeLabels[zone.type] || zone.type
-                    }}</strong>
-                  <div class="boss-part-cell__bar">
+                        ></span>
+                      </template>
+                    </div>
+                    <img
+                        v-if="isPartCollapsed(zone)"
+                        class="boss-part-cell__crack"
+                        :src="effectSrc('crack-pattern-1.png')"
+                        alt="结构崩塌"
+                    />
+                    <img
+                        v-if="isPartDoomMarked(zone)"
+                        class="boss-part-cell__crosshair"
+                        :src="effectSrc('crosshair-mark.png')"
+                        alt="末日审判标记"
+                    />
+                    <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
+                    <strong class="boss-zone-button__label">{{
+                        zone.displayName || partTypeLabels[zone.type] || zone.type
+                      }}</strong>
+                    <div class="boss-part-cell__bar">
               <span
                   class="boss-part-cell__fill"
                   :style="{ width: `${zone.healthPercent}%` }"
               ></span>
-                  </div>
-                  <div class="boss-zone-button__meta">
-                    <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
-                    <span>护甲 : {{ isPartCollapsed(zone) ? 0 : zone.armor }}</span>
-                  </div>
-                </template>
-                <span v-else class="boss-part-cell__empty"></span>
-              </button>
+                    </div>
+                    <div class="boss-zone-button__meta">
+                      <span>血量 : {{ zone.currentHp }}/{{ zone.maxHp }}</span><br>
+                      <span>护甲 : {{ isPartCollapsed(zone) ? 0 : zone.armor }}</span>
+                    </div>
+                  </template>
+                  <span v-else class="boss-part-cell__empty"></span>
+                </button>
+              </div>
             </div>
           </div>
-          </div>
-          
+
         </div>
         <!-- 天赋瞬发特效覆盖层 -->
         <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
@@ -563,7 +590,7 @@ const collapsePartNames = computed(() => {
                  offsetY: -80,
                  fallback: { top: '10%', left: '50%', marginLeft: '-120px' },
                })"
-               alt="自动打击" />
+               alt="自动打击"/>
           <img v-if="hasRecentTrigger('bleed')"
                :key="triggerKey('bleed')"
                class="talent-effect-overlay__bleed"
@@ -574,7 +601,7 @@ const collapsePartNames = computed(() => {
                  offsetY: -30,
                  fallback: { top: '20%', right: '30%' },
                })"
-               alt="致命出血" />
+               alt="致命出血"/>
           <div v-if="hasRecentTrigger('omen_harvest')"
                :key="triggerKey('omen_harvest')"
                class="talent-spritesheet talent-spritesheet--scythe talent-spritesheet--playing"
@@ -600,7 +627,7 @@ const collapsePartNames = computed(() => {
                  height: 320,
                  fallback: { top: '50%', left: '50%', marginLeft: '-160px', marginTop: '-160px' },
                })"
-               alt="结构崩塌" />
+               alt="结构崩塌"/>
           <div v-if="hasRecentTrigger('collapse_trigger')"
                :key="`armor-break-${triggerKey('collapse_trigger')}`"
                class="talent-spritesheet talent-spritesheet--armor-break talent-spritesheet--playing"
@@ -634,15 +661,18 @@ const collapsePartNames = computed(() => {
                  fallback: { top: '40%', left: '30%', marginLeft: '-240px', marginTop: '-240px' },
                }))"></div>
         </div>
-        <div v-if="talentVisualState.silverStormActive || talentVisualState.omenStacks > 0 || talentVisualState.doomCritBuff" class="talent-status-bar">
-          <span v-if="talentVisualState.silverStormActive" class="talent-status-bar__item talent-status-bar__item--silver">
+        <div
+            v-if="talentVisualState.silverStormActive || talentVisualState.omenStacks > 0 || talentVisualState.doomCritBuff"
+            class="talent-status-bar">
+          <span v-if="talentVisualState.silverStormActive"
+                class="talent-status-bar__item talent-status-bar__item--silver">
             白银风暴 {{ talentVisualState.silverStormRemaining }}
           </span>
           <span v-if="showOmenRing" class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
             <svg class="talent-omen-ring__svg" viewBox="0 0 40 40">
               <circle class="talent-omen-ring__track" cx="20" cy="20" r="16"/>
               <circle class="talent-omen-ring__fill" cx="20" cy="20" r="16"
-                :style="{ strokeDasharray: `${omenRingProgress * 100.5} ${100.5 - omenRingProgress * 100.5}` }"/>
+                      :style="{ strokeDasharray: `${omenRingProgress * 100.5} ${100.5 - omenRingProgress * 100.5}` }"/>
             </svg>
             死兆 {{ talentVisualState.omenStacks }}
           </span>
@@ -675,7 +705,9 @@ const collapsePartNames = computed(() => {
         <div v-if="talentTriggerFeed.length > 0" class="vote-stage__boss-note vote-stage__boss-note--rules">
           <strong>天赋触发</strong>
           <span v-for="entry in talentTriggerFeed.slice(0, 3)" :key="entry.id">
-            {{ entry.name }}：{{ entry.message }} <template v-if="entry.extraDamage > 0">（+{{ entry.extraDamage }}）</template>
+            {{ entry.name }}：{{ entry.message }} <template v-if="entry.extraDamage > 0">（+{{
+              entry.extraDamage
+            }}）</template>
           </span>
         </div>
       </section>
@@ -714,10 +746,10 @@ const collapsePartNames = computed(() => {
             >
               <span class="boss-drop-card__type">装备</span>
               <img
-                v-if="item.imagePath"
-                class="boss-drop-card__avatar"
-                :src="item.imagePath"
-                :alt="item.imageAlt || item.itemName || item.itemId"
+                  v-if="item.imagePath"
+                  class="boss-drop-card__avatar"
+                  :src="item.imagePath"
+                  :alt="item.imageAlt || item.itemName || item.itemId"
               />
               <strong>
                 <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
@@ -793,12 +825,13 @@ const collapsePartNames = computed(() => {
             <p>本次未掉落装备。</p>
           </div>
           <div v-else class="reward-grid">
-            <article v-for="reward in rewardModal.rewards" :key="`${reward.itemId}-${reward.grantedAt}`" class="reward-grid__item">
+            <article v-for="reward in rewardModal.rewards" :key="`${reward.itemId}-${reward.grantedAt}`"
+                     class="reward-grid__item">
               <img
-                v-if="reward.imagePath"
-                class="reward-grid__icon"
-                :src="reward.imagePath"
-                :alt="reward.imageAlt || reward.itemName || reward.itemId"
+                  v-if="reward.imagePath"
+                  class="reward-grid__icon"
+                  :src="reward.imagePath"
+                  :alt="reward.imageAlt || reward.itemName || reward.itemId"
               />
               <span v-else class="reward-grid__fallback">{{ reward.itemName?.slice(0, 1) || '?' }}</span>
             </article>
