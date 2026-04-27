@@ -3004,7 +3004,7 @@ select {
   transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
-  font-size: clamp(0.92rem, 1.6vw, 1.32rem);
+  font-size: clamp(1.15rem, 2.2vw, 1.7rem);
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.02em;

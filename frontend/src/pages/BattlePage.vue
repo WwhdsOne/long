@@ -54,7 +54,7 @@ const talentEffectOverlayRef = ref(null)
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
 let tickTimer = 0
-onMounted(() => { tickTimer = setInterval(() => { nowTick.value++ }, 500) })
+onMounted(() => { tickTimer = setInterval(() => { nowTick.value++ }, 250) })
 onBeforeUnmount(() => { clearInterval(tickTimer) })
 
 const bossZones = computed(() => {
