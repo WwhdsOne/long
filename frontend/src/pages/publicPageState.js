@@ -1524,20 +1524,20 @@ function nextBurstOffset(key, variant) {
     }, 260)
 
     const pattern = [
-        [-12, -36],
-        [14, -52],
-        [-8, -44],
-        [6, -60],
+        [0, -36],
+        [0, -52],
+        [0, -44],
+        [0, -60],
         [0, -48],
-        [-16, -56],
-        [10, -40],
+        [0, -56],
+        [0, -40],
     ]
     const base = pattern[currentIndex % pattern.length]
     const lane = Math.floor(currentIndex / pattern.length)
     const shift = lane * 22
     const variantBias = variant === 'doomsday' ? 16 : variant === 'judgement' ? 28 : 0
     return {
-        x: base[0] + (currentIndex % 2 === 0 ? -shift : shift),
+        x: 0,
         y: base[1] - shift - variantBias,
     }
 }

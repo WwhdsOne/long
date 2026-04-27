@@ -3004,7 +3004,7 @@ select {
   transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
-  font-size: clamp(1.15rem, 2.2vw, 1.7rem);
+  font-size: clamp(2.3rem, 4.4vw, 3.4rem);
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.02em;
@@ -3052,13 +3052,13 @@ select {
 
 .boss-zone-button__damage-burst--doomsday {
   color: #c084fc;
-  font-size: clamp(1.4rem, 3vw, 2.8rem);
+  font-size: clamp(2.8rem, 6vw, 5.6rem);
   text-shadow: 0 0 24px rgba(192, 132, 252, 0.8), 0 0 48px rgba(168, 85, 247, 0.4), 0 8px 18px rgba(15, 23, 42, 0.68);
 }
 
 .boss-zone-button__damage-burst--judgement {
   color: #fde047;
-  font-size: clamp(1.56rem, 3.6vw, 3.2rem);
+  font-size: clamp(3.12rem, 7.2vw, 6.4rem);
   text-shadow: 0 0 28px rgba(253, 224, 71, 0.9), 0 0 56px rgba(234, 179, 8, 0.5), 0 10px 20px rgba(15, 23, 42, 0.72);
 }
 
@@ -4055,6 +4055,15 @@ select {
 
 .combo-box__timeout-bar--empty {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.combo-box__count--idle {
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.combo-box__timeout-bar--empty .combo-box__timeout-fill {
+  width: 0;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .combo-box__timeout-fill {
