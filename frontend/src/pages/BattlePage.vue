@@ -468,7 +468,7 @@ const omenRingProgress = computed(() => {
                   </div>
                   <div class="boss-zone-button__meta">
                     <span>{{ zone.currentHp }}/{{ zone.maxHp }}</span>
-                    <span>护甲 : {{zone.armor}}</span>
+                    <span>护甲 : {{ isPartCollapsed(zone) ? 0 : zone.armor }}</span>
                   </div>
                 </template>
                 <span v-else class="boss-part-cell__empty"></span>
