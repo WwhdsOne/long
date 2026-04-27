@@ -16,6 +16,7 @@ import (
 )
 
 const afkStartDelay = 60 * time.Second
+const afkMaxDuration = 24 * time.Hour
 
 type afkPlayerState struct {
 	LastSeenAt     int64
@@ -203,6 +204,11 @@ func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix
 			log.Printf("afk start failed nickname=%s err=%v", nickname, err)
 			return
 		}
+	}
+
+	if state.AfkStartedAt > 0 && nowUnix-state.AfkStartedAt >= int64(afkMaxDuration.Seconds()) {
+		s.stopAfk(ctx, nickname)
+		return
 	}
 
 	result, err := s.store.AttackBossPartAFK(ctx, nickname)
