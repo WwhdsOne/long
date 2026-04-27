@@ -11,11 +11,6 @@ import (
 	"long/internal/vote"
 )
 
-type talentSelectRequest struct {
-	Tree    string `json:"tree"`
-	SubTree string `json:"subTree,omitempty"`
-}
-
 type talentLearnRequest struct {
 	TalentID string `json:"talentId"`
 }
@@ -34,7 +29,6 @@ func registerTalentRoutes(router route.IRouter, options Options) {
 	talentGroup := router.Group("/api/talents")
 	talentGroup.Use(requireTalentAuth(h.auth))
 	{
-		talentGroup.POST("/select", h.selectTree)
 		talentGroup.GET("/state", h.getState)
 		talentGroup.POST("/learn", h.learn)
 		talentGroup.POST("/reset", h.reset)
@@ -53,27 +47,6 @@ func requireTalentAuth(auth PlayerAuthenticator) app.HandlerFunc {
 	}
 }
 
-func (h *talentAPI) selectTree(ctx context.Context, c *app.RequestContext) {
-	nickname, _ := c.Get("nickname")
-	nickStr, _ := nickname.(string)
-
-	var req talentSelectRequest
-	if err := c.BindJSON(&req); err != nil {
-		c.JSON(consts.StatusBadRequest, map[string]string{"error": "invalid json"})
-		return
-	}
-
-	tree := vote.TalentTree(req.Tree)
-	subTree := vote.TalentTree(req.SubTree)
-
-	if err := h.store.SelectTalentTree(ctx, nickStr, tree, subTree); err != nil {
-		c.JSON(consts.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-
-	c.JSON(consts.StatusOK, map[string]string{"status": "ok"})
-}
-
 func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 	nickname, _ := c.Get("nickname")
 	nickStr, _ := nickname.(string)
@@ -84,10 +57,10 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	treeDefs := vote.GetTreeTalents(state.Tree)
-	subDefs := []vote.TalentDef{}
-	if state.SubTree != "" {
-		subDefs = vote.GetTreeTalents(state.SubTree)
+	allTrees := map[string][]vote.TalentDef{
+		"normal": vote.GetTreeTalents(vote.TalentTreeNormal),
+		"armor":  vote.GetTreeTalents(vote.TalentTreeArmor),
+		"crit":   vote.GetTreeTalents(vote.TalentTreeCrit),
 	}
 
 	userState, err := h.store.GetUserState(ctx, nickStr)
@@ -97,11 +70,8 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 	}
 
 	c.JSON(consts.StatusOK, map[string]any{
-		"tree":         state.Tree,
-		"subTree":      state.SubTree,
+		"trees":        allTrees,
 		"talents":      state.Talents,
-		"treeDefs":     treeDefs,
-		"subDefs":      subDefs,
 		"talentPoints": userState.TalentPoints,
 	})
 }
@@ -205,10 +175,8 @@ func talentErrorStatus(err error) int {
 	case errors.Is(err, vote.ErrTalentNotFound):
 		return consts.StatusNotFound
 	case errors.Is(err, vote.ErrTalentPointsInsufficient),
-		errors.Is(err, vote.ErrTalentTreeNotSet),
 		errors.Is(err, vote.ErrTalentPrerequisite),
 		errors.Is(err, vote.ErrTalentAlreadyLearned),
-		errors.Is(err, vote.ErrTalentMaxLevel),
 		errors.Is(err, vote.ErrTalentInvalidCost),
 		errors.Is(err, vote.ErrInvalidTalentTree):
 		return consts.StatusBadRequest
@@ -223,14 +191,10 @@ func talentErrorCode(err error) string {
 		return "TALENT_POINTS_INSUFFICIENT"
 	case errors.Is(err, vote.ErrTalentInvalidCost):
 		return "TALENT_INVALID_COST"
-	case errors.Is(err, vote.ErrTalentTreeNotSet):
-		return "TALENT_TREE_NOT_SET"
 	case errors.Is(err, vote.ErrTalentPrerequisite):
 		return "TALENT_PREREQUISITE_NOT_MET"
 	case errors.Is(err, vote.ErrTalentAlreadyLearned):
 		return "TALENT_ALREADY_LEARNED"
-	case errors.Is(err, vote.ErrTalentMaxLevel):
-		return "TALENT_MAX_LEVEL"
 	case errors.Is(err, vote.ErrInvalidTalentTree):
 		return "INVALID_TALENT_TREE"
 	case errors.Is(err, vote.ErrTalentNotFound):
@@ -246,14 +210,10 @@ func talentErrorMessage(err error) string {
 		return "天赋点不足，无法学习该节点。"
 	case errors.Is(err, vote.ErrTalentInvalidCost):
 		return "天赋配置异常，节点成本无效。"
-	case errors.Is(err, vote.ErrTalentTreeNotSet):
-		return "请先选择主系/副系。"
 	case errors.Is(err, vote.ErrTalentPrerequisite):
 		return "前置节点尚未学习。"
 	case errors.Is(err, vote.ErrTalentAlreadyLearned):
 		return "该天赋已学习。"
-	case errors.Is(err, vote.ErrTalentMaxLevel):
-		return "副系节点已达上限。"
 	case errors.Is(err, vote.ErrInvalidTalentTree):
 		return "天赋树选择无效。"
 	case errors.Is(err, vote.ErrTalentNotFound):

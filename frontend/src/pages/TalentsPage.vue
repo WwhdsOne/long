@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { usePublicPageState } from './publicPageState'
 import { effectAssetUrl } from '../utils/effectAssets'
+import { watch } from 'vue'
+
 
 const { isLoggedIn, talentPoints: sharedTalentPoints } = usePublicPageState()
 
@@ -11,9 +13,7 @@ const errorMsg = ref('')
 const treeDefs = ref(null)
 const talentState = ref(null)
 const selectedTree = ref('normal')
-const selectedSubTree = ref('')
-const activePanel = ref('main')
-const selectedMarker = ref({ panel: '', id: '' })
+const selectedMarker = ref({ panel: 'main', id: '' })
 
 const treeConfig = {
   normal: { name: '均衡攻势', color: '#2bb873' },
@@ -29,28 +29,22 @@ const arcEndAngle = 45
 
 const learnedSet = computed(() => new Set(talentState.value?.talents || []))
 
-// 小节点识别（ID 包含 _t1a/_t1b/_t2a/_t2b/_t3a/_t3b）
 function isFillerNode(id) {
   if (!id) return false
   return /_(t[1-3][ab])$/.test(id)
 }
 
-// 将天赋 ID 映射到像素图标文件名
 function talentIconPath(id) {
   if (!id) return ''
-  // 小节点：normal_filler_t1a → talent-normal-t1a.png
   if (isFillerNode(id)) {
     const parts = id.split('_')
     return effectAssetUrl(`talent-${parts[0]}-${parts[2]}.png`)
   }
-  // 主节点：talent-{id}.png
   return effectAssetUrl(`talent-${id}.png`)
 }
 
-// 每层节点总数（主 + 小），与后端 tierNodeCount 一致
 const tierNodeCount = { 0: 1, 1: 5, 2: 5, 3: 4, 4: 1 }
 
-// 当前主系某层已学节点数
 function learnedInTierCount(tree, tier) {
   return (talentState.value?.talents || []).filter((id) => {
     const def = findDef(id)
@@ -62,17 +56,15 @@ function isTierFull(tree, tier) {
   return learnedInTierCount(tree, tier) >= (tierNodeCount[tier] || 0)
 }
 
-// 某层是否前置层未满（主系层锁）
 function isLayerLocked(def) {
-  if (!def || !talentState.value?.tree) return false
-  if (def.tree !== talentState.value.tree) return false
+  if (!def || !talentState.value) return false
   if (def.tier === 0) return false
-  return !isTierFull(talentState.value.tree, def.tier - 1)
+  return !isTierFull(def.tree, def.tier - 1)
 }
 
 const activeTierBonuses = computed(() => {
-  if (!talentState.value?.tree) return []
-  const tree = talentState.value.tree
+  if (!talentState.value) return []
+  const tree = selectedTree.value
   const bonusLabels = treeDefs.value?.trees?.[tree]?.tierCompletionBonuses || {}
   const bonuses = []
   for (let tier = 0; tier <= 4; tier++) {
@@ -98,11 +90,6 @@ const currentTreeDefs = computed(() => {
   return treeDefs.value.trees[selectedTree.value]?.talents || []
 })
 
-const subTreeDefs = computed(() => {
-  if (!selectedSubTree.value || !treeDefs.value?.trees) return []
-  return treeDefs.value.trees[selectedSubTree.value]?.talents || []
-})
-
 function safeJSON(response) {
   return response.json().catch(() => null)
 }
@@ -125,119 +112,85 @@ function isPrerequisiteMet(def) {
   return learnedSet.value.has(def.prerequisite)
 }
 
-function subTreeLearnedCount() {
-  if (!talentState.value?.subTree) return 0
-  return (talentState.value.talents || []).filter((id) => {
-    const def = findDef(id)
-    return def && def.tree === talentState.value.subTree
-  }).length
-}
-
 function canLearn(def) {
-  if (!def || !talentState.value?.tree) return false
-  if (isLearned(def.id)) return false
-  if (!isPrerequisiteMet(def)) return false
+  if (!def || isLearned(def.id)) return false
   if (isLayerLocked(def)) return false
-
-  const cost = Number(def.cost || 0)
-  if (cost <= 0 || availableTalentPoints.value < cost) return false
-
-  if (def.tree === talentState.value.tree) return true
-  if (def.tree === talentState.value.subTree) {
-    if (def.tier === 0 || def.tier === 4) return false
-    return subTreeLearnedCount() < 2
-  }
-  return false
+  if (!isPrerequisiteMet(def)) return false
+  return availableTalentPoints.value >= Number(def.cost || 0)
 }
 
 function nodeState(def) {
-  if (!def) return 'locked'
   if (isLearned(def.id)) return 'learned'
-  if (!talentState.value?.tree) return 'locked'
-  if (!isPrerequisiteMet(def)) return 'locked'
   if (isLayerLocked(def)) return 'layer-locked'
-
-  if (def.tree !== talentState.value.tree && def.tree !== talentState.value.subTree) return 'locked'
-  if (def.tree === talentState.value.subTree && (def.tier === 0 || def.tier === 4)) return 'locked'
-  if (def.tree === talentState.value.subTree && subTreeLearnedCount() >= 2) return 'locked'
-
+  if (!isPrerequisiteMet(def)) return 'locked'
   if (availableTalentPoints.value < Number(def.cost || 0)) return 'insufficient'
   return 'available'
 }
 
 function stateLabel(def) {
   const state = nodeState(def)
-  if (state === 'learned') return '已学'
-  if (state === 'available') return '可学'
-  if (state === 'layer-locked') return '需先点满下层'
-  if (state === 'insufficient') return '点数不足'
-  return '锁定'
+  const map = {
+    learned: '已学习',
+    available: '可学习',
+    insufficient: '天赋点不足',
+    locked: '前置未满足',
+    'layer-locked': '上一层未点满',
+  }
+  return map[state] || '未知'
 }
 
 function prerequisiteLabel(def) {
-  if (def?.prerequisiteName) return def.prerequisiteName
   if (!def?.prerequisite) return '无'
   const pre = findDef(def.prerequisite)
   return pre?.name || def.prerequisite
 }
 
 function effectDescription(def) {
-  if (def?.effectDescription) return def.effectDescription
-  return '效果说明待配置'
+  return def?.effectDescription || def?.description || def?.effect || '暂无效果说明'
 }
 
 function stateReason(def) {
-  if (!def) return ''
   const state = nodeState(def)
-  if (state === 'learned') return '该节点已学习。'
-  if (state === 'available') return '满足条件，点击即可学习。'
-  if (state === 'layer-locked') return `需先点满第 ${def.tier - 1 + 1} 层所有节点（含小节点）。`
-  if (state === 'insufficient') return `当前天赋点不足，需要 ${def.cost} 点。`
-  if (!talentState.value?.tree) return '请先选择主系。'
-  if (!isPrerequisiteMet(def)) return `前置未满足：${prerequisiteLabel(def)}`
-  return '当前条件不满足。'
-}
-
-function coordinatesForTierNodes(nodes, tier) {
-  if (nodes.length === 0) return []
-  const radius = tierRadiusPercent[tier] || 20
-  const centerAngle = (arcStartAngle + arcEndAngle) / 2
-
-  // 基石层和终极层强制居中，满足“第一层中间”和“最后一层中间”布局要求。
-  if (tier === 0 || tier === 4) {
-    const gap = 10
-    const middle = (nodes.length - 1) / 2
-    return nodes.map((_, index) => {
-      const angle = centerAngle + (middle - index) * gap
-      const radian = (angle * Math.PI) / 180
-      const x = Number((Math.cos(radian) * radius).toFixed(2))
-      const y = Number((Math.sin(radian) * radius).toFixed(2))
-      return {
-        leftPercent: 50 + x,
-        topPercent: 90 - y,
-      }
-    })
-  }
-
-  const step = nodes.length === 1 ? 0 : (arcStartAngle - arcEndAngle) / (nodes.length - 1)
-
-  return nodes.map((_, index) => {
-    const angle = arcStartAngle - step * index
-    const radian = (angle * Math.PI) / 180
-    const x = Number((Math.cos(radian) * radius).toFixed(2))
-    const y = Number((Math.sin(radian) * radius).toFixed(2))
-    return {
-      leftPercent: 50 + x,
-      topPercent: 90 - y,
-    }
-  })
+  if (state === 'learned') return '该天赋已生效'
+  if (state === 'available') return '点击即可学习'
+  if (state === 'insufficient') return '当前天赋点不足'
+  if (state === 'locked') return '需要先学习前置天赋'
+  if (state === 'layer-locked') return '需要先点满上一层天赋'
+  return ''
 }
 
 function toPolarPoint(radius, angle) {
-  const radian = (angle * Math.PI) / 180
+  const rad = (angle * Math.PI) / 180
   return {
-    x: Number((50 + Math.cos(radian) * radius).toFixed(3)),
-    y: Number((90 - Math.sin(radian) * radius).toFixed(3)),
+    x: 50 + radius * Math.cos(rad),
+    y: 86 - radius * Math.sin(rad),
+  }
+}
+
+function coordinatesForTierNodes(defs, tier) {
+  const radius = tierRadiusPercent[tier] || 20
+  const count = defs.length
+  if (count <= 0) return []
+
+  if (count === 1) {
+    return [toNodePercent(radius, 90)]
+  }
+
+  const start = arcStartAngle
+  const end = arcEndAngle
+  const step = (start - end) / (count - 1)
+
+  return defs.map((_, index) => {
+    const angle = start - step * index
+    return toNodePercent(radius, angle)
+  })
+}
+
+function toNodePercent(radius, angle) {
+  const point = toPolarPoint(radius, angle)
+  return {
+    leftPercent: point.x,
+    topPercent: point.y,
   }
 }
 
@@ -282,17 +235,11 @@ function mapRingNodes(defs, panel) {
 }
 
 const mainRingNodes = computed(() => mapRingNodes(currentTreeDefs.value, 'main'))
-const subRingNodes = computed(() => mapRingNodes(subTreeDefs.value, 'sub'))
-const activeTree = computed(() => (activePanel.value === 'sub' && selectedSubTree.value ? selectedSubTree.value : selectedTree.value))
-const activeRingNodes = computed(() => (activePanel.value === 'sub' ? subRingNodes.value : mainRingNodes.value))
 
 const selectedNode = computed(() => {
-  const targetPanel = selectedMarker.value.panel
   const targetID = selectedMarker.value.id
-  if (!targetPanel || !targetID) return null
-
-  const list = targetPanel === 'sub' ? subRingNodes.value : mainRingNodes.value
-  return list.find((item) => item.id === targetID) || null
+  if (!targetID) return null
+  return mainRingNodes.value.find((item) => item.id === targetID) || null
 })
 
 function ringNodeStyle(item) {
@@ -302,32 +249,36 @@ function ringNodeStyle(item) {
   }
 }
 
-function detailFloatStyle(panel) {
-  if (!selectedNode.value || selectedNode.value.panel !== panel) return {}
-  const left = Math.max(8, Math.min(66, selectedNode.value.leftPercent + 8))
-  const top = Math.max(6, Math.min(68, selectedNode.value.topPercent - 20))
+function detailFloatStyle() {
+  if (!selectedNode.value) return {}
+
+  const node = selectedNode.value
+  let left = node.leftPercent + 8
+  let top = node.topPercent - 20
+
+  if (node.leftPercent > 70) {
+    left = node.leftPercent - 34
+  }
+
+  if (node.leftPercent < 30) {
+    left = node.leftPercent + 10
+  }
+
+  left = Math.max(4, Math.min(68, left))
+  top = Math.max(4, Math.min(72, top))
+
   return {
     left: `${left}%`,
     top: `${top}%`,
   }
 }
 
-const activePlateTitle = computed(() => {
-  if (activePanel.value === 'sub' && selectedSubTree.value) {
-    return `副系：${treeConfig[selectedSubTree.value]?.name || ''}`
-  }
-  return `主系：${treeConfig[selectedTree.value]?.name || ''}`
-})
+const activePlateTitle = computed(() => treeConfig[selectedTree.value]?.name || '')
 
-const activePlateHint = computed(() => {
-  if (activePanel.value === 'sub' && selectedSubTree.value) {
-    return '副系最多学习 2 个中层节点'
-  }
-  return '点击节点可学习，或查看浮层说明'
-})
+const activePlateHint = computed(() => '点击节点可学习，或查看浮层说明')
 
 function selectNode(def) {
-  selectedMarker.value = { panel: def.panel, id: def.id }
+  selectedMarker.value = { panel: 'main', id: def.id }
 }
 
 async function loadDefs() {
@@ -353,77 +304,16 @@ async function loadState() {
     }
 
     talentState.value = await res.json()
-    if (talentState.value?.tree) selectedTree.value = talentState.value.tree
-    selectedSubTree.value = talentState.value?.subTree || ''
-    if (!talentState.value?.subTree && activePanel.value === 'sub') activePanel.value = 'main'
+    if (!selectedTree.value) selectedTree.value = 'normal'
   } catch (error) {
     errorMsg.value = error.message || '加载天赋状态失败'
   }
 }
 
 async function selectTree(tree) {
-  if (!isLoggedIn.value) return
-  loading.value = true
-  errorMsg.value = ''
-  try {
-    const body = { tree }
-    if (selectedSubTree.value && selectedSubTree.value !== tree) {
-      body.subTree = selectedSubTree.value
-    }
-
-    const res = await fetch('/api/talents/select', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(body),
-    })
-
-    if (!res.ok) {
-      const payload = await safeJSON(res)
-      throw new Error(payload?.message || '选择主系失败')
-    }
-
-    selectedTree.value = tree
-    activePanel.value = 'main'
-    selectedMarker.value = { panel: '', id: '' }
-    await loadState()
-  } catch (error) {
-    errorMsg.value = error.message || '选择主系失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function selectSubTree(tree) {
-  if (!isLoggedIn.value) return
-  loading.value = true
-  errorMsg.value = ''
-  try {
-    const subTree = tree === selectedTree.value ? '' : tree
-
-    const res = await fetch('/api/talents/select', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ tree: selectedTree.value, subTree }),
-    })
-
-    if (!res.ok) {
-      const payload = await safeJSON(res)
-      throw new Error(payload?.message || '选择副系失败')
-    }
-
-    selectedSubTree.value = subTree
-    activePanel.value = subTree ? 'sub' : 'main'
-    if (!subTree && selectedMarker.value.panel === 'sub') {
-      selectedMarker.value = { panel: '', id: '' }
-    }
-    await loadState()
-  } catch (error) {
-    errorMsg.value = error.message || '选择副系失败'
-  } finally {
-    loading.value = false
-  }
+  selectedTree.value = tree
+  selectedMarker.value = { panel: 'main', id: '' }
+  await loadState()
 }
 
 async function learnTalent(def) {
@@ -458,6 +348,10 @@ function clickNode(def) {
   }
 }
 
+function clearNode() {
+  selectedMarker.value = { panel: 'main', id: '' }
+}
+
 async function resetTalents() {
   if (!isLoggedIn.value) return
   if (!window.confirm('确定洗点并返还已消耗天赋点吗？')) return
@@ -483,9 +377,16 @@ async function resetTalents() {
   }
 }
 
-onMounted(() => {
-  void loadDefs()
-  void loadState()
+onMounted(async () => {
+  await loadDefs()
+  await loadState()
+})
+
+
+watch(isLoggedIn, (val) => {
+  if (val) {
+    loadState()
+  }
 })
 </script>
 
@@ -512,45 +413,20 @@ onMounted(() => {
     </div>
 
     <template v-else>
-      <section class="talent-select">
+      <section class="talent-select talent-select--main-only">
         <div class="talent-select__group">
           <span class="talent-select__label">主系</span>
           <div class="talent-select__buttons">
             <button
-              v-for="tree in trees"
-              :key="`main-${tree}`"
-              class="talent-select__btn"
-              :class="{ 'talent-select__btn--active': selectedTree === tree }"
-              :style="{ '--tree-color': treeConfig[tree].color }"
-              :disabled="loading"
-              @click="selectTree(tree)"
+                v-for="tree in trees"
+                :key="`main-${tree}`"
+                class="talent-select__btn"
+                :class="{ 'talent-select__btn--active': selectedTree === tree }"
+                :style="{ '--tree-color': treeConfig[tree].color }"
+                :disabled="loading"
+                @click="selectTree(tree)"
             >
               {{ treeConfig[tree].name }}
-            </button>
-          </div>
-        </div>
-
-        <div class="talent-select__group">
-          <span class="talent-select__label">副系</span>
-          <div class="talent-select__buttons">
-            <button
-              v-for="tree in trees"
-              :key="`sub-${tree}`"
-              class="talent-select__btn"
-              :class="{ 'talent-select__btn--active': selectedSubTree === tree }"
-              :style="{ '--tree-color': treeConfig[tree].color }"
-              :disabled="loading || tree === selectedTree"
-              @click="selectSubTree(tree)"
-            >
-              {{ treeConfig[tree].name }}
-            </button>
-            <button
-              class="talent-select__btn"
-              :class="{ 'talent-select__btn--active': selectedSubTree === '' }"
-              :disabled="loading"
-              @click="selectSubTree('')"
-            >
-              无
             </button>
           </div>
         </div>
@@ -562,13 +438,12 @@ onMounted(() => {
           <span>{{ activePlateHint }}</span>
         </header>
 
-        <div class="talent-half-ring" :style="{ '--active-color': treeConfig[activeTree]?.color }">
-          <!-- 层满奖励 -->
-          <div v-if="activePanel === 'main' && activeTierBonuses.length > 0" class="talent-tier-bonuses">
+        <div class="talent-half-ring" :style="{ '--active-color': treeConfig[selectedTree]?.color }">
+          <div v-if="activeTierBonuses.length > 0" class="talent-tier-bonuses">
             <span
-              v-for="b in activeTierBonuses"
-              :key="`bonus-${b.tier}`"
-              class="talent-tier-bonuses__badge"
+                v-for="b in activeTierBonuses"
+                :key="`bonus-${b.tier}`"
+                class="talent-tier-bonuses__badge"
             >
               第 {{ b.tier + 1 }} 层满：{{ b.label }}
             </span>
@@ -576,37 +451,39 @@ onMounted(() => {
 
           <svg class="talent-arc-grid" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             <path
-              v-for="entry in arcGridPaths"
-              :key="`main-path-${entry.tier}`"
-              :d="entry.path"
-              class="talent-arc-grid__path"
+                v-for="entry in arcGridPaths"
+                :key="`main-path-${entry.tier}`"
+                :d="entry.path"
+                class="talent-arc-grid__path"
             />
           </svg>
 
           <button
-            v-for="item in activeRingNodes"
-            :key="`${activePanel}-${item.id}`"
-            class="talent-dot"
-            :class="[
+              v-for="item in mainRingNodes"
+              :key="`main-${item.id}`"
+              class="talent-dot"
+              :class="[
               `talent-dot--${nodeState(item)}`,
-              { 'talent-dot--selected': selectedMarker.panel === activePanel && selectedMarker.id === item.id },
+              { 'talent-dot--selected': selectedMarker.id === item.id },
               { 'talent-dot--filler': isFillerNode(item.id) },
             ]"
-            :style="ringNodeStyle(item)"
-            @click="clickNode(item)"
+              :style="ringNodeStyle(item)"
+              @mouseenter="selectNode(item)"
+              @mouseleave="clearNode"
+              @click="learnTalent(item)"
           >
             <img
-              v-if="talentIconPath(item.id)"
-              :src="talentIconPath(item.id)"
-              class="talent-dot__icon"
-              :class="{ 'talent-dot__icon--filler': isFillerNode(item.id) }"
-              alt=""
+                v-if="talentIconPath(item.id)"
+                :src="talentIconPath(item.id)"
+                class="talent-dot__icon"
+                :class="{ 'talent-dot__icon--filler': isFillerNode(item.id) }"
+                alt=""
             />
             <span class="talent-dot__name">{{ item.name }}</span>
             <span class="talent-dot__meta">{{ tierLabels[item.tier] }} · {{ item.cost }}</span>
           </button>
 
-          <div v-if="selectedNode && selectedNode.panel === activePanel" class="talent-float" :style="detailFloatStyle(activePanel)">
+          <div v-if="selectedNode" class="talent-float" :style="detailFloatStyle()">
             <strong>{{ selectedNode.name }}</strong>
             <p>状态：{{ stateLabel(selectedNode) }}</p>
             <p>消耗：{{ selectedNode.cost }} 天赋点</p>
@@ -668,7 +545,7 @@ onMounted(() => {
 .talent-select {
   margin: 0.75rem 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 0.6rem;
 }
 
@@ -771,6 +648,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   gap: 0.14rem;
+  z-index: 1;
 }
 
 .talent-dot__icon {
@@ -871,6 +749,7 @@ onMounted(() => {
   background: #0c1319;
   padding: 0.64rem;
   z-index: 3;
+  pointer-events: none;
 }
 
 .talent-float strong {
@@ -902,10 +781,6 @@ onMounted(() => {
 }
 
 @media (max-width: 980px) {
-  .talent-select {
-    grid-template-columns: 1fr;
-  }
-
   .talent-head {
     flex-direction: column;
     align-items: flex-start;
