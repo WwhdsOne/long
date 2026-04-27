@@ -1683,6 +1683,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			events = append(events, TalentTriggerEvent{
 				TalentID: "crit_bleed", Name: "致命出血", EffectType: "bleed",
 				ExtraDamage: bd, Message: "致命出血",
+				PartX: part.X, PartY: part.Y,
 			})
 		}
 	}
@@ -1697,6 +1698,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		events = append(events, TalentTriggerEvent{
 			TalentID: "crit_omen_reap", Name: "死兆收割", EffectType: "omen_harvest",
 			ExtraDamage: rd, Message: "死兆收割",
+			PartX: part.X, PartY: part.Y,
 		})
 		if rd > baseDamage*5 { damageTypeOverride = "doomsday" }
 	}
@@ -1714,6 +1716,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			events = append(events, TalentTriggerEvent{
 				TalentID: "crit_final_cut", Name: "终末血斩！", EffectType: "final_cut",
 				ExtraDamage: cd, Message: "终末血斩！",
+				PartX: part.X, PartY: part.Y,
 			})
 			damageTypeOverride = "doomsday"
 		}
@@ -1725,6 +1728,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		events = append(events, TalentTriggerEvent{
 			TalentID: "crit_death_ecstasy", Name: "死亡狂喜激活！6 秒内暴伤 +200%，全攻击视为弱点", EffectType: "death_ecstasy",
 			Message: "死亡狂喜激活！6 秒内暴伤 +200%，全攻击视为弱点",
+			PartX: part.X, PartY: part.Y,
 		})
 	}
 
@@ -1738,12 +1742,14 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 					events = append(events, TalentTriggerEvent{
 						TalentID: "crit_ultimate", Name: "末日审判", EffectType: "doom_judgment",
 						Message: "终结标记击碎！+100 死兆，下次暴伤 x3",
+						PartX: part.X, PartY: part.Y,
 					})
 					damageTypeOverride = "doomsday"
 				} else if combatState.DoomDestroyed >= 2 && combatState.DoomCritBuff {
 					events = append(events, TalentTriggerEvent{
 						TalentID: "crit_ultimate", Name: "末日审判", EffectType: "doom_judgment",
 						Message: "双标记击碎！暴伤 x6",
+						PartX: part.X, PartY: part.Y,
 					})
 					damageTypeOverride = "doomsday"
 				}
