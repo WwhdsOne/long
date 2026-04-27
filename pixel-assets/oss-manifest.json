@@ -1,0 +1,2355 @@
+{
+  "mode": "append",
+  "runs": [
+    {
+      "generatedAt": "2026-04-27T07:54:24.950874+00:00",
+      "bucket": "hai-world2",
+      "endpoint": "https://oss-cn-beijing.aliyuncs.com",
+      "publicBaseURL": "https://hai-world2.oss-cn-beijing.aliyuncs.com",
+      "prefix": "effects",
+      "pattern": "*.png",
+      "deleteLocal": true,
+      "dryRun": false,
+      "totalFiles": 86,
+      "files": [
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "armor-break-spritesheet.png",
+          "sourcePath": "pixel-assets/output/armor-break-spritesheet.png",
+          "objectKey": "effects/armor-break-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/armor-break-spritesheet.png",
+          "size": 265,
+          "sha256": "e4571547615ad25c0c78ffd129911d7c10872c1092598a0e2f35098fcbb9141b",
+          "etag": "69193E3CB53DC2402C982FDD9D675038",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/armor-break-spritesheet.png",
+            "/Users/Learning/web/long/pixel-assets/output/armor-break-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-blade-spritesheet.png",
+          "sourcePath": "pixel-assets/output/blood-blade-spritesheet.png",
+          "objectKey": "effects/blood-blade-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-blade-spritesheet.png",
+          "size": 313,
+          "sha256": "867550cb9ea5c6ce75aa99ca55a57625382583c3f45f5154918d3aca3c57ac7f",
+          "etag": "D14EB8CFB7CC5EEE00FE6B29ED5A055F",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/blood-blade-spritesheet.png",
+            "/Users/Learning/web/long/pixel-assets/output/blood-blade-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-drop-large.png",
+          "sourcePath": "pixel-assets/output/blood-drop-large.png",
+          "objectKey": "effects/blood-drop-large.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-drop-large.png",
+          "size": 109,
+          "sha256": "5d8cb729fbcc9e4fb3cde22c52bbcbbb4658a529229aef6c09121362c7589771",
+          "etag": "B19A441DD260C6E1366BA290880F3E87",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/blood-drop-large.png",
+            "/Users/Learning/web/long/pixel-assets/output/blood-drop-large.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-drop-medium.png",
+          "sourcePath": "pixel-assets/output/blood-drop-medium.png",
+          "objectKey": "effects/blood-drop-medium.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-drop-medium.png",
+          "size": 99,
+          "sha256": "ebb7b0003174a4b288c0e1df865b2e9eff175e26f7db04327cef0a8905e75111",
+          "etag": "5F178C327CF89EA393CFE3A312A7913A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/blood-drop-medium.png",
+            "/Users/Learning/web/long/pixel-assets/output/blood-drop-medium.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-drop-small.png",
+          "sourcePath": "pixel-assets/output/blood-drop-small.png",
+          "objectKey": "effects/blood-drop-small.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-drop-small.png",
+          "size": 95,
+          "sha256": "ab219894b34e56974fc48db11b3e5eb493485bf81654518bd5f1317e36173682",
+          "etag": "89B4590906682B63F69D34A88718F77A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/blood-drop-small.png",
+            "/Users/Learning/web/long/pixel-assets/output/blood-drop-small.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crack-pattern-1.png",
+          "sourcePath": "pixel-assets/output/crack-pattern-1.png",
+          "objectKey": "effects/crack-pattern-1.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crack-pattern-1.png",
+          "size": 146,
+          "sha256": "f4ba54287d6a68cd197bb58378237429fd7fa3daee54f03fe46bfd94a36d0ed8",
+          "etag": "09789C9240263EDDB9F4042DD4AD492B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/crack-pattern-1.png",
+            "/Users/Learning/web/long/pixel-assets/output/crack-pattern-1.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crack-pattern-2.png",
+          "sourcePath": "pixel-assets/output/crack-pattern-2.png",
+          "objectKey": "effects/crack-pattern-2.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crack-pattern-2.png",
+          "size": 133,
+          "sha256": "09f4954b5bdb93512b7d9a1fbcaa98f1d3d9f274cb1f3e9dd54ce6ca85beca14",
+          "etag": "AE4B59EC99E674C90EB42E813FE737CB",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/crack-pattern-2.png",
+            "/Users/Learning/web/long/pixel-assets/output/crack-pattern-2.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crack-pattern-3.png",
+          "sourcePath": "pixel-assets/output/crack-pattern-3.png",
+          "objectKey": "effects/crack-pattern-3.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crack-pattern-3.png",
+          "size": 145,
+          "sha256": "90602797813f085e56ff7a4c4325e6af6b631e0bc0fa3f99848c743c1afa96b3",
+          "etag": "EB80111320C6BA34246DE0A5E08052AE",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/crack-pattern-3.png",
+            "/Users/Learning/web/long/pixel-assets/output/crack-pattern-3.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crosshair-mark-glow.png",
+          "sourcePath": "pixel-assets/output/crosshair-mark-glow.png",
+          "objectKey": "effects/crosshair-mark-glow.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crosshair-mark-glow.png",
+          "size": 164,
+          "sha256": "5ac0706255a5574eacd685cb96075e982dea929631bb3e995e0fc70520583c04",
+          "etag": "6CEE63DBD2929DB69B0D9E8C08E98853",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/crosshair-mark-glow.png",
+            "/Users/Learning/web/long/pixel-assets/output/crosshair-mark-glow.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crosshair-mark.png",
+          "sourcePath": "pixel-assets/output/crosshair-mark.png",
+          "objectKey": "effects/crosshair-mark.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crosshair-mark.png",
+          "size": 124,
+          "sha256": "cd5a1c65f7318654d772f3243abd88e5b5e687942b57666f0cdcf19d61772c0c",
+          "etag": "7F55030B5FC80B4FD54334FA89CC77A6",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/crosshair-mark.png",
+            "/Users/Learning/web/long/pixel-assets/output/crosshair-mark.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-armor.png",
+          "sourcePath": "pixel-assets/output/emblem-armor.png",
+          "objectKey": "effects/emblem-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-armor.png",
+          "size": 153,
+          "sha256": "d0086be9559dd47828c268f26e854248ece80a19beead57bdd8290ba9a8927b1",
+          "etag": "50332E2C237DB234F1C80C4601912BDB",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/emblem-armor.png",
+            "/Users/Learning/web/long/pixel-assets/output/emblem-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-crit.png",
+          "sourcePath": "pixel-assets/output/emblem-crit.png",
+          "objectKey": "effects/emblem-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-crit.png",
+          "size": 151,
+          "sha256": "9f0fc31e9f36f5f73a1c38ccd55a3590fb4258fbbb8e4ceff1d86b54ffa5d72c",
+          "etag": "CE2CA3B5DAEE4DF5471457F7D158852A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/emblem-crit.png",
+            "/Users/Learning/web/long/pixel-assets/output/emblem-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-normal.png",
+          "sourcePath": "pixel-assets/output/emblem-normal.png",
+          "objectKey": "effects/emblem-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-normal.png",
+          "size": 157,
+          "sha256": "795437b852c621879ef78d8629b17db1a024dda721cf2edc158fd1fd98754d58",
+          "etag": "D66F940956333FB4FC30745DE2051D39",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/emblem-normal.png",
+            "/Users/Learning/web/long/pixel-assets/output/emblem-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-talent.png",
+          "sourcePath": "pixel-assets/output/emblem-talent.png",
+          "objectKey": "effects/emblem-talent.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-talent.png",
+          "size": 189,
+          "sha256": "6931abf04b958c147c1f35bc1edb53fb9dfc09bb5807a8692fe1c4b0834bf662",
+          "etag": "0F8E8ADB9510B3B7FB2F31AB36FA6C79",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/emblem-talent.png",
+            "/Users/Learning/web/long/pixel-assets/output/emblem-talent.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "green-ring-spritesheet.png",
+          "sourcePath": "pixel-assets/output/green-ring-spritesheet.png",
+          "objectKey": "effects/green-ring-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/green-ring-spritesheet.png",
+          "size": 226,
+          "sha256": "21c4ad6159cf8b6b997c452af91c362a6e2f67c37510f235985db71d03a31d12",
+          "etag": "BA4BD1EEB9E68261B666173454DD3AF0",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/green-ring-spritesheet.png",
+            "/Users/Learning/web/long/pixel-assets/output/green-ring-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "hammer-crack-spritesheet.png",
+          "sourcePath": "pixel-assets/output/hammer-crack-spritesheet.png",
+          "objectKey": "effects/hammer-crack-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/hammer-crack-spritesheet.png",
+          "size": 230,
+          "sha256": "4fd121f6fa218dbf48c663d8435527702a525abf25d723da96087b19c2eaf23a",
+          "etag": "773BC744F190C6896C4DDE49701D8AC8",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/hammer-crack-spritesheet.png",
+            "/Users/Learning/web/long/pixel-assets/output/hammer-crack-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "hammer-impact.png",
+          "sourcePath": "pixel-assets/output/hammer-impact.png",
+          "objectKey": "effects/hammer-impact.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/hammer-impact.png",
+          "size": 183,
+          "sha256": "7b57e84ef36c388d7eaacb079d5b75cc81fda5d93cf09720604732c9cf25b693",
+          "etag": "E47D6A0F75C8C08C611D035BECB8D2F3",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/hammer-impact.png",
+            "/Users/Learning/web/long/pixel-assets/output/hammer-impact.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "hammer-raised.png",
+          "sourcePath": "pixel-assets/output/hammer-raised.png",
+          "objectKey": "effects/hammer-raised.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/hammer-raised.png",
+          "size": 158,
+          "sha256": "5a3385a1c22f78e8077e3f6018da639e791312bc6f66271a785c2506281c5b72",
+          "etag": "1D68192156302DA02EC2B9EC95F638E1",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/hammer-raised.png",
+            "/Users/Learning/web/long/pixel-assets/output/hammer-raised.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "scythe-sweep-spritesheet.png",
+          "sourcePath": "pixel-assets/output/scythe-sweep-spritesheet.png",
+          "objectKey": "effects/scythe-sweep-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/scythe-sweep-spritesheet.png",
+          "size": 253,
+          "sha256": "048f5b77252932da8aa63f997160f652907cc4535f833b3c00d3166e032cc727",
+          "etag": "D1473E49478D8BE7648A3DD0238662D4",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/scythe-sweep-spritesheet.png",
+            "/Users/Learning/web/long/pixel-assets/output/scythe-sweep-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-0.png",
+          "sourcePath": "pixel-assets/output/slash-green-0.png",
+          "objectKey": "effects/slash-green-0.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-0.png",
+          "size": 148,
+          "sha256": "c5754b45ab711e5b317a3bee9d1e3e790f91c4261f803f686840721b1731ca3e",
+          "etag": "DA58E854DA15EA4E6FD022202B522ED1",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/slash-green-0.png",
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-0.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-135.png",
+          "sourcePath": "pixel-assets/output/slash-green-135.png",
+          "objectKey": "effects/slash-green-135.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-135.png",
+          "size": 147,
+          "sha256": "05dbabec2b1d6f92c4c9872986335fae985884d722fb4ea5acadfde2c8a47607",
+          "etag": "626C351CCB27215C5AD93A66A8903A30",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/slash-green-135.png",
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-135.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-45.png",
+          "sourcePath": "pixel-assets/output/slash-green-45.png",
+          "objectKey": "effects/slash-green-45.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-45.png",
+          "size": 148,
+          "sha256": "06ba3648efbb49c2e1fe3a524e5133fdf8220e848dec569c341108c53465a204",
+          "etag": "FD44073A53CCD293D83E6C44BE91006E",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/slash-green-45.png",
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-45.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-90.png",
+          "sourcePath": "pixel-assets/output/slash-green-90.png",
+          "objectKey": "effects/slash-green-90.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-90.png",
+          "size": 137,
+          "sha256": "8b27ae704270cb1c4580f4f0e7a98cd06895f28184191bad9dc587924758d822",
+          "etag": "28AD048C6CCE7FCCB29D56DA1DE934F0",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/slash-green-90.png",
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-90.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t1a.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t1a.png",
+          "objectKey": "effects/talent-armor-t1a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t1a.png",
+          "size": 135,
+          "sha256": "6b360157f3cdb9f8a210d4c2da3324ab5e000723bb20d06d3c49a975cf571cd5",
+          "etag": "AB2ACBD45280A3862E9ABE8A666A122B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor-t1a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t1a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t1b.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t1b.png",
+          "objectKey": "effects/talent-armor-t1b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t1b.png",
+          "size": 148,
+          "sha256": "2c99f0c17de9e5c6b834061ac6f4bc2790bed2e1b1be4c1772c3699acfb761da",
+          "etag": "8ED2BDE3FC1676C298F56E5F7D6B7444",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor-t1b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t1b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t2a.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t2a.png",
+          "objectKey": "effects/talent-armor-t2a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t2a.png",
+          "size": 153,
+          "sha256": "a6ee5d9ea75333845ab86a94f392237c00b36ea0f08a52b2686cf3e109d0a914",
+          "etag": "A3DD256D940013B0803BA235B8CACC7E",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor-t2a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t2a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t2b.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t2b.png",
+          "objectKey": "effects/talent-armor-t2b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t2b.png",
+          "size": 137,
+          "sha256": "35ad735378962de0fe4e2276e2d241cb537c75e10a1ae896b2aae8eb67acd7e7",
+          "etag": "22266A70A63070A66E2C6CC20CD99FD0",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor-t2b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t2b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t3a.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t3a.png",
+          "objectKey": "effects/talent-armor-t3a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t3a.png",
+          "size": 148,
+          "sha256": "b13c5060ea0600b137912097f4997f767dd61a5c05cca5c2f741705690d46387",
+          "etag": "DBB01B07FE1F798C18B7BE825A56D15B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor-t3a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t3a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t3b.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t3b.png",
+          "objectKey": "effects/talent-armor-t3b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t3b.png",
+          "size": 144,
+          "sha256": "5ca6ac4b69d47cb21aa42f32d9696ea5175d04c374a3c0e1a9593491ed89a917",
+          "etag": "881967E22A5311665ACD8857A3178A63",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor-t3b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t3b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_auto_strike.png",
+          "sourcePath": "pixel-assets/output/talent-armor_auto_strike.png",
+          "objectKey": "effects/talent-armor_auto_strike.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_auto_strike.png",
+          "size": 156,
+          "sha256": "0744b83d2f7484c886367e5560ffdfb7c8a5f43a3597dba92ae887d08b2bc4a2",
+          "etag": "1A39C7FDB203E3BA3B300BED7615015F",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_auto_strike.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_auto_strike.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_boss_hunter.png",
+          "sourcePath": "pixel-assets/output/talent-armor_boss_hunter.png",
+          "objectKey": "effects/talent-armor_boss_hunter.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_boss_hunter.png",
+          "size": 158,
+          "sha256": "72f30e3a96bbe13586945a0156a450cdddd5bde85851cff247db1093d9387636",
+          "etag": "5453E409CBE4BC66872D9E218771C2DA",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_boss_hunter.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_boss_hunter.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_collapse_ext.png",
+          "sourcePath": "pixel-assets/output/talent-armor_collapse_ext.png",
+          "objectKey": "effects/talent-armor_collapse_ext.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_collapse_ext.png",
+          "size": 160,
+          "sha256": "de0a8c75c16b48c352fbc75975b060ea208f9b78672949f0187a629b51f62b90",
+          "etag": "2B7F143642F81047B82279235C67FE26",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_collapse_ext.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_collapse_ext.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_core.png",
+          "sourcePath": "pixel-assets/output/talent-armor_core.png",
+          "objectKey": "effects/talent-armor_core.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_core.png",
+          "size": 153,
+          "sha256": "6254409f155ad0c092b7897921bfa0cb3ff2a04be00e3dacb99f20305e2c336c",
+          "etag": "73ABC423209215646A64DFF17A865BC3",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_core.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_core.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_heavy_atk.png",
+          "sourcePath": "pixel-assets/output/talent-armor_heavy_atk.png",
+          "objectKey": "effects/talent-armor_heavy_atk.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_heavy_atk.png",
+          "size": 137,
+          "sha256": "af053030457aee560ea8c36e2d04f403d7eb18122e54b7ae883fb9313099873f",
+          "etag": "96267076C88AB493D36A80EDA7932B11",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_heavy_atk.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_heavy_atk.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_heavy_scale.png",
+          "sourcePath": "pixel-assets/output/talent-armor_heavy_scale.png",
+          "objectKey": "effects/talent-armor_heavy_scale.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_heavy_scale.png",
+          "size": 155,
+          "sha256": "088551b38f08ab9dd2b51d90b4c0244fb6762bb95e869f3840a0ead8c5b2b56e",
+          "etag": "26A8C913EA8521E30798B2F5F81DFAE2",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_heavy_scale.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_heavy_scale.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_pen_convert.png",
+          "sourcePath": "pixel-assets/output/talent-armor_pen_convert.png",
+          "objectKey": "effects/talent-armor_pen_convert.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_pen_convert.png",
+          "size": 158,
+          "sha256": "8d6fb9ca4d8250d8a71a89c2f676d020158798b7e4b6091652418d90a69b6cb8",
+          "etag": "7F07346C177C63D84DFFEAF6DEC26B2F",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_pen_convert.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_pen_convert.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_pen_up.png",
+          "sourcePath": "pixel-assets/output/talent-armor_pen_up.png",
+          "objectKey": "effects/talent-armor_pen_up.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_pen_up.png",
+          "size": 145,
+          "sha256": "bdbe2bcb2964faf4346e636dab7f1f9a8b6734de1de35161f997fc1bd61f0b5b",
+          "etag": "5A80F7CB4687BF644ADD644966D0CBB4",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_pen_up.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_pen_up.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_ruin.png",
+          "sourcePath": "pixel-assets/output/talent-armor_ruin.png",
+          "objectKey": "effects/talent-armor_ruin.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_ruin.png",
+          "size": 153,
+          "sha256": "64d8b7e9b020d25c92c377c21ad950a33266223481aed19aefe82ae2a22e418b",
+          "etag": "69BCA648A2BF995E9784808AD6CF1243",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_ruin.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_ruin.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_ultimate.png",
+          "sourcePath": "pixel-assets/output/talent-armor_ultimate.png",
+          "objectKey": "effects/talent-armor_ultimate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_ultimate.png",
+          "size": 158,
+          "sha256": "164ee9ba6437ae3158e5cfd6f8363fe9d6674e4ad81b45dfaa78261017900e19",
+          "etag": "DFAE39F6B39C42A2835C5E3B5FEAB0D5",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-armor_ultimate.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_ultimate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t1a.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t1a.png",
+          "objectKey": "effects/talent-crit-t1a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t1a.png",
+          "size": 147,
+          "sha256": "983209024c5f2a0e5f040b37e2427ff06e60ee1f19b799e8a2515433efc7df4d",
+          "etag": "BF3EE9CDD9CCD7D916B76F6D814B4F5E",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit-t1a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t1a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t1b.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t1b.png",
+          "objectKey": "effects/talent-crit-t1b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t1b.png",
+          "size": 145,
+          "sha256": "8cd2e7b02437aacd7df3d17c65d8883569ecf8038f3d14f99925f918d132b778",
+          "etag": "D229BCF556B2DE82C325B91D89CA8370",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit-t1b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t1b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t2a.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t2a.png",
+          "objectKey": "effects/talent-crit-t2a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t2a.png",
+          "size": 148,
+          "sha256": "0712937c938794ae640bedb4e3eddf8466e114c30388cd3e492c62d35b635cef",
+          "etag": "C6304F275E2311577713FFF5D1505961",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit-t2a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t2a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t2b.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t2b.png",
+          "objectKey": "effects/talent-crit-t2b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t2b.png",
+          "size": 142,
+          "sha256": "4d117a92e01f2a335d5a3c3e823d795446a3f84947aaf0e6fcc104b0c630fcc3",
+          "etag": "5897A20E0A2B6B747E693684B96D55FE",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit-t2b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t2b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t3a.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t3a.png",
+          "objectKey": "effects/talent-crit-t3a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t3a.png",
+          "size": 148,
+          "sha256": "2ba1fc84720652b1c010d114302167ba807d843e762d0afd574372e4358796c3",
+          "etag": "0F9D1570E25E90533395B6F540AC05CA",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit-t3a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t3a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t3b.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t3b.png",
+          "objectKey": "effects/talent-crit-t3b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t3b.png",
+          "size": 148,
+          "sha256": "5ead0c9c6834a091d5f829aeb95ae83213716ae3ec7b8e5d9def7adf384f3bc3",
+          "etag": "FE07EC295ED71727114B657F099E1850",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit-t3b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t3b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_bleed.png",
+          "sourcePath": "pixel-assets/output/talent-crit_bleed.png",
+          "objectKey": "effects/talent-crit_bleed.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_bleed.png",
+          "size": 151,
+          "sha256": "6cbf723c986243e21da6e66cd553e962608744e3675f1fd5168c92bcadd6ff57",
+          "etag": "EB1FBF2B2D4800AC83B00B2BF4C67E28",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_bleed.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_bleed.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_core.png",
+          "sourcePath": "pixel-assets/output/talent-crit_core.png",
+          "objectKey": "effects/talent-crit_core.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_core.png",
+          "size": 152,
+          "sha256": "ee2754d2c8e4720073ee49630f3e4a9ac38e0ec685ff90480d123830d494a5a7",
+          "etag": "8A3CD047E9C85489208ADDAE20914F86",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_core.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_core.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_cruel.png",
+          "sourcePath": "pixel-assets/output/talent-crit_cruel.png",
+          "objectKey": "effects/talent-crit_cruel.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_cruel.png",
+          "size": 146,
+          "sha256": "721b83cc0efbeb4df776a633ad56730650e126fdc1d8d0230160765e375d3039",
+          "etag": "1CCC85E26C4D4B40FED4D2D5B90F716D",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_cruel.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_cruel.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_death_ecstasy.png",
+          "sourcePath": "pixel-assets/output/talent-crit_death_ecstasy.png",
+          "objectKey": "effects/talent-crit_death_ecstasy.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_death_ecstasy.png",
+          "size": 157,
+          "sha256": "f3a29fd36b89fd06c9ef8f7ef495ce8a26207336309c1646a864d80210033348",
+          "etag": "43A9D0FA113644B6FF63303C6214C466",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_death_ecstasy.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_death_ecstasy.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_final_cut.png",
+          "sourcePath": "pixel-assets/output/talent-crit_final_cut.png",
+          "objectKey": "effects/talent-crit_final_cut.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_final_cut.png",
+          "size": 148,
+          "sha256": "2a1b67bb34e22c3e13cc4a8ef8dc73c1a2093a71e5b59e55ed5c6e3022b9ddff",
+          "etag": "697FAD9883EDCDAB31D17137657C400D",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_final_cut.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_final_cut.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_omen_kill.png",
+          "sourcePath": "pixel-assets/output/talent-crit_omen_kill.png",
+          "objectKey": "effects/talent-crit_omen_kill.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_omen_kill.png",
+          "size": 154,
+          "sha256": "fa2b6fd02a3b6e7936ea9f8dd442551924ba4eaa3f38bf6ba456e26347720c3e",
+          "etag": "CAB7D391D8803398108E3013AC995E78",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_omen_kill.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_omen_kill.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_omen_reap.png",
+          "sourcePath": "pixel-assets/output/talent-crit_omen_reap.png",
+          "objectKey": "effects/talent-crit_omen_reap.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_omen_reap.png",
+          "size": 151,
+          "sha256": "2387798d196d8eee9d7bf30530ced0da09be1d6d6f14fb780d2c4c6578061b03",
+          "etag": "2CD67C4609C2F1DC3BD6CB4110A11A46",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_omen_reap.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_omen_reap.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_omen_resonate.png",
+          "sourcePath": "pixel-assets/output/talent-crit_omen_resonate.png",
+          "objectKey": "effects/talent-crit_omen_resonate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_omen_resonate.png",
+          "size": 152,
+          "sha256": "6251dd6eddc61a5aaa984d717a27b2166ee1f5f36cf2f3080c0de3b5cc11009d",
+          "etag": "FF3416743F62A15501C5CC0905CBCF56",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_omen_resonate.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_omen_resonate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_skinner.png",
+          "sourcePath": "pixel-assets/output/talent-crit_skinner.png",
+          "objectKey": "effects/talent-crit_skinner.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_skinner.png",
+          "size": 150,
+          "sha256": "085adaa2b07278db0f707aa45d174727079461d8c7f38a4e466c8f4545944902",
+          "etag": "DD7B0A9ADD2207A4DDB858EF403C3B3E",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_skinner.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_skinner.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_ultimate.png",
+          "sourcePath": "pixel-assets/output/talent-crit_ultimate.png",
+          "objectKey": "effects/talent-crit_ultimate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_ultimate.png",
+          "size": 158,
+          "sha256": "d24b5b262185a719ed993c16809de854e52dc187d3e8611ffd32c488abfba7fd",
+          "etag": "ABF099854D4674645E2433768955A494",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-crit_ultimate.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_ultimate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t1a.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t1a.png",
+          "objectKey": "effects/talent-normal-t1a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t1a.png",
+          "size": 140,
+          "sha256": "c7fa0da353736eb97045be219bfab7de9a4b4aabcb96a4788439e3ac394eb56a",
+          "etag": "83741E7AB4DF3CDE599BE72E728196D7",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal-t1a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t1a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t1b.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t1b.png",
+          "objectKey": "effects/talent-normal-t1b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t1b.png",
+          "size": 150,
+          "sha256": "d6b033eb1c909d81796444bffbcfb3779b14541a5323ae9a73164ce33b1b9d9b",
+          "etag": "42AFCFBCBBDE1CC9B5360FD66964B7DE",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal-t1b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t1b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t2a.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t2a.png",
+          "objectKey": "effects/talent-normal-t2a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t2a.png",
+          "size": 150,
+          "sha256": "2a9ce4351f2f3db35cda1628e06dd563836d6c8f4f8a8624fc040188fadcae0a",
+          "etag": "082A59F357EDCF06BB04EADAC09C29FC",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal-t2a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t2a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t2b.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t2b.png",
+          "objectKey": "effects/talent-normal-t2b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t2b.png",
+          "size": 141,
+          "sha256": "1bc9efdd11f143abda6357ec088aeba5317fbcdbeb83b70d43e0edf464c6ce07",
+          "etag": "119544133308DD3556F9D28B5123F68D",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal-t2b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t2b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t3a.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t3a.png",
+          "objectKey": "effects/talent-normal-t3a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t3a.png",
+          "size": 151,
+          "sha256": "5f66f3b77871a76b0942bbf6f9cb32f52ee088bc96a26f684bc019ce85f2d2aa",
+          "etag": "8D9548EA52C2FA0A6579213A95826D3A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal-t3a.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t3a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t3b.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t3b.png",
+          "objectKey": "effects/talent-normal-t3b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t3b.png",
+          "size": 148,
+          "sha256": "244de742ca93e8df7547d70fc2636d26ef75f885afdd6e3622c3e1bfdb03fac7",
+          "etag": "B033419546443139BF2B98033D913590",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal-t3b.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t3b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_atk_up.png",
+          "sourcePath": "pixel-assets/output/talent-normal_atk_up.png",
+          "objectKey": "effects/talent-normal_atk_up.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_atk_up.png",
+          "size": 161,
+          "sha256": "22acf2fe37fac51ba74e87793a4dd5354c23256f546e00cbe03a4ea0ee7829eb",
+          "etag": "A761BBA54648A7C598C2F64CCC4E1A6C",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_atk_up.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_atk_up.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_charge.png",
+          "sourcePath": "pixel-assets/output/talent-normal_charge.png",
+          "objectKey": "effects/talent-normal_charge.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_charge.png",
+          "size": 159,
+          "sha256": "c208056f2cd53ce42c4b38facbcfce3a8bb1f91164600372b98b45774cf1c47f",
+          "etag": "A386654616EA5AA302BCB5A1B5844D82",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_charge.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_charge.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_chase_up.png",
+          "sourcePath": "pixel-assets/output/talent-normal_chase_up.png",
+          "objectKey": "effects/talent-normal_chase_up.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_chase_up.png",
+          "size": 151,
+          "sha256": "f4c70f30a04725ca4cdf3599c2d39b81c8e2dce668e7de3a22988208b67c939b",
+          "etag": "F0BA2686E81AF4A86F39AD6CD926A884",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_chase_up.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_chase_up.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_combo_ext.png",
+          "sourcePath": "pixel-assets/output/talent-normal_combo_ext.png",
+          "objectKey": "effects/talent-normal_combo_ext.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_combo_ext.png",
+          "size": 152,
+          "sha256": "9b6bafd6899a9ce771074c924b614f21b27126b066b110d27570d5460927f74f",
+          "etag": "51FBECC9270E127E2D267A7F7A268024",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_combo_ext.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_combo_ext.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_core.png",
+          "sourcePath": "pixel-assets/output/talent-normal_core.png",
+          "objectKey": "effects/talent-normal_core.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_core.png",
+          "size": 147,
+          "sha256": "3ecd57c4d343a1c79d5b406bacea91856a9f6d97b946f731bcf0160a93858f93",
+          "etag": "412792EE3D6945AD4276312E1353EDAB",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_core.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_core.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_dmg_amp.png",
+          "sourcePath": "pixel-assets/output/talent-normal_dmg_amp.png",
+          "objectKey": "effects/talent-normal_dmg_amp.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_dmg_amp.png",
+          "size": 153,
+          "sha256": "927a4c63af514317f5f53c2b031bbe25ccdf0479f7b76d8a73b2fb89ca541a67",
+          "etag": "98D34CB3314EEEB94A9FC59B440BBF04",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_dmg_amp.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_dmg_amp.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_encircle.png",
+          "sourcePath": "pixel-assets/output/talent-normal_encircle.png",
+          "objectKey": "effects/talent-normal_encircle.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_encircle.png",
+          "size": 151,
+          "sha256": "b1ed0cc1be210a84ba60677f01b6a1be8096d85ba4a5b0472b5edeea6fc1856a",
+          "etag": "5CA19F97F9ECB5792EECC844317076ED",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_encircle.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_encircle.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_low_hp.png",
+          "sourcePath": "pixel-assets/output/talent-normal_low_hp.png",
+          "objectKey": "effects/talent-normal_low_hp.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_low_hp.png",
+          "size": 153,
+          "sha256": "6204f60d7927137395ba5f1dc6248c54b4c8d75662c75bd7ee97f70bbd24edf0",
+          "etag": "7527C70526898D5C3EE26EC353F2062D",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_low_hp.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_low_hp.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_soft_atk.png",
+          "sourcePath": "pixel-assets/output/talent-normal_soft_atk.png",
+          "objectKey": "effects/talent-normal_soft_atk.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_soft_atk.png",
+          "size": 155,
+          "sha256": "684dcbe3064f53db860be6d593616cc4847d818b47850739e2b03ee361dbbd7f",
+          "etag": "33FE5A1E2CB54FA6B74095EE2334CB1B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_soft_atk.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_soft_atk.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_ultimate.png",
+          "sourcePath": "pixel-assets/output/talent-normal_ultimate.png",
+          "objectKey": "effects/talent-normal_ultimate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_ultimate.png",
+          "size": 159,
+          "sha256": "2622e24548634c203a098202f865a56a0326341dca3e52e84a1bcf6b9a189e7e",
+          "etag": "5F554EB5ABC41879C8C8D602796B3A0F",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/talent-normal_ultimate.png",
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_ultimate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T0-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T0-armor.png",
+          "objectKey": "effects/tier-reward-T0-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T0-armor.png",
+          "size": 139,
+          "sha256": "8d5001c9d67c2b2e5279ea926f62cbc1ae90c4ee1814c41da6c0b72020003ee7",
+          "etag": "65B198BBA94BBAE7A8C37BDA971CC473",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T0-armor.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T0-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T0-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T0-crit.png",
+          "objectKey": "effects/tier-reward-T0-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T0-crit.png",
+          "size": 138,
+          "sha256": "1fb9093084e3ba74a2335530625dc81cb42644a0443a5f05d8b6caa5d304f9a6",
+          "etag": "F51424F68F6A6D75890A35A2D4F1829A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T0-crit.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T0-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T0-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T0-normal.png",
+          "objectKey": "effects/tier-reward-T0-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T0-normal.png",
+          "size": 140,
+          "sha256": "ba3ca20e2d62557d4f2c32097d112109b0570cda3e170f1c17be24755343c8d8",
+          "etag": "BBC2E57E66D0240B6CCC4D6843D3D064",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T0-normal.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T0-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T1-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T1-armor.png",
+          "objectKey": "effects/tier-reward-T1-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T1-armor.png",
+          "size": 137,
+          "sha256": "0ffba78af91eccaba92d4f58f48b2e7b233bcfb5902e08442aa1224b7ed7bc35",
+          "etag": "84FAC887FEC538E4F9645624F363C7D0",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T1-armor.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T1-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T1-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T1-crit.png",
+          "objectKey": "effects/tier-reward-T1-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T1-crit.png",
+          "size": 136,
+          "sha256": "3f9f38765b5ab622a759f07758b5c6e6938a44863d8dffc14505624158f41629",
+          "etag": "9E8EE8DB50FB15311CB2206A3F691119",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T1-crit.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T1-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T1-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T1-normal.png",
+          "objectKey": "effects/tier-reward-T1-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T1-normal.png",
+          "size": 138,
+          "sha256": "e7280669d3d714bef6ba0d335d92ebce9d187379aeea70383fda27be6fc27874",
+          "etag": "0F6D958651B75C645A8554BD6D84D571",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T1-normal.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T1-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T2-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T2-armor.png",
+          "objectKey": "effects/tier-reward-T2-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T2-armor.png",
+          "size": 140,
+          "sha256": "6cc53b1c37a23cab127c29d873a0311348d755b281e598b41d0fd6e426dfb398",
+          "etag": "9397426C9DD173043C508ABEE0DBD959",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T2-armor.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T2-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T2-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T2-crit.png",
+          "objectKey": "effects/tier-reward-T2-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T2-crit.png",
+          "size": 139,
+          "sha256": "609339f4ccca79cacb50633e5bf4d927c525bc16b8a5d2ce3746155ce1b7ef0f",
+          "etag": "4C12D2B06B2CA8B97C355937291EE45C",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T2-crit.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T2-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T2-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T2-normal.png",
+          "objectKey": "effects/tier-reward-T2-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T2-normal.png",
+          "size": 141,
+          "sha256": "61b000f958438c169879123ee37a13616c5488814a17a1d956a0c38dc42edef5",
+          "etag": "9B87F793F74B1EC9C7601AF094945337",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T2-normal.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T2-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T3-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T3-armor.png",
+          "objectKey": "effects/tier-reward-T3-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T3-armor.png",
+          "size": 145,
+          "sha256": "7dd9ec01883c40f3750e98af8526bc69a456a3baa3475ac7132d420f5bbe7b89",
+          "etag": "91E2436B7876D1B7EDFBAEE7F358F645",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T3-armor.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T3-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T3-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T3-crit.png",
+          "objectKey": "effects/tier-reward-T3-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T3-crit.png",
+          "size": 144,
+          "sha256": "479f879070e529affa7289e21bc90483f12fb593929bb2b04acab4d91b99814e",
+          "etag": "2B094AAE30B7B49EBB683E5587D81701",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T3-crit.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T3-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T3-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T3-normal.png",
+          "objectKey": "effects/tier-reward-T3-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T3-normal.png",
+          "size": 146,
+          "sha256": "3ff4022fa65c07f969db20c1042605097e14b911089f5db3da6883654a5be79f",
+          "etag": "69A6307868C3759E433365A21126E26B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T3-normal.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T3-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T4-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T4-armor.png",
+          "objectKey": "effects/tier-reward-T4-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T4-armor.png",
+          "size": 147,
+          "sha256": "c378344849ed4a8886593b88dec734a0a73b9183e6dcef72ad631a7535fc1f6d",
+          "etag": "0E61978ADF22DFA2E6B451480CB321A4",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T4-armor.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T4-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T4-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T4-crit.png",
+          "objectKey": "effects/tier-reward-T4-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T4-crit.png",
+          "size": 146,
+          "sha256": "2d8ea5d59c28a352dee9f967be71ea7baac1bf3a87075bd1b44f6983eef697b3",
+          "etag": "24B317C31266132043AB8F84E19F1E01",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T4-crit.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T4-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T4-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T4-normal.png",
+          "objectKey": "effects/tier-reward-T4-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T4-normal.png",
+          "size": 148,
+          "sha256": "cca95284349fa2893f93e5ffd85126fe6eb8b1edfc540136d9cad8afed2703fb",
+          "etag": "F44BCD0C97F9DA526A304F957C1E9D68",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/frontend/public/effects/tier-reward-T4-normal.png",
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T4-normal.png"
+          ]
+        }
+      ]
+    },
+    {
+      "generatedAt": "2026-04-27T08:37:57.505559+00:00",
+      "bucket": "hai-world2",
+      "endpoint": "https://oss-cn-beijing.aliyuncs.com",
+      "publicBaseURL": "https://hai-world2.oss-cn-beijing.aliyuncs.com",
+      "prefix": "effects",
+      "pattern": "*.png",
+      "deleteLocal": true,
+      "dryRun": false,
+      "totalFiles": 86,
+      "files": [
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "armor-break-spritesheet.png",
+          "sourcePath": "pixel-assets/output/armor-break-spritesheet.png",
+          "objectKey": "effects/armor-break-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/armor-break-spritesheet.png",
+          "size": 330,
+          "sha256": "ae0a4ea26158dec817f80bccb195bc6f8698fb8e89b6a18c7820b5c069279460",
+          "etag": "8FB3A98D95C14829B01668B8AD568A95",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/armor-break-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-blade-spritesheet.png",
+          "sourcePath": "pixel-assets/output/blood-blade-spritesheet.png",
+          "objectKey": "effects/blood-blade-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-blade-spritesheet.png",
+          "size": 400,
+          "sha256": "fad6c7ffe8f78517e34e7325602dac2dd2cc737cd6d78b22fe65d78f8a20873f",
+          "etag": "DCE956855FBBBB9D343BA8A7F411E105",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/blood-blade-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-drop-large.png",
+          "sourcePath": "pixel-assets/output/blood-drop-large.png",
+          "objectKey": "effects/blood-drop-large.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-drop-large.png",
+          "size": 133,
+          "sha256": "352950c75d4d7d6d5a74cbb2d18780e4cacc2e18810914858d3f97291e68c4c1",
+          "etag": "1436DF151F8737F6310A38872F2111A6",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/blood-drop-large.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-drop-medium.png",
+          "sourcePath": "pixel-assets/output/blood-drop-medium.png",
+          "objectKey": "effects/blood-drop-medium.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-drop-medium.png",
+          "size": 121,
+          "sha256": "ca5c2edaf21c393a478792188bdf627a4a1065ef41084d427a883b070e0b584b",
+          "etag": "CBC27DCD6547370175B44EDBB35C7A0D",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/blood-drop-medium.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "blood-drop-small.png",
+          "sourcePath": "pixel-assets/output/blood-drop-small.png",
+          "objectKey": "effects/blood-drop-small.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/blood-drop-small.png",
+          "size": 114,
+          "sha256": "8f9cf7f720179b86182d3e4202bdb75f12a55b1b686625e2bc5612dfe7d37a81",
+          "etag": "56F309BA5EFB909576E41830F1F17124",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/blood-drop-small.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crack-pattern-1.png",
+          "sourcePath": "pixel-assets/output/crack-pattern-1.png",
+          "objectKey": "effects/crack-pattern-1.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crack-pattern-1.png",
+          "size": 204,
+          "sha256": "99f1696b40219cf6fef522e3711a1f0abf70b42e0a75fd32c82d5ace2f3f798d",
+          "etag": "022775B8BA330D339AFD2C39C73A7AA5",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/crack-pattern-1.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crack-pattern-2.png",
+          "sourcePath": "pixel-assets/output/crack-pattern-2.png",
+          "objectKey": "effects/crack-pattern-2.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crack-pattern-2.png",
+          "size": 195,
+          "sha256": "befd011ac2e239a885f4a9f106c096fbc42e30dd32214a2ad1781464930d85e5",
+          "etag": "4C0EA4F21DF0ADA55EB636806411F278",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/crack-pattern-2.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crack-pattern-3.png",
+          "sourcePath": "pixel-assets/output/crack-pattern-3.png",
+          "objectKey": "effects/crack-pattern-3.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crack-pattern-3.png",
+          "size": 206,
+          "sha256": "1fd09ee2231b803be0be5678148322d79a32c91d7dbba9b5f46fd7144a8fc210",
+          "etag": "51936A0D28B199A3CAF72723E4BFFB66",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/crack-pattern-3.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crosshair-mark-glow.png",
+          "sourcePath": "pixel-assets/output/crosshair-mark-glow.png",
+          "objectKey": "effects/crosshair-mark-glow.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crosshair-mark-glow.png",
+          "size": 184,
+          "sha256": "ccdfb8fe4b9922efd10cd56889e5caf5221aa64faa5e90c31cff4035c3469cc4",
+          "etag": "0874F5E51CA5E27C9A25FCC96CF1E946",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/crosshair-mark-glow.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "crosshair-mark.png",
+          "sourcePath": "pixel-assets/output/crosshair-mark.png",
+          "objectKey": "effects/crosshair-mark.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/crosshair-mark.png",
+          "size": 165,
+          "sha256": "36c40c4fc0dfef3f3133d7d72f88663f6ecd123c868b513df7f6b9d519732cde",
+          "etag": "072BA8C524C9F237582A4CC1C01033F1",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/crosshair-mark.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-armor.png",
+          "sourcePath": "pixel-assets/output/emblem-armor.png",
+          "objectKey": "effects/emblem-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-armor.png",
+          "size": 217,
+          "sha256": "cace2bf23be544ec7102ffb7a9943a155fca8d4efdb0b93eb56ad503ccba5c4b",
+          "etag": "DE50CF44B493053227B40888FC622E2D",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/emblem-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-crit.png",
+          "sourcePath": "pixel-assets/output/emblem-crit.png",
+          "objectKey": "effects/emblem-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-crit.png",
+          "size": 212,
+          "sha256": "e1cd93517ed2ca326f177a42b09a8950a8b420e4f8e6445430432993b68cc8c0",
+          "etag": "FCE196CF50A34C86919B9F8CDCD7E00B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/emblem-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-normal.png",
+          "sourcePath": "pixel-assets/output/emblem-normal.png",
+          "objectKey": "effects/emblem-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-normal.png",
+          "size": 209,
+          "sha256": "cf9029caaabf5b6c0e1d368a19e18a044a38b4b1c1ca5b9118033d281abc2856",
+          "etag": "1343CD1692022975B1A2649B41F33DF7",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/emblem-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "emblem-talent.png",
+          "sourcePath": "pixel-assets/output/emblem-talent.png",
+          "objectKey": "effects/emblem-talent.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/emblem-talent.png",
+          "size": 239,
+          "sha256": "c893d9f3760ba29685836de468bc0b6448e7332fed245ac57e1a8a497580581a",
+          "etag": "4B5BD308292FE0DF0CBC63F91F0C34FD",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/emblem-talent.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "green-ring-spritesheet.png",
+          "sourcePath": "pixel-assets/output/green-ring-spritesheet.png",
+          "objectKey": "effects/green-ring-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/green-ring-spritesheet.png",
+          "size": 321,
+          "sha256": "674d8c0fe3f509ff1e726d4839abf6068bf7364bb58b7229773ff0f98e5c0ed9",
+          "etag": "9E48EC18B7EDE334C60B7D6F94591D2A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/green-ring-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "hammer-crack-spritesheet.png",
+          "sourcePath": "pixel-assets/output/hammer-crack-spritesheet.png",
+          "objectKey": "effects/hammer-crack-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/hammer-crack-spritesheet.png",
+          "size": 333,
+          "sha256": "c7e9e8f85f8ed948c8b8085ae906d5355026811ade60be0f048e0af923026807",
+          "etag": "7320DB015F385D12B0BEBB2B342FCB17",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/hammer-crack-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "hammer-impact.png",
+          "sourcePath": "pixel-assets/output/hammer-impact.png",
+          "objectKey": "effects/hammer-impact.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/hammer-impact.png",
+          "size": 231,
+          "sha256": "57fe0a4b1dc19792697587091a281963f214f929c1ab046726c544f60313164a",
+          "etag": "25288D4751C3164A690AEB398DD7B6A6",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/hammer-impact.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "hammer-raised.png",
+          "sourcePath": "pixel-assets/output/hammer-raised.png",
+          "objectKey": "effects/hammer-raised.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/hammer-raised.png",
+          "size": 224,
+          "sha256": "d43313e7225e62eff180bbffba3f6a6d80ff6d5dd240d67766c41296326f4970",
+          "etag": "8FDA2B5271FE6B2B1EBE8C85424655AC",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/hammer-raised.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "scythe-sweep-spritesheet.png",
+          "sourcePath": "pixel-assets/output/scythe-sweep-spritesheet.png",
+          "objectKey": "effects/scythe-sweep-spritesheet.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/scythe-sweep-spritesheet.png",
+          "size": 377,
+          "sha256": "c91fd593c5b8220d10b4ccb9468c4170a64107dbc7737193f716f9d80c132d30",
+          "etag": "329DBC11E2A086F6765698DABAC74F5E",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/scythe-sweep-spritesheet.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-0.png",
+          "sourcePath": "pixel-assets/output/slash-green-0.png",
+          "objectKey": "effects/slash-green-0.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-0.png",
+          "size": 210,
+          "sha256": "51ddc0f187927c5d20791e6e8f78a902e4979d2c71dbe3a6729a990b0420bf6e",
+          "etag": "4CC5EA02BE74B7383A52A86C65A54A26",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-0.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-135.png",
+          "sourcePath": "pixel-assets/output/slash-green-135.png",
+          "objectKey": "effects/slash-green-135.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-135.png",
+          "size": 197,
+          "sha256": "5896eee3ce3ee88160f8ff5ef708ee9f759e00f3d2df9c36f68a54eac875b325",
+          "etag": "0CAED3CDB61E324670C41A1A1369E785",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-135.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-45.png",
+          "sourcePath": "pixel-assets/output/slash-green-45.png",
+          "objectKey": "effects/slash-green-45.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-45.png",
+          "size": 209,
+          "sha256": "3b6723d0efcbe32880fe97811a3691ce99e34f93a291792849e2b95915096ac0",
+          "etag": "775179066278CBA84D7FB3A3FBB6F4E7",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-45.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "slash-green-90.png",
+          "sourcePath": "pixel-assets/output/slash-green-90.png",
+          "objectKey": "effects/slash-green-90.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/slash-green-90.png",
+          "size": 204,
+          "sha256": "28189ba432c70f69d7d7fc61831f773e4c2252bed05a8395782cc44368eb0ff5",
+          "etag": "BD6C97EFB7B25CF6777521D25428D752",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/slash-green-90.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t1a.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t1a.png",
+          "objectKey": "effects/talent-armor-t1a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t1a.png",
+          "size": 194,
+          "sha256": "bdcea95279758e8469ad6e8b8993cb12b80ffa3ca283a5fcbdc7e1e32217858c",
+          "etag": "B386D3CFBC52F14012AE77D2B0A8451B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t1a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t1b.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t1b.png",
+          "objectKey": "effects/talent-armor-t1b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t1b.png",
+          "size": 208,
+          "sha256": "7479608e966f8c135199d57621e3c1aefd677e3f80f768a184d9da41281b9bf5",
+          "etag": "342482EB60AEAA0376056215D90BC34F",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t1b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t2a.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t2a.png",
+          "objectKey": "effects/talent-armor-t2a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t2a.png",
+          "size": 220,
+          "sha256": "e90ba79354583a3b0151d032b25e9e40e0dc6588cef22b096890accf9ad09475",
+          "etag": "DD192AF92909F8C10FB24341ACB17BDF",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t2a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t2b.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t2b.png",
+          "objectKey": "effects/talent-armor-t2b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t2b.png",
+          "size": 196,
+          "sha256": "70054594e331a5703b91f33700f1f123eaae33110fb712a06cc39eb486f566e8",
+          "etag": "5DAECE546F53C0972F54F6D0A3E5F7C3",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t2b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t3a.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t3a.png",
+          "objectKey": "effects/talent-armor-t3a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t3a.png",
+          "size": 221,
+          "sha256": "08fd4f9f4ec56b2dda641689f904d3b8dd5319c7b2ecc0b8bf914bbc7b025e44",
+          "etag": "37A9A395F18A8A69F68E8140D7DD6171",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t3a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor-t3b.png",
+          "sourcePath": "pixel-assets/output/talent-armor-t3b.png",
+          "objectKey": "effects/talent-armor-t3b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor-t3b.png",
+          "size": 188,
+          "sha256": "afcdcd047ce51152a8822e7d27668d52e17908bb19b956adceafd13ed2c363e3",
+          "etag": "CE2857C813240F57BD35B4BEDB229BDD",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor-t3b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_auto_strike.png",
+          "sourcePath": "pixel-assets/output/talent-armor_auto_strike.png",
+          "objectKey": "effects/talent-armor_auto_strike.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_auto_strike.png",
+          "size": 210,
+          "sha256": "73941fba57140d7dbaf9f268ebe89f6181642ec5ade7b12214bfffc7c7439ff0",
+          "etag": "DECCE3E7C28C6FD416CD77CD50AFA765",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_auto_strike.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_boss_hunter.png",
+          "sourcePath": "pixel-assets/output/talent-armor_boss_hunter.png",
+          "objectKey": "effects/talent-armor_boss_hunter.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_boss_hunter.png",
+          "size": 224,
+          "sha256": "b1913bf7a5a8dc2bc4b0f980ae82d55dc29b88a5d6c9c2d103074303cf7430d9",
+          "etag": "964A654F861BAAF12DC680149CD60001",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_boss_hunter.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_collapse_ext.png",
+          "sourcePath": "pixel-assets/output/talent-armor_collapse_ext.png",
+          "objectKey": "effects/talent-armor_collapse_ext.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_collapse_ext.png",
+          "size": 203,
+          "sha256": "bdf95d473203129a17a45d717c5b37684d05caa7cb4531cb810f9e3f34718b7c",
+          "etag": "D9AAD80ED0281F39B8FDCFA88ABA97FF",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_collapse_ext.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_core.png",
+          "sourcePath": "pixel-assets/output/talent-armor_core.png",
+          "objectKey": "effects/talent-armor_core.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_core.png",
+          "size": 218,
+          "sha256": "3dfcfa54ac8bb931b8b386d61312a68ee482ba03f399b5aa8c1c5f8bdbfbd8ed",
+          "etag": "7B50F868CD2DD8410C743DE82E803E91",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_core.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_heavy_atk.png",
+          "sourcePath": "pixel-assets/output/talent-armor_heavy_atk.png",
+          "objectKey": "effects/talent-armor_heavy_atk.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_heavy_atk.png",
+          "size": 188,
+          "sha256": "88ec15129253d3e9a83a107af0ed46244f9eee9339b05fe3f765986132950e4f",
+          "etag": "D607908803F50D4A5136724BC648556C",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_heavy_atk.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_heavy_scale.png",
+          "sourcePath": "pixel-assets/output/talent-armor_heavy_scale.png",
+          "objectKey": "effects/talent-armor_heavy_scale.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_heavy_scale.png",
+          "size": 231,
+          "sha256": "91ccd40b38054ac216e133f10b378e931a733af6ddb9804db47c45b0d3eb3205",
+          "etag": "375DA6D042EF7ECC30B959EDE76A3F1F",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_heavy_scale.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_pen_convert.png",
+          "sourcePath": "pixel-assets/output/talent-armor_pen_convert.png",
+          "objectKey": "effects/talent-armor_pen_convert.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_pen_convert.png",
+          "size": 219,
+          "sha256": "5b534641500adad6c59016030aa5cc1d7e1a002a87615a5b9b6e9dfa30024dd9",
+          "etag": "0A2362BD41310C68F0EF99758AB1E669",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_pen_convert.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_pen_up.png",
+          "sourcePath": "pixel-assets/output/talent-armor_pen_up.png",
+          "objectKey": "effects/talent-armor_pen_up.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_pen_up.png",
+          "size": 209,
+          "sha256": "faeb6091d8554b184c570c18e17757f38b714542ec777c4ecfa753093ba0db0b",
+          "etag": "C56A88A1E7DDC2FDD2BF359226CDD1F4",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_pen_up.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_ruin.png",
+          "sourcePath": "pixel-assets/output/talent-armor_ruin.png",
+          "objectKey": "effects/talent-armor_ruin.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_ruin.png",
+          "size": 187,
+          "sha256": "9961fb7ef6704282faa33b37e594063689d354fd91dc4c490dedd01b2afae0ce",
+          "etag": "4D5E7E4AC0F7A7639CE7A22414C38031",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_ruin.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-armor_ultimate.png",
+          "sourcePath": "pixel-assets/output/talent-armor_ultimate.png",
+          "objectKey": "effects/talent-armor_ultimate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-armor_ultimate.png",
+          "size": 225,
+          "sha256": "435d26d4cf7e7a390e9944eec16f61b1de70be0ac7a4a16381ed887338e69cdd",
+          "etag": "D15C5557999D3EA31186C26DE7092823",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-armor_ultimate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t1a.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t1a.png",
+          "objectKey": "effects/talent-crit-t1a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t1a.png",
+          "size": 204,
+          "sha256": "293480b995002357132c79a35c154a2c508089873e16a44df51cdfa8f28c1a88",
+          "etag": "37DA7B115C2C62DFEA00E09A5596B2D5",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t1a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t1b.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t1b.png",
+          "objectKey": "effects/talent-crit-t1b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t1b.png",
+          "size": 216,
+          "sha256": "97c2030f545a5f359998c12bc6d620407e87a1044b7a2cf6db2a96d97da87024",
+          "etag": "B9423BEBF94084879E17751DF5E24BFC",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t1b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t2a.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t2a.png",
+          "objectKey": "effects/talent-crit-t2a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t2a.png",
+          "size": 201,
+          "sha256": "af3dbbecf055cf4cb7799b0e13463c54c69033d050102244b79c6dfea27cc8ba",
+          "etag": "DC537C68571A160004DE801A1C9520D6",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t2a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t2b.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t2b.png",
+          "objectKey": "effects/talent-crit-t2b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t2b.png",
+          "size": 207,
+          "sha256": "4cfe6eaa2a04a50a28eedaf26ec6d3f573a5cc67219794aa31e572172c90a188",
+          "etag": "DFBDC094DC699DB363921987F825AAA3",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t2b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t3a.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t3a.png",
+          "objectKey": "effects/talent-crit-t3a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t3a.png",
+          "size": 221,
+          "sha256": "5b54eb5364459cc73660b3d043dea9bd4b08f8c3f4708ce2ea754b3534f7220e",
+          "etag": "EDA35BAFD4B5076B47B4DE1F7BA0BA7A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t3a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit-t3b.png",
+          "sourcePath": "pixel-assets/output/talent-crit-t3b.png",
+          "objectKey": "effects/talent-crit-t3b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit-t3b.png",
+          "size": 215,
+          "sha256": "432c07bf95283d9d7c0abeefaad6460be61c1e5b35d48677132143d0e27a4212",
+          "etag": "6348285D1A682B27D2A3DEFD11881456",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit-t3b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_bleed.png",
+          "sourcePath": "pixel-assets/output/talent-crit_bleed.png",
+          "objectKey": "effects/talent-crit_bleed.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_bleed.png",
+          "size": 206,
+          "sha256": "d588f51778dccd356b2c1936b329d8f03eb17c89c2c5c7d4b93f21fdc3b5bba1",
+          "etag": "F4369E3F41558D4E7CB0FA2D14B6D971",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_bleed.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_core.png",
+          "sourcePath": "pixel-assets/output/talent-crit_core.png",
+          "objectKey": "effects/talent-crit_core.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_core.png",
+          "size": 217,
+          "sha256": "515271bf890f90fa016a66b603eed9b44dd973e17c0417946714215b3ef764e6",
+          "etag": "0361E4774250CCC135ED029EA241564A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_core.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_cruel.png",
+          "sourcePath": "pixel-assets/output/talent-crit_cruel.png",
+          "objectKey": "effects/talent-crit_cruel.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_cruel.png",
+          "size": 203,
+          "sha256": "cdb1b275e1a793ae1801918b91f5ad9900ddb212b4bbaf81f596c9ac1aa357b6",
+          "etag": "4F4092C86470BF1E5DC4D56BDAB6ED6A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_cruel.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_death_ecstasy.png",
+          "sourcePath": "pixel-assets/output/talent-crit_death_ecstasy.png",
+          "objectKey": "effects/talent-crit_death_ecstasy.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_death_ecstasy.png",
+          "size": 206,
+          "sha256": "2b50a0cfe9036f2cf01849c9d538645beb247000f70170fa2478c2f165e08389",
+          "etag": "925568E7FF3E3523BA0F98C7E86809D5",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_death_ecstasy.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_final_cut.png",
+          "sourcePath": "pixel-assets/output/talent-crit_final_cut.png",
+          "objectKey": "effects/talent-crit_final_cut.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_final_cut.png",
+          "size": 221,
+          "sha256": "e2c67a95689bb9595f8fb9e54fde9b3d4a6a320358fbc31a4c62df0adc724f43",
+          "etag": "B7A8AF228D7B2E6735964375EA160C9B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_final_cut.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_omen_kill.png",
+          "sourcePath": "pixel-assets/output/talent-crit_omen_kill.png",
+          "objectKey": "effects/talent-crit_omen_kill.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_omen_kill.png",
+          "size": 195,
+          "sha256": "39fdf6de93383b92f57002af6db8e0962e55634375429e9b603adf804f867721",
+          "etag": "5021F00488BD0A0905B641E73E0C1452",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_omen_kill.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_omen_reap.png",
+          "sourcePath": "pixel-assets/output/talent-crit_omen_reap.png",
+          "objectKey": "effects/talent-crit_omen_reap.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_omen_reap.png",
+          "size": 216,
+          "sha256": "fb125afb1e6a37f6a028524094fb628b709958521ac8841abbb97653b5a6ac74",
+          "etag": "1437B81657395FCEE705F7FBF1B5BB97",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_omen_reap.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_omen_resonate.png",
+          "sourcePath": "pixel-assets/output/talent-crit_omen_resonate.png",
+          "objectKey": "effects/talent-crit_omen_resonate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_omen_resonate.png",
+          "size": 216,
+          "sha256": "2b88439e4dba23aaa231a98b8f49712791ecff1359499abb7f2c44d0fb0d9c31",
+          "etag": "937FD4BF3C82D52DC18025BB4BEF75DA",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_omen_resonate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_skinner.png",
+          "sourcePath": "pixel-assets/output/talent-crit_skinner.png",
+          "objectKey": "effects/talent-crit_skinner.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_skinner.png",
+          "size": 205,
+          "sha256": "e04135083f8602be32f5160bd18f57249240aa89daddbadf01b3cfdb6af6cf96",
+          "etag": "FFDE0470B11113A6E4FA28B61A271976",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_skinner.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-crit_ultimate.png",
+          "sourcePath": "pixel-assets/output/talent-crit_ultimate.png",
+          "objectKey": "effects/talent-crit_ultimate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-crit_ultimate.png",
+          "size": 202,
+          "sha256": "2983b3118c6ad30551b0039f380d26bc67cfbb28acbc79a79a406cbeb644101d",
+          "etag": "73D4CD6DF58BDD6FFE8DE61664164063",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-crit_ultimate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t1a.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t1a.png",
+          "objectKey": "effects/talent-normal-t1a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t1a.png",
+          "size": 191,
+          "sha256": "b135ce272311cf3ba61306a9d5f5b8387b5aa8dc458b30bef23f487e43809c00",
+          "etag": "E26486C33CB755667A926E54C22D545D",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t1a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t1b.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t1b.png",
+          "objectKey": "effects/talent-normal-t1b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t1b.png",
+          "size": 205,
+          "sha256": "336b85cea7385a153af7ef8e4901a38a180f70aa94d0d3caaa125bafc604afb1",
+          "etag": "E9C56A18E6F7C9F70A0E7104F4D31EDC",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t1b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t2a.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t2a.png",
+          "objectKey": "effects/talent-normal-t2a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t2a.png",
+          "size": 218,
+          "sha256": "e5f699fdcf1cac23270b7f94aad5c3e747c03da7b164a24ed349ac871830c26a",
+          "etag": "89B9675BD873872D57996AF2D9C6D3EA",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t2a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t2b.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t2b.png",
+          "objectKey": "effects/talent-normal-t2b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t2b.png",
+          "size": 219,
+          "sha256": "0749a659b21ab7f5bd3595ab79404b50d135823ffa18a6f6971a92168500a54b",
+          "etag": "AF3A78523BDC3147B2D3EB68AE6F3323",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t2b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t3a.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t3a.png",
+          "objectKey": "effects/talent-normal-t3a.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t3a.png",
+          "size": 203,
+          "sha256": "7db02fd5cae22769f2b4602eb733e8b63c6caa11dc38d2d82b2fdd459e551628",
+          "etag": "475A4E36F1EEA3D34D646CC260B170B0",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t3a.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal-t3b.png",
+          "sourcePath": "pixel-assets/output/talent-normal-t3b.png",
+          "objectKey": "effects/talent-normal-t3b.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal-t3b.png",
+          "size": 206,
+          "sha256": "37f0003620d5f1739a5776c81e84938108f89d9d2fb62f64e18f52a672569329",
+          "etag": "115A22388FF651A0ACEFB2A703E27A13",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal-t3b.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_atk_up.png",
+          "sourcePath": "pixel-assets/output/talent-normal_atk_up.png",
+          "objectKey": "effects/talent-normal_atk_up.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_atk_up.png",
+          "size": 212,
+          "sha256": "2a1c7151d181ff5aa0da2f0d982d1da3babeb323f6a9fe99e9211efaae94eef6",
+          "etag": "231DB7F5F570590E510E1B313E0FDE92",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_atk_up.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_charge.png",
+          "sourcePath": "pixel-assets/output/talent-normal_charge.png",
+          "objectKey": "effects/talent-normal_charge.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_charge.png",
+          "size": 230,
+          "sha256": "5d5daf7dfec6c6459978a3baf3ee0653815e50dd8d39587a8ac3eef7e3aeb7c6",
+          "etag": "3FA5ECD51C67A8F35F470AEA6DBAC626",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_charge.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_chase_up.png",
+          "sourcePath": "pixel-assets/output/talent-normal_chase_up.png",
+          "objectKey": "effects/talent-normal_chase_up.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_chase_up.png",
+          "size": 218,
+          "sha256": "d2cada52469b6f5a625f34cac6702b408ea395ef9da9f7dbaa3a1d4b46f9eb08",
+          "etag": "7E593942BB85B6FEAAC01C47B13C195C",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_chase_up.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_combo_ext.png",
+          "sourcePath": "pixel-assets/output/talent-normal_combo_ext.png",
+          "objectKey": "effects/talent-normal_combo_ext.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_combo_ext.png",
+          "size": 217,
+          "sha256": "cb113678bebf763f2f24b6989ee29dd30b51da3520b42bd24e76c163a96b8641",
+          "etag": "51104249296A1E193D2825564C5F7D29",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_combo_ext.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_core.png",
+          "sourcePath": "pixel-assets/output/talent-normal_core.png",
+          "objectKey": "effects/talent-normal_core.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_core.png",
+          "size": 224,
+          "sha256": "7973ed1196d51bed6a1ebff2d1b25cc790fb31251a7df5b6d9e5e86fbbf274af",
+          "etag": "F3285D4F68F3989946B3607AF8645E6A",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_core.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_dmg_amp.png",
+          "sourcePath": "pixel-assets/output/talent-normal_dmg_amp.png",
+          "objectKey": "effects/talent-normal_dmg_amp.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_dmg_amp.png",
+          "size": 197,
+          "sha256": "c4de3fe025739f6ca0def7501d76756ade1f9f1c652e8fd4476571bcfadb7d06",
+          "etag": "EB3BFDF0D6413EACF0B1952A03D3C73B",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_dmg_amp.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_encircle.png",
+          "sourcePath": "pixel-assets/output/talent-normal_encircle.png",
+          "objectKey": "effects/talent-normal_encircle.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_encircle.png",
+          "size": 208,
+          "sha256": "749830347b58e393063cd6d918971ad0c939352a61f207528f11c9e3951de35b",
+          "etag": "40BD3A112C314741C1BED43B4358A8DD",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_encircle.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_low_hp.png",
+          "sourcePath": "pixel-assets/output/talent-normal_low_hp.png",
+          "objectKey": "effects/talent-normal_low_hp.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_low_hp.png",
+          "size": 209,
+          "sha256": "e53cefb072c83bb4fbc5fb1b7b69bbfc2c459202ec9d1cf5dd7d78b90cde1e23",
+          "etag": "70375A59114A43074B0A6F4FBB6A3FA7",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_low_hp.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_soft_atk.png",
+          "sourcePath": "pixel-assets/output/talent-normal_soft_atk.png",
+          "objectKey": "effects/talent-normal_soft_atk.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_soft_atk.png",
+          "size": 208,
+          "sha256": "c395c6911c7fde435b94fe306a3cbe9822973cf4621670836f3175480616b1f6",
+          "etag": "8326EF033B1CFEF5DB2DE9D3EA38FDEA",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_soft_atk.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "talent-normal_ultimate.png",
+          "sourcePath": "pixel-assets/output/talent-normal_ultimate.png",
+          "objectKey": "effects/talent-normal_ultimate.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-normal_ultimate.png",
+          "size": 223,
+          "sha256": "9b24e8e4b2025ee8986eca767fbc5b3fb6b860483929d95614b675fc25fa89a9",
+          "etag": "21B9F87F884A6216DF68B9A290D993AD",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/talent-normal_ultimate.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T0-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T0-armor.png",
+          "objectKey": "effects/tier-reward-T0-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T0-armor.png",
+          "size": 193,
+          "sha256": "0f8f4cbf0ced456b926acc4b8fa8137bb013fee536a61ee65d7c29cbf7cf3efe",
+          "etag": "2B5C521D51C941FAD67A3B84470B69F5",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T0-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T0-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T0-crit.png",
+          "objectKey": "effects/tier-reward-T0-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T0-crit.png",
+          "size": 194,
+          "sha256": "58b141d98907949ef55604ad20e7c21fe51215920c6247ccfc9b4052fb75d9e1",
+          "etag": "F37AB75F70D46B293800FF6D97F5D2FF",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T0-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T0-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T0-normal.png",
+          "objectKey": "effects/tier-reward-T0-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T0-normal.png",
+          "size": 196,
+          "sha256": "2dbd338020e5e8472004b31124f90dce6635dba9633f894ab5e18b8a4a35ff4b",
+          "etag": "6CAF5E58C3A8E128E25FE0C13D90A7EF",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T0-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T1-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T1-armor.png",
+          "objectKey": "effects/tier-reward-T1-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T1-armor.png",
+          "size": 184,
+          "sha256": "89c5e9616ae7f4f91b16858bb6eeb0eb2f0070a6574ba9fce7658207f3e6b058",
+          "etag": "66B74BF38F9C41379CCBD4DDC4EE49B5",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T1-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T1-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T1-crit.png",
+          "objectKey": "effects/tier-reward-T1-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T1-crit.png",
+          "size": 186,
+          "sha256": "27e49944baa8ae09893512b706050eaee434ea60d23d3460743e165bdba6acf7",
+          "etag": "696BA9F083D92D14EDBE6AD1EC4E84D7",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T1-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T1-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T1-normal.png",
+          "objectKey": "effects/tier-reward-T1-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T1-normal.png",
+          "size": 187,
+          "sha256": "bb7e53f5fa42c73ffbd9a69889ce8dd23b47219be68f9acf631d422c60cedaaf",
+          "etag": "BBF600D00F4A7A6B3111FD940BBB19DD",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T1-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T2-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T2-armor.png",
+          "objectKey": "effects/tier-reward-T2-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T2-armor.png",
+          "size": 187,
+          "sha256": "1c5f11b491125cffb1fa0b1100a605b10ff979f0b718e06a94134c30fd9cf786",
+          "etag": "F83FE1049766997AF0C1804512246433",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T2-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T2-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T2-crit.png",
+          "objectKey": "effects/tier-reward-T2-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T2-crit.png",
+          "size": 188,
+          "sha256": "2de133578b0832343fef04b5b9a608621dfdbf9ad46e079fb20eef6d1c347c82",
+          "etag": "FB83F8B34E6452183EDF8F26D2BFCAE8",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T2-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T2-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T2-normal.png",
+          "objectKey": "effects/tier-reward-T2-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T2-normal.png",
+          "size": 189,
+          "sha256": "c9f0adbc038b39aa41751d1a78d5d2dd8339160d33a573c20e7f7c925fafc867",
+          "etag": "EE17CC0292C3A5A59116267C25E94ADC",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T2-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T3-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T3-armor.png",
+          "objectKey": "effects/tier-reward-T3-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T3-armor.png",
+          "size": 189,
+          "sha256": "99cfb9f6f181fc2beedc48558d35776c1051b2b284940b2951dead0e1622b658",
+          "etag": "6AEF5A79F65BD4D2068DF7DB224DE313",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T3-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T3-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T3-crit.png",
+          "objectKey": "effects/tier-reward-T3-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T3-crit.png",
+          "size": 189,
+          "sha256": "5260cb13f428e3d4e3f57d158587182a47fc606a7b6b6012cf06dfd53eb08ad7",
+          "etag": "323889DD519C3D19403CEF9E226843C0",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T3-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T3-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T3-normal.png",
+          "objectKey": "effects/tier-reward-T3-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T3-normal.png",
+          "size": 191,
+          "sha256": "dfff9a3f4f851d869af525bb7fb0277f830bc8986e454213fc80e530a5325ff6",
+          "etag": "87A12CBD8DE627037CFBAB1EEB480381",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T3-normal.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T4-armor.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T4-armor.png",
+          "objectKey": "effects/tier-reward-T4-armor.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T4-armor.png",
+          "size": 196,
+          "sha256": "2a931f7c468cbbf78aebebd11732cc756635cf1e90f3090a83702b3199996567",
+          "etag": "15914C14DC69BF18A4D84671AD06261E",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T4-armor.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T4-crit.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T4-crit.png",
+          "objectKey": "effects/tier-reward-T4-crit.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T4-crit.png",
+          "size": 197,
+          "sha256": "61cc983351c1dad2f6990b018e6ea236fcb8d27b77506ee9c639cfcecc18cfd7",
+          "etag": "5EFB00F7666A432B619BE05732FBAD3E",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T4-crit.png"
+          ]
+        },
+        {
+          "sourceRoot": "pixel-assets/output",
+          "relativePath": "tier-reward-T4-normal.png",
+          "sourcePath": "pixel-assets/output/tier-reward-T4-normal.png",
+          "objectKey": "effects/tier-reward-T4-normal.png",
+          "url": "https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/tier-reward-T4-normal.png",
+          "size": 199,
+          "sha256": "1e26c915ef65098ad7c004fd4bfbdd1b8d389dfc9cf4444e242627453563c861",
+          "etag": "89918DE727B0147790A1CF790006F9CC",
+          "deletedLocalPaths": [
+            "/Users/Learning/web/long/pixel-assets/output/tier-reward-T4-normal.png"
+          ]
+        }
+      ]
+    }
+  ],
+  "lastGeneratedAt": "2026-04-27T08:37:57.505559+00:00",
+  "totalRuns": 2
+}

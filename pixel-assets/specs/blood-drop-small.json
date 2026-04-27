@@ -1,0 +1,38 @@
+{
+    "name": "blood-drop-small",
+    "size": [
+        8,
+        8
+    ],
+    "constraints": {
+        "maxPixels": 5,
+        "allowAlpha": false
+    },
+    "pixels": [
+        {
+            "x": 3,
+            "y": 2,
+            "color": "#ef4444"
+        },
+        {
+            "x": 4,
+            "y": 3,
+            "color": "#dc2626"
+        },
+        {
+            "x": 4,
+            "y": 4,
+            "color": "#dc2626"
+        },
+        {
+            "x": 4,
+            "y": 5,
+            "color": "#7f1d1d"
+        },
+        {
+            "x": 4,
+            "y": 1,
+            "color": "#ef4444"
+        }
+    ]
+}

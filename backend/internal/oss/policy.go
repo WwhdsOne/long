@@ -66,7 +66,7 @@ func (s *Signer) CreatePolicy(_ context.Context) (Policy, error) {
 
 	dirPrefix := strings.Trim(strings.TrimSpace(s.config.UploadDirPrefix), "/")
 	if dirPrefix == "" {
-		dirPrefix = "buttons"
+		dirPrefix = "equipments"
 	}
 
 	expiresAt := time.Now().UTC().Add(time.Duration(expireSeconds) * time.Second)

@@ -1,0 +1,524 @@
+{
+  "specCount": 86,
+  "totalBeforePixels": 1421,
+  "totalAfterPixels": 3209,
+  "dryRun": false,
+  "files": {
+    "armor-break-spritesheet.json": {
+      "before": 116,
+      "after": 168,
+      "target": 168,
+      "maxPixels": 197
+    },
+    "blood-blade-spritesheet.json": {
+      "before": 67,
+      "after": 97,
+      "target": 97,
+      "maxPixels": 115
+    },
+    "blood-drop-large.json": {
+      "before": 10,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 36
+    },
+    "blood-drop-medium.json": {
+      "before": 7,
+      "after": 20,
+      "target": 20,
+      "maxPixels": 27
+    },
+    "blood-drop-small.json": {
+      "before": 5,
+      "after": 14,
+      "target": 14,
+      "maxPixels": 24
+    },
+    "crack-pattern-1.json": {
+      "before": 16,
+      "after": 40,
+      "target": 40,
+      "maxPixels": 50
+    },
+    "crack-pattern-2.json": {
+      "before": 16,
+      "after": 40,
+      "target": 40,
+      "maxPixels": 50
+    },
+    "crack-pattern-3.json": {
+      "before": 16,
+      "after": 40,
+      "target": 40,
+      "maxPixels": 50
+    },
+    "crosshair-mark-glow.json": {
+      "before": 22,
+      "after": 46,
+      "target": 46,
+      "maxPixels": 56
+    },
+    "crosshair-mark.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "emblem-armor.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "emblem-crit.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "emblem-normal.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "emblem-talent.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "green-ring-spritesheet.json": {
+      "before": 41,
+      "after": 74,
+      "target": 74,
+      "maxPixels": 89
+    },
+    "hammer-crack-spritesheet.json": {
+      "before": 48,
+      "after": 86,
+      "target": 86,
+      "maxPixels": 102
+    },
+    "hammer-impact.json": {
+      "before": 39,
+      "after": 70,
+      "target": 70,
+      "maxPixels": 84
+    },
+    "hammer-raised.json": {
+      "before": 40,
+      "after": 72,
+      "target": 72,
+      "maxPixels": 86
+    },
+    "scythe-sweep-spritesheet.json": {
+      "before": 59,
+      "after": 106,
+      "target": 106,
+      "maxPixels": 125
+    },
+    "slash-green-0.json": {
+      "before": 10,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "slash-green-135.json": {
+      "before": 10,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "slash-green-45.json": {
+      "before": 10,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "slash-green-90.json": {
+      "before": 10,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "talent-armor-t1a.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-armor-t1b.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-armor-t2a.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-armor-t2b.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-armor-t3a.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-armor-t3b.json": {
+      "before": 11,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "talent-armor_auto_strike.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-armor_boss_hunter.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-armor_collapse_ext.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-armor_core.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-armor_heavy_atk.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-armor_heavy_scale.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-armor_pen_convert.json": {
+      "before": 15,
+      "after": 38,
+      "target": 38,
+      "maxPixels": 47
+    },
+    "talent-armor_pen_up.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-armor_ruin.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-armor_ultimate.json": {
+      "before": 15,
+      "after": 38,
+      "target": 38,
+      "maxPixels": 47
+    },
+    "talent-crit-t1a.json": {
+      "before": 11,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "talent-crit-t1b.json": {
+      "before": 11,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "talent-crit-t2a.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-crit-t2b.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-crit-t3a.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-crit-t3b.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-crit_bleed.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-crit_core.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-crit_cruel.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-crit_death_ecstasy.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-crit_final_cut.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-crit_omen_kill.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-crit_omen_reap.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-crit_omen_resonate.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-crit_skinner.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-crit_ultimate.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-normal-t1a.json": {
+      "before": 10,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "talent-normal-t1b.json": {
+      "before": 10,
+      "after": 28,
+      "target": 28,
+      "maxPixels": 42
+    },
+    "talent-normal-t2a.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-normal-t2b.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-normal-t3a.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-normal-t3b.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-normal_atk_up.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-normal_charge.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-normal_chase_up.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-normal_combo_ext.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-normal_core.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-normal_dmg_amp.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "talent-normal_encircle.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-normal_low_hp.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "talent-normal_soft_atk.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "talent-normal_ultimate.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "tier-reward-T0-armor.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "tier-reward-T0-crit.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "tier-reward-T0-normal.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "tier-reward-T1-armor.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "tier-reward-T1-crit.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "tier-reward-T1-normal.json": {
+      "before": 12,
+      "after": 30,
+      "target": 30,
+      "maxPixels": 42
+    },
+    "tier-reward-T2-armor.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "tier-reward-T2-crit.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "tier-reward-T2-normal.json": {
+      "before": 13,
+      "after": 32,
+      "target": 32,
+      "maxPixels": 42
+    },
+    "tier-reward-T3-armor.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "tier-reward-T3-crit.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "tier-reward-T3-normal.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "tier-reward-T4-armor.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "tier-reward-T4-crit.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    },
+    "tier-reward-T4-normal.json": {
+      "before": 14,
+      "after": 35,
+      "target": 35,
+      "maxPixels": 44
+    }
+  }
+}

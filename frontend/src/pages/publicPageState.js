@@ -72,7 +72,7 @@ const publicPages = [
     {id: 'inventory', label: '背包', path: '/profile/inventory'},
     {id: 'stats', label: '属性', path: '/profile/stats'},
     {id: 'loadout', label: '装备栏', path: '/profile/loadout'},
-    // {id: 'talents', label: '天赋', path: '/talents'},
+    {id: 'talents', label: '天赋', path: '/talents'},
     {id: 'messages', label: '消息', path: '/messages'},
 ]
 
@@ -103,6 +103,20 @@ const pendingKeys = ref(new Set())
 const actioningItemId = ref('')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
+function defaultTalentVisualState() {
+  return {
+    omenStacks: 0,
+    silverStormActive: false,
+    silverStormRemaining: 0,
+    deathEcstasyActive: false,
+    collapsePartKeys: [],
+    doomMarks: [],
+    doomDestroyed: 0,
+    doomCritBuff: false,
+    finalCutCooldown: 0,
+  }
+}
+
 const damageBursts = ref({})
 const talentTriggerFeed = ref([])
 const damageStageFx = ref({
@@ -113,6 +127,88 @@ const damageStageFx = ref({
     slowMo: false,
     vignette: false,
 })
+const talentVisualState = ref(defaultTalentVisualState())
+
+// 连击计数系统
+const comboCount = ref(0)
+const comboPartKey = ref('')
+const comboLastClickAt = ref(0)
+const comboMilestone = ref(0) // 0, 50, 100, 150, 200
+const comboTriggerFlash = ref(false)
+const COMBO_TIMEOUT_MS = 3000 // 3 秒无点击重置连击
+const STORM_TRIGGER = 100
+
+function advanceCombo(key) {
+  const now = Date.now()
+  if (now - comboLastClickAt.value > COMBO_TIMEOUT_MS) {
+    // 超时重置
+    comboCount.value = 0
+    comboMilestone.value = 0
+  }
+  comboCount.value++
+  comboPartKey.value = key
+  comboLastClickAt.value = now
+  scheduleComboClear()
+
+  // 检测里程碑
+  const prev = comboMilestone.value
+  if (comboCount.value >= 100 && prev < 100) comboMilestone.value = 100
+  else if (comboCount.value >= 75 && prev < 75) comboMilestone.value = 75
+  else if (comboCount.value >= 50 && prev < 50) comboMilestone.value = 50
+  else if (comboCount.value >= 25 && prev < 25) comboMilestone.value = 25
+}
+
+function onStormComboTrigger() {
+  comboTriggerFlash.value = true
+  setTimeout(() => { comboTriggerFlash.value = false }, 800)
+  // 蓄力返还：保留 30%
+  comboCount.value = Math.floor(comboCount.value * 0.3)
+  comboMilestone.value = 0
+}
+
+function clearComboState() {
+  clearTimeout(comboTimer)
+  clearInterval(comboTickTimer)
+  comboResetSeconds.value = 0
+  comboCount.value = 0
+  comboMilestone.value = 0
+  comboPartKey.value = ''
+  comboLastClickAt.value = 0
+  comboTriggerFlash.value = false
+}
+
+let comboTimer = 0
+let comboTickTimer = 0
+const comboResetSeconds = ref(0)
+
+function startComboTick() {
+  clearInterval(comboTickTimer)
+  comboTickTimer = setInterval(() => {
+    if (comboCount.value <= 0) {
+      comboResetSeconds.value = 0
+      clearInterval(comboTickTimer)
+      return
+    }
+    const elapsed = Date.now() - comboLastClickAt.value
+    const remaining = Math.max(0, COMBO_TIMEOUT_MS - elapsed)
+    comboResetSeconds.value = Math.ceil(remaining / 1000)
+  }, 200)
+}
+
+const comboProgress = computed(() => {
+  return Math.min(100, Math.round((comboCount.value / STORM_TRIGGER) * 100))
+})
+
+function scheduleComboClear() {
+  clearTimeout(comboTimer)
+  startComboTick()
+  comboTimer = setTimeout(() => {
+    if (Date.now() - comboLastClickAt.value >= COMBO_TIMEOUT_MS) {
+      clearComboState()
+      clearInterval(comboTickTimer)
+    }
+  }, COMBO_TIMEOUT_MS + 300)
+}
 const onlineCount = ref(null)
 const bossHistory = ref([])
 const bossHistoryQuery = ref('')
@@ -856,6 +952,10 @@ function applyPublicState(payload) {
     }
     if (bossResourceVersion(previousBoss) !== bossResourceVersion()) {
         void loadBossResources(true)
+        if (previousBoss?.id && boss.value?.id && previousBoss.id !== boss.value.id) {
+            clearTalentVisualState()
+            clearComboState()
+        }
     } else if (boss.value?.id && !lastBossResourceVersion) {
         void loadBossResources(true)
     }
@@ -896,6 +996,9 @@ function applyBattleUserState(payload) {
     }
     if ('recentRewards' in payload) {
         recentRewards.value = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
+    }
+    if ('talentCombatState' in payload && payload.talentCombatState) {
+        applyTalentCombatState(payload.talentCombatState)
     }
     const latestReward = latestRewardFromList(recentRewards.value)
     const signature = rewardSignature(latestReward)
@@ -975,8 +1078,103 @@ function applyClickResult(payload) {
     bossLeaderboard.value = nextClickState.bossLeaderboard
     myBossStats.value = nextClickState.myBossStats
     recentRewards.value = nextClickState.recentRewards
+    appendTalentTriggerEvents(payload.talentEvents)
     syncing.value = false
     markUpdated()
+}
+
+function indexToPartKey(index) {
+  const parts = boss.value?.parts
+  if (!Array.isArray(parts) || index < 0 || index >= parts.length) return null
+  return `${parts[index].x}-${parts[index].y}`
+}
+
+function applyTalentCombatState(state) {
+  if (!state || typeof state !== 'object') return
+  const vs = talentVisualState.value
+  vs.omenStacks = Number(state.omenStacks) || 0
+
+  vs.silverStormActive = Boolean(state.silverStormActive)
+  vs.silverStormRemaining = Number(state.silverStormRemaining) || 0
+
+  vs.deathEcstasyActive = state.deathEcstasyEndsAt > Math.floor(Date.now() / 1000)
+  vs.doomDestroyed = Math.min(2, Number(state.doomDestroyed) || 0)
+  vs.doomCritBuff = Boolean(state.doomCritBuff)
+
+  // doomMarks: indices → "x-y" keys
+  if (Array.isArray(state.doomMarks)) {
+    vs.doomMarks = state.doomMarks
+      .map(indexToPartKey)
+      .filter(Boolean)
+  }
+  // collapsePartKeys: indices → "x-y" keys
+  if (Array.isArray(state.collapseParts)) {
+    vs.collapsePartKeys = state.collapseParts
+      .map(indexToPartKey)
+      .filter(Boolean)
+  }
+}
+
+function applyTalentVisualState(events) {
+    if (!Array.isArray(events)) return
+    const vs = talentVisualState.value
+    for (const event of events) {
+        switch (event?.effectType) {
+            case 'storm_combo':
+                onStormComboTrigger()
+                break
+            case 'silver_storm':
+                vs.silverStormActive = true
+                vs.silverStormRemaining = 15
+                onStormComboTrigger()
+                break
+            case 'death_ecstasy':
+                vs.deathEcstasyActive = true
+                break
+            case 'collapse_trigger':
+                if (event.partX !== undefined && event.partY !== undefined) {
+                    const key = `${event.partX}-${event.partY}`
+                    if (!vs.collapsePartKeys.includes(key)) {
+                        vs.collapsePartKeys.push(key)
+                    }
+                }
+                break
+            case 'doom_judgment':
+                vs.doomDestroyed = Math.min(2, vs.doomDestroyed + 1)
+                vs.doomCritBuff = true
+                break
+            case 'auto_strike':
+            case 'bleed':
+            case 'omen_harvest':
+            case 'final_cut':
+                break
+        }
+    }
+}
+
+function appendTalentTriggerEvents(events) {
+    if (!Array.isArray(events) || events.length === 0) {
+        return
+    }
+    const now = Date.now()
+    talentTriggerFeed.value = [
+        ...events.map((event, index) => ({
+            id: `${now}-${index}-${event.talentId || 'talent'}`,
+            name: event.name || event.talentId || '天赋',
+            message: event.message || '天赋触发',
+            extraDamage: Number(event.extraDamage || 0),
+            triggeredAt: Number(event.triggeredAt || now),
+            effectType: event.effectType || '',
+            partX: event.partX,
+            partY: event.partY,
+        })),
+        ...talentTriggerFeed.value,
+    ].slice(0, 6)
+    applyTalentVisualState(events)
+}
+
+function clearTalentVisualState() {
+    talentVisualState.value = defaultTalentVisualState()
 }
 
 function clearUserRealtimeState() {
@@ -994,6 +1192,7 @@ function clearUserRealtimeState() {
     lastRecentRewardSignature = ''
     lastKnownGold = 0
     lastKnownStones = 0
+    clearTalentVisualState()
 }
 
 function clearPendingClicks(key = '') {
@@ -1071,18 +1270,7 @@ function ensureRealtimeTransport() {
             const key = resolveClickAckKey(payload)
             if (key) {
                 triggerDamageBurst(key, payload)
-            }
-            if (Array.isArray(payload?.talentEvents) && payload.talentEvents.length > 0) {
-                const now = Date.now()
-                talentTriggerFeed.value = [
-                    ...payload.talentEvents.map((event, index) => ({
-                        id: `${now}-${index}-${event.talentId || 'talent'}`,
-                        name: event.name || event.talentId || '天赋',
-                        message: event.message || '天赋触发',
-                        extraDamage: Number(event.extraDamage || 0),
-                    })),
-                    ...talentTriggerFeed.value,
-                ].slice(0, 6)
+                advanceCombo(key)
             }
             clearPendingClicks(key)
             if (key) {
@@ -1846,6 +2034,13 @@ export function usePublicPageState() {
         liveConnected,
         damageBursts,
         talentTriggerFeed,
+        talentVisualState,
+        comboCount,
+        comboProgress,
+        comboMilestone,
+        comboTriggerFlash,
+        comboPartKey,
+        comboResetSeconds,
         damageStageFx,
         bossHistory,
         bossHistoryQuery,

@@ -55,31 +55,30 @@ async function handleLoginSubmit() {
 </script>
 
 <template>
+  <nav class="public-nav" aria-label="前台导航">
+    <button
+        v-for="page in publicPages"
+        :key="page.id"
+        class="public-nav__item"
+        :class="{ 'public-nav__item--active': currentPublicPage === page.id }"
+        type="button"
+        @click="navigatePublicPage(page.id)"
+    >
+      {{ page.label }}
+    </button>
+    <button
+        class="public-nav__item public-nav__auth"
+        type="button"
+        @click="handleAuthClick"
+    >
+      {{ isLoggedIn ? '退出登录' : '登录/注册' }}
+    </button>
+  </nav>
   <main class="page-shell">
+
     <div class="page-shell__glow page-shell__glow--pink"></div>
     <div class="page-shell__glow page-shell__glow--blue"></div>
     <div class="page-shell__glow page-shell__glow--yellow"></div>
-
-    <nav class="public-nav" aria-label="前台导航">
-      <button
-          v-for="page in publicPages"
-          :key="page.id"
-          class="public-nav__item"
-          :class="{ 'public-nav__item--active': currentPublicPage === page.id }"
-          type="button"
-          @click="navigatePublicPage(page.id)"
-      >
-        {{ page.label }}
-      </button>
-      <button
-          class="public-nav__item public-nav__auth"
-          type="button"
-          @click="handleAuthClick"
-      >
-        {{ isLoggedIn ? '退出登录' : '登录/注册' }}
-      </button>
-    </nav>
-
     <section class="hero">
       <div class="hero__copy">
         <p class="hero__eyebrow">Hai-World</p>

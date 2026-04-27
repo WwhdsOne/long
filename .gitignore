@@ -11,6 +11,7 @@
 node_modules/
 long.tar.gz
 *.tar.gz
+/scripts/__pycache__
 
 # 依赖
 vendor/
@@ -47,3 +48,4 @@ configs/*.env
 
 # Git hooks
 .git/hooks/
+

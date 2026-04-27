@@ -1,0 +1,48 @@
+{
+    "name": "blood-drop-medium",
+    "size": [
+        10,
+        12
+    ],
+    "constraints": {
+        "maxPixels": 7,
+        "allowAlpha": false
+    },
+    "pixels": [
+        {
+            "x": 4,
+            "y": 2,
+            "color": "#ef4444"
+        },
+        {
+            "x": 5,
+            "y": 3,
+            "color": "#dc2626"
+        },
+        {
+            "x": 4,
+            "y": 4,
+            "color": "#dc2626"
+        },
+        {
+            "x": 5,
+            "y": 5,
+            "color": "#dc2626"
+        },
+        {
+            "x": 5,
+            "y": 7,
+            "color": "#dc2626"
+        },
+        {
+            "x": 5,
+            "y": 9,
+            "color": "#7f1d1d"
+        },
+        {
+            "x": 3,
+            "y": 3,
+            "color": "#ef4444"
+        }
+    ]
+}

@@ -1,6 +1,7 @@
 <script setup>
 import {computed, ref} from 'vue'
 import {usePublicPageState} from './publicPageState'
+import {effectAssetUrl} from '../utils/effectAssets'
 
 const {
   boss,
@@ -16,6 +17,13 @@ const {
   pendingKeys,
   damageBursts,
   talentTriggerFeed,
+  talentVisualState,
+  comboCount,
+  comboProgress,
+  comboMilestone,
+  comboTriggerFlash,
+  comboPartKey,
+  comboResetSeconds,
   damageStageFx,
   totalVotes,
   isLoggedIn,
@@ -27,8 +35,6 @@ const {
   effectiveIncrement,
   bossStatusLabel,
   bossProgress,
-  displayedRecentRewards,
-  recentRewardTitle,
   formatDropRate,
   formatRarityLabel,
   formatItemStats,
@@ -40,6 +46,7 @@ const {
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
+const talentEffectOverlayRef = ref(null)
 
 const bossZones = computed(() => {
   if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return []
@@ -122,6 +129,128 @@ function zoneDamageBursts(zone) {
   if (!key) return []
   return damageBursts.value?.[key] || []
 }
+
+// 天赋视觉状态
+const talentEdgeGlowClass = computed(() => {
+  const vs = talentVisualState.value
+  if (vs.deathEcstasyActive) return 'talent-edge-glow--crit'
+  if (vs.silverStormActive) return ''
+  const recent = talentTriggerFeed.value[0]
+  if (recent && recent.name === '暴风连击') {
+    return 'talent-edge-glow--normal'
+  }
+  return ''
+})
+
+const showSilverFlash = computed(() => talentVisualState.value.silverStormActive && talentVisualState.value.silverStormRemaining >= 14)
+const TALENT_EFFECT_WINDOW_MS = 1350
+
+function slashOverlayStyle() {
+  const recent = talentTriggerFeed.value[0]
+  if (recent && (recent.name === '暴风连击' || recent.talentId === 'normal_core')) {
+    return 'active'
+  }
+  return ''
+}
+
+function latestTrigger(type) {
+  return talentTriggerFeed.value.find((e) => e.effectType === type) || null
+}
+
+function isTriggerFresh(entry, windowMs = TALENT_EFFECT_WINDOW_MS) {
+  if (!entry) return false
+  const at = Number(entry.triggeredAt || 0)
+  if (!Number.isFinite(at) || at <= 0) return false
+  return Date.now() - at <= windowMs
+}
+
+function hasRecentTrigger(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
+  return isTriggerFresh(latestTrigger(type), windowMs)
+}
+
+function triggerKey(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
+  const entry = latestTrigger(type)
+  if (!isTriggerFresh(entry, windowMs)) return ''
+  return `${type}-${entry.id}`
+}
+
+function findBossZoneElement(partX, partY) {
+  if (typeof window === 'undefined') return null
+  const x = Number(partX)
+  const y = Number(partY)
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  const key = `${Math.floor(x)}-${Math.floor(y)}`
+  return document.querySelector(`.boss-part-cell[data-zone-key="${key}"]`)
+}
+
+function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
+  const entry = latestTrigger(type)
+  if (!isTriggerFresh(entry, windowMs)) return null
+  const overlayEl = talentEffectOverlayRef.value
+  const zoneEl = findBossZoneElement(entry.partX, entry.partY)
+  if (!(overlayEl instanceof HTMLElement) || !(zoneEl instanceof HTMLElement)) {
+    return null
+  }
+  const overlayRect = overlayEl.getBoundingClientRect()
+  const zoneRect = zoneEl.getBoundingClientRect()
+  return {
+    left: zoneRect.left - overlayRect.left + zoneRect.width / 2,
+    top: zoneRect.top - overlayRect.top + zoneRect.height / 2,
+  }
+}
+
+function triggerOverlayStyle(type, options = {}) {
+  const {
+    width = 0,
+    height = 0,
+    offsetX = 0,
+    offsetY = 0,
+    fallback = {},
+  } = options
+  const anchor = triggerAnchor(type)
+  if (!anchor) {
+    return fallback
+  }
+  return {
+    left: `${Math.round(anchor.left + offsetX)}px`,
+    top: `${Math.round(anchor.top + offsetY)}px`,
+    marginLeft: `${Math.round(-width / 2)}px`,
+    marginTop: `${Math.round(-height / 2)}px`,
+  }
+}
+
+function effectSrc(filename) {
+  return effectAssetUrl(filename)
+}
+
+function spriteStyle(filename, style = {}) {
+  return {
+    ...style,
+    backgroundImage: `url("${effectSrc(filename)}")`,
+  }
+}
+
+function isPartFractured(zone) {
+  if (!zone) return false
+  const hpRatio = zone.maxHp > 0 ? zone.currentHp / zone.maxHp : 1
+  return hpRatio < 0.25 && hpRatio > 0
+}
+
+function isPartCollapsed(zone) {
+  if (!zone) return false
+  return talentVisualState.value.collapsePartKeys.includes(`${zone.x}-${zone.y}`)
+}
+
+function isPartDoomMarked(zone) {
+  if (!zone) return false
+  return talentVisualState.value.doomMarks.includes(`${zone.x}-${zone.y}`)
+}
+
+const showOmenRing = computed(() => talentVisualState.value.omenStacks > 0)
+const omenRingProgress = computed(() => {
+  const stacks = talentVisualState.value.omenStacks
+  return Math.min(1, stacks / 100)
+})
 </script>
 
 <template>
@@ -166,6 +295,9 @@ function zoneDamageBursts(zone) {
             'damage-stage--blade': damageStageFx.blade,
             'damage-stage--slowmo': damageStageFx.slowMo,
             'damage-stage--vignette': damageStageFx.vignette,
+            'talent-silver-flash': showSilverFlash,
+            'talent-blood-flash': damageStageFx.doom,
+            [talentEdgeGlowClass]: talentEdgeGlowClass !== '',
           }"
       >
         <div class="vote-stage__boss-hud-head">
@@ -223,13 +355,15 @@ function zoneDamageBursts(zone) {
             </div>
           </div>
 
-          <!-- 右侧：原版 5×5 Boss 网格（完整保留） -->
+          <!-- 右侧：5×5 Boss 网格 + 连击计数 -->
+          <div class="boss-part-grid-with-combo">
           <div class="boss-part-grid">
             <div v-for="(row, yi) in bossZones" :key="yi" class="boss-part-grid__row">
               <button
                   v-for="(zone, xi) in row"
                   :key="yi + '-' + xi"
                   class="boss-part-cell boss-zone-button"
+                  :data-zone-key="zone ? `${zone.x}-${zone.y}` : ''"
                   :class="{
             'boss-part-cell--alive': zone?.alive,
             'boss-part-cell--dead': zone && !zone.alive,
@@ -240,6 +374,8 @@ function zoneDamageBursts(zone) {
             'boss-zone-button--empty': !zone,
             'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
             'boss-zone-button--damage': zoneDamageBursts(zone).length > 0,
+            'boss-part-cell--fracture': zone && isPartFractured(zone),
+            'talent-hammer-strike': zone && isPartCollapsed(zone),
           }"
                   :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
                   type="button"
@@ -272,6 +408,18 @@ function zoneDamageBursts(zone) {
               {{ burst.value }}
             </span>
                   </div>
+                  <img
+                      v-if="isPartCollapsed(zone)"
+                      class="boss-part-cell__crack"
+                      :src="effectSrc('crack-pattern-1.png')"
+                      alt="结构崩塌"
+                  />
+                  <img
+                      v-if="isPartDoomMarked(zone)"
+                      class="boss-part-cell__crosshair"
+                      :src="effectSrc('crosshair-mark.png')"
+                      alt="末日审判标记"
+                  />
                   <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
                   <strong class="boss-zone-button__label">{{
                       zone.displayName || partTypeLabels[zone.type] || zone.type
@@ -291,12 +439,139 @@ function zoneDamageBursts(zone) {
               </button>
             </div>
           </div>
+          </div>
+          <div v-if="comboCount > 0" class="combo-counter" :class="{ 'combo-counter--flash': comboTriggerFlash }">
+          <span class="combo-counter__label">连击</span>
+          <span class="combo-counter__count" :class="{ 'combo-counter__count--burst': comboTriggerFlash }">x{{ comboCount }}</span>
+          <span v-if="comboResetSeconds > 0" class="combo-counter__reset">{{ comboResetSeconds }}s</span>
+          <div class="combo-counter__bar">
+          <span class="combo-counter__bar-fill" :style="{ width: `${comboProgress}%` }"
+          :class="{
+          'combo-counter__bar-fill--m25': comboMilestone >= 25 && comboMilestone < 50,
+          'combo-counter__bar-fill--m50': comboMilestone >= 50 && comboMilestone < 75,
+          'combo-counter__bar-fill--m75': comboMilestone >= 75 && comboMilestone < 100,
+          'combo-counter__bar-fill--m100': comboMilestone >= 100,
+          }"></span>
+          </div>
+          <span v-if="comboMilestone >= 50" class="combo-counter__milestone">
+          {{ comboMilestone >= 100 ? '追击爆发!' : comboMilestone >= 75 ? '即将触发' : comboMilestone >= 50 ? '过半' : '热身' }}
+          </span>
+          </div>
+        </div>
+        <!-- 天赋瞬发特效覆盖层 -->
+        <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
+          <div v-if="hasRecentTrigger('storm_combo')"
+               :key="triggerKey('storm_combo')"
+               class="talent-spritesheet talent-spritesheet--slash talent-spritesheet--playing"
+               :style="spriteStyle('slash-green-45.png', triggerOverlayStyle('storm_combo', {
+                 width: 480,
+                 height: 480,
+                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
+               }))"></div>
+          <img v-if="hasRecentTrigger('auto_strike')"
+               :key="triggerKey('auto_strike')"
+               class="talent-effect-overlay__hammer"
+               :src="effectSrc('hammer-impact.png')"
+               :style="triggerOverlayStyle('auto_strike', {
+                 width: 240,
+                 height: 480,
+                 offsetY: -80,
+                 fallback: { top: '10%', left: '50%', marginLeft: '-120px' },
+               })"
+               alt="自动打击" />
+          <img v-if="hasRecentTrigger('bleed')"
+               :key="triggerKey('bleed')"
+               class="talent-effect-overlay__bleed"
+               :src="effectSrc('blood-drop-large.png')"
+               :style="triggerOverlayStyle('bleed', {
+                 width: 120,
+                 height: 160,
+                 offsetY: -30,
+                 fallback: { top: '20%', right: '30%' },
+               })"
+               alt="致命出血" />
+          <div v-if="hasRecentTrigger('omen_harvest')"
+               :key="triggerKey('omen_harvest')"
+               class="talent-spritesheet talent-spritesheet--scythe talent-spritesheet--playing"
+               :style="spriteStyle('scythe-sweep-spritesheet.png', triggerOverlayStyle('omen_harvest', {
+                 width: 480,
+                 height: 480,
+                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
+               }))"></div>
+          <div v-if="hasRecentTrigger('final_cut')"
+               :key="triggerKey('final_cut')"
+               class="talent-spritesheet talent-spritesheet--blade talent-spritesheet--playing"
+               :style="spriteStyle('blood-blade-spritesheet.png', triggerOverlayStyle('final_cut', {
+                 width: 480,
+                 height: 480,
+                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
+               }))"></div>
+          <img v-if="hasRecentTrigger('collapse_trigger')"
+               :key="triggerKey('collapse_trigger')"
+               class="talent-effect-overlay__crack-burst"
+               :src="effectSrc('crack-pattern-3.png')"
+               :style="triggerOverlayStyle('collapse_trigger', {
+                 width: 320,
+                 height: 320,
+                 fallback: { top: '50%', left: '50%', marginLeft: '-160px', marginTop: '-160px' },
+               })"
+               alt="结构崩塌" />
+          <div v-if="hasRecentTrigger('collapse_trigger')"
+               :key="`armor-break-${triggerKey('collapse_trigger')}`"
+               class="talent-spritesheet talent-spritesheet--armor-break talent-spritesheet--playing"
+               :style="spriteStyle('armor-break-spritesheet.png', triggerOverlayStyle('collapse_trigger', {
+                 width: 320,
+                 height: 320,
+                 fallback: { top: '50%', left: '50%', marginLeft: '-160px', marginTop: '-160px' },
+               }))"></div>
+          <div v-if="hasRecentTrigger('judgment_day')"
+               :key="triggerKey('judgment_day')"
+               class="talent-spritesheet talent-spritesheet--hammer-crack talent-spritesheet--playing"
+               :style="spriteStyle('hammer-crack-spritesheet.png', triggerOverlayStyle('judgment_day', {
+                 width: 320,
+                 height: 320,
+                 fallback: { top: '50%', left: '50%', marginLeft: '-160px', marginTop: '-160px' },
+               }))"></div>
+          <div v-if="hasRecentTrigger('doom_judgment')"
+               :key="triggerKey('doom_judgment')"
+               class="talent-spritesheet talent-spritesheet--ring talent-spritesheet--playing"
+               :style="spriteStyle('green-ring-spritesheet.png', triggerOverlayStyle('doom_judgment', {
+                 width: 480,
+                 height: 480,
+                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
+               }))"></div>
+          <div v-if="hasRecentTrigger('silver_storm')"
+               :key="triggerKey('silver_storm')"
+               class="talent-spritesheet talent-spritesheet--scythe talent-spritesheet--playing"
+               :style="spriteStyle('scythe-sweep-spritesheet.png', triggerOverlayStyle('silver_storm', {
+                 width: 480,
+                 height: 480,
+                 fallback: { top: '40%', left: '30%', marginLeft: '-240px', marginTop: '-240px' },
+               }))"></div>
+        </div>
+        <div v-if="talentVisualState.silverStormActive || talentVisualState.deathEcstasyActive || talentVisualState.omenStacks > 0" class="talent-status-bar">
+          <span v-if="talentVisualState.silverStormActive" class="talent-status-bar__item talent-status-bar__item--silver">
+            白银风暴 {{ talentVisualState.silverStormRemaining }}
+          </span>
+          <span v-if="talentVisualState.deathEcstasyActive" class="talent-status-bar__item talent-status-bar__item--danger">
+            死亡狂喜
+          </span>
+          <span v-if="showOmenRing" class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
+            <svg class="talent-omen-ring__svg" viewBox="0 0 40 40">
+              <circle class="talent-omen-ring__track" cx="20" cy="20" r="16"/>
+              <circle class="talent-omen-ring__fill" cx="20" cy="20" r="16"
+                :style="{ strokeDasharray: `${omenRingProgress * 100.5} ${100.5 - omenRingProgress * 100.5}` }"/>
+            </svg>
+            死兆 {{ talentVisualState.omenStacks }}
+          </span>
+          <span v-if="talentVisualState.doomCritBuff" class="talent-status-bar__item talent-status-bar__item--active">
+            暴伤 x3
+          </span>
         </div>
         <div class="vote-stage__boss-hud-stats">
           <span>我的伤害 {{ myBossDamage }}</span>
           <span>Boss 榜 {{ bossLeaderboard.length }} 人</span>
           <span>掉落池 {{ bossDropPool.length }} 件</span>
-          <span v-if="displayedRecentRewards.length > 0">最近掉落 {{ recentRewardTitle }}</span>
         </div>
         <div class="vote-stage__boss-note">
           <span>只有对 Boss 造成至少 1% 生命值的伤害，才有资格掉落装备与资源。</span>

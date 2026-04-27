@@ -1,0 +1,93 @@
+{
+    "name": "crack-pattern-1",
+    "size": [
+        32,
+        32
+    ],
+    "constraints": {
+        "maxPixels": 16,
+        "allowAlpha": false
+    },
+    "pixels": [
+        {
+            "x": 16,
+            "y": 16,
+            "color": "#e5e7eb"
+        },
+        {
+            "x": 16,
+            "y": 15,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 15,
+            "y": 16,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 14,
+            "y": 15,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 13,
+            "y": 14,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 12,
+            "y": 13,
+            "color": "#9ca3af"
+        },
+        {
+            "x": 11,
+            "y": 12,
+            "color": "#9ca3af"
+        },
+        {
+            "x": 17,
+            "y": 14,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 18,
+            "y": 12,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 19,
+            "y": 10,
+            "color": "#9ca3af"
+        },
+        {
+            "x": 16,
+            "y": 17,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 17,
+            "y": 18,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 18,
+            "y": 19,
+            "color": "#9ca3af"
+        },
+        {
+            "x": 15,
+            "y": 18,
+            "color": "#d1d5db"
+        },
+        {
+            "x": 14,
+            "y": 19,
+            "color": "#9ca3af"
+        },
+        {
+            "x": 16,
+            "y": 14,
+            "color": "#bae6fd"
+        }
+    ]
+}

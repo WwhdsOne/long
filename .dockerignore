@@ -5,3 +5,5 @@ backend/node_modules
 .DS_Store
 backend/public
 npm-debug.log*
+scripts
+pixel-assets

@@ -292,12 +292,23 @@ function goNextPage() {
           <div class="dialog-panel">
             <p class="vote-stage__eyebrow">模板基础信息与部位</p>
             <div class="admin-form">
-              <input v-model="bossForm.id" class="nickname-form__input" type="text" placeholder="模板 ID，如 dragon" />
-              <input v-model="bossForm.name" class="nickname-form__input" type="text" placeholder="Boss 显示名称" />
-              <input v-model.number="bossForm.goldOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀金币基准" />
-              <input v-model.number="bossForm.stoneOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀强化石基准" />
-              <input v-model.number="bossForm.talentPointsOnKill" class="nickname-form__input" type="number" min="0" placeholder="击杀天赋点基准" />
-              <input class="nickname-form__input" type="number" min="0" :value="bossPartTotalHp" readonly aria-label="Boss 总血量" />
+              <label>模板 ID</label>
+              <input v-model="bossForm.id" class="nickname-form__input" />
+
+              <label>Boss 名称</label>
+              <input v-model="bossForm.name" class="nickname-form__input" />
+
+              <label>击杀金币</label>
+              <input v-model.number="bossForm.goldOnKill" class="nickname-form__input" type="number" />
+
+              <label>击杀强化石</label>
+              <input v-model.number="bossForm.stoneOnKill" class="nickname-form__input" type="number" />
+
+              <label>击杀天赋点</label>
+              <input v-model.number="bossForm.talentPointsOnKill" class="nickname-form__input" type="number" />
+
+              <label>Boss 总血量</label>
+              <input :value="bossPartTotalHp" class="nickname-form__input" readonly />
             </div>
 
             <fieldset class="admin-fieldset">

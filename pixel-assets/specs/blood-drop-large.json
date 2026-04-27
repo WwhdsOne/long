@@ -1,0 +1,63 @@
+{
+    "name": "blood-drop-large",
+    "size": [
+        12,
+        16
+    ],
+    "constraints": {
+        "maxPixels": 10,
+        "allowAlpha": false
+    },
+    "pixels": [
+        {
+            "x": 5,
+            "y": 2,
+            "color": "#ef4444"
+        },
+        {
+            "x": 6,
+            "y": 3,
+            "color": "#dc2626"
+        },
+        {
+            "x": 5,
+            "y": 4,
+            "color": "#dc2626"
+        },
+        {
+            "x": 6,
+            "y": 5,
+            "color": "#dc2626"
+        },
+        {
+            "x": 6,
+            "y": 7,
+            "color": "#dc2626"
+        },
+        {
+            "x": 6,
+            "y": 9,
+            "color": "#dc2626"
+        },
+        {
+            "x": 6,
+            "y": 11,
+            "color": "#dc2626"
+        },
+        {
+            "x": 6,
+            "y": 13,
+            "color": "#7f1d1d"
+        },
+        {
+            "x": 4,
+            "y": 3,
+            "color": "#ef4444"
+        },
+        {
+            "x": 6,
+            "y": 6,
+            "color": "#dc2626"
+        }
+    ]
+}

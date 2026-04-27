@@ -162,16 +162,19 @@ func (h *talentAPI) getDefs(ctx context.Context, c *app.RequestContext) {
 	result := map[string]any{
 		"trees": map[string]any{
 			"normal": map[string]any{
-				"name":    "均衡攻势",
-				"talents": defsToMap(vote.GetTreeTalents(vote.TalentTreeNormal)),
+				"name":                  "均衡攻势",
+				"talents":               defsToMap(vote.GetTreeTalents(vote.TalentTreeNormal)),
+				"tierCompletionBonuses": vote.TalentTierCompletionBonusLabels(vote.TalentTreeNormal),
 			},
 			"armor": map[string]any{
-				"name":    "碎盾攻坚",
-				"talents": defsToMap(vote.GetTreeTalents(vote.TalentTreeArmor)),
+				"name":                  "碎盾攻坚",
+				"talents":               defsToMap(vote.GetTreeTalents(vote.TalentTreeArmor)),
+				"tierCompletionBonuses": vote.TalentTierCompletionBonusLabels(vote.TalentTreeArmor),
 			},
 			"crit": map[string]any{
-				"name":    "致命洞察",
-				"talents": defsToMap(vote.GetTreeTalents(vote.TalentTreeCrit)),
+				"name":                  "致命洞察",
+				"talents":               defsToMap(vote.GetTreeTalents(vote.TalentTreeCrit)),
+				"tierCompletionBonuses": vote.TalentTierCompletionBonusLabels(vote.TalentTreeCrit),
 			},
 		},
 	}
