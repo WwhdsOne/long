@@ -5,6 +5,7 @@ import {effectAssetUrl} from '../utils/effectAssets'
 
 const {
   boss,
+  bossTheme,
   bossLeaderboard,
   bossLoot,
   bossGoldRange,
@@ -336,7 +337,7 @@ const deathEcstasyRemaining = computed(() => {
         <div v-else-if="bossZones.length === 0" class="feedback-panel feedback-panel--compact">
           <p>当前 Boss 尚未配置可攻击分区。</p>
         </div>
-        <div v-else class="boss-part-grid-container">
+        <div v-else class="boss-part-grid-container" :class="`boss-theme--${bossTheme}`">
           <!-- 左侧面板列 -->
           <div class="boss-left-panels">
             <!-- 1. 部位系数 -->
@@ -450,7 +451,7 @@ const deathEcstasyRemaining = computed(() => {
                   `boss-zone-button__damage-burst--${burst.type}`,
                 ]"
                 :style="{
-                  '--damage-left': `${burst.damageLeft}%`,
+                  '--damage-offset-x': `${burst.offsetX}px`,
                   '--damage-offset-y': `${burst.offsetY}px`,
                   '--damage-scale': burst.scale,
                   '--damage-ttl': `${burst.ttl}ms`,

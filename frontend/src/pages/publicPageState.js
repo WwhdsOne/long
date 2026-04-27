@@ -1,4 +1,4 @@
-import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 
 import {mergeBossState} from '../utils/bossState'
 import {formatDropRate} from '../utils/buttonBoard'
@@ -93,6 +93,19 @@ const publicPages = [
 const buttonTotalVotes = ref(0)
 const leaderboard = ref([])
 const boss = ref(null)
+const bossTheme = ref('cyberpunk')
+
+const BOSS_THEMES = ['cyberpunk', 'arcane', 'organic', 'glass', 'forge', 'cosmic']
+
+function pickBossTheme() {
+  const idx = Math.floor(Math.random() * BOSS_THEMES.length)
+  bossTheme.value = BOSS_THEMES[idx]
+}
+
+watch(() => boss.value?.id, (next, prev) => {
+  if (next && next !== prev) pickBossTheme()
+})
+
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
 const bossGoldRange = ref({min: 0, max: 0})
@@ -1512,14 +1525,22 @@ function nextBurstOffset(key, variant) {
         }
     }, 260)
 
-    // 随机水平位置 5% ~ 95%，垂直方向向上偏移
-    const leftPct = 5 + Math.random() * 90
-    const yOffsets = [-56, -72, -88, -104, -120]
-    const baseY = yOffsets[currentIndex % yOffsets.length]
-    const variantBias = variant === 'doomsday' ? 20 : variant === 'judgement' ? 32 : 0
+    const pattern = [
+        [-66, -52],
+        [58, -72],
+        [-84, -98],
+        [76, -118],
+        [0, -136],
+        [-104, -152],
+        [95, -170],
+    ]
+    const base = pattern[currentIndex % pattern.length]
+    const lane = Math.floor(currentIndex / pattern.length)
+    const shift = lane * 22
+    const variantBias = variant === 'doomsday' ? 16 : variant === 'judgement' ? 28 : 0
     return {
-        left: leftPct,
-        y: baseY - variantBias,
+        x: base[0] + (currentIndex % 2 === 0 ? -shift : shift),
+        y: base[1] - shift - variantBias,
     }
 }
 
@@ -1535,7 +1556,7 @@ function buildDamageBurst(key, payload, part, source) {
         value: formatNumber(damageValue),
         scale: config.scale,
         ttl: config.ttl,
-        damageLeft: offset.left,
+        offsetX: offset.x,
         offsetY: offset.y,
     }
 }
@@ -2061,6 +2082,7 @@ export function usePublicPageState() {
         buttonTotalVotes,
         leaderboard,
         boss,
+        bossTheme,
         bossLeaderboard,
         bossLoot,
         bossGoldRange,
