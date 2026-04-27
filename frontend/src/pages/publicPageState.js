@@ -1524,13 +1524,13 @@ function nextBurstOffset(key, variant) {
     }, 260)
 
     const pattern = [
-        [-66, -52],
-        [58, -72],
-        [-84, -98],
-        [76, -118],
-        [0, -136],
-        [-104, -152],
-        [95, -170],
+        [-12, -36],
+        [14, -52],
+        [-8, -44],
+        [6, -60],
+        [0, -48],
+        [-16, -56],
+        [10, -40],
     ]
     const base = pattern[currentIndex % pattern.length]
     const lane = Math.floor(currentIndex / pattern.length)
