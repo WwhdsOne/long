@@ -1102,6 +1102,9 @@ function applyClickResult(payload) {
     myBossStats.value = nextClickState.myBossStats
     recentRewards.value = nextClickState.recentRewards
     appendTalentTriggerEvents(payload.talentEvents)
+    if (payload.talentCombatState) {
+      applyTalentCombatState(payload.talentCombatState)
+    }
     syncing.value = false
     markUpdated()
 }

@@ -376,9 +376,10 @@ type ClickResult struct {
 	BossLeaderboard  []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
 	MyBossStats      *BossUserStats         `json:"myBossStats,omitempty"`
 	RecentRewards    []Reward               `json:"recentRewards,omitempty"`
-	TalentEvents     []TalentTriggerEvent   `json:"talentEvents,omitempty"`
-	PartStateDeltas  []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
-	BroadcastUserAll bool                   `json:"-"`
+	TalentEvents      []TalentTriggerEvent   `json:"talentEvents,omitempty"`
+	TalentCombatState *TalentCombatState     `json:"talentCombatState,omitempty"`
+	PartStateDeltas   []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
+	BroadcastUserAll  bool                   `json:"-"`
 }
 
 // TalentTriggerEvent 描述一次天赋触发事件，供前端战斗反馈显示。
@@ -1507,6 +1508,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	_ = s.SaveTalentCombatState(ctx, nickname, boss.ID, combatState)
+	result.TalentCombatState = combatState
 
 	allDead := true
 	for _, p := range boss.Parts {

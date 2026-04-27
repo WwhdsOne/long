@@ -3862,19 +3862,20 @@ select {
   gap: 4px;
   padding: 8px 12px;
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.06);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  backdrop-filter: blur(6px);
 }
 
 .combo-box__count {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 900;
-  color: #c0dce8;
-  text-shadow: 0 0 10px rgba(43, 184, 115, 0.4);
+  color: #f0fdf4;
+  text-shadow: 0 0 14px rgba(74, 222, 128, 0.6);
 }
 
 .combo-box__count--idle {
-  color: #5a6a7a;
+  color: #94a3b8;
   text-shadow: none;
 }
 
@@ -3882,26 +3883,27 @@ select {
   width: 100%;
   height: 4px;
   border-radius: 2px;
-  background: #253b44;
+  background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
 
 .combo-box__timeout-bar--empty {
-  background: #1a2a30;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .combo-box__timeout-fill {
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: #5a8a9a;
+  background: linear-gradient(90deg, #2bb873, #4ade80);
   transition: width 0.2s linear;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
 }
 
 .combo-box__timeout-text {
   font-size: 0.6rem;
   font-weight: 700;
-  color: #7898a8;
+  color: #86efac;
 }
 
 /* 部位累计进度面板 */
@@ -3911,8 +3913,9 @@ select {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.06);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(6px);
 }
 
 .part-progress-panel__title {
@@ -3920,9 +3923,9 @@ select {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--ink-soft);
+  color: #cbd5e1;
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
 .part-progress-panel__item {
@@ -3937,15 +3940,15 @@ select {
 }
 
 .part-progress-panel__name--soft { color: #4ade80; }
-.part-progress-panel__name--heavy { color: #94a3b8; }
-.part-progress-panel__name--weak { color: #ef4444; }
+.part-progress-panel__name--heavy { color: #cbd5e1; }
+.part-progress-panel__name--weak { color: #f87171; }
 
 .part-progress-panel__track {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 0.6rem;
-  color: var(--ink-soft);
+  color: #cbd5e1;
   white-space: nowrap;
 }
 
@@ -3953,7 +3956,7 @@ select {
   flex: 1;
   height: 4px;
   border-radius: 2px;
-  background: #253b44;
+  background: rgba(255, 255, 255, 0.1);
   overflow: hidden;
   min-width: 40px;
 }
@@ -3963,12 +3966,14 @@ select {
   height: 100%;
   border-radius: 2px;
   transition: width 0.3s ease;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
 }
 
 .part-progress-panel__bar-fill--storm {
-  background: linear-gradient(90deg, #2bb873, #4ade80);
+  background: linear-gradient(90deg, #22c55e, #4ade80);
 }
 
 .part-progress-panel__bar-fill--armor {
   background: linear-gradient(90deg, #f59e0b, #fbbf24);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
 }
