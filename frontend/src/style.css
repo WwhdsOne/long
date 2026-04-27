@@ -4079,15 +4079,15 @@ select {
   gap: 6px;
   padding: 6px 10px;
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.15);
   backdrop-filter: blur(6px);
 }
 
 .collapse-timer__label {
   font-size: 0.65rem;
   font-weight: 800;
-  color: #fbbf24;
+  color: #d97706;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -4095,9 +4095,8 @@ select {
 .collapse-timer__count {
   font-size: 0.9rem;
   font-weight: 900;
-  color: #fde68a;
+  color: #f59e0b;
   margin-left: auto;
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
 }
 
 /* 死亡狂喜倒计时 */
