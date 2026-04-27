@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"math/rand/v2"
 	"slices"
@@ -1510,8 +1509,6 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	_ = s.SaveTalentCombatState(ctx, nickname, boss.ID, combatState)
 	result.TalentCombatState = combatState
-	log.Printf("[DEBUG] ClickResult TalentCombatState: PartStormComboCount=%v PartHeavyClickCount=%v CollapseParts=%v",
-		combatState.PartStormComboCount, combatState.PartHeavyClickCount, combatState.CollapseParts)
 
 	allDead := true
 	for _, p := range boss.Parts {

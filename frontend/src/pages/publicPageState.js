@@ -202,7 +202,6 @@ const armorProgress = computed(() => Math.min(100, Math.round((armorCombo.value 
 const partProgressList = computed(() => {
   const parts = boss.value?.parts
   const cs = talentCombatState.value
-  console.log('[DEBUG] partProgressList computed: hasParts=', Array.isArray(parts) && parts.length, 'hasCS=', !!cs, 'stormMap=', cs?.partStormComboCount, 'heavyMap=', cs?.partHeavyClickCount)
   if (!Array.isArray(parts) || parts.length === 0) return []
   const stormMap = cs?.partStormComboCount || {}
   const heavyMap = cs?.partHeavyClickCount || {}
@@ -1103,7 +1102,6 @@ function applyClickResult(payload) {
     myBossStats.value = nextClickState.myBossStats
     recentRewards.value = nextClickState.recentRewards
     appendTalentTriggerEvents(payload.talentEvents)
-    console.log('[DEBUG] applyClickResult hasTalentCombatState:', !!payload.talentCombatState, payload.talentCombatState ? JSON.stringify({ partStormComboCount: payload.talentCombatState.partStormComboCount, partHeavyClickCount: payload.talentCombatState.partHeavyClickCount }) : '')
     if (payload.talentCombatState) {
       applyTalentCombatState(payload.talentCombatState)
     }
@@ -1119,7 +1117,6 @@ function indexToPartKey(index) {
 
 function applyTalentCombatState(state) {
   if (!state || typeof state !== 'object') return
-  console.log('[DEBUG] applyTalentCombatState:', JSON.stringify({ partStormComboCount: state.partStormComboCount, partHeavyClickCount: state.partHeavyClickCount, collapseParts: state.collapseParts }))
   talentCombatState.value = state
   const vs = talentVisualState.value
   vs.omenStacks = Number(state.omenStacks) || 0
