@@ -36,11 +36,9 @@ var ErrBossCycleQueueEmpty = errors.New("boss cycle queue empty")
 var ErrBossPartsRequired = errors.New("boss parts required")
 var ErrBossPartNotFound = errors.New("boss part not found")
 var ErrBossPartAlreadyDead = errors.New("boss part already dead")
-var ErrTalentTreeNotSet = errors.New("talent tree not set")
 var ErrTalentAlreadyLearned = errors.New("talent already learned")
 var ErrTalentPrerequisite = errors.New("talent prerequisite not met")
 var ErrTalentNotFound = errors.New("talent not found")
-var ErrTalentMaxLevel = errors.New("talent max level reached")
 var ErrInvalidTalentTree = errors.New("invalid talent tree")
 var ErrTalentPointsInsufficient = errors.New("talent points insufficient")
 var ErrTalentInvalidCost = errors.New("talent invalid cost")
@@ -1595,8 +1593,8 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			}
 
 			partKey := TalentPartKey(part.X, part.Y)
-			effectiveClicks := clickCount + combatState.PartRetainedClicks[partKey]
-			if triggerCount > 0 && effectiveClicks%triggerCount == 0 {
+			combatState.PartStormComboCount[partKey]++
+			if combatState.PartStormComboCount[partKey] >= triggerCount {
 				burst := int64(math.Floor(float64(maxInt64(1, baseDamage)) * chaseRatio * float64(maxInt64(1, extraHits))))
 				if burst > 0 {
 					if burst > part.CurrentHP { burst = part.CurrentHP }
@@ -1607,11 +1605,12 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 					events = append(events, TalentTriggerEvent{
 						TalentID: "normal_core", Name: def.Name, EffectType: def.EffectType,
 						ExtraDamage: burst, Message: fmt.Sprintf("追击爆发 %d 段伤害", extraHits),
+						PartX: part.X, PartY: part.Y,
 					})
 					if hasTalent(learned, "normal_charge") {
-						if retained := int64(float64(clickCount) * 0.30); retained > 0 {
-							combatState.PartRetainedClicks[partKey] = retained
-						}
+						combatState.PartStormComboCount[partKey] = int64(float64(triggerCount) * 0.30)
+					} else {
+						combatState.PartStormComboCount[partKey] = 0
 					}
 				}
 			}
@@ -1621,7 +1620,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 	if hasTalent(learned, "armor_core") && part.Type == PartTypeHeavy {
 		partKey := TalentPartKey(part.X, part.Y)
 		combatState.PartHeavyClickCount[partKey]++
-		if combatState.PartHeavyClickCount[partKey] == 100 {
+		if combatState.PartHeavyClickCount[partKey] >= 100 {
 			cd := int64(8)
 			if hasTalent(learned, "armor_collapse_ext") { cd = 15 }
 			combatState.CollapseParts = append(combatState.CollapseParts, partIndex)
@@ -1632,6 +1631,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 				PartX:    part.X,
 				PartY:    part.Y,
 			})
+			combatState.PartHeavyClickCount[partKey] = 0 // 触发后归零，允许多次崩塌
 		}
 	}
 
@@ -1751,6 +1751,12 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 	}
 
 	if combatState.CollapseEndsAt > 0 && now >= combatState.CollapseEndsAt {
+		for _, idx := range combatState.CollapseParts {
+			if idx >= 0 && idx < len(boss.Parts) {
+				pk := TalentPartKey(boss.Parts[idx].X, boss.Parts[idx].Y)
+				combatState.PartHeavyClickCount[pk] = 0
+			}
+		}
 		combatState.CollapseParts = nil
 		combatState.CollapseEndsAt = 0
 	}
