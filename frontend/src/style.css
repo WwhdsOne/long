@@ -3019,38 +3019,47 @@ select {
 
 .boss-zone-button__damage-burst--critical {
   color: #facc15;
+  text-shadow: 0 0 14px rgba(250, 204, 21, 0.5), 0 4px 14px rgba(15, 23, 42, 0.65);
   animation:
-    boss-damage-float var(--damage-ttl) cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    boss-damage-float var(--damage-ttl) cubic-bezier(0.22, 1, 0.36, 1) forwards,
     boss-damage-shake 100ms ease-in-out 0s 1;
 }
 
 .boss-zone-button__damage-burst--weakCritical {
   color: #facc15;
-  -webkit-text-stroke: 1.5px #b91c1c;
+  -webkit-text-stroke: 1.8px #dc2626;
+  text-shadow: 0 0 16px rgba(250, 204, 21, 0.55), 0 0 30px rgba(239, 68, 68, 0.3), 0 4px 14px rgba(15, 23, 42, 0.65);
   animation:
-    boss-damage-float var(--damage-ttl) cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    boss-damage-float var(--damage-ttl) cubic-bezier(0.22, 1, 0.36, 1) forwards,
     boss-damage-shake 150ms ease-in-out 0s 1;
 }
 
 .boss-zone-button__damage-burst--pursuit {
   color: #60a5fa;
+  text-shadow: 0 0 10px rgba(96, 165, 250, 0.45), 0 4px 14px rgba(15, 23, 42, 0.65);
 }
 
 .boss-zone-button__damage-burst--trueDamage {
   color: #c084fc;
-  text-shadow: 0 0 12px rgba(168, 85, 247, 0.55), 0 4px 14px rgba(15, 23, 42, 0.65);
+  text-shadow: 0 0 14px rgba(192, 132, 252, 0.55), 0 4px 14px rgba(15, 23, 42, 0.65);
+}
+
+.boss-zone-button__damage-burst--trueDamage::before {
+  content: '⚡';
+  font-size: 0.7em;
+  margin-right: 2px;
 }
 
 .boss-zone-button__damage-burst--doomsday {
   color: #c084fc;
   font-size: clamp(1.4rem, 3vw, 2.8rem);
-  text-shadow: 0 0 18px rgba(167, 139, 250, 0.7), 0 8px 18px rgba(15, 23, 42, 0.68);
+  text-shadow: 0 0 24px rgba(192, 132, 252, 0.8), 0 0 48px rgba(168, 85, 247, 0.4), 0 8px 18px rgba(15, 23, 42, 0.68);
 }
 
 .boss-zone-button__damage-burst--judgement {
   color: #fde047;
   font-size: clamp(1.56rem, 3.6vw, 3.2rem);
-  text-shadow: 0 0 22px rgba(234, 179, 8, 0.8), 0 10px 20px rgba(15, 23, 42, 0.72);
+  text-shadow: 0 0 28px rgba(253, 224, 71, 0.9), 0 0 56px rgba(234, 179, 8, 0.5), 0 10px 20px rgba(15, 23, 42, 0.72);
 }
 
 .vote-stage__boss-hud--merged {
@@ -3111,22 +3120,53 @@ select {
   0% {
     opacity: 0;
     transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
-      scale(calc(var(--damage-scale) * 0.84));
+      scale(calc(var(--damage-scale) * 0.3));
+    filter: brightness(1);
   }
-  14% {
+  10% {
     opacity: 1;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 10px))
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 12px))
+      scale(calc(var(--damage-scale) * 1.2));
+    filter: brightness(1.5);
+  }
+  22% {
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 28px))
       scale(var(--damage-scale));
+    filter: brightness(1.2);
   }
-  70% {
-    opacity: 1;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 36px))
-      scale(calc(var(--damage-scale) * 1.03));
+  60% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 50px))
+      scale(var(--damage-scale));
+    filter: brightness(1);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 74px))
-      scale(calc(var(--damage-scale) * 0.9));
+    transform: translate(-50%, -50%) translate(var(--damage-offset-x), calc(var(--damage-offset-y) - 82px))
+      scale(calc(var(--damage-scale) * 0.85));
+    filter: brightness(0.8);
+  }
+}
+
+/* 伤害粒子 */
+.boss-zone-button__damage-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+  z-index: 8;
+  border-radius: 50%;
+  animation: boss-particle-fly 0.8s ease-out forwards;
+}
+
+@keyframes boss-particle-fly {
+  0% {
+    opacity: 0.85;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--px), var(--py)) scale(0);
   }
 }
 

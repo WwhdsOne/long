@@ -456,6 +456,18 @@ const deathEcstasyRemaining = computed(() => {
             >
               {{ burst.value }}
             </span>
+            <span
+                v-for="p in (burst.particles || [])"
+                :key="p.id"
+                class="boss-zone-button__damage-particle"
+                :style="{
+                  '--px': `${p.x}px`,
+                  '--py': `${p.y}px`,
+                  width: `${p.size}px`,
+                  height: `${p.size}px`,
+                  background: p.color,
+                }"
+            ></span>
                   </div>
                   <img
                       v-if="isPartCollapsed(zone)"

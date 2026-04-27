@@ -17,45 +17,59 @@ const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 't
 const DAMAGE_VARIANTS = {
     normal: {
         scale: 1,
-        ttl: 1250,
+        ttl: 1400,
         shake: 0,
         stageFx: [],
+        particles: 6,
+        colors: ['#f8fafc', '#e2e8f0', '#cbd5e1'],
     },
     pursuit: {
         scale: 1,
-        ttl: 1300,
+        ttl: 1400,
         shake: 0,
         stageFx: ['flash'],
+        particles: 8,
+        colors: ['#60a5fa', '#93bbfd', '#3b82f6', '#bfdbfe'],
     },
     trueDamage: {
         scale: 1,
-        ttl: 1420,
+        ttl: 1500,
         shake: 0,
         stageFx: ['flash'],
+        particles: 10,
+        colors: ['#c084fc', '#a78bfa', '#8b5cf6', '#ddd6fe'],
     },
     critical: {
         scale: 1.5,
-        ttl: 1500,
+        ttl: 1600,
         shake: 100,
         stageFx: ['shake'],
+        particles: 14,
+        colors: ['#facc15', '#fbbf24', '#f59e0b', '#fef08a', '#eab308'],
     },
     weakCritical: {
-        scale: 2,
-        ttl: 1600,
+        scale: 2.0,
+        ttl: 1700,
         shake: 150,
         stageFx: ['shake', 'flash'],
+        particles: 20,
+        colors: ['#facc15', '#ef4444', '#f87171', '#fbbf24', '#f59e0b', '#dc2626'],
     },
     doomsday: {
         scale: 2.8,
-        ttl: 1900,
+        ttl: 2000,
         shake: 240,
         stageFx: ['shake', 'doom', 'blade'],
+        particles: 28,
+        colors: ['#c084fc', '#a78bfa', '#8b5cf6', '#7c3aed', '#ddd6fe', '#ede9fe'],
     },
     judgement: {
-        scale: 4,
-        ttl: 2200,
+        scale: 4.0,
+        ttl: 2400,
         shake: 180,
         stageFx: ['shake', 'slowMo', 'vignette'],
+        particles: 36,
+        colors: ['#fde047', '#facc15', '#fbbf24', '#fef08a', '#eab308', '#f59e0b'],
     },
 }
 
@@ -1544,6 +1558,21 @@ function triggerDamageBurst(key, payload = {}) {
     const part = findBossPartByKey(normalizedKey)
     const burst = buildDamageBurst(normalizedKey, payload, part, source)
     const config = DAMAGE_VARIANTS[burst.type] || DAMAGE_VARIANTS.normal
+    burst.particleCount = config.particles || 0
+    burst.particleColors = config.colors || []
+    burst.particles = []
+    for (let i = 0; i < burst.particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const dist = 18 + Math.random() * 48
+      const size = 2 + Math.random() * 4
+      burst.particles.push({
+        id: `${burst.id}-p${i}`,
+        color: burst.particleColors[Math.floor(Math.random() * burst.particleColors.length)],
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist,
+        size,
+      })
+    }
     const currentBursts = damageBursts.value[normalizedKey] || []
     const nextBursts = [...currentBursts, burst]
         .sort((left, right) => left.priority - right.priority)
