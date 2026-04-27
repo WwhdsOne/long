@@ -1,5 +1,5 @@
 <script setup>
-import {computed, ref} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import {effectAssetUrl} from '../utils/effectAssets'
 
@@ -50,6 +50,12 @@ const {
 
 const bossDropModalOpen = ref(false)
 const talentEffectOverlayRef = ref(null)
+
+// 每秒 tick 驱动倒计时刷新
+const nowTick = ref(0)
+let tickTimer = 0
+onMounted(() => { tickTimer = setInterval(() => { nowTick.value++ }, 500) })
+onBeforeUnmount(() => { clearInterval(tickTimer) })
 
 const bossZones = computed(() => {
   if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return []
@@ -256,6 +262,7 @@ const omenRingProgress = computed(() => {
 })
 
 const deathEcstasyRemaining = computed(() => {
+  void nowTick.value
   const endsAt = talentVisualState.value.deathEcstasyEndsAt
   if (!endsAt) return 0
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
@@ -263,6 +270,7 @@ const deathEcstasyRemaining = computed(() => {
 
 const collapseActive = computed(() => talentVisualState.value.collapsePartKeys.length > 0)
 const collapseRemaining = computed(() => {
+  void nowTick.value
   const endsAt = talentVisualState.value.collapseEndsAt
   if (!endsAt) return 0
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
