@@ -3908,6 +3908,38 @@ select {
   color: #86efac;
 }
 
+/* 死亡狂喜倒计时 */
+.death-ecstasy-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  backdrop-filter: blur(6px);
+}
+
+.death-ecstasy-timer__icon {
+  font-size: 0.9rem;
+}
+
+.death-ecstasy-timer__label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fca5a5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.death-ecstasy-timer__count {
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #fecaca;
+  margin-left: auto;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
 /* 部位累计进度面板 */
 .part-progress-panel {
   display: flex;

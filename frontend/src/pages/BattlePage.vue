@@ -253,6 +253,12 @@ const omenRingProgress = computed(() => {
   const stacks = talentVisualState.value.omenStacks
   return Math.min(1, stacks / 100)
 })
+
+const deathEcstasyRemaining = computed(() => {
+  const endsAt = talentVisualState.value.deathEcstasyEndsAt
+  if (!endsAt) return 0
+  return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
+})
 </script>
 
 <template>
@@ -372,6 +378,13 @@ const omenRingProgress = computed(() => {
                 <span class="combo-box__count combo-box__count--idle">x 0</span>
                 <span class="combo-box__timeout-bar combo-box__timeout-bar--empty"></span>
               </template>
+            </div>
+
+            <!-- 死亡狂喜倒计时 -->
+            <div v-if="talentVisualState.deathEcstasyActive" class="death-ecstasy-timer">
+              <span class="death-ecstasy-timer__icon">💀</span>
+              <span class="death-ecstasy-timer__label">死亡狂喜</span>
+              <span class="death-ecstasy-timer__count">{{ deathEcstasyRemaining }}s</span>
             </div>
 
             <!-- 3. 部位累计进度列表：仅当有进度时显示 -->
@@ -569,12 +582,9 @@ const omenRingProgress = computed(() => {
                  fallback: { top: '40%', left: '30%', marginLeft: '-240px', marginTop: '-240px' },
                }))"></div>
         </div>
-        <div v-if="talentVisualState.silverStormActive || talentVisualState.deathEcstasyActive || talentVisualState.omenStacks > 0" class="talent-status-bar">
+        <div v-if="talentVisualState.silverStormActive || talentVisualState.omenStacks > 0 || talentVisualState.doomCritBuff" class="talent-status-bar">
           <span v-if="talentVisualState.silverStormActive" class="talent-status-bar__item talent-status-bar__item--silver">
             白银风暴 {{ talentVisualState.silverStormRemaining }}
-          </span>
-          <span v-if="talentVisualState.deathEcstasyActive" class="talent-status-bar__item talent-status-bar__item--danger">
-            死亡狂喜
           </span>
           <span v-if="showOmenRing" class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
             <svg class="talent-omen-ring__svg" viewBox="0 0 40 40">

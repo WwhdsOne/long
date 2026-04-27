@@ -109,6 +109,7 @@ function defaultTalentVisualState() {
     silverStormActive: false,
     silverStormRemaining: 0,
     deathEcstasyActive: false,
+    deathEcstasyEndsAt: 0,
     collapsePartKeys: [],
     doomMarks: [],
     doomDestroyed: 0,
@@ -1125,6 +1126,7 @@ function applyTalentCombatState(state) {
   vs.silverStormRemaining = Number(state.silverStormRemaining) || 0
 
   vs.deathEcstasyActive = state.deathEcstasyEndsAt > Math.floor(Date.now() / 1000)
+	  vs.deathEcstasyEndsAt = Number(state.deathEcstasyEndsAt) || 0
   vs.doomDestroyed = Math.min(2, Number(state.doomDestroyed) || 0)
   vs.doomCritBuff = Boolean(state.doomCritBuff)
 
