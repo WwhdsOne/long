@@ -440,9 +440,11 @@ const deathEcstasyRemaining = computed(() => {
                       :alt="zone.displayName || partTypeLabels[zone.type] || zone.type"
                   />
                   <div class="boss-zone-button__damage-layer" aria-hidden="true">
-            <span
+            <template
                 v-for="burst in zoneDamageBursts(zone)"
                 :key="burst.id"
+            >
+              <span
                 class="boss-zone-button__damage-burst"
                 :class="[
                   `boss-zone-button__damage-burst--${burst.type}`,
@@ -453,10 +455,10 @@ const deathEcstasyRemaining = computed(() => {
                   '--damage-scale': burst.scale,
                   '--damage-ttl': `${burst.ttl}ms`,
                 }"
-            >
-              {{ burst.value }}
-            </span>
-            <span
+              >
+                {{ burst.value }}
+              </span>
+              <span
                 v-for="p in (burst.particles || [])"
                 :key="p.id"
                 class="boss-zone-button__damage-particle"
@@ -467,7 +469,8 @@ const deathEcstasyRemaining = computed(() => {
                   height: `${p.size}px`,
                   background: p.color,
                 }"
-            ></span>
+              ></span>
+            </template>
                   </div>
                   <img
                       v-if="isPartCollapsed(zone)"
