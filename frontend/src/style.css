@@ -3000,8 +3000,8 @@ select {
   --damage-ttl: 1200ms;
   position: absolute;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
+  top: -18px;
+  transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
   font-size: clamp(1.15rem, 2.2vw, 1.7rem);
@@ -3119,7 +3119,7 @@ select {
 @keyframes boss-damage-float {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y))
+    transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y))
       scale(calc(var(--damage-scale) * 0.3));
     filter: brightness(1);
   }
@@ -3171,11 +3171,11 @@ select {
 }
 
 @keyframes boss-damage-shake {
-  0% { transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  0% { transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
   25% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
   50% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) + 2px), var(--damage-offset-y)) scale(var(--damage-scale)); }
   75% { transform: translate(-50%, -50%) translate(calc(var(--damage-offset-x) - 1px), var(--damage-offset-y)) scale(var(--damage-scale)); }
-  100% { transform: translate(-50%, -50%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
+  100% { transform: translate(-50%, -100%) translate(var(--damage-offset-x), var(--damage-offset-y)) scale(var(--damage-scale)); }
 }
 
 @keyframes boss-stage-flash {
