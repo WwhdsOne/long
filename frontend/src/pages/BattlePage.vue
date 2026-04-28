@@ -90,6 +90,42 @@ function hideCursor() {
   swordSwung = false
 }
 
+// 挥剑粒子系统
+const swordParticles = []
+const PARTICLE_COLORS = {
+  soft:  { colors: ['#e8e8f4','#fafaff','#d0d0dc'], count: 8,  size: [3,5], speed: [3,7], gravity: 0.08 },
+  heavy: { colors: ['#9ca3af','#787888','#64748b'], count: 5,  size: [2,4], speed: [2,5], gravity: 0.18 },
+  weak:  { colors: ['#fcd34d','#fbbf24','#f59e0b','#ef4444','#fef3c7'], count: 14, size: [4,7], speed: [5,10], gravity: 0.05 },
+}
+
+function spawnSwordParticles(cx, cy, cellType) {
+  const cfg = PARTICLE_COLORS[cellType] || PARTICLE_COLORS.soft
+  for (let i = 0; i < cfg.count; i++) {
+    const el = document.createElement('div')
+    el.className = 'sword-particle'
+    const angle = Math.PI * 0.15 + Math.random() * Math.PI * 0.4
+    const speed = cfg.speed[0] + Math.random() * (cfg.speed[1] - cfg.speed[0])
+    const sz = cfg.size[0] + Math.floor(Math.random() * (cfg.size[1] - cfg.size[0] + 1))
+    el.style.width = el.style.height = sz + 'px'
+    el.style.background = cfg.colors[Math.floor(Math.random() * cfg.colors.length)]
+    el.style.left = cx + 'px'
+    el.style.top = cy + 'px'
+    document.body.appendChild(el)
+    swordParticles.push({ el, x: cx, y: cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, gravity: cfg.gravity, decay: 0.02 + Math.random() * 0.03 })
+  }
+  updateSwordParticles()
+}
+
+function updateSwordParticles() {
+  for (let i = swordParticles.length - 1; i >= 0; i--) {
+    const p = swordParticles[i]
+    p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life -= p.decay
+    p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px'; p.el.style.opacity = p.life
+    if (p.life <= 0) { p.el.remove(); swordParticles.splice(i, 1) }
+  }
+  if (swordParticles.length > 0) requestAnimationFrame(updateSwordParticles)
+}
+
 function doCursorAttack(e) {
   const now = Date.now()
   if (now - lastAttackTime < 32) return
@@ -107,6 +143,11 @@ function doCursorAttack(e) {
     swordCursor.classList.add('recovering')
     swordSwung = false
   }, 50)
+
+  // 粒子特效
+  const cell = e.target.closest('.boss-part-cell')
+  const cellType = cell ? (cell.classList.contains('boss-part-cell--weak') ? 'weak' : cell.classList.contains('boss-part-cell--heavy') ? 'heavy' : 'soft') : 'soft'
+  spawnSwordParticles(e.clientX, e.clientY, cellType)
 }
 
 onMounted(() => {
@@ -121,12 +162,10 @@ onMounted(() => {
     const grid = getGridArea()
     if (!grid) return
     const inside = grid.contains(e.target)
-    if (inside && !cursorVisible) {
-      showCursor()
+    if (inside) {
+      if (!cursorVisible) showCursor()
       updateCursorPos(e)
-    } else if (inside && cursorVisible) {
-      updateCursorPos(e)
-    } else if (!inside && cursorVisible) {
+    } else if (cursorVisible) {
       hideCursor()
     }
   })
@@ -547,23 +586,25 @@ const collapseRemaining = computed(() => {
             <!-- 2. 连击框：始终可见 -->
             <div class="combo-box">
               <template v-if="comboCount > 0">
-                <span class="combo-box__count">连击 x{{ comboCount }}</span>
-                <span v-if="Math.floor(comboCount / 50) > 0" class="combo-box__bonus">
-                  +{{ Math.floor(comboCount / 50) * 5 }}%
-                </span>
+                <div class="combo-box__row">
+                  <span class="combo-box__count">连击 x{{ comboCount }}</span>
+                  <span v-if="Math.floor(comboCount / 50) > 0" class="combo-box__bonus">
+                    伤害 +{{ Math.floor(comboCount / 50) * 5 }}%
+                  </span>
+                  <span class="combo-box__timeout-text">
+                    {{ Math.ceil(comboTimeoutPercent / 20) }}s
+                  </span>
+                </div>
                 <span class="combo-box__timeout-bar">
                   <span
                       class="combo-box__timeout-fill"
                       :style="{ width: comboTimeoutPercent + '%' }"
                   ></span>
                 </span>
-                <span class="combo-box__timeout-text">
-                  {{ Math.ceil(comboTimeoutPercent / 20) }}s
-                </span>
               </template>
               <template v-else>
                 <span class="combo-box__count combo-box__count--idle">
-                  连击 x️ 0
+                  连击 x 0
                 </span>
                 <span class="combo-box__timeout-bar combo-box__timeout-bar--empty">
                   <span class="combo-box__timeout-fill"></span>
@@ -713,10 +754,10 @@ const collapseRemaining = computed(() => {
                 </button>
               </div>
             </div>
-            <div id="boss-sword-cursor" style="display:none;"></div>
           </div>
 
         </div>
+        <div id="boss-sword-cursor" style="display:none;"></div>
         <!-- 天赋瞬发特效覆盖层 -->
         <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
           <div v-if="hasRecentTrigger('storm_combo')"

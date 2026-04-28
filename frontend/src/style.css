@@ -2751,8 +2751,9 @@ select {
   gap: 6px;
   padding: 10px 8px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.06);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
   min-width: 0;
   flex-shrink: 0;
 }
@@ -2762,9 +2763,9 @@ select {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--ink-soft);
+  color: rgba(255, 255, 255, 0.6);
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .boss-part-info__item {
@@ -3251,17 +3252,25 @@ select {
   height: 96px;
   background: url('https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png') center/contain no-repeat;
   image-rendering: pixelated;
-  transform: translate(-30%, -60%) rotate(0deg);
+  transform: translate(calc(-45% - 50px), -30%) rotate(0deg);
   transition: transform 0.08s ease-out;
   will-change: transform, left, top;
 }
 #boss-sword-cursor.swinging {
-  transform: translate(-30%, -60%) rotate(60deg);
+  transform: translate(calc(-45% - 50px), -30%) rotate(60deg);
   transition: transform 0.06s ease-out;
 }
 #boss-sword-cursor.recovering {
-  transform: translate(-30%, -60%) rotate(0deg);
+  transform: translate(calc(-45% - 50px), -30%) rotate(0deg);
   transition: transform 0.12s ease-out;
+}
+
+/* ===== 挥剑粒子 ===== */
+.sword-particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9998;
+  image-rendering: pixelated;
 }
 
 /* ===== Boss 命中与屏幕特效 ===== */
@@ -4003,7 +4012,6 @@ select {
 .combo-box {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 4px;
   padding: 8px 12px;
   border-radius: 10px;
@@ -4012,23 +4020,39 @@ select {
   backdrop-filter: blur(6px);
 }
 
+.combo-box__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 .combo-box__count {
   font-size: 1.1rem;
   font-weight: 900;
   color: #f0fdf4;
   text-shadow: 0 0 14px rgba(74, 222, 128, 0.6);
   font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
 }
 
 .combo-box__bonus {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 800;
   color: #fbbf24;
   text-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+  flex: 0 0 auto;
+}
+
+.combo-box__timeout-text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #86efac;
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .combo-box__count--idle {
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.48);
   text-shadow: none;
 }
 
@@ -4044,10 +4068,6 @@ select {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.combo-box__count--idle {
-  color: rgba(255, 255, 255, 0.48);
-}
-
 .combo-box__timeout-bar--empty .combo-box__timeout-fill {
   width: 0;
   background: rgba(255, 255, 255, 0.22);
@@ -4060,12 +4080,6 @@ select {
   background: linear-gradient(90deg, #2bb873, #4ade80);
   transition: width 0.2s linear;
   box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
-}
-
-.combo-box__timeout-text {
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: #86efac;
 }
 
 /* 崩塌面板 */
