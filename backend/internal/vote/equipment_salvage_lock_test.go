@@ -2,6 +2,7 @@ package vote
 
 import (
 	"context"
+	"slices"
 	"testing"
 )
 
@@ -159,10 +160,5 @@ func seedEquipmentDefinitionWithRarity(t *testing.T, store *Store, ctx context.C
 }
 
 func containsString(items []string, target string) bool {
-	for _, item := range items {
-		if item == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(items, target)
 }

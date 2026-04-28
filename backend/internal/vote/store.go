@@ -470,10 +470,6 @@ type Store struct {
 	now                     func() time.Time
 	validator               interface{ Validate(string) error }
 
-	leaderboardCache   []LeaderboardEntry
-	leaderboardCacheAt time.Time
-	leaderboardCacheMu sync.Mutex
-
 	combatStatsCache   map[string]CombatStats
 	combatStatsCacheMu sync.RWMutex
 
@@ -1128,20 +1124,11 @@ func (s *Store) ListBossLeaderboard(ctx context.Context, bossID string, limit in
 	return leaderboard, nil
 }
 
-// ListLeaderboard 获取排行榜前 N 名（10 分钟缓存，降低 Redis 读取频率）。
+// ListLeaderboard 获取排行榜前 N 名。
 func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]LeaderboardEntry, error) {
 	if limit <= 0 {
 		limit = 10
 	}
-
-	s.leaderboardCacheMu.Lock()
-	if time.Since(s.leaderboardCacheAt) < 10*time.Minute && int64(len(s.leaderboardCache)) >= limit {
-		cached := make([]LeaderboardEntry, limit)
-		copy(cached, s.leaderboardCache[:limit])
-		s.leaderboardCacheMu.Unlock()
-		return cached, nil
-	}
-	s.leaderboardCacheMu.Unlock()
 
 	scores, err := s.client.ZRevRangeWithScores(ctx, s.leaderboardKey, 0, limit-1).Result()
 	if err != nil {
@@ -1161,11 +1148,6 @@ func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]Leaderboard
 			ClickCount: int64(score.Score),
 		})
 	}
-
-	s.leaderboardCacheMu.Lock()
-	s.leaderboardCache = leaderboard
-	s.leaderboardCacheAt = time.Now()
-	s.leaderboardCacheMu.Unlock()
 
 	return leaderboard, nil
 }

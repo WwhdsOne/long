@@ -182,6 +182,39 @@ func TestLearnTalentConsumesTalentPointsAndResetRefunds(t *testing.T) {
 	}
 }
 
+func TestTier0TalentUpgradeAndResetRefundUsesNewCurve(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed talent points: %v", err)
+	}
+
+	if err := store.UpgradeTalent(ctx, nickname, "normal_core", 3); err != nil {
+		t.Fatalf("upgrade normal_core to lv3: %v", err)
+	}
+	userState, err := store.GetUserState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get user state after upgrade: %v", err)
+	}
+	if userState.TalentPoints != 4532 {
+		t.Fatalf("expected talent points to be deducted to 4532, got %d", userState.TalentPoints)
+	}
+
+	if err := store.ResetTalents(ctx, nickname); err != nil {
+		t.Fatalf("reset talents: %v", err)
+	}
+	userState, err = store.GetUserState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get user state after reset: %v", err)
+	}
+	if userState.TalentPoints != 5000 {
+		t.Fatalf("expected tier0 refund after reset to 5000, got %d", userState.TalentPoints)
+	}
+}
+
 func TestLearnTalentRejectsWhenTalentPointsInsufficient(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

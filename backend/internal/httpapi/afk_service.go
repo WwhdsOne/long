@@ -16,7 +16,7 @@ import (
 )
 
 const afkStartDelay = 60 * time.Second
-const afkMaxDuration = 24 * time.Hour
+const afkMaxDuration = 8 * time.Hour
 
 type afkPlayerState struct {
 	LastSeenAt     int64

@@ -22,6 +22,7 @@ function showToast(msg) {
 const treeDefs = ref(null)
 const talentState = ref(null)
 const talentEffectLines = ref({})
+const talentEffectDescriptions = ref({})
 const selectedTree = ref('normal')
 const selectedMarker = ref({ panel: 'main', id: '' })
 
@@ -196,7 +197,11 @@ function prerequisiteLabel(def) {
 }
 
 function effectDescription(def) {
-  return def?.effectDescription || def?.description || def?.effect || '暂无效果说明'
+  return talentEffectDescriptions.value?.[def?.id]
+    || def?.effectDescription
+    || def?.description
+    || def?.effect
+    || '暂无效果说明'
 }
 
 function effectLines(def, curLv) {
@@ -380,6 +385,7 @@ async function loadState() {
 
     talentState.value = await res.json()
     talentEffectLines.value = talentState.value?.effectLines || {}
+    talentEffectDescriptions.value = talentState.value?.effectDescriptions || {}
     // Sync learnedMap from API response (talents is now {talentId: level} object)
     Object.keys(learnedMap).forEach(k => delete learnedMap[k])
     if (talentState.value?.talents) {
@@ -438,6 +444,7 @@ async function handleNodeClick(item) {
       talentState.value.talents = data.talents
     }
     talentEffectLines.value = data.effectLines || talentEffectLines.value
+    talentEffectDescriptions.value = data.effectDescriptions || talentEffectDescriptions.value
     learnedMap[item.id] = targetLevel
   } catch (e) {
     showToast(e.message)
@@ -598,6 +605,7 @@ watch(isLoggedIn, (val) => {
               下一级消耗：{{ upgradeCost(selectedNode) }} 天赋点
             </p>
             <p>前置：{{ prerequisiteLabel(selectedNode) }}</p>
+            <p>{{ effectDescription(selectedNode) }}</p>
             <div class="talent-float__effects">
               <div v-for="line in effectLines(selectedNode, nodeLevel(selectedNode.id))" :key="line.label" class="talent-float__effect-line">
                 <span class="talent-float__effect-label">{{ line.label }}</span>

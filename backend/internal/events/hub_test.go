@@ -16,7 +16,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	xiaohong, unsubscribeXiaohong := hub.Subscribe("小红")
 	defer unsubscribeXiaohong()
 
-	if err := hub.BroadcastPublic(vote.Snapshot{}); err != nil {
+	if err := hub.BroadcastPublic(vote.Snapshot{}, true); err != nil {
 		t.Fatalf("broadcast public snapshot: %v", err)
 	}
 

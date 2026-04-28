@@ -146,6 +146,15 @@ func run() error {
 		}
 	}()
 
+	go func() {
+		if err := broadcastLeaderboardOnMinute(pollCtx, dispatcher); err != nil && !errors.Is(err, context.Canceled) {
+			select {
+			case errCh <- fmt.Errorf("broadcast leaderboard every minute: %w", err):
+			default:
+			}
+		}
+	}()
+
 	if _, err := stateCache.RefreshSnapshot(startupCtx); err != nil {
 		return fmt.Errorf("warm snapshot cache: %w", err)
 	}
@@ -176,6 +185,23 @@ func run() error {
 	}
 
 	return nil
+}
+
+func broadcastLeaderboardOnMinute(ctx context.Context, dispatcher *events.Dispatcher) error {
+	for {
+		next := time.Now().Truncate(time.Minute).Add(time.Minute)
+		timer := time.NewTimer(time.Until(next))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+
+		if err := dispatcher.BroadcastLeaderboard(context.Background()); err != nil {
+			return err
+		}
+	}
 }
 
 func serverAddress(port int) string {

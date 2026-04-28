@@ -867,6 +867,12 @@ select {
   border-top: 1px solid rgba(183, 53, 97, 0.14);
 }
 
+.leaderboard-card__hint {
+  margin: 0 0 8px;
+  color: rgba(63, 38, 46, 0.72);
+  font-size: 0.82rem;
+}
+
 .social-card__head {
   display: flex;
   align-items: center;

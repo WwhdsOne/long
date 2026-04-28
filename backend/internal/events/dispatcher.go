@@ -84,7 +84,23 @@ func (d *Dispatcher) flushPublic() {
 	if snapshot.Boss != nil {
 		_, _ = d.cache.RefreshBossResources(ctx)
 	}
-	_ = d.hub.BroadcastPublic(snapshot)
+	_ = d.hub.BroadcastPublic(snapshot, false)
+}
+
+// BroadcastLeaderboard 主动广播一份带点击总榜的公共态。
+func (d *Dispatcher) BroadcastLeaderboard(ctx context.Context) error {
+	if d == nil || d.cache == nil || d.hub == nil {
+		return nil
+	}
+
+	snapshot, err := d.cache.RefreshSnapshot(ctx)
+	if err != nil {
+		return err
+	}
+	if snapshot.Boss != nil {
+		_, _ = d.cache.RefreshBossResources(ctx)
+	}
+	return d.hub.BroadcastPublic(snapshot, true)
 }
 
 func affectsPublicState(changeType vote.StateChangeType) bool {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -331,10 +332,7 @@ func getSlotBounds(rarity string, slot string) (rarityBounds, error) {
 	}
 
 	attackMin := int(float64(base.attackMin) * mod.attackMinRatio)
-	attackMax := int(float64(base.attackMax) * mod.attackMaxRatio)
-	if attackMax < attackMin {
-		attackMax = attackMin
-	}
+	attackMax := max(int(float64(base.attackMax)*mod.attackMaxRatio), attackMin)
 
 	return rarityBounds{
 		attackMin:      int64(attackMin),
@@ -440,12 +438,7 @@ func validateEquipmentDraft(draft vote.EquipmentDefinition) error {
 }
 
 func allowedString(value string, allowed []string) bool {
-	for _, candidate := range allowed {
-		if value == candidate {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowed, value)
 }
 
 // ============================================================================

@@ -740,7 +740,7 @@ const collapseRemaining = computed(() => {
           <span>战斗效果：每秒自动攻击 1 次，挂机效率约为手动操作四分之一。</span>
           <span>奖励说明：金币和强化石获取减半，天赋点和装备正常掉落。</span>
           <span>结算方式：回到页面后自动弹出结算窗口，显示击杀数与收益。</span>
-          <span>温馨提示：挂机最多持续 24 小时；关闭页面后挂机仍会继续，服务器重启后不会丢失挂机状态。</span>
+          <span>温馨提示：挂机最多持续 8 小时；关闭页面后挂机仍会继续，服务器重启后不会丢失挂机状态。</span>
         </div>
         <div v-if="talentTriggerFeed.length > 0" class="vote-stage__boss-note vote-stage__boss-note--rules">
           <strong>天赋触发</strong>
@@ -908,9 +908,10 @@ const collapseRemaining = computed(() => {
 
         <section class="leaderboard-card__section">
           <div class="social-card__head">
-            <p class="vote-stage__eyebrow">实时排行榜</p>
+            <p class="vote-stage__eyebrow">点击总榜</p>
             <strong>前 {{ leaderboard.length || 0 }} 名</strong>
           </div>
+          <p class="leaderboard-card__hint">点击总榜每分钟整点更新一次</p>
 
           <ol v-if="leaderboard.length > 0" class="leaderboard-list">
             <li

@@ -71,10 +71,11 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 	}
 
 	c.JSON(consts.StatusOK, map[string]any{
-		"trees":        allTrees,
-		"talents":      state.Talents,
-		"talentPoints": userState.TalentPoints,
-		"effectLines":  vote.BuildTalentEffectLineMap(state),
+		"trees":              allTrees,
+		"talents":            state.Talents,
+		"talentPoints":       userState.TalentPoints,
+		"effectLines":        vote.BuildTalentEffectLineMap(state),
+		"effectDescriptions": vote.BuildTalentEffectDescriptionMap(state),
 	})
 }
 
@@ -88,10 +89,7 @@ func (h *talentAPI) upgrade(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	targetLevel := req.TargetLevel
-	if targetLevel < 1 {
-		targetLevel = 1
-	}
+	targetLevel := max(req.TargetLevel, 1)
 	if err := h.store.UpgradeTalent(ctx, nickStr, req.TalentID, targetLevel); err != nil {
 		c.JSON(talentErrorStatus(err), map[string]string{
 			"error":   talentErrorCode(err),
@@ -111,10 +109,11 @@ func (h *talentAPI) upgrade(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	c.JSON(consts.StatusOK, map[string]any{
-		"status":       "ok",
-		"talents":      state.Talents,
-		"talentPoints": userState.TalentPoints,
-		"effectLines":  vote.BuildTalentEffectLineMap(state),
+		"status":             "ok",
+		"talents":            state.Talents,
+		"talentPoints":       userState.TalentPoints,
+		"effectLines":        vote.BuildTalentEffectLineMap(state),
+		"effectDescriptions": vote.BuildTalentEffectDescriptionMap(state),
 	})
 }
 

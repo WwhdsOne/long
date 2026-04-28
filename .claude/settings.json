@@ -1,0 +1,27 @@
+{
+  "skillOverrides": {
+    "xlsx": "off",
+    "docx": "off",
+    "pptx": "off",
+    "pdf": "off",
+    "autoresearch": "off",
+    "doc-coauthoring": "off",
+    "internal-comms": "off",
+    "algorithmic-art": "off",
+    "canvas-design": "off",
+    "slack-gif-creator": "off",
+    "theme-factory": "off",
+    "brand-guidelines": "off",
+    "web-artifacts-builder": "off",
+    "mcp-builder": "off",
+    "skill-creator": "off",
+    "skill-vetter": "off",
+    "find-skills": "off",
+    "academic-writing-workflow-zh": "off",
+    "claude-api": "off",
+    "template-skill": "off",
+    "superpowers:execute-plan": "off",
+    "superpowers:write-plan": "off",
+    "superpowers:brainstorm": "off"
+  }
+}

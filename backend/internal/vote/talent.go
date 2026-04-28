@@ -34,6 +34,7 @@ const (
 
 	talentCostLevelExponent = 0.85
 	talentCostMultiplier    = 1.8
+	talentTier0GrowthFactor = 3.0
 
 	// ===== 普攻系关键参数（可直接调）=====
 	// 暴风连击：触发所需点击次数
@@ -53,6 +54,9 @@ const (
 func TalentLevelCost(base int64, targetLevel int) int64 {
 	if base <= 0 || targetLevel <= 0 {
 		return 0
+	}
+	if base == TalentCostTier0Main {
+		return int64(math.Round(float64(base) * talentCostMultiplier * math.Pow(talentTier0GrowthFactor, float64(targetLevel-1))))
 	}
 	return int64(math.Round(float64(base) * math.Pow(float64(targetLevel), talentCostLevelExponent) * talentCostMultiplier))
 }
@@ -285,76 +289,194 @@ func TalentPrerequisiteName(def TalentDef) string {
 	return preDef.Name
 }
 
-// TalentEffectDescription 返回天赋效果中文描述，供前端直接展示。
+// TalentEffectDescription 返回 Lv1 天赋效果中文描述，供静态定义展示。
 func TalentEffectDescription(def TalentDef) string {
+	return TalentEffectDescriptionForLevel(def, 1)
+}
+
+// TalentEffectDescriptionForLevel 返回指定等级下的天赋效果中文描述，供前端直接展示。
+func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 	effectType := strings.TrimSpace(def.EffectType)
 	value, _ := def.EffectValue.(map[string]any)
+	currentFactor := max(level, 1)
 	switch effectType {
 	case "storm_combo":
 		trigger := talentInt(value["triggerCount"])
-		hits := talentInt(value["extraHits"])
-		ratio := talentPercent(value["chaseRatio"])
+		hits := talentIntScaled(value["extraHits"], currentFactor)
+		ratio := talentPercentScaled(value["chaseRatio"], currentFactor)
+		if def.ID == "normal_core" {
+			trigger = normalCoreTriggerCountForLevel(currentFactor)
+			hits = normalCoreExtraHitsForLevel(currentFactor)
+			ratio = talentPercent(value["chaseRatio"])
+		}
 		return fmt.Sprintf("每 %d 次点击触发追击爆发，造成 基础伤害 x %s x %d 段总伤。可无限触发。",
 			trigger, ratio, hits,
 		)
 	case "attack_power_percent":
-		return fmt.Sprintf("攻击力提升 %s", talentPercent(value["percent"]))
+		return fmt.Sprintf("攻击力提升 %s", talentPercentScaled(value["percent"], currentFactor))
 	case "all_damage_amplify":
-		return fmt.Sprintf("所有伤害提升 %s", talentPercent(value["percent"]))
+		return fmt.Sprintf("所有伤害提升 %s", talentPercentScaled(value["percent"], currentFactor))
 	case "part_type_damage":
-		return fmt.Sprintf("%s伤害提升 %s", talentPartTypeLabel(value["partType"]), talentPercent(value["percent"]))
+		percent := talentPercentScaled(value["percent"], currentFactor)
+		if def.ID == "normal_soft_atk" {
+			percent = talentPercent(normalCoreScaledPartDamage(currentFactor, 0.80, 3.00))
+		}
+		if def.ID == "armor_heavy_atk" {
+			percent = talentPercent(normalCoreScaledPartDamage(currentFactor, 1.00, 3.00))
+		}
+		return fmt.Sprintf("%s伤害提升 %s", talentPartTypeLabel(value["partType"]), percent)
 	case "charge_retain":
-		return fmt.Sprintf("追击爆发触发后，该部位连击进度保留 %s（从30%%开始重新计数）。被动生效。", talentPercent(value["retainPercent"]))
+		retain := talentPercentScaled(value["retainPercent"], currentFactor)
+		if def.ID == "normal_charge" {
+			retain = talentPercent(normalChargeRetainPercentForLevel(currentFactor))
+		}
+		return fmt.Sprintf("追击爆发触发后，该部位连击进度保留 %s（从30%%开始重新计数）。被动生效。", retain)
 	case "chase_upgrade":
-		return fmt.Sprintf("追击爆发单段倍率从50%%提升到 %s。被动生效。", talentPercent(value["chaseRatio"]))
+		ratio := talentPercentScaled(value["chaseRatio"], currentFactor)
+		if def.ID == "normal_chase_up" {
+			ratio = talentPercent(normalChaseUpgradeRatioForLevel(currentFactor))
+		}
+		return fmt.Sprintf("追击爆发单段倍率从50%%提升到 %s。被动生效。", ratio)
 	case "combo_extend":
-		return fmt.Sprintf("追击爆发段数从15增加到 %d。被动生效。", talentInt(value["extraHits"]))
+		hits := talentIntScaled(value["extraHits"], currentFactor)
+		if def.ID == "normal_combo_ext" {
+			hits = normalComboExtendHitsForLevel(currentFactor)
+		}
+		return fmt.Sprintf("追击爆发段数从15增加到 %d。被动生效。", hits)
 	case "per_part_damage":
-		return fmt.Sprintf("每个存活部位额外增加 %s 全伤害。被动生效。", talentPercent(value["percentPerPart"]))
+		return fmt.Sprintf("每个存活部位额外增加 %s 全伤害。被动生效。", talentPercentScaled(value["percentPerPart"], currentFactor))
 	case "low_hp_bonus":
-		return fmt.Sprintf("部位剩余血量低于 %s 时，伤害x%.0f。被动生效。", talentPercent(value["hpThreshold"]), talentFloat(value["multiplier"]))
+		threshold := talentPercentScaled(value["hpThreshold"], currentFactor)
+		multiplier := talentFloat(value["multiplier"]) * float64(currentFactor)
+		if def.ID == "normal_low_hp" {
+			threshold = talentPercent(normalLowHPThresholdForLevel(currentFactor))
+			multiplier = normalLowHPMultiplierForLevel(currentFactor)
+		}
+		return fmt.Sprintf("部位剩余血量低于 %s 时，伤害x%.0f。被动生效。", threshold, multiplier)
 	case "silver_storm":
-		return fmt.Sprintf("任意部位被击碎时立即触发，持续15秒内所有部位视为%s（x1.0系数）。每部位击碎均可触发。", talentPartTypeLabel(value["treatAllAs"]))
+		return fmt.Sprintf("任意部位被击碎时立即触发，持续%d秒内所有部位视为%s（x1.0系数）。每部位击碎均可触发。", normalSilverStormDurationForLevel(currentFactor), talentPartTypeLabel(value["treatAllAs"]))
 	case "permanent_armor_pen":
-		return fmt.Sprintf("常驻 %s 护甲穿透。对重甲部位累计 %d 次命中后该部位护甲归零 %d 秒（崩塌）。同一部位可多次触发。", talentPercent(value["penPercent"]), talentInt(value["collapseTrigger"]), talentInt(value["collapseDuration"]))
+		penPercent := talentPercentScaled(value["penPercent"], currentFactor)
+		collapseTrigger := talentInt(value["collapseTrigger"])
+		if def.ID == "armor_core" {
+			penPercent = talentPercent(armorCorePenPercentForLevel(currentFactor))
+			collapseTrigger = armorCoreCollapseTriggerForLevel(currentFactor)
+		}
+		return fmt.Sprintf("常驻 %s 护甲穿透。对重甲部位累计 %d 次命中后该部位护甲归零 %d 秒（崩塌）。同一部位可多次触发。", penPercent, collapseTrigger, talentInt(value["collapseDuration"]))
 	case "armor_pen_extra":
-		return fmt.Sprintf("额外护甲穿透 %s", talentPercent(value["extraPen"]))
+		extraPen := talentPercentScaled(value["extraPen"], currentFactor)
+		if def.ID == "armor_pen_up" {
+			extraPen = talentPercent(armorPenUpExtraForLevel(currentFactor))
+		}
+		return fmt.Sprintf("额外护甲穿透 %s", extraPen)
 	case "armor_scaling":
-		return fmt.Sprintf("每 100 护甲额外获得 %s 伤害增幅", talentPercent(value["damagePer100Armor"]))
+		percent := talentPercentScaled(value["damagePer100Armor"], currentFactor)
+		if def.ID == "armor_heavy_scale" {
+			percent = talentPercent(armorHeavyScaleForLevel(currentFactor))
+		}
+		return fmt.Sprintf("每 100 护甲额外获得 %s 伤害增幅", percent)
 	case "collapse_extend":
-		return fmt.Sprintf("崩塌持续时间从8秒延长到 %d 秒。被动生效。", talentInt(value["extraDuration"]))
+		duration := talentIntScaled(value["extraDuration"], currentFactor)
+		if def.ID == "armor_collapse_ext" {
+			duration = armorCollapseExtendForLevel(currentFactor)
+		}
+		return fmt.Sprintf("崩塌持续时间从8秒延长到 %d 秒。被动生效。", duration)
 	case "auto_strike":
-		return fmt.Sprintf("每 %d 秒自动对血量最高的重甲造成 %.1fx攻击力必中真伤。无需点击。", talentInt(value["interval"]), talentFloat(value["damageRatio"]))
+		interval := talentInt(value["interval"])
+		ratio := talentFloat(value["damageRatio"]) * float64(currentFactor)
+		if def.ID == "armor_auto_strike" {
+			interval = armorAutoStrikeIntervalForLevel(currentFactor)
+			ratio = armorAutoStrikeRatioForLevel(currentFactor)
+		}
+		return fmt.Sprintf("每 %d 秒自动对血量最高的重甲造成 %.1fx攻击力必中真伤。无需点击。", interval, ratio)
 	case "collapse_damage_amp":
-		return fmt.Sprintf("攻击处于崩塌状态的部位时，额外增伤 %s。被动生效。", talentPercent(value["extraPercent"]))
+		percent := talentPercentScaled(value["extraPercent"], currentFactor)
+		if def.ID == "armor_ruin" {
+			percent = talentPercent(armorRuinAmpForLevel(currentFactor))
+		}
+		return fmt.Sprintf("攻击处于崩塌状态的部位时，额外增伤 %s。被动生效。", percent)
 	case "pen_to_amplify":
-		return fmt.Sprintf("将 %s 的护甲穿透值转化为全伤害加成。被动生效。", talentPercent(value["convertRatio"]))
+		ratio := talentPercentScaled(value["convertRatio"], currentFactor)
+		if def.ID == "armor_pen_convert" {
+			ratio = talentPercent(armorPenConvertRatioForLevel(currentFactor))
+		}
+		return fmt.Sprintf("将 %s 的护甲穿透值转化为全伤害加成。被动生效。", ratio)
 	case "judgment_day":
-		return fmt.Sprintf("对同一重甲部位累计 %d 次命中后，立即削除该部位 %s 最大生命值。每部位每场战斗仅一次。", talentInt(value["triggerCount"]), talentPercent(value["hpCutPercent"]))
+		triggerCount := talentInt(value["triggerCount"])
+		hpCutPercent := talentPercentScaled(value["hpCutPercent"], currentFactor)
+		if def.ID == "armor_ultimate" {
+			triggerCount = armorUltimateTriggerCountForLevel(currentFactor)
+			hpCutPercent = talentPercent(armorUltimateHpCutForLevel(currentFactor))
+		}
+		return fmt.Sprintf("对同一重甲部位累计 %d 次命中后，立即削除该部位 %s 最大生命值。每部位每场战斗仅一次。", triggerCount, hpCutPercent)
 	case "overkill":
-		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤。弱点暴击+2层死兆，普通暴击+1层，击碎部位+5层。", talentPercent(value["baseCritBonus"]), talentPercent(value["overflowToCritDmg"]))
+		baseCritBonus := talentPercentScaled(value["baseCritBonus"], currentFactor)
+		if def.ID == "crit_core" {
+			baseCritBonus = talentPercent(critCoreBaseCritBonusForLevel(currentFactor))
+		}
+		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤。弱点暴击+2层死兆，普通暴击+1层，击碎部位+5层。", baseCritBonus, talentPercent(value["overflowToCritDmg"]))
 	case "omen_crit_damage":
-		return fmt.Sprintf("每层死兆叠加 %s 暴击伤害（例：100层=+%.0f%%暴伤）。无上限。", talentPercent(value["critDmgPerOmen"]), talentFloat(value["critDmgPerOmen"])*100*100)
+		critDmgPerOmen := talentFloat(value["critDmgPerOmen"]) * float64(currentFactor)
+		if def.ID == "crit_omen_resonate" {
+			critDmgPerOmen = critOmenResonateForLevel(currentFactor)
+		}
+		return fmt.Sprintf("每层死兆叠加 %s 暴击伤害（例：100层=+%.0f%%暴伤）。无上限。", talentPercent(critDmgPerOmen), critDmgPerOmen*100)
 	case "crit_damage_bonus":
-		return fmt.Sprintf("暴击伤害额外提升 %s", talentPercent(value["percent"]))
+		percent := talentPercentScaled(value["percent"], currentFactor)
+		if def.ID == "crit_cruel" {
+			percent = talentPercent(critCruelBonusForLevel(currentFactor))
+		}
+		return fmt.Sprintf("暴击伤害额外提升 %s", percent)
 	case "force_weak":
-		return fmt.Sprintf("暴击时有 %s 概率将当前部位视为弱点（x2.5系数），持续 %d 秒。", talentPercent(value["chance"]), talentInt(value["duration"]))
+		chance := talentPercentScaled(value["chance"], currentFactor)
+		duration := talentIntScaled(value["duration"], currentFactor)
+		if def.ID == "crit_skinner" {
+			chance = talentPercent(critSkinnerChanceForLevel(currentFactor))
+			duration = critSkinnerDurationForLevel(currentFactor)
+		}
+		return fmt.Sprintf("暴击时有 %s 概率将当前部位视为弱点（x2.5系数），持续 %d 秒。", chance, duration)
 	case "bleed":
-		return fmt.Sprintf("暴击时附加真伤 = 本次伤害 x %s。一次性结算。", talentPercent(value["damageRatio"]))
+		ratio := talentPercentScaled(value["damageRatio"], currentFactor)
+		if def.ID == "crit_bleed" {
+			ratio = talentPercent(critBleedRatioForLevel(currentFactor))
+		}
+		return fmt.Sprintf("暴击时附加真伤 = 本次伤害 x %s。一次性结算。", ratio)
 	case "omen_low_hp":
-		return fmt.Sprintf("部位血量低于 %s 时，每层死兆额外 +%s 伤害（例：47层=+47%%）。被动生效。", talentPercent(value["hpThreshold"]), talentPercent(value["dmgPerOmen"]))
+		hpThreshold := talentPercentScaled(value["hpThreshold"], currentFactor)
+		dmgPerOmen := talentPercentScaled(value["dmgPerOmen"], currentFactor)
+		if def.ID == "crit_omen_kill" {
+			hpThreshold = talentPercent(critOmenKillThresholdForLevel(currentFactor))
+			dmgPerOmen = talentPercent(critOmenKillDmgPerOmenForLevel(currentFactor))
+		}
+		return fmt.Sprintf("部位血量低于 %s 时，每层死兆额外 +%s 伤害（例：47层=+47%%）。被动生效。", hpThreshold, dmgPerOmen)
 	case "omen_reap_passive":
 		thresholds := "30/60/90/120"
 		mults := "×1.5/×2.0/×2.5/×3.0"
 		return fmt.Sprintf("死兆达%s层时，伤害自动提升至%s（不消耗层数）。被动生效。", thresholds, mults)
 	case "death_ecstasy_ult":
-		return fmt.Sprintf("死兆达到%d层时消耗%d层，造成 baseDamage × 层数(上限100) × 暴伤倍率 的巨额伤害。", talentInt(value["omenCost"]), talentInt(value["omenCost"]))
+		mult := talentMultiplierScaled(value["critDmgMult"], currentFactor)
+		if def.ID == "crit_death_ecstasy" {
+			mult = fmt.Sprintf("×%.1f", critDeathEcstasyMultForLevel(currentFactor))
+		}
+		return fmt.Sprintf("死兆达到%d层时消耗%d层，造成 baseDamage × 层数(上限100) × %s 的巨额伤害。", talentInt(value["omenCost"]), talentInt(value["omenCost"]), mult)
 	case "final_cut":
-		return fmt.Sprintf("累计 %d 次暴击后削除Boss最大生命值的 %s（%d 秒冷却）。", talentInt(value["critCount"]), talentPercent(value["hpCutPercent"]), talentInt(value["cooldown"]))
+		critCount := talentInt(value["critCount"])
+		hpCutPercent := talentPercentScaled(value["hpCutPercent"], currentFactor)
+		if def.ID == "crit_final_cut" {
+			critCount = critFinalCutCountForLevel(currentFactor)
+			hpCutPercent = talentPercent(critFinalCutHpCutForLevel(currentFactor))
+		}
+		return fmt.Sprintf("累计 %d 次暴击后削除Boss最大生命值的 %s（%d 秒冷却）。", critCount, hpCutPercent, talentInt(value["cooldown"]))
 	case "doom_mark":
-		return fmt.Sprintf("开局随机标记%d个部位。被标记部位被击碎时触发+%d死兆。可升级增加标记数和层数。", talentInt(value["markCount"]), talentInt(value["omenPerMark"]))
+		markCount := talentIntScaled(value["markCount"], currentFactor)
+		omenPerMark := talentIntScaled(value["omenPerMark"], currentFactor)
+		if def.ID == "crit_doom_judgment" {
+			markCount = critDoomMarkCountForLevel(currentFactor)
+			omenPerMark = critDoomOmenPerMarkForLevel(currentFactor)
+		}
+		return fmt.Sprintf("开局随机标记%d个部位。被标记部位被击碎时触发+%d死兆。可升级增加标记数和层数。", markCount, omenPerMark)
 	case "chase_ratio_bonus":
-		return fmt.Sprintf("追击爆发单段倍率额外 +%s。被动生效。", talentPercent(value["percent"]))
+		return fmt.Sprintf("追击爆发单段倍率额外 +%s。被动生效。", talentPercentScaled(value["percent"], currentFactor))
 	default:
 		return "该天赋效果说明暂未配置"
 	}
@@ -735,6 +857,15 @@ func BuildTalentEffectLineMap(state *TalentState) map[string][]TalentEffectLine 
 	return result
 }
 
+func BuildTalentEffectDescriptionMap(state *TalentState) map[string]string {
+	result := make(map[string]string, len(talentDefs))
+	for id, def := range talentDefs {
+		level := GetTalentLevel(state, id)
+		result[id] = TalentEffectDescriptionForLevel(def, level)
+	}
+	return result
+}
+
 // TalentTierCompletionBonusLabels 返回指定天赋树的层满奖励文案（key 为层级）。
 func TalentTierCompletionBonusLabels(tree TalentTree) map[int]string {
 	labels, ok := tierCompletionBonusLabels[tree]
@@ -785,6 +916,10 @@ func talentFloat(v any) float64 {
 
 func talentInt(v any) int {
 	return int(talentFloat(v))
+}
+
+func talentIntScaled(v any, factor int) int {
+	return int(math.Round(talentFloat(v) * float64(factor)))
 }
 
 func talentPercent(v any) string {

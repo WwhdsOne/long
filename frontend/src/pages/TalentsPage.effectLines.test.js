@@ -19,6 +19,7 @@ describe('TalentsPage effectLines 响应链路', () => {
   it('初次加载从 /api/talents/state 读取后端 effectLines', () => {
     expect(pageSource).toContain("fetch('/api/talents/state'")
     expect(pageSource).toContain('talentEffectLines.value = talentState.value?.effectLines || {}')
+    expect(pageSource).toContain('talentEffectDescriptions.value = talentState.value?.effectDescriptions || {}')
   })
 
   it('升级成功后用响应里的 effectLines 刷新浮层描述', () => {
@@ -29,5 +30,15 @@ describe('TalentsPage effectLines 响应链路', () => {
 
     expect(upgradeSegment).toContain("fetch('/api/talents/upgrade'")
     expect(upgradeSegment).toContain('talentEffectLines.value = data.effectLines || talentEffectLines.value')
+    expect(upgradeSegment).toContain('talentEffectDescriptions.value = data.effectDescriptions || talentEffectDescriptions.value')
+  })
+
+  it('浮层优先展示后端返回的动态效果描述，并保留静态文案兜底', () => {
+    expect(pageSource).toContain('function effectDescription(def) {')
+    expect(pageSource).toContain('return talentEffectDescriptions.value?.[def?.id]')
+    expect(pageSource).toContain('|| def?.effectDescription')
+    expect(pageSource).toContain('|| def?.description')
+    expect(pageSource).toContain("|| '暂无效果说明'")
+    expect(pageSource).toContain('{{ effectDescription(selectedNode) }}')
   })
 })

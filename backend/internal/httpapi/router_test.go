@@ -375,7 +375,6 @@ func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
 	return nil
 }
 
-
 func (m *mockStore) GetTalentState(_ context.Context, _ string) (*vote.TalentState, error) {
 	if m.talentState != nil {
 		return m.talentState, nil
@@ -563,6 +562,14 @@ func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
 	if firstLine["label"] != "触发次数" || firstLine["text"] != "45 → 40" {
 		t.Fatalf("expected trigger count preview from backend, got %+v", firstLine)
 	}
+
+	effectDescriptions, ok := payload["effectDescriptions"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected effectDescriptions map in payload, got %+v", payload["effectDescriptions"])
+	}
+	if effectDescriptions["normal_core"] != "每 45 次点击触发追击爆发，造成 基础伤害 x 50% x 24 段总伤。可无限触发。" {
+		t.Fatalf("expected dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
+	}
 }
 
 func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
@@ -619,6 +626,14 @@ func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
 	}
 	if firstLine["label"] != "触发次数" || firstLine["text"] != "45 → 40" {
 		t.Fatalf("expected updated trigger count preview from backend, got %+v", firstLine)
+	}
+
+	effectDescriptions, ok := payload["effectDescriptions"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected effectDescriptions map in payload, got %+v", payload["effectDescriptions"])
+	}
+	if effectDescriptions["normal_core"] != "每 45 次点击触发追击爆发，造成 基础伤害 x 50% x 24 段总伤。可无限触发。" {
+		t.Fatalf("expected upgraded dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
 	}
 }
 

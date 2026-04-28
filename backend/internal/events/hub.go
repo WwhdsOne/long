@@ -35,6 +35,14 @@ type realtimeUserStatePayload struct {
 	RecentRewards []vote.Reward       `json:"recentRewards,omitempty"`
 }
 
+type publicStatePayload struct {
+	TotalVotes          int64                       `json:"totalVotes"`
+	Leaderboard         *[]vote.LeaderboardEntry    `json:"leaderboard,omitempty"`
+	Boss                *vote.Boss                  `json:"boss,omitempty"`
+	BossLeaderboard     []vote.BossLeaderboardEntry `json:"bossLeaderboard"`
+	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
+}
+
 // StateReader 提供 SSE 初始状态所需的公共态与个人态读取能力。
 type StateReader interface {
 	GetSnapshot(context.Context) (vote.Snapshot, error)
@@ -87,8 +95,8 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 	return client.ch, unsubscribe
 }
 
-func (h *Hub) BroadcastPublic(snapshot vote.Snapshot) error {
-	payload, err := sonic.Marshal(snapshot)
+func (h *Hub) BroadcastPublic(snapshot vote.Snapshot, includeLeaderboard bool) error {
+	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot, includeLeaderboard))
 	if err != nil {
 		return err
 	}
@@ -100,6 +108,26 @@ func (h *Hub) BroadcastPublic(snapshot vote.Snapshot) error {
 	}
 
 	return nil
+}
+
+func buildPublicStatePayload(snapshot vote.Snapshot, includeLeaderboard bool) publicStatePayload {
+	payload := publicStatePayload{
+		TotalVotes:          snapshot.TotalVotes,
+		Boss:                snapshot.Boss,
+		BossLeaderboard:     snapshot.BossLeaderboard,
+		AnnouncementVersion: snapshot.AnnouncementVersion,
+	}
+	if payload.BossLeaderboard == nil {
+		payload.BossLeaderboard = []vote.BossLeaderboardEntry{}
+	}
+	if includeLeaderboard {
+		leaderboard := snapshot.Leaderboard
+		if leaderboard == nil {
+			leaderboard = []vote.LeaderboardEntry{}
+		}
+		payload.Leaderboard = &leaderboard
+	}
+	return payload
 }
 
 func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
