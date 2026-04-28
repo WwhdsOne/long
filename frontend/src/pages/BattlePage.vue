@@ -59,73 +59,94 @@ const nowTick = ref(0)
 let tickTimer = 0
 
 // 像素剑光标
+let swordCursor = null
 let cursorVisible = false
 let swordSwung = false
 let recoverTimer = 0
 let lastAttackTime = 0
+
+function getGridArea() {
+  return document.querySelector('.boss-part-grid-with-combo')
+}
+
+function updateCursorPos(e) {
+  if (!swordCursor) return
+  swordCursor.style.left = e.clientX + 'px'
+  swordCursor.style.top = e.clientY + 'px'
+}
+
+function showCursor() {
+  if (!swordCursor) return
+  swordCursor.style.display = 'block'
+  cursorVisible = true
+}
+
+function hideCursor() {
+  if (!swordCursor) return
+  swordCursor.style.display = 'none'
+  cursorVisible = false
+  clearTimeout(recoverTimer)
+  swordCursor.classList.remove('swinging', 'recovering')
+  swordSwung = false
+}
+
+function doCursorAttack(e) {
+  const now = Date.now()
+  if (now - lastAttackTime < 32) return
+  lastAttackTime = now
+  e.preventDefault()
+  if (!swordCursor) return
+
+  clearTimeout(recoverTimer)
+  swordCursor.classList.remove('recovering')
+  swordCursor.classList.add('swinging')
+  swordSwung = true
+  recoverTimer = setTimeout(() => {
+    if (!swordCursor) return
+    swordCursor.classList.remove('swinging')
+    swordCursor.classList.add('recovering')
+    swordSwung = false
+  }, 50)
+}
 
 onMounted(() => {
   tickTimer = setInterval(() => {
     nowTick.value++
   }, 250)
 
-  // 像素剑光标
-  const swordCursor = document.getElementById('boss-sword-cursor')
-  const gridArea = document.querySelector('.boss-part-grid-with-combo')
-  if (swordCursor && gridArea) {
-    const updatePos = (e) => {
-      swordCursor.style.left = e.clientX + 'px'
-      swordCursor.style.top = e.clientY + 'px'
+  // 像素剑光标（文档级事件，动态检测区域）
+  swordCursor = document.getElementById('boss-sword-cursor')
+
+  document.addEventListener('pointermove', (e) => {
+    const grid = getGridArea()
+    if (!grid) return
+    const inside = grid.contains(e.target)
+    if (inside && !cursorVisible) {
+      showCursor()
+      updateCursorPos(e)
+    } else if (inside && cursorVisible) {
+      updateCursorPos(e)
+    } else if (!inside && cursorVisible) {
+      hideCursor()
     }
+  })
 
-    document.addEventListener('pointermove', (e) => {
-      if (!cursorVisible) return
-      updatePos(e)
-    })
+  document.addEventListener('pointerdown', (e) => {
+    const grid = getGridArea()
+    if (grid && grid.contains(e.target)) doCursorAttack(e)
+  })
 
-    gridArea.addEventListener('pointerenter', (e) => {
-      swordCursor.style.display = 'block'
-      cursorVisible = true
-      updatePos(e)
-    })
+  document.addEventListener('click', (e) => {
+    const grid = getGridArea()
+    if (grid && grid.contains(e.target)) doCursorAttack(e)
+  })
 
-    gridArea.addEventListener('pointerleave', (e) => {
-      if (gridArea.contains(e.relatedTarget)) return
-      swordCursor.style.display = 'none'
-      cursorVisible = false
-      clearTimeout(recoverTimer)
-      swordCursor.classList.remove('swinging', 'recovering')
-      swordSwung = false
-    })
-
-    function doAttack(e) {
-      const now = Date.now()
-      if (now - lastAttackTime < 32) return
-      lastAttackTime = now
-      e.preventDefault()
-
-      clearTimeout(recoverTimer)
-      swordCursor.classList.remove('recovering')
-      swordCursor.classList.add('swinging')
-      swordSwung = true
-
-      recoverTimer = setTimeout(() => {
-        swordCursor.classList.remove('swinging')
-        swordCursor.classList.add('recovering')
-        swordSwung = false
-      }, 50)
+  document.addEventListener('pointerup', () => {
+    if (!swordSwung && swordCursor) {
+      swordCursor.classList.remove('swinging')
+      swordCursor.classList.add('recovering')
     }
-
-    gridArea.addEventListener('pointerdown', doAttack)
-    gridArea.addEventListener('click', doAttack)
-
-    gridArea.addEventListener('pointerup', () => {
-      if (!swordSwung) {
-        swordCursor.classList.remove('swinging')
-        swordCursor.classList.add('recovering')
-      }
-    })
-  }
+  })
 })
 
 onBeforeUnmount(() => {

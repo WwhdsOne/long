@@ -2864,7 +2864,7 @@ select {
 .boss-zone-button {
   position: relative;
   border-style: solid;
-  cursor: pointer;
+  cursor: none;
   overflow: visible;
   text-align: center;
 }
@@ -2875,7 +2875,7 @@ select {
 }
 
 .boss-zone-button:disabled {
-  cursor: not-allowed;
+  cursor: none;
 }
 
 .boss-zone-button--pending {
@@ -3239,9 +3239,8 @@ select {
 
 /* ===== 像素剑光标 ===== */
 
-.boss-part-grid-with-combo,
-.boss-part-grid-with-combo * {
-  cursor: none !important;
+.boss-part-grid-with-combo {
+  cursor: none;
 }
 
 #boss-sword-cursor {
@@ -3252,16 +3251,16 @@ select {
   height: 96px;
   background: url('https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png') center/contain no-repeat;
   image-rendering: pixelated;
-  transform: translate(-30%, -30%) rotate(0deg);
+  transform: translate(-30%, -60%) rotate(0deg);
   transition: transform 0.08s ease-out;
   will-change: transform, left, top;
 }
 #boss-sword-cursor.swinging {
-  transform: translate(-30%, -30%) rotate(60deg);
+  transform: translate(-30%, -60%) rotate(60deg);
   transition: transform 0.06s ease-out;
 }
 #boss-sword-cursor.recovering {
-  transform: translate(-30%, -30%) rotate(0deg);
+  transform: translate(-30%, -60%) rotate(0deg);
   transition: transform 0.12s ease-out;
 }
 
