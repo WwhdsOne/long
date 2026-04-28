@@ -2745,10 +2745,6 @@ select {
 }
 
 /* Boss part info sidebar */
-.boss-part-grid-container {
-  position: relative;
-}
-
 .boss-part-info {
   display: flex;
   flex-direction: column;
@@ -2836,7 +2832,7 @@ select {
 .boss-part-cell {
   flex: 1;
   aspect-ratio: 1;
-  border: 1px solid #334155;
+  border: 2px solid rgba(71, 85, 105, 0.5);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
@@ -2845,9 +2841,24 @@ select {
   gap: 2px;
   padding: 4px;
   min-width: 0;
-  background: #1e293b;
+  background: rgba(30, 41, 59, 0.7);
   color: #e2e8f0;
-  transition: transform 0.16s, border-color 0.2s, background 0.2s, opacity 0.2s, box-shadow 0.2s;
+  transition: all 0.2s ease;
+}
+
+.boss-zone-button:not(:disabled):hover {
+  border-color: rgba(148, 163, 184, 0.8);
+  background: rgba(40, 52, 72, 0.9);
+  filter: brightness(1.15);
+  transform: scale(1.04);
+}
+
+.boss-part-grid-container {
+  position: relative;
+  padding: 12px;
+  border-radius: 14px;
+  background: radial-gradient(ellipse at center, rgba(99, 102, 241, 0.12) 0%, rgba(30, 41, 59, 0.6) 65%, rgba(15, 23, 42, 0.85) 100%);
+  box-shadow: 0 0 60px rgba(99, 102, 241, 0.06), inset 0 0 30px rgba(0, 0, 0, 0.15);
 }
 
 .boss-zone-button {
@@ -2856,11 +2867,6 @@ select {
   cursor: pointer;
   overflow: visible;
   text-align: center;
-}
-
-.boss-zone-button:not(:disabled):hover {
-  transform: scale(1.02);
-  filter: brightness(1.08);
 }
 
 .boss-zone-button:not(:disabled):active {
@@ -2883,60 +2889,35 @@ select {
 }
 
 .boss-part-cell--alive {
-  border-color: var(--part-color, #64748b);
+  border-color: var(--part-color, rgba(71, 85, 105, 0.6));
 }
 
 .boss-part-cell--soft {
-  border: 2px solid #22c55e;
-  background: rgba(34, 197, 94, 0.12);
-  box-shadow: 0 0 12px rgba(74, 222, 128, 0.25), inset 0 0 8px rgba(74, 222, 128, 0.06);
-  animation: boss-soft-breathe 2s ease-in-out infinite;
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
 }
 
 .boss-part-cell--heavy {
-  border: 3px solid #6b7280;
-  background:
-    linear-gradient(105deg, transparent 0 36%, rgba(200, 200, 210, 0.25) 46%, transparent 58%),
-    rgba(107, 114, 128, 0.18);
-  background-size: 220% 100%, auto;
-  box-shadow: inset 0 3px 8px rgba(200, 200, 210, 0.15), inset 0 -6px 14px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(156, 163, 175, 0.3);
-  animation: boss-heavy-sheen 4s linear infinite;
+  border-color: rgba(107, 114, 128, 0.6);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .boss-part-cell--weak {
-  border: 2px solid #dc2626;
-  background: radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.18), rgba(127, 29, 29, 0.08));
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.3), inset 0 0 12px rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.2);
   animation: boss-weak-pulse 0.8s ease-in-out infinite;
 }
 
 .boss-part-cell--low {
-  filter: brightness(0.72) saturate(0.92);
-}
-
-.boss-part-cell--low.boss-part-cell--soft {
-  animation: boss-soft-breathe 2s ease-in-out infinite, boss-part-low-shake 0.28s linear infinite;
-}
-
-.boss-part-cell--low.boss-part-cell--heavy {
-  background:
-    linear-gradient(105deg, transparent 0 36%, rgba(255, 255, 255, 0.14) 46%, transparent 58%),
-    radial-gradient(circle at 30% 35%, rgba(120, 53, 15, 0.28), transparent 34%),
-    rgba(107, 114, 128, 0.26);
-}
-
-.boss-part-cell--low.boss-part-cell--weak {
-  animation: boss-weak-pulse 0.4s ease-in-out infinite;
-  background: rgba(127, 29, 29, 0.2);
+  filter: brightness(0.75) saturate(0.9);
 }
 
 .boss-part-cell--dead {
-  opacity: 0.5;
-  border-color: #475569;
-  background: #1f2937;
-  box-shadow: inset 0 8px 18px rgba(0, 0, 0, 0.34);
-  animation: boss-part-break 0.32s ease-out both;
-  filter: grayscale(1);
+  opacity: 0.4;
+  border-color: rgba(71, 85, 105, 0.3);
+  background: rgba(30, 41, 59, 0.5);
+  box-shadow: inset 0 8px 18px rgba(0, 0, 0, 0.3);
+  filter: grayscale(0.8);
 }
 
 .boss-part-cell__type {
@@ -3256,68 +3237,79 @@ select {
   height: 100%;
 }
 
-/* ===== Boss 战场主题 ===== */
-.boss-theme--cyberpunk .boss-part-grid {
-  background: radial-gradient(ellipse at 40% 30%, rgba(168, 85, 247, 0.08), rgba(10, 5, 20, 0.9));
-  border: 1px solid rgba(168, 85, 247, 0.15);
-}
-.boss-theme--cyberpunk .boss-zone-button {
-  background: rgba(20, 10, 40, 0.7);
-  border-color: rgba(168, 85, 247, 0.2);
-  color: #e0d0ff;
-}
-.boss-theme--cyberpunk .boss-zone-button:not(:disabled):hover {
-  border-color: #a78bfa;
-  box-shadow: 0 0 18px rgba(168, 85, 247, 0.2), inset 0 0 18px rgba(168, 85, 247, 0.04);
-}
-.boss-theme--cyberpunk .boss-part-cell--soft { border-color: #22c55e; background: rgba(34, 197, 94, 0.15); box-shadow: 0 0 16px rgba(74, 222, 128, 0.4), inset 0 0 10px rgba(74, 222, 128, 0.08); }
-.boss-theme--cyberpunk .boss-part-cell--heavy { border-color: #6b7280; background: linear-gradient(105deg, transparent 0 36%, rgba(200, 200, 220, 0.18) 46%, transparent 58%), rgba(107, 114, 128, 0.15); box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.4), inset 0 2px 8px rgba(200, 200, 220, 0.1), inset 0 -4px 10px rgba(0, 0, 0, 0.3); }
-.boss-theme--cyberpunk .boss-part-cell--weak { border-color: #ef4444; background: radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.2), rgba(127, 29, 29, 0.1)); box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), inset 0 0 14px rgba(239, 68, 68, 0.06); }
-.boss-theme--cyberpunk .boss-part-cell__bar { background: rgba(255,255,255,0.06); }
-.boss-theme--cyberpunk .boss-part-cell__fill { background: linear-gradient(90deg, #8b5cf6, #a78bfa); box-shadow: 0 0 6px rgba(168,85,247,0.5); }
+/* ===== 像素剑光标 ===== */
 
-.boss-theme--arcane .boss-part-grid {
-  background: radial-gradient(ellipse at 50% 40%, rgba(251, 191, 36, 0.06), rgba(20, 16, 30, 0.9));
-  border: 1px solid rgba(251, 191, 36, 0.1);
+.boss-part-grid-with-combo {
+  cursor: none;
 }
-.boss-theme--arcane .boss-zone-button {
-  background: rgba(30, 30, 50, 0.6);
-  border-color: rgba(251, 191, 36, 0.15);
-  color: #fef3c7;
-  border-radius: 6px;
+
+#boss-sword-cursor {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  width: 96px;
+  height: 96px;
+  background: url('https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png') center/contain no-repeat;
+  image-rendering: pixelated;
+  transform: translate(-30%, -30%) rotate(0deg);
+  transition: transform 0.08s ease-out;
+  will-change: transform, left, top;
 }
-.boss-theme--arcane .boss-zone-button:not(:disabled):hover {
-  border-color: #fbbf24;
-  box-shadow: 0 0 20px rgba(251, 191, 36, 0.15), inset 0 0 20px rgba(251, 191, 36, 0.03);
+#boss-sword-cursor.swinging {
+  transform: translate(-30%, -30%) rotate(60deg);
+  transition: transform 0.06s ease-out;
 }
-.boss-theme--arcane .boss-part-cell--soft { border-color: #22c55e; background: rgba(34, 197, 94, 0.12); box-shadow: 0 0 14px rgba(52, 211, 153, 0.35), inset 0 0 8px rgba(52, 211, 153, 0.06); }
-.boss-theme--arcane .boss-part-cell--heavy { border-color: #6b7280; background: linear-gradient(105deg, transparent 0 36%, rgba(200, 200, 220, 0.15) 46%, transparent 58%), rgba(107, 114, 128, 0.12); box-shadow: 0 0 0 1px rgba(180, 180, 200, 0.35), inset 0 2px 6px rgba(200, 200, 220, 0.1); }
-.boss-theme--arcane .boss-part-cell--weak { border-color: #dc2626; background: radial-gradient(ellipse at 50% 50%, rgba(239, 68, 68, 0.18), rgba(127, 29, 29, 0.08)); box-shadow: 0 0 18px rgba(248, 113, 113, 0.35), inset 0 0 10px rgba(248, 113, 113, 0.05); }
-.boss-theme--arcane .boss-part-cell__fill { background: linear-gradient(90deg, #d97706, #fbbf24); }
-
-
-
-
-
-
-
-.boss-theme--cosmic .boss-part-grid {
-  background: radial-gradient(ellipse at 30% 20%, rgba(99, 102, 241, 0.1), rgba(5, 5, 20, 0.9));
-  border: 1px solid rgba(99, 102, 241, 0.12);
+#boss-sword-cursor.recovering {
+  transform: translate(-30%, -30%) rotate(0deg);
+  transition: transform 0.12s ease-out;
 }
-.boss-theme--cosmic .boss-zone-button {
-  background: radial-gradient(ellipse at 60% 40%, rgba(99, 102, 241, 0.08), rgba(10, 10, 30, 0.5));
-  border-color: rgba(99, 102, 241, 0.15);
-  color: #c7d2fe;
+
+/* ===== Boss 命中与屏幕特效 ===== */
+
+.boss-part-cell.hit-flash {
+  animation: boss-hit-flash 0.25s ease-out;
 }
-.boss-theme--cosmic .boss-zone-button:not(:disabled):hover {
-  border-color: #a5b4fc;
-  box-shadow: 0 0 28px rgba(129, 140, 248, 0.2), inset 0 0 24px rgba(99, 102, 241, 0.05);
+@keyframes boss-hit-flash {
+  0%   { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 24px rgba(255, 255, 255, 0.25); }
+  100% { background: rgba(30, 41, 59, 0.7); }
 }
-.boss-theme--cosmic .boss-part-cell--soft { border-color: #22c55e; background: rgba(34, 197, 94, 0.12); box-shadow: 0 0 16px rgba(52, 211, 153, 0.4), inset 0 0 10px rgba(52, 211, 153, 0.08); }
-.boss-theme--cosmic .boss-part-cell--heavy { border-color: #6b7280; background: linear-gradient(105deg, transparent 0 36%, rgba(180, 180, 210, 0.15) 46%, transparent 58%), rgba(107, 114, 128, 0.12); box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.4), inset 0 2px 6px rgba(160, 160, 200, 0.1); }
-.boss-theme--cosmic .boss-part-cell--weak { border-color: #f472b6; background: radial-gradient(ellipse at 50% 50%, rgba(244, 114, 182, 0.18), rgba(100, 20, 40, 0.1)); box-shadow: 0 0 20px rgba(244, 114, 182, 0.4), inset 0 0 12px rgba(244, 114, 182, 0.08); }
-.boss-theme--cosmic .boss-part-cell__fill { background: linear-gradient(90deg, #6366f1, #818cf8); box-shadow: 0 0 10px rgba(99,102,241,0.5); }
+
+.boss-part-grid-container.shake      { animation: boss-shake 0.12s ease-out; }
+.boss-part-grid-container.shake-hard { animation: boss-shake-hard 0.18s ease-out; }
+@keyframes boss-shake {
+  0%,100% { transform: translate(0); }
+  20% { transform: translate(-3px, 1px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(-1px, -1px); }
+  80% { transform: translate(2px, 1px); }
+}
+@keyframes boss-shake-hard {
+  0%,100% { transform: translate(0); }
+  15% { transform: translate(-6px, 2px); }
+  30% { transform: translate(4px, -3px); }
+  60% { transform: translate(5px, 1px); }
+  90% { transform: translate(3px, 2px); }
+}
+
+.screen-flash {
+  position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  animation: boss-flash-burst 0.5s ease-out forwards;
+}
+@keyframes boss-flash-burst {
+  0% { background: rgba(251, 191, 36, 0.3); }
+  100% { background: transparent; }
+}
+
+.screen-vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 99;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
+  animation: boss-vignette-in 0.6s ease-out forwards;
+}
+@keyframes boss-vignette-in {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 /* ===== 天赋特效 ===== */
 

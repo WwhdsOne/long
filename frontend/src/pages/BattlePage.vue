@@ -57,11 +57,76 @@ const talentEffectOverlayRef = ref(null)
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
 let tickTimer = 0
+
+// 像素剑光标
+let cursorVisible = false
+let swordSwung = false
+let recoverTimer = 0
+let lastAttackTime = 0
+
 onMounted(() => {
   tickTimer = setInterval(() => {
     nowTick.value++
   }, 250)
+
+  // 像素剑光标
+  const swordCursor = document.getElementById('boss-sword-cursor')
+  const gridArea = document.querySelector('.boss-part-grid-with-combo')
+  if (swordCursor && gridArea) {
+    const updatePos = (e) => {
+      swordCursor.style.left = e.clientX + 'px'
+      swordCursor.style.top = e.clientY + 'px'
+    }
+
+    document.addEventListener('pointermove', (e) => {
+      if (!cursorVisible) return
+      updatePos(e)
+    })
+
+    gridArea.addEventListener('pointerenter', (e) => {
+      swordCursor.style.display = 'block'
+      cursorVisible = true
+      updatePos(e)
+    })
+
+    gridArea.addEventListener('pointerleave', () => {
+      swordCursor.style.display = 'none'
+      cursorVisible = false
+      clearTimeout(recoverTimer)
+      swordCursor.classList.remove('swinging', 'recovering')
+      swordSwung = false
+    })
+
+    function doAttack(e) {
+      const now = Date.now()
+      if (now - lastAttackTime < 32) return
+      lastAttackTime = now
+      e.preventDefault()
+
+      clearTimeout(recoverTimer)
+      swordCursor.classList.remove('recovering')
+      swordCursor.classList.add('swinging')
+      swordSwung = true
+
+      recoverTimer = setTimeout(() => {
+        swordCursor.classList.remove('swinging')
+        swordCursor.classList.add('recovering')
+        swordSwung = false
+      }, 50)
+    }
+
+    gridArea.addEventListener('pointerdown', doAttack)
+    gridArea.addEventListener('click', doAttack)
+
+    gridArea.addEventListener('pointerup', () => {
+      if (!swordSwung) {
+        swordCursor.classList.remove('swinging')
+        swordCursor.classList.add('recovering')
+      }
+    })
+  }
 })
+
 onBeforeUnmount(() => {
   clearInterval(tickTimer)
 })
@@ -128,7 +193,14 @@ function getBossZoneButtonKey(zone) {
 // 纯点击
 function clickBossZone(zone) {
   const key = getBossZoneButtonKey(zone)
-  if (key) clickButton(key)
+  if (!key) return
+  const el = findBossZoneElement(zone.x, zone.y)
+  if (el) {
+    el.classList.remove('hit-flash')
+    void el.offsetWidth
+    el.classList.add('hit-flash')
+  }
+  clickButton(key)
 }
 
 function isBossZoneDisabled(zone) {
@@ -619,6 +691,7 @@ const collapseRemaining = computed(() => {
                 </button>
               </div>
             </div>
+            <div id="boss-sword-cursor" style="display:none;"></div>
           </div>
 
         </div>
