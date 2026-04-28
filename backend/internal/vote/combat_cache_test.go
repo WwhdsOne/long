@@ -2,6 +2,8 @@ package vote
 
 import (
 	"context"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -153,7 +155,6 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 			"armor_ruin":         5,
 			"armor_ultimate":     4,
 			"crit_core":          5,
-			"crit_omen_resonate": 3,
 			"crit_cruel":         2,
 			"crit_skinner":       4,
 			"crit_doom_judgment": 2,
@@ -172,8 +173,8 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 	if compiled.Armor.CollapseTrigger != expectedCollapseTrigger {
 		t.Fatalf("expected compiled collapse trigger %d, got %d", expectedCollapseTrigger, compiled.Armor.CollapseTrigger)
 	}
-	if compiled.Armor.AutoStrikeInterval != int64(armorAutoStrikeIntervalForLevel(2)) {
-		t.Fatalf("expected auto strike interval %d, got %d", armorAutoStrikeIntervalForLevel(2), compiled.Armor.AutoStrikeInterval)
+	if compiled.Armor.AutoStrikeTrigger != int64(armorAutoStrikeTriggerCountForLevel(2)) {
+		t.Fatalf("expected auto strike trigger count %d, got %d", armorAutoStrikeTriggerCountForLevel(2), compiled.Armor.AutoStrikeTrigger)
 	}
 	if compiled.Armor.AutoStrikeRatio != armorAutoStrikeRatioForLevel(2) {
 		t.Fatalf("expected auto strike ratio %.2f, got %.2f", armorAutoStrikeRatioForLevel(2), compiled.Armor.AutoStrikeRatio)
@@ -196,6 +197,82 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 	if compiled.Crit.DoomMarkCount != critDoomMarkCountForLevel(2) {
 		t.Fatalf("expected doom mark count %d, got %d", critDoomMarkCountForLevel(2), compiled.Crit.DoomMarkCount)
 	}
+	if compiled.Crit.OmenResonatePerOmen != critOmenResonateForLevel(5) {
+		t.Fatalf("expected core omen crit bonus %.3f, got %.3f", critOmenResonateForLevel(5), compiled.Crit.OmenResonatePerOmen)
+	}
+}
+
+func TestCritOmenResonateRemovedAndDescriptionsUpdated(t *testing.T) {
+	if _, ok := GetTalentDef("crit_omen_resonate"); ok {
+		t.Fatal("expected crit_omen_resonate to be removed from talent defs")
+	}
+
+	bleed, ok := GetTalentDef("crit_bleed")
+	if !ok {
+		t.Fatal("expected crit_bleed def")
+	}
+	if bleed.Tier != 2 {
+		t.Fatalf("expected crit_bleed to remain tier 2, got %d", bleed.Tier)
+	}
+
+	core, ok := GetTalentDef("crit_core")
+	if !ok {
+		t.Fatal("expected crit_core def")
+	}
+	coreDesc := TalentEffectDescriptionForLevel(core, 5)
+	if !containsAll(coreDesc, []string{"每层死兆", "暴击伤害"}) {
+		t.Fatalf("expected crit_core description to include omen crit damage, got %q", coreDesc)
+	}
+	if containsAny(coreDesc, []string{"无上限", "最高到100", "上限100"}) {
+		t.Fatalf("expected crit_core description to avoid removed wording, got %q", coreDesc)
+	}
+
+	deathEcstasy, ok := GetTalentDef("crit_death_ecstasy")
+	if !ok {
+		t.Fatal("expected crit_death_ecstasy def")
+	}
+	deathDesc := TalentEffectDescriptionForLevel(deathEcstasy, 5)
+	if containsAny(deathDesc, []string{"上限100", "最高到100", "无上限"}) {
+		t.Fatalf("expected death ecstasy description to avoid removed wording, got %q", deathDesc)
+	}
+	if containsAny(deathDesc, []string{"× ×", "x x", "× ×1.0", "x x1.0"}) {
+		t.Fatalf("expected death ecstasy description to avoid duplicated multiplier marker, got %q", deathDesc)
+	}
+}
+
+func TestAllTalentPrerequisitesRemoved(t *testing.T) {
+	talentSource, err := os.ReadFile("talent.go")
+	if err != nil {
+		t.Fatalf("read talent.go: %v", err)
+	}
+	sourceText := string(talentSource)
+	if strings.Contains(sourceText, "Prerequisite:") {
+		t.Fatal("expected talent defs to remove single-node prerequisite assignments")
+	}
+	if strings.Contains(sourceText, "prerequisite,omitempty") {
+		t.Fatal("expected TalentDef to remove prerequisite field")
+	}
+	if strings.Contains(sourceText, "TalentPrerequisiteName") {
+		t.Fatal("expected prerequisite helper to be removed")
+	}
+}
+
+func containsAll(s string, parts []string) bool {
+	for _, part := range parts {
+		if !strings.Contains(s, part) {
+			return false
+		}
+	}
+	return true
+}
+
+func containsAny(s string, parts []string) bool {
+	for _, part := range parts {
+		if strings.Contains(s, part) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestApplyBossPartDamageDeltaUpdatesBossCurrentHPIncrementally(t *testing.T) {

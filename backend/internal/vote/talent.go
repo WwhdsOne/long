@@ -22,19 +22,22 @@ const (
 )
 
 const (
-	TalentCostTier0Main   int64 = 20
-	TalentCostTier1Main   int64 = 30
-	TalentCostTier2Main   int64 = 80
-	TalentCostTier3Main   int64 = 150
-	TalentCostTier4Main   int64 = 200
-	TalentCostTier1Filler int64 = 15
-	TalentCostTier2Filler int64 = 35
-	TalentCostTier3Filler int64 = 60
-	TalentDefaultMaxLevel       = 5
+	TalentCostTier0Main       int64 = 20
+	TalentCostTier1Main       int64 = 30
+	TalentCostTier2Main       int64 = 80
+	TalentCostTier3Main       int64 = 150
+	TalentCostTier4Main       int64 = 200
+	TalentCostTier1Filler     int64 = 15
+	TalentCostTier2Filler     int64 = 35
+	TalentCostTier3Filler     int64 = 60
+	TalentDefaultMaxLevel           = 5
+	TalentAutoStrikeWindowSec       = 5
+	TalentOmenStackCap              = 100
 
-	talentCostLevelExponent = 0.85
-	talentCostMultiplier    = 1.8
-	talentTier0GrowthFactor = 3.0
+	talentCostLevelExponent       = 0.85
+	talentCostMultiplier          = 1.8
+	talentTier0GrowthFactor       = 3.0
+	TalentOmenOverflowDamageRatio = 0.02
 
 	// ===== 普攻系关键参数（可直接调）=====
 	// 暴风连击：触发所需点击次数
@@ -80,15 +83,14 @@ func TalentCumulativeCost(base int64, targetLevel int) int64 {
 
 // TalentDef 天赋节点定义
 type TalentDef struct {
-	ID           string     `json:"id"`
-	Tree         TalentTree `json:"tree"`
-	Tier         int        `json:"tier"`     // 0=基石, 1-3=中间, 4=终极
-	Cost         int64      `json:"cost"`     // Lv1 基准成本
-	MaxLevel     int        `json:"maxLevel"` // 最高可学等级，默认 5
-	Name         string     `json:"name"`
-	EffectType   string     `json:"effectType"`
-	EffectValue  any        `json:"effectValue"`
-	Prerequisite string     `json:"prerequisite,omitempty"` // 前置天赋 ID
+	ID          string     `json:"id"`
+	Tree        TalentTree `json:"tree"`
+	Tier        int        `json:"tier"`     // 0=基石, 1-3=中间, 4=终极
+	Cost        int64      `json:"cost"`     // Lv1 基准成本
+	MaxLevel    int        `json:"maxLevel"` // 最高可学等级，默认 5
+	Name        string     `json:"name"`
+	EffectType  string     `json:"effectType"`
+	EffectValue any        `json:"effectValue"`
 }
 
 // TalentState 玩家天赋状态
@@ -121,39 +123,38 @@ func HasTalentLearned(state *TalentState, talentID string) bool {
 var talentDefs = map[string]TalentDef{
 	// ===== 普攻：均衡攻势 =====
 	"normal_core":      {ID: "normal_core", Tree: TalentTreeNormal, Tier: 0, MaxLevel: 5, Name: "暴风连击", EffectType: "storm_combo", EffectValue: map[string]any{"triggerCount": 50.0, "extraHits": 20.0, "chaseRatio": 0.50, "maxChaseRatio": 0.80}},
-	"normal_atk_up":    {ID: "normal_atk_up", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "攻击强化", EffectType: "attack_power_percent", EffectValue: map[string]any{"percent": 0.60}, Prerequisite: "normal_core"},
-	"normal_dmg_amp":   {ID: "normal_dmg_amp", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "伤害增幅", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.50}, Prerequisite: "normal_core"},
-	"normal_soft_atk":  {ID: "normal_soft_atk", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "软组织特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "soft", "percent": 0.80}, Prerequisite: "normal_core"},
-	"normal_charge":    {ID: "normal_charge", Tree: TalentTreeNormal, Tier: 2, MaxLevel: 5, Name: "蓄力返还", EffectType: "charge_retain", EffectValue: map[string]any{"retainPercent": 0.40}, Prerequisite: "normal_atk_up"},
-	"normal_chase_up":  {ID: "normal_chase_up", Tree: TalentTreeNormal, Tier: 2, MaxLevel: 5, Name: "追击强化", EffectType: "chase_upgrade", EffectValue: map[string]any{"chaseRatio": 1.00}, Prerequisite: "normal_dmg_amp"},
-	"normal_combo_ext": {ID: "normal_combo_ext", Tree: TalentTreeNormal, Tier: 2, MaxLevel: 5, Name: "连击扩展", EffectType: "combo_extend", EffectValue: map[string]any{"extraHits": 30.0}, Prerequisite: "normal_soft_atk"},
-	"normal_encircle":  {ID: "normal_encircle", Tree: TalentTreeNormal, Tier: 3, MaxLevel: 5, Name: "围剿", EffectType: "per_part_damage", EffectValue: map[string]any{"percentPerPart": 0.20}, Prerequisite: "normal_charge"},
-	"normal_low_hp":    {ID: "normal_low_hp", Tree: TalentTreeNormal, Tier: 3, MaxLevel: 5, Name: "残血收割", EffectType: "low_hp_bonus", EffectValue: map[string]any{"hpThreshold": 0.40, "multiplier": 3.0}, Prerequisite: "normal_chase_up"},
-	"normal_ultimate":  {ID: "normal_ultimate", Tree: TalentTreeNormal, Tier: 4, MaxLevel: 5, Name: "白银风暴", EffectType: "silver_storm", EffectValue: map[string]any{"triggerHits": 15, "treatAllAs": "soft"}, Prerequisite: "normal_encircle"},
+	"normal_atk_up":    {ID: "normal_atk_up", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "攻击强化", EffectType: "attack_power_percent", EffectValue: map[string]any{"percent": 0.60}},
+	"normal_dmg_amp":   {ID: "normal_dmg_amp", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "伤害增幅", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.50}},
+	"normal_soft_atk":  {ID: "normal_soft_atk", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "软组织特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "soft", "percent": 0.80}},
+	"normal_charge":    {ID: "normal_charge", Tree: TalentTreeNormal, Tier: 2, MaxLevel: 5, Name: "蓄力返还", EffectType: "charge_retain", EffectValue: map[string]any{"retainPercent": 0.40}},
+	"normal_chase_up":  {ID: "normal_chase_up", Tree: TalentTreeNormal, Tier: 2, MaxLevel: 5, Name: "追击强化", EffectType: "chase_upgrade", EffectValue: map[string]any{"chaseRatio": 1.00}},
+	"normal_combo_ext": {ID: "normal_combo_ext", Tree: TalentTreeNormal, Tier: 2, MaxLevel: 5, Name: "连击扩展", EffectType: "combo_extend", EffectValue: map[string]any{"extraHits": 30.0}},
+	"normal_encircle":  {ID: "normal_encircle", Tree: TalentTreeNormal, Tier: 3, MaxLevel: 5, Name: "围剿", EffectType: "per_part_damage", EffectValue: map[string]any{"percentPerPart": 0.20}},
+	"normal_low_hp":    {ID: "normal_low_hp", Tree: TalentTreeNormal, Tier: 3, MaxLevel: 5, Name: "残血收割", EffectType: "low_hp_bonus", EffectValue: map[string]any{"hpThreshold": 0.40, "multiplier": 3.0}},
+	"normal_ultimate":  {ID: "normal_ultimate", Tree: TalentTreeNormal, Tier: 4, MaxLevel: 5, Name: "白银风暴", EffectType: "silver_storm", EffectValue: map[string]any{"triggerHits": 15, "treatAllAs": "soft"}},
 
 	// ===== 破甲：碎盾攻坚 =====
 	"armor_core":         {ID: "armor_core", Tree: TalentTreeArmor, Tier: 0, MaxLevel: 5, Name: "灭绝穿甲", EffectType: "permanent_armor_pen", EffectValue: map[string]any{"penPercent": 0.60, "collapseTrigger": 50, "collapseDuration": 8}},
-	"armor_pen_up":       {ID: "armor_pen_up", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "穿甲强化", EffectType: "armor_pen_extra", EffectValue: map[string]any{"extraPen": 0.50}, Prerequisite: "armor_core"},
-	"armor_boss_hunter":  {ID: "armor_boss_hunter", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "首领猎杀", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.60}, Prerequisite: "armor_core"},
-	"armor_heavy_scale":  {ID: "armor_heavy_scale", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "以强制强", EffectType: "armor_scaling", EffectValue: map[string]any{"damagePer100Armor": 0.04}, Prerequisite: "armor_core"},
-	"armor_heavy_atk":    {ID: "armor_heavy_atk", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "重甲特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "heavy", "percent": 1.00}, Prerequisite: "armor_pen_up"},
-	"armor_collapse_ext": {ID: "armor_collapse_ext", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "崩塌延长", EffectType: "collapse_extend", EffectValue: map[string]any{"extraDuration": 20.0}, Prerequisite: "armor_boss_hunter"},
-	"armor_auto_strike":  {ID: "armor_auto_strike", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "自动打击", EffectType: "auto_strike", EffectValue: map[string]any{"interval": 15.0, "damageRatio": 4.0}, Prerequisite: "armor_heavy_scale"},
-	"armor_ruin":         {ID: "armor_ruin", Tree: TalentTreeArmor, Tier: 3, MaxLevel: 5, Name: "废墟打击", EffectType: "collapse_damage_amp", EffectValue: map[string]any{"extraPercent": 2.0}, Prerequisite: "armor_heavy_atk"},
-	"armor_pen_convert":  {ID: "armor_pen_convert", Tree: TalentTreeArmor, Tier: 3, MaxLevel: 5, Name: "破甲转化", EffectType: "pen_to_amplify", EffectValue: map[string]any{"convertRatio": 0.60}, Prerequisite: "armor_collapse_ext"},
-	"armor_ultimate":     {ID: "armor_ultimate", Tree: TalentTreeArmor, Tier: 4, MaxLevel: 5, Name: "审判日", EffectType: "judgment_day", EffectValue: map[string]any{"triggerCount": 60.0, "hpCutPercent": 0.60}, Prerequisite: "armor_ruin"},
+	"armor_pen_up":       {ID: "armor_pen_up", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "穿甲强化", EffectType: "armor_pen_extra", EffectValue: map[string]any{"extraPen": 0.50}},
+	"armor_boss_hunter":  {ID: "armor_boss_hunter", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "首领猎杀", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.60}},
+	"armor_heavy_scale":  {ID: "armor_heavy_scale", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "以强制强", EffectType: "armor_scaling", EffectValue: map[string]any{"damagePer100Armor": 0.04}},
+	"armor_heavy_atk":    {ID: "armor_heavy_atk", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "重甲特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "heavy", "percent": 1.00}},
+	"armor_collapse_ext": {ID: "armor_collapse_ext", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "崩塌延长", EffectType: "collapse_extend", EffectValue: map[string]any{"extraDuration": 20.0}},
+	"armor_auto_strike":  {ID: "armor_auto_strike", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "自动打击", EffectType: "auto_strike", EffectValue: map[string]any{"triggerCount": 15.0, "damageRatio": 4.0}},
+	"armor_ruin":         {ID: "armor_ruin", Tree: TalentTreeArmor, Tier: 3, MaxLevel: 5, Name: "废墟打击", EffectType: "collapse_damage_amp", EffectValue: map[string]any{"extraPercent": 2.0}},
+	"armor_pen_convert":  {ID: "armor_pen_convert", Tree: TalentTreeArmor, Tier: 3, MaxLevel: 5, Name: "破甲转化", EffectType: "pen_to_amplify", EffectValue: map[string]any{"convertRatio": 0.60}},
+	"armor_ultimate":     {ID: "armor_ultimate", Tree: TalentTreeArmor, Tier: 4, MaxLevel: 5, Name: "审判日", EffectType: "judgment_day", EffectValue: map[string]any{"triggerCount": 60.0, "hpCutPercent": 0.60}},
 
 	// ===== 暴击：致命洞察 =====
-	"crit_core":          {ID: "crit_core", Tree: TalentTreeCrit, Tier: 0, MaxLevel: 5, Name: "溢杀", EffectType: "overkill", EffectValue: map[string]any{"baseCritBonus": 0.35, "overflowToCritDmg": 0.02, "omenPerWeakCrit": 2}},
-	"crit_omen_resonate": {ID: "crit_omen_resonate", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "死兆共鸣", EffectType: "omen_crit_damage", EffectValue: map[string]any{"critDmgPerOmen": 0.008}, Prerequisite: "crit_core"},
-	"crit_cruel":         {ID: "crit_cruel", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "残忍", EffectType: "crit_damage_bonus", EffectValue: map[string]any{"percent": 1.20}, Prerequisite: "crit_core"},
-	"crit_skinner":       {ID: "crit_skinner", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "剥皮", EffectType: "force_weak", EffectValue: map[string]any{"chance": 0.50, "duration": 8}, Prerequisite: "crit_core"},
-	"crit_doom_judgment": {ID: "crit_doom_judgment", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "末日审判", EffectType: "doom_mark", EffectValue: map[string]any{"markCount": 2.0, "omenPerMark": 25.0, "hpThreshold": 0.30}, Prerequisite: "crit_core"},
-	"crit_bleed":         {ID: "crit_bleed", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "致命出血", EffectType: "bleed", EffectValue: map[string]any{"duration": 4, "damageRatio": 1.00}, Prerequisite: "crit_omen_resonate"},
-	"crit_omen_kill":     {ID: "crit_omen_kill", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "斩杀预兆", EffectType: "omen_low_hp", EffectValue: map[string]any{"hpThreshold": 0.50, "dmgPerOmen": 0.02}, Prerequisite: "crit_cruel"},
-	"crit_omen_reap":     {ID: "crit_omen_reap", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "死兆收割", EffectType: "omen_reap_passive", EffectValue: map[string]any{"thresholds": []float64{30, 60, 90, 120}, "damageMult": []float64{1.5, 2.0, 2.5, 3.0}}, Prerequisite: "crit_skinner"},
-	"crit_final_cut":     {ID: "crit_final_cut", Tree: TalentTreeCrit, Tier: 3, MaxLevel: 5, Name: "终末血斩", EffectType: "final_cut", EffectValue: map[string]any{"critCount": 80.0, "hpCutPercent": 0.15, "cooldown": 30}, Prerequisite: "crit_omen_kill"},
-	"crit_death_ecstasy": {ID: "crit_death_ecstasy", Tree: TalentTreeCrit, Tier: 4, MaxLevel: 5, Name: "死亡狂喜", EffectType: "death_ecstasy_ult", EffectValue: map[string]any{"omenCost": 100.0, "critDmgMult": 1.0}, Prerequisite: "crit_bleed"},
+	"crit_core":          {ID: "crit_core", Tree: TalentTreeCrit, Tier: 0, MaxLevel: 5, Name: "溢杀", EffectType: "overkill", EffectValue: map[string]any{"baseCritBonus": 0.35, "overflowToCritDmg": 0.02, "omenPerWeakCrit": 2, "critDmgPerOmen": 0.008}},
+	"crit_cruel":         {ID: "crit_cruel", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "残忍", EffectType: "crit_damage_bonus", EffectValue: map[string]any{"percent": 1.20}},
+	"crit_skinner":       {ID: "crit_skinner", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "剥皮", EffectType: "force_weak", EffectValue: map[string]any{"chance": 0.50, "duration": 8}},
+	"crit_doom_judgment": {ID: "crit_doom_judgment", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "末日审判", EffectType: "doom_mark", EffectValue: map[string]any{"markCount": 2.0, "omenPerMark": 25.0, "hpThreshold": 0.30}},
+	"crit_bleed":         {ID: "crit_bleed", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "致命出血", EffectType: "bleed", EffectValue: map[string]any{"duration": 4, "damageRatio": 1.00}},
+	"crit_omen_kill":     {ID: "crit_omen_kill", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "斩杀预兆", EffectType: "omen_low_hp", EffectValue: map[string]any{"hpThreshold": 0.50, "dmgPerOmen": 0.02}},
+	"crit_omen_reap":     {ID: "crit_omen_reap", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "死兆收割", EffectType: "omen_reap_passive", EffectValue: map[string]any{"thresholds": []float64{30, 60, 90, 120}, "damageMult": []float64{1.5, 2.0, 2.5, 3.0}}},
+	"crit_final_cut":     {ID: "crit_final_cut", Tree: TalentTreeCrit, Tier: 3, MaxLevel: 5, Name: "终末血斩", EffectType: "final_cut", EffectValue: map[string]any{"critCount": 80.0, "hpCutPercent": 0.15, "cooldown": 30}},
+	"crit_death_ecstasy": {ID: "crit_death_ecstasy", Tree: TalentTreeCrit, Tier: 4, MaxLevel: 5, Name: "死亡狂喜", EffectType: "death_ecstasy_ult", EffectValue: map[string]any{"omenCost": 100.0, "critDmgMult": 1.0}},
 
 	// ===== 均衡攻势 小节点 =====
 	"normal_filler_t1a": {ID: "normal_filler_t1a", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "锐锋", EffectType: "attack_power_percent", EffectValue: map[string]any{"percent": 0.15}},
@@ -276,19 +277,6 @@ func isLearnedTierFull(tree TalentTree, tier int, talents map[string]int) bool {
 	return count >= needed
 }
 
-// TalentPrerequisiteName 返回前置天赋名称，未配置则返回“无”。
-func TalentPrerequisiteName(def TalentDef) string {
-	prerequisite := strings.TrimSpace(def.Prerequisite)
-	if prerequisite == "" {
-		return "无"
-	}
-	preDef, ok := talentDefs[prerequisite]
-	if !ok || strings.TrimSpace(preDef.Name) == "" {
-		return prerequisite
-	}
-	return preDef.Name
-}
-
 // TalentEffectDescription 返回 Lv1 天赋效果中文描述，供静态定义展示。
 func TalentEffectDescription(def TalentDef) string {
 	return TalentEffectDescriptionForLevel(def, 1)
@@ -382,13 +370,13 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		}
 		return fmt.Sprintf("崩塌持续时间从8秒延长到 %d 秒。被动生效。", duration)
 	case "auto_strike":
-		interval := talentInt(value["interval"])
+		triggerCount := talentInt(value["triggerCount"])
 		ratio := talentFloat(value["damageRatio"]) * float64(currentFactor)
 		if def.ID == "armor_auto_strike" {
-			interval = armorAutoStrikeIntervalForLevel(currentFactor)
+			triggerCount = armorAutoStrikeTriggerCountForLevel(currentFactor)
 			ratio = armorAutoStrikeRatioForLevel(currentFactor)
 		}
-		return fmt.Sprintf("每 %d 秒自动对血量最高的重甲造成 %.1fx攻击力必中真伤。无需点击。", interval, ratio)
+		return fmt.Sprintf("5秒内连续命中同一重甲部位 %d 次后，追加一次 %.1fx 攻击力的碎甲重击。触发后重置累计。", triggerCount, ratio)
 	case "collapse_damage_amp":
 		percent := talentPercentScaled(value["extraPercent"], currentFactor)
 		if def.ID == "armor_ruin" {
@@ -414,13 +402,10 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		if def.ID == "crit_core" {
 			baseCritBonus = talentPercent(critCoreBaseCritBonusForLevel(currentFactor))
 		}
-		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤。弱点暴击+2层死兆，普通暴击+1层，击碎部位+5层。", baseCritBonus, talentPercent(value["overflowToCritDmg"]))
+		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤；每层死兆额外提供 %s 暴击伤害。死兆最多累积至 %d 层，溢出转化为额外伤害。弱点暴击+2层死兆，普通暴击+1层，击碎部位+5层。", baseCritBonus, talentPercent(value["overflowToCritDmg"]), talentPercent(critOmenResonateForLevel(currentFactor)), TalentOmenStackCap)
 	case "omen_crit_damage":
 		critDmgPerOmen := talentFloat(value["critDmgPerOmen"]) * float64(currentFactor)
-		if def.ID == "crit_omen_resonate" {
-			critDmgPerOmen = critOmenResonateForLevel(currentFactor)
-		}
-		return fmt.Sprintf("每层死兆叠加 %s 暴击伤害（例：100层=+%.0f%%暴伤）。无上限。", talentPercent(critDmgPerOmen), critDmgPerOmen*100)
+		return fmt.Sprintf("每层死兆叠加 %s 暴击伤害（例：100层=+%.0f%%暴伤）。", talentPercent(critDmgPerOmen), critDmgPerOmen*100)
 	case "crit_damage_bonus":
 		percent := talentPercentScaled(value["percent"], currentFactor)
 		if def.ID == "crit_cruel" {
@@ -458,7 +443,7 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		if def.ID == "crit_death_ecstasy" {
 			mult = fmt.Sprintf("×%.1f", critDeathEcstasyMultForLevel(currentFactor))
 		}
-		return fmt.Sprintf("死兆达到%d层时消耗%d层，造成 baseDamage × 层数(上限100) × %s 的巨额伤害。", talentInt(value["omenCost"]), talentInt(value["omenCost"]), mult)
+		return fmt.Sprintf("死兆达到%d层时消耗%d层，造成 baseDamage × 层数，再乘以 %s 的巨额伤害。", talentInt(value["omenCost"]), talentInt(value["omenCost"]), mult)
 	case "final_cut":
 		critCount := talentInt(value["critCount"])
 		hpCutPercent := talentPercentScaled(value["hpCutPercent"], currentFactor)
@@ -553,7 +538,7 @@ func armorCollapseExtendForLevel(level int) int {
 	return lerpTalentInt(level, 20, 35)
 }
 
-func armorAutoStrikeIntervalForLevel(level int) int {
+func armorAutoStrikeTriggerCountForLevel(level int) int {
 	return lerpTalentInt(level, 15, 8)
 }
 
@@ -732,11 +717,11 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		add("崩塌持续", talentDurationScaled(value["extraDuration"], currentFactor), talentDurationScaled(value["extraDuration"], nextLevel))
 	case "auto_strike":
 		if def.ID == "armor_auto_strike" {
-			add("打击间隔", fmt.Sprintf("%ds", armorAutoStrikeIntervalForLevel(currentFactor)), fmt.Sprintf("%ds", armorAutoStrikeIntervalForLevel(nextLevel)))
+			add("触发次数", fmt.Sprintf("%d", armorAutoStrikeTriggerCountForLevel(currentFactor)), fmt.Sprintf("%d", armorAutoStrikeTriggerCountForLevel(nextLevel)))
 			add("伤害倍率", fmt.Sprintf("×%.1f", armorAutoStrikeRatioForLevel(currentFactor)), fmt.Sprintf("×%.1f", armorAutoStrikeRatioForLevel(nextLevel)))
 			break
 		}
-		add("打击间隔", talentDurationString(value["interval"]), talentDurationString(value["interval"]))
+		add("触发次数", talentIntString(value["triggerCount"]), talentIntString(value["triggerCount"]))
 		add("伤害倍率", talentMultiplierScaled(value["damageRatio"], currentFactor), talentMultiplierScaled(value["damageRatio"], nextLevel))
 	case "collapse_damage_amp":
 		if def.ID == "armor_ruin" {
@@ -762,6 +747,7 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		if def.ID == "crit_core" {
 			add("暴击率", talentPercent(critCoreBaseCritBonusForLevel(currentFactor)), talentPercent(critCoreBaseCritBonusForLevel(nextLevel)))
 			add("溢出转暴伤", talentPercent(value["overflowToCritDmg"]), talentPercent(value["overflowToCritDmg"]))
+			add("每层暴伤", talentPercent(critOmenResonateForLevel(currentFactor)), talentPercent(critOmenResonateForLevel(nextLevel)))
 			add("弱点暴击获层", talentIntString(value["omenPerWeakCrit"]), talentIntString(value["omenPerWeakCrit"]))
 			break
 		}
@@ -769,10 +755,6 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		add("溢出转暴伤", talentPercent(value["overflowToCritDmg"]), talentPercent(value["overflowToCritDmg"]))
 		add("弱点暴击获层", talentIntString(value["omenPerWeakCrit"]), talentIntString(value["omenPerWeakCrit"]))
 	case "omen_crit_damage":
-		if def.ID == "crit_omen_resonate" {
-			add("每层暴伤", talentPercent(critOmenResonateForLevel(currentFactor)), talentPercent(critOmenResonateForLevel(nextLevel)))
-			break
-		}
 		add("每层暴伤", talentPercentScaled(value["critDmgPerOmen"], currentFactor), talentPercentScaled(value["critDmgPerOmen"], nextLevel))
 	case "crit_damage_bonus":
 		if def.ID == "crit_cruel" {
@@ -1075,14 +1057,9 @@ func (s *Store) UpgradeTalent(ctx context.Context, nickname string, talentID str
 		return ErrTalentAlreadyLearned
 	}
 	if currentLevel == 0 && targetLevel >= 1 {
-		if def.Prerequisite != "" {
-			if !HasTalentLearned(state, def.Prerequisite) {
-				return ErrTalentPrerequisite
-			}
-		}
 		if def.Tier > 0 {
 			if !isLearnedTierFull(def.Tree, def.Tier-1, state.Talents) {
-				return ErrTalentPrerequisite
+				return ErrTalentTierLocked
 			}
 		}
 	}
@@ -1276,25 +1253,29 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 
 // TalentCombatState 玩家在单场 Boss 战中的天赋战斗状态。
 type TalentCombatState struct {
-	OmenStacks           int              `json:"omenStacks"`
-	CollapseParts        []int            `json:"collapseParts"`
-	CollapseEndsAt       int64            `json:"collapseEndsAt"`
-	CollapseDuration     int64            `json:"collapseDuration"`
-	DoomMarks            []int            `json:"doomMarks"`
-	DoomMarkCumDamage    map[string]int64 `json:"doomMarkCumDamage"`
-	SilverStormRemaining int              `json:"silverStormRemaining"`
-	SilverStormEndsAt    int64            `json:"silverStormEndsAt"`
-	SilverStormActive    bool             `json:"silverStormActive"`
-	LastAutoStrikeAt     int64            `json:"lastAutoStrikeAt"`
-	LastFinalCutAt       int64            `json:"lastFinalCutAt"`
-	JudgmentDayUsed      map[string]bool  `json:"judgmentDayUsed"`
-	PartHeavyClickCount  map[string]int64 `json:"partHeavyClickCount"`
-	PartRetainedClicks   map[string]int64 `json:"partRetainedClicks"`
-	PartStormComboCount  map[string]int64 `json:"partStormComboCount"`
-	CritCount            int64            `json:"critCount"`
-	SkinnerParts         map[string]int64 `json:"skinnerParts"`
-	NormalTriggerCount   int64            `json:"normalTriggerCount"`
-	ArmorTriggerCount    int64            `json:"armorTriggerCount"`
+	OmenStacks             int              `json:"omenStacks"`
+	CollapseParts          []int            `json:"collapseParts"`
+	CollapseEndsAt         int64            `json:"collapseEndsAt"`
+	CollapseDuration       int64            `json:"collapseDuration"`
+	DoomMarks              []int            `json:"doomMarks"`
+	DoomMarkCumDamage      map[string]int64 `json:"doomMarkCumDamage"`
+	SilverStormRemaining   int              `json:"silverStormRemaining"`
+	SilverStormEndsAt      int64            `json:"silverStormEndsAt"`
+	SilverStormActive      bool             `json:"silverStormActive"`
+	AutoStrikeTargetPart   string           `json:"autoStrikeTargetPart"`
+	AutoStrikeComboCount   int64            `json:"autoStrikeComboCount"`
+	AutoStrikeExpiresAt    int64            `json:"autoStrikeExpiresAt"`
+	LastFinalCutAt         int64            `json:"lastFinalCutAt"`
+	JudgmentDayUsed        map[string]bool  `json:"judgmentDayUsed"`
+	PartHeavyClickCount    map[string]int64 `json:"partHeavyClickCount"`
+	PartRetainedClicks     map[string]int64 `json:"partRetainedClicks"`
+	PartStormComboCount    map[string]int64 `json:"partStormComboCount"`
+	CritCount              int64            `json:"critCount"`
+	SkinnerParts           map[string]int64 `json:"skinnerParts"`
+	NormalTriggerCount     int64            `json:"normalTriggerCount"`
+	ArmorTriggerCount      int64            `json:"armorTriggerCount"`
+	AutoStrikeTriggerCount int64            `json:"autoStrikeTriggerCount"`
+	AutoStrikeWindowSec    int64            `json:"autoStrikeWindowSec"`
 }
 
 // NewTalentCombatState 创建空天赋战斗状态。
@@ -1367,10 +1348,7 @@ func (s *Store) AddOmenStacks(ctx context.Context, nickname, bossID string, delt
 	if err != nil {
 		return 0, err
 	}
-	state.OmenStacks += delta
-	if state.OmenStacks < 0 {
-		state.OmenStacks = 0
-	}
+	state.OmenStacks, _ = applyOmenStackDelta(state.OmenStacks, delta)
 	return state.OmenStacks, s.SaveTalentCombatState(ctx, nickname, bossID, state)
 }
 
@@ -1390,4 +1368,15 @@ func (s *Store) ConsumeOmenStacks(ctx context.Context, nickname, bossID string, 
 // TalentPartKey 生成部位标识 key。
 func TalentPartKey(x, y int) string {
 	return fmt.Sprintf("%d-%d", x, y)
+}
+
+func applyOmenStackDelta(current, delta int) (next int, overflow int) {
+	next = current + delta
+	if next < 0 {
+		return 0, 0
+	}
+	if next > TalentOmenStackCap {
+		return TalentOmenStackCap, next - TalentOmenStackCap
+	}
+	return next, 0
 }

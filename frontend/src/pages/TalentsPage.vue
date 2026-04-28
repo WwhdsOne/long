@@ -124,6 +124,14 @@ const activeTierBonuses = computed(() => {
   return bonuses
 })
 
+const currentTierCompletionBonuses = computed(() => {
+  const bonusLabels = treeDefs.value?.trees?.[selectedTree.value]?.tierCompletionBonuses || {}
+  return [0, 1, 2, 3, 4].map((tier) => ({
+    tier,
+    label: bonusLabels[tier] || `${tierLabels[tier] || `第 ${tier + 1} 层`} 点满后获得额外加成`,
+  }))
+})
+
 const availableTalentPoints = computed(() => {
   if (typeof talentState.value?.talentPoints === 'number') {
     return Math.max(0, Number(talentState.value.talentPoints))
@@ -140,22 +148,8 @@ function safeJSON(response) {
   return response.json().catch(() => null)
 }
 
-function findDef(id) {
-  if (!treeDefs.value?.trees) return null
-  for (const key of ['normal', 'armor', 'crit']) {
-    const found = treeDefs.value.trees[key]?.talents?.find((item) => item.id === id)
-    if (found) return found
-  }
-  return null
-}
-
 function isLearned(id) {
   return nodeLevel(id) > 0
-}
-
-function isPrerequisiteMet(def) {
-  if (!def?.prerequisite) return true
-  return nodeLevel(def.prerequisite) > 0
 }
 
 function canLearn(def) {
@@ -163,7 +157,6 @@ function canLearn(def) {
   if (nodeLevel(def.id) >= (def.maxLevel || 5)) return false
   if (isLearned(def.id)) return false
   if (isLayerLocked(def)) return false
-  if (!isPrerequisiteMet(def)) return false
   return availableTalentPoints.value >= talentCostForLevel(def, 1)
 }
 
@@ -172,7 +165,6 @@ function nodeState(def) {
   if (lv >= (def.maxLevel || 5)) return 'maxed'
   if (lv > 0) return 'upgradable'
   if (isLayerLocked(def)) return 'layer-locked'
-  if (!isPrerequisiteMet(def)) return 'locked'
   if (availableTalentPoints.value < talentCostForLevel(def, 1)) return 'insufficient'
   return 'available'
 }
@@ -184,16 +176,9 @@ function stateLabel(def) {
     maxed: '已满级',
     available: '可学习',
     insufficient: '天赋点不足',
-    locked: '前置未满足',
     'layer-locked': '上一层未点满',
   }
   return map[state] || '未知'
-}
-
-function prerequisiteLabel(def) {
-  if (!def?.prerequisite) return '无'
-  const pre = findDef(def.prerequisite)
-  return pre?.name || def.prerequisite
 }
 
 function effectDescription(def) {
@@ -214,7 +199,6 @@ function stateReason(def) {
   if (state === 'maxed') return '已提升至最高等级'
   if (state === 'available') return '点击即可学习'
   if (state === 'insufficient') return '当前天赋点不足'
-  if (state === 'locked') return '需要先学习前置天赋'
   if (state === 'layer-locked') return '需要先点满上一层天赋'
   return ''
 }
@@ -418,13 +402,6 @@ async function handleNodeClick(item) {
     return
   }
 
-  // Confirmation for upgrade (skip for Lv1 first-learn)
-  if (currentLevel > 0) {
-    if (!(await showConfirm('确认升级', `将 ${item.name} 从 Lv${currentLevel} 升级到 Lv${targetLevel}，消耗 ${cost} 天赋点？`))) {
-      return
-    }
-  }
-
   learnLoading.value = true
   errorMsg.value = ''
   try {
@@ -537,6 +514,29 @@ watch(isLoggedIn, (val) => {
         </div>
       </section>
 
+      <section class="talent-guide">
+        <div class="talent-guide__block">
+          <strong>解锁规则</strong>
+          <p>上一层所有节点到 Lv1，才能学习下一层节点。</p>
+        </div>
+        <div class="talent-guide__block">
+          <strong>当前主系层满额外加成</strong>
+          <ul class="talent-guide__list">
+            <li v-for="bonus in currentTierCompletionBonuses" :key="`guide-bonus-${bonus.tier}`">
+              {{ tierLabels[bonus.tier] }}：{{ bonus.label }}
+            </li>
+          </ul>
+        </div>
+        <div class="talent-guide__block">
+          <strong>其他注意事项</strong>
+          <ul class="talent-guide__list">
+            <li>节点首次学习和后续升级都会消耗天赋点，等级越高消耗越多。</li>
+            <li>层满加成在该层所有节点达到 Lv1 后立即生效，切换主系时会同步查看对应文案。</li>
+            <li>洗点会返还当前已投入的天赋点，但需要重新按层解锁。</li>
+          </ul>
+        </div>
+      </section>
+
       <article class="talent-plate">
         <header class="talent-plate__head">
           <strong>{{ activePlateTitle }}</strong>
@@ -601,10 +601,9 @@ watch(isLoggedIn, (val) => {
             <p v-if="nodeLevel(selectedNode.id) > 0">
               等级：Lv{{ nodeLevel(selectedNode.id) }} / Lv{{ selectedNode.maxLevel || 5 }}
             </p>
-            <p v-if="nodeState(selectedNode) === 'upgradable'">
+            <p v-if="nodeState(selectedNode) === 'upgradable' || nodeState(selectedNode) === 'available'">
               下一级消耗：{{ upgradeCost(selectedNode) }} 天赋点
             </p>
-            <p>前置：{{ prerequisiteLabel(selectedNode) }}</p>
             <p>{{ effectDescription(selectedNode) }}</p>
             <div class="talent-float__effects">
               <div v-for="line in effectLines(selectedNode, nodeLevel(selectedNode.id))" :key="line.label" class="talent-float__effect-line">
@@ -725,6 +724,46 @@ watch(isLoggedIn, (val) => {
 .talent-select__btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.talent-guide {
+  margin-bottom: 0.75rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.talent-guide__block {
+  border: 1px solid #2d3f48;
+  border-radius: 0.8rem;
+  background: linear-gradient(180deg, #101d25 0%, #0d171d 100%);
+  padding: 0.8rem 0.9rem;
+}
+
+.talent-guide__block strong {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: #f4f9fc;
+  font-size: 0.84rem;
+}
+
+.talent-guide__block p {
+  margin: 0;
+  color: #a9bfcb;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.talent-guide__list {
+  margin: 0;
+  padding-left: 1rem;
+  color: #a9bfcb;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.talent-guide__list li + li {
+  margin-top: 0.22rem;
 }
 
 .talent-plate {
@@ -921,6 +960,10 @@ watch(isLoggedIn, (val) => {
   .talent-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .talent-guide {
+    grid-template-columns: 1fr;
   }
 
   .talent-head__actions {

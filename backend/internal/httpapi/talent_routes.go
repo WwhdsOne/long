@@ -176,8 +176,6 @@ func defsToMap(defs []vote.TalentDef) []map[string]any {
 			"effectDescription": vote.TalentEffectDescription(d),
 			"maxLevel":          d.MaxLevel,
 			"cost":              d.Cost,
-			"prerequisite":      d.Prerequisite,
-			"prerequisiteName":  vote.TalentPrerequisiteName(d),
 		})
 	}
 	return result
@@ -188,7 +186,7 @@ func talentErrorStatus(err error) int {
 	case errors.Is(err, vote.ErrTalentNotFound):
 		return consts.StatusNotFound
 	case errors.Is(err, vote.ErrTalentPointsInsufficient),
-		errors.Is(err, vote.ErrTalentPrerequisite),
+		errors.Is(err, vote.ErrTalentTierLocked),
 		errors.Is(err, vote.ErrTalentAlreadyLearned),
 		errors.Is(err, vote.ErrTalentInvalidCost),
 		errors.Is(err, vote.ErrTalentMaxLevel),
@@ -206,8 +204,8 @@ func talentErrorCode(err error) string {
 		return "TALENT_POINTS_INSUFFICIENT"
 	case errors.Is(err, vote.ErrTalentInvalidCost):
 		return "TALENT_INVALID_COST"
-	case errors.Is(err, vote.ErrTalentPrerequisite):
-		return "TALENT_PREREQUISITE_NOT_MET"
+	case errors.Is(err, vote.ErrTalentTierLocked):
+		return "TALENT_TIER_LOCKED"
 	case errors.Is(err, vote.ErrTalentAlreadyLearned):
 		return "TALENT_ALREADY_LEARNED"
 	case errors.Is(err, vote.ErrInvalidTalentTree):
@@ -229,8 +227,8 @@ func talentErrorMessage(err error) string {
 		return "天赋点不足，无法学习该节点。"
 	case errors.Is(err, vote.ErrTalentInvalidCost):
 		return "天赋配置异常，节点成本无效。"
-	case errors.Is(err, vote.ErrTalentPrerequisite):
-		return "前置节点尚未学习。"
+	case errors.Is(err, vote.ErrTalentTierLocked):
+		return "上一层天赋尚未点满。"
 	case errors.Is(err, vote.ErrTalentAlreadyLearned):
 		return "该天赋已学习。"
 	case errors.Is(err, vote.ErrInvalidTalentTree):

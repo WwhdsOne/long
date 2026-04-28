@@ -38,7 +38,7 @@ var ErrBossPartsRequired = errors.New("boss parts required")
 var ErrBossPartNotFound = errors.New("boss part not found")
 var ErrBossPartAlreadyDead = errors.New("boss part already dead")
 var ErrTalentAlreadyLearned = errors.New("talent already learned")
-var ErrTalentPrerequisite = errors.New("talent prerequisite not met")
+var ErrTalentTierLocked = errors.New("talent tier locked")
 var ErrTalentNotFound = errors.New("talent not found")
 var ErrInvalidTalentTree = errors.New("invalid talent tree")
 var ErrTalentPointsInsufficient = errors.New("talent points insufficient")
@@ -1469,7 +1469,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		}
 	}
 
-	if critical && compiledTalents.Has("crit_omen_resonate") && combatState.OmenStacks > 0 {
+	if critical && compiledTalents.Has("crit_core") && combatState.OmenStacks > 0 {
 		partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*compiledTalents.Crit.OmenResonatePerOmen))
 	}
 
@@ -1495,19 +1495,32 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		}
 	}
 
-	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, partDamage)
-	partWasAlive := beforeHP > 0
-
-	// 死兆层数获取：弱点暴击 +2，普通暴击 +1，击碎部位 +5
-	if critical && compiledTalents.Has("crit_core") {
-		if effectivePartType == PartTypeWeak && partWasAlive {
-			combatState.OmenStacks += 2
-		} else {
-			combatState.OmenStacks++
+	partWasAlive := part.CurrentHP > 0
+	omenGain := 0
+	if compiledTalents.Has("crit_core") {
+		if critical {
+			omenGain = 1
+			if effectivePartType == PartTypeWeak && partWasAlive {
+				omenGain = 2
+			}
+		}
+		if partDamage >= part.CurrentHP {
+			omenGain += 5
 		}
 	}
-	if partJustDied && compiledTalents.Has("crit_core") {
-		combatState.OmenStacks += 5
+	_, omenOverflow := applyOmenStackDelta(combatState.OmenStacks, omenGain)
+	omenOverflowBonus := int64(0)
+	if omenOverflow > 0 {
+		omenOverflowBonus = maxInt64(1, int64(math.Round(float64(maxInt64(1, partDamage))*TalentOmenOverflowDamageRatio*float64(omenOverflow))))
+	}
+
+	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, partDamage+omenOverflowBonus)
+	mainActualDamage := min(partDamage, beforeHP)
+	omenOverflowActualDamage := maxInt64(0, actualDamage-mainActualDamage)
+
+	// 死兆层数获取：弱点暴击 +2，普通暴击 +1，击碎部位 +5
+	if compiledTalents.Has("crit_core") && omenGain > 0 {
+		combatState.OmenStacks, _ = applyOmenStackDelta(combatState.OmenStacks, omenGain)
 	}
 
 	if critical && part.Type != PartTypeWeak && effectivePartType != PartTypeWeak && compiledTalents.Has("crit_skinner") {
@@ -1517,6 +1530,17 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	totalDamage := actualDamage
+	if omenOverflowActualDamage > 0 {
+		result.TalentEvents = append(result.TalentEvents, TalentTriggerEvent{
+			TalentID:    "crit_core",
+			Name:        "溢杀",
+			EffectType:  "omen_overflow",
+			ExtraDamage: omenOverflowActualDamage,
+			Message:     fmt.Sprintf("死兆溢出 %d 层，转化额外伤害 +%d", omenOverflow, omenOverflowActualDamage),
+			PartX:       part.X,
+			PartY:       part.Y,
+		})
+	}
 	result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
 		X:        part.X,
 		Y:        part.Y,
@@ -1578,6 +1602,10 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 	if compiledTalents.Has("armor_core") {
 		combatState.ArmorTriggerCount = compiledTalents.Armor.CollapseTrigger
+	}
+	if compiledTalents.Has("armor_auto_strike") {
+		combatState.AutoStrikeTriggerCount = compiledTalents.Armor.AutoStrikeTrigger
+		combatState.AutoStrikeWindowSec = TalentAutoStrikeWindowSec
 	}
 
 	result.TalentCombatState = combatState
@@ -1685,12 +1713,6 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 	}
 
 	if combatState.CollapseEndsAt > 0 && now >= combatState.CollapseEndsAt {
-		for _, idx := range combatState.CollapseParts {
-			if idx >= 0 && idx < len(boss.Parts) {
-				pk := TalentPartKey(boss.Parts[idx].X, boss.Parts[idx].Y)
-				combatState.PartHeavyClickCount[pk] = 0
-			}
-		}
 		combatState.CollapseParts = nil
 		combatState.CollapseEndsAt = 0
 	}
