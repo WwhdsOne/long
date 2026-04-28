@@ -3467,6 +3467,57 @@ select {
   box-shadow: 0 0 6px rgba(192, 192, 192, 0.3);
 }
 
+.talent-status-chip {
+  display: grid;
+  gap: 4px;
+  min-width: 136px;
+  padding: 0.3rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid #2f454f;
+  background: #102029;
+}
+
+.talent-status-chip--silver {
+  border-color: #c0c0c0;
+  box-shadow: 0 0 6px rgba(192, 192, 192, 0.3);
+}
+
+.talent-status-chip__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.talent-status-chip__label {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.talent-status-chip__count {
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.talent-status-chip__bar {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.talent-status-chip__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.25s linear;
+}
+
+.talent-status-chip__bar-fill--silver {
+  background: linear-gradient(90deg, #f8fafc, #cbd5e1);
+}
+
 @media (max-width: 768px) {
   .boss-part-grid {
     gap: 4px;
@@ -3551,23 +3602,6 @@ select {
 }
 
 /* 崩塌裂纹覆盖层 */
-.boss-part-cell__crack {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  pointer-events: none;
-  z-index: 3;
-  opacity: 0.85;
-  animation: talent-crack-pulse 0.9s ease-in-out infinite alternate;
-}
-
-@keyframes talent-crack-pulse {
-  0% { opacity: 0.7; filter: brightness(0.9); }
-  100% { opacity: 1; filter: brightness(1.2); }
-}
-
 /* 末日审判准星标记 */
 .boss-part-cell__crosshair {
   position: absolute;
@@ -4195,4 +4229,131 @@ select {
 .part-progress-panel__bar-fill--armor {
   background: linear-gradient(90deg, #f59e0b, #fbbf24);
   box-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
+}
+
+.part-progress-panel__bar-fill--auto-strike {
+  background: linear-gradient(90deg, #94a3b8, #e2e8f0);
+  box-shadow: 0 0 6px rgba(226, 232, 240, 0.45);
+}
+
+.part-progress-panel__bar-fill--timer {
+  background: linear-gradient(90deg, #f8fafc, #cbd5e1);
+  box-shadow: none;
+}
+
+.part-progress-panel__bar--timer {
+  max-width: 54px;
+}
+
+.part-progress-panel__countdown {
+  min-width: 2.4em;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.talent-buff-demo-page {
+  min-height: 100vh;
+}
+
+.talent-buff-demo {
+  width: min(1240px, calc(100% - 48px));
+  margin: 0 auto 48px;
+  display: grid;
+  gap: 24px;
+}
+
+.talent-buff-demo__header {
+  padding: 28px 32px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(108, 255, 203, 0.16), transparent 38%),
+    linear-gradient(145deg, rgba(17, 20, 33, 0.92), rgba(10, 12, 22, 0.96));
+  box-shadow: 0 26px 60px rgba(3, 6, 16, 0.42);
+}
+
+.talent-buff-demo__header h1 {
+  margin: 8px 0 12px;
+}
+
+.talent-buff-demo__copy {
+  margin: 0;
+  max-width: 760px;
+  color: rgba(235, 242, 255, 0.74);
+  line-height: 1.7;
+}
+
+.talent-buff-demo__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.nickname-form__submit--ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(245, 248, 255, 0.88);
+}
+
+.talent-buff-demo__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.talent-buff-demo__preview,
+.talent-buff-demo__controls {
+  min-width: 0;
+}
+
+.talent-buff-demo__panel {
+  display: grid;
+  gap: 16px;
+  min-height: 620px;
+  padding: 28px;
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(180deg, rgba(22, 26, 42, 0.96), rgba(11, 14, 26, 0.96)),
+    radial-gradient(circle at top, rgba(108, 255, 203, 0.08), transparent 45%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 60px rgba(0, 0, 0, 0.34);
+  align-content: start;
+}
+
+.talent-buff-demo__controls {
+  display: grid;
+  gap: 16px;
+}
+
+.talent-buff-demo__card {
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(17, 19, 30, 0.96), rgba(8, 10, 18, 0.98));
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.24);
+}
+
+.talent-buff-demo__card strong {
+  font-size: 1rem;
+}
+
+.talent-buff-demo__card--note span {
+  color: rgba(235, 242, 255, 0.78);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 960px) {
+  .talent-buff-demo {
+    width: min(100% - 24px, 1240px);
+  }
+
+  .talent-buff-demo__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .talent-buff-demo__panel {
+    min-height: auto;
+  }
 }

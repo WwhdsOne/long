@@ -2,6 +2,7 @@
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import {effectAssetUrl} from '../utils/effectAssets'
+import PixelShatter from '../components/PixelShatter.vue'
 
 const {
   boss,
@@ -26,6 +27,7 @@ const {
   armorProgress,
   stormTrigger,
   armorTrigger,
+  autoStrikeTrigger,
   comboTriggerFlash,
   comboTimeoutPercent,
   damageStageFx,
@@ -269,18 +271,17 @@ const omenRingProgress = computed(() => {
   return Math.min(1, stacks / 100)
 })
 
-const deathEcstasyRemaining = computed(() => {
-  void nowTick.value
-  const endsAt = talentVisualState.value.deathEcstasyEndsAt
-  if (!endsAt) return 0
-  return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
-})
-
 const silverStormCountdown = computed(() => {
   void nowTick.value
   const endsAt = talentVisualState.value.silverStormEndsAt
   if (!endsAt) return talentVisualState.value.silverStormRemaining || 0
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
+})
+const silverStormRemainingSec = computed(() => {
+  void nowTick.value
+  const endsAt = talentVisualState.value.silverStormEndsAt
+  if (!endsAt) return Number(talentVisualState.value.silverStormRemaining) || 0
+  return Math.max(0, endsAt - Date.now() / 1000)
 })
 
 const silverStormActive = computed(() => {
@@ -288,6 +289,19 @@ const silverStormActive = computed(() => {
   if (!talentVisualState.value.silverStormActive) return false
   if (!talentVisualState.value.silverStormEndsAt) return talentVisualState.value.silverStormRemaining > 0
   return talentVisualState.value.silverStormEndsAt > Date.now() / 1000
+})
+const silverStormTotalSec = ref(0)
+watch([silverStormActive, silverStormCountdown], ([active, countdown]) => {
+  if (!active) {
+    silverStormTotalSec.value = 0
+    return
+  }
+  silverStormTotalSec.value = Math.max(silverStormTotalSec.value, countdown)
+}, { immediate: true })
+const silverStormPercent = computed(() => {
+  const total = silverStormTotalSec.value
+  if (!silverStormActive.value || total <= 0) return 0
+  return Math.min(100, Math.max(0, (silverStormRemainingSec.value / total) * 100))
 })
 
 const collapsePartNames = computed(() => {
@@ -464,14 +478,6 @@ const collapseRemaining = computed(() => {
               </template>
             </div>
 
-            <!-- 5. 死亡狂喜倒计时 -->
-            <div v-if="talentVisualState.deathEcstasyActive" class="death-ecstasy-timer">
-              <span class="death-ecstasy-timer__icon">💀</span>
-              <span class="death-ecstasy-timer__label">死亡狂喜</span>
-              <span class="death-ecstasy-timer__count">{{ deathEcstasyRemaining }}s</span>
-            </div>
-
-
             <!-- 3. 部位累计进度列表：仅当有进度时显示 -->
             <div v-if="partProgressList.length > 0" class="part-progress-panel">
               <div class="part-progress-panel__title">部位累计进度</div>
@@ -490,6 +496,16 @@ const collapseRemaining = computed(() => {
                   <span class="part-progress-panel__bar"><span
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor"
                       :style="{ width: p.armorProgress + '%' }"></span></span>
+                </span>
+                <span v-if="p.type === 'heavy' && p.autoStrike > 0" class="part-progress-panel__track part-progress-panel__track--auto-strike">
+                  碎甲重击 {{ p.autoStrike }}/{{ autoStrikeTrigger }}
+                  <span class="part-progress-panel__bar"><span
+                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--auto-strike"
+                      :style="{ width: p.autoStrikeProgress + '%' }"></span></span>
+                  <span class="part-progress-panel__countdown">{{ Math.ceil(p.autoStrikeCountdown) }}s</span>
+                  <span class="part-progress-panel__bar part-progress-panel__bar--timer"><span
+                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--timer"
+                      :style="{ width: p.autoStrikeTimeoutPercent + '%' }"></span></span>
                 </span>
               </div>
             </div>
@@ -576,11 +592,8 @@ const collapseRemaining = computed(() => {
                         ></span>
                       </template>
                     </div>
-                    <img
+                    <PixelShatter
                         v-if="isPartCollapsed(zone)"
-                        class="boss-part-cell__crack"
-                        :src="effectSrc('crack-pattern-1.png')"
-                        alt="结构崩塌"
                     />
                     <img
                         v-if="isPartDoomMarked(zone)"
@@ -630,7 +643,7 @@ const collapseRemaining = computed(() => {
                  offsetY: -80,
                  fallback: { top: '10%', left: '50%', marginLeft: '-120px' },
                })"
-               alt="自动打击"/>
+               alt="碎甲重击"/>
           <img v-if="hasRecentTrigger('bleed')"
                :key="triggerKey('bleed')"
                class="talent-effect-overlay__bleed"
@@ -702,12 +715,20 @@ const collapseRemaining = computed(() => {
                }))"></div>
         </div>
         <div
-            v-if="silverStormActive || talentVisualState.omenStacks > 0 || talentVisualState.doomCritBuff"
+            v-if="silverStormActive || talentVisualState.omenStacks > 0"
             class="talent-status-bar">
-          <span v-if="silverStormActive"
-                class="talent-status-bar__item talent-status-bar__item--silver">
-            白银风暴 {{ silverStormCountdown }}s
-          </span>
+          <div v-if="silverStormActive" class="talent-status-chip talent-status-chip--silver">
+            <span class="talent-status-chip__head">
+              <span class="talent-status-chip__label">白银风暴</span>
+              <span class="talent-status-chip__count">{{ silverStormCountdown }}s</span>
+            </span>
+            <span class="talent-status-chip__bar">
+              <span
+                  class="talent-status-chip__bar-fill talent-status-chip__bar-fill--silver"
+                  :style="{ width: silverStormPercent + '%' }"
+              ></span>
+            </span>
+          </div>
           <span v-if="showOmenRing" class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
             <svg class="talent-omen-ring__svg" viewBox="0 0 40 40">
               <circle class="talent-omen-ring__track" cx="20" cy="20" r="16"/>
@@ -715,9 +736,6 @@ const collapseRemaining = computed(() => {
                       :style="{ strokeDasharray: `${omenRingProgress * 100.5} ${100.5 - omenRingProgress * 100.5}` }"/>
             </svg>
             死兆 {{ talentVisualState.omenStacks }}
-          </span>
-          <span v-if="talentVisualState.doomCritBuff" class="talent-status-bar__item talent-status-bar__item--active">
-            暴伤 x3
           </span>
         </div>
         <div class="vote-stage__boss-hud-stats">

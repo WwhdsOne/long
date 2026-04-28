@@ -165,6 +165,8 @@ const DEFAULT_STORM_TRIGGER = 100
 const DEFAULT_ARMOR_TRIGGER = 100
 const stormTrigger = computed(() => talentCombatState.value?.normalTriggerCount || DEFAULT_STORM_TRIGGER)
 const armorTrigger = computed(() => talentCombatState.value?.armorTriggerCount || DEFAULT_ARMOR_TRIGGER)
+const autoStrikeTrigger = computed(() => Math.max(0, Number(talentCombatState.value?.autoStrikeTriggerCount) || 0))
+const autoStrikeWindowSec = computed(() => Math.max(0, Number(talentCombatState.value?.autoStrikeWindowSec) || 0))
 const comboCount = ref(0)
 const stormCombo = ref(0)
 const armorCombo = ref(0)
@@ -229,6 +231,17 @@ function scheduleComboClear() {
 
 const stormProgress = computed(() => Math.min(100, Math.round((stormCombo.value / stormTrigger.value) * 100)))
 const armorProgress = computed(() => Math.min(100, Math.round((armorCombo.value / armorTrigger.value) * 100)))
+const autoStrikeCountdown = computed(() => {
+  void nowTick.value
+  const expiresAt = Number(talentCombatState.value?.autoStrikeExpiresAt) || 0
+  if (!expiresAt) return 0
+  return Math.max(0, expiresAt - Date.now() / 1000)
+})
+const autoStrikeTimeoutPercent = computed(() => {
+  const windowSec = autoStrikeWindowSec.value
+  if (windowSec <= 0) return 0
+  return Math.min(100, Math.max(0, Math.round((autoStrikeCountdown.value / windowSec) * 100)))
+})
 
 const partProgressList = computed(() => {
   const parts = boss.value?.parts
@@ -236,12 +249,15 @@ const partProgressList = computed(() => {
   if (!Array.isArray(parts) || parts.length === 0) return []
   const stormMap = cs?.partStormComboCount || {}
   const heavyMap = cs?.partHeavyClickCount || {}
+  const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
+  const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
   const result = []
   for (const part of parts) {
     const key = `${part.x}-${part.y}`
     const storm = Number(stormMap[key]) || 0
     const armor = Number(heavyMap[key]) || 0
-    if (storm <= 0 && armor <= 0) continue
+    const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
+    if (storm <= 0 && armor <= 0 && autoStrike <= 0) continue
     if (!part.alive) continue
     result.push({
       key,
@@ -253,6 +269,12 @@ const partProgressList = computed(() => {
       stormProgress: Math.min(100, Math.round((storm / stormTrigger.value) * 100)),
       armor,
       armorProgress: Math.min(100, Math.round((armor / armorTrigger.value) * 100)),
+      autoStrike,
+      autoStrikeProgress: autoStrikeTrigger.value > 0
+        ? Math.min(100, Math.round((autoStrike / autoStrikeTrigger.value) * 100))
+        : 0,
+      autoStrikeCountdown: autoStrike > 0 ? autoStrikeCountdown.value : 0,
+      autoStrikeTimeoutPercent: autoStrike > 0 ? autoStrikeTimeoutPercent.value : 0,
       alive: part.alive,
     })
   }
@@ -2118,6 +2140,7 @@ export function usePublicPageState() {
         armorProgress,
         stormTrigger,
         armorTrigger,
+        autoStrikeTrigger,
         partProgressList,
         talentCombatState,
         comboTriggerFlash,

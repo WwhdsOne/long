@@ -14,8 +14,15 @@ describe('白银风暴秒级状态', () => {
     expect(stateSource).not.toContain('vs.silverStormRemaining = 15')
   })
 
-  it('战斗页显示白银风暴倒计时而不是攻击轮次计数', () => {
+  it('战斗页把白银风暴显示为进度条加倒计时', () => {
     expect(battleSource).toContain('silverStormCountdown')
-    expect(battleSource).not.toContain('白银风暴 {{ talentVisualState.silverStormRemaining }}')
+    expect(battleSource).toContain('silverStormPercent')
+    expect(battleSource).toContain('silverStormRemainingSec')
+    expect(battleSource).toContain('talent-status-chip__bar-fill')
+  })
+
+  it('战斗页不再保留旧的暴伤x3和死亡狂喜持续 Buff 占位', () => {
+    expect(battleSource).not.toContain('talentVisualState.doomCritBuff')
+    expect(battleSource).not.toContain('death-ecstasy-timer')
   })
 })
