@@ -1683,168 +1683,20 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		compiledTalents = compileTalentSet(nil)
 	}
 
-	var totalExtra int64
-	var events []TalentTriggerEvent
-	var damageTypeOverride string
-
-	if compiledTalents.Has("normal_core") {
-		def, ok := talentDefs["normal_core"]
-		if ok {
-			triggerCount := compiledTalents.Normal.TriggerCount
-			extraHits := compiledTalents.Normal.ExtraHits
-			chaseRatio := compiledTalents.Normal.ChaseRatio
-
-			partKey := TalentPartKey(part.X, part.Y)
-			combatState.PartStormComboCount[partKey]++
-			if combatState.PartStormComboCount[partKey] >= triggerCount {
-				burst := int64(math.Floor(float64(maxInt64(1, baseDamage)) * chaseRatio * float64(maxInt64(1, extraHits))))
-				if burst > 0 {
-					_, burst, _ = applyBossPartDamageDelta(boss, part, burst)
-					totalExtra += burst
-					events = append(events, TalentTriggerEvent{
-						TalentID: "normal_core", Name: def.Name, EffectType: def.EffectType,
-						ExtraDamage: burst, Message: fmt.Sprintf("追击爆发 %d 段伤害", extraHits),
-						PartX: part.X, PartY: part.Y,
-					})
-					if compiledTalents.Has("normal_charge") {
-						combatState.PartStormComboCount[partKey] = int64(float64(triggerCount) * compiledTalents.Normal.RetainPercent)
-					} else {
-						combatState.PartStormComboCount[partKey] = 0
-					}
-				}
-			}
-		}
+	triggerCtx := &talentTriggerContext{
+		boss:            boss,
+		part:            part,
+		nickname:        nickname,
+		clickCount:      clickCount,
+		baseDamage:      baseDamage,
+		isCritical:      isCritical,
+		partIndex:       partIndex,
+		compiledTalents: compiledTalents,
+		combatState:     combatState,
+		now:             now,
 	}
-
-	if compiledTalents.Has("armor_core") && part.Type == PartTypeHeavy {
-		partKey := TalentPartKey(part.X, part.Y)
-		combatState.PartHeavyClickCount[partKey]++
-
-		collapseTrigger := compiledTalents.Armor.CollapseTrigger
-
-		if combatState.PartHeavyClickCount[partKey] >= collapseTrigger {
-			cd := compiledTalents.Armor.CollapseDuration
-			combatState.CollapseParts = append(combatState.CollapseParts, partIndex)
-			combatState.CollapseEndsAt = now + cd
-			combatState.CollapseDuration = cd
-			events = append(events, TalentTriggerEvent{
-				TalentID: "armor_core", Name: "灭绝穿甲", EffectType: "collapse_trigger",
-				Message: fmt.Sprintf("结构崩塌！护甲归零 %d 秒", cd),
-				PartX:   part.X,
-				PartY:   part.Y,
-			})
-			combatState.PartHeavyClickCount[partKey] = 0 // 触发后归零，允许多次崩塌
-		}
-	}
-
-	if compiledTalents.Has("armor_auto_strike") {
-		asInterval := compiledTalents.Armor.AutoStrikeInterval
-		asRatio := compiledTalents.Armor.AutoStrikeRatio
-		if now-combatState.LastAutoStrikeAt >= asInterval {
-			var best *BossPart
-			for i := range boss.Parts {
-				p := &boss.Parts[i]
-				if !p.Alive || p.Type != PartTypeHeavy {
-					continue
-				}
-				if best == nil || p.CurrentHP > best.CurrentHP {
-					best = p
-				}
-			}
-			if best != nil {
-				sd := int64(float64(baseDamage) * asRatio)
-				_, sd, _ = applyBossPartDamageDelta(boss, best, sd)
-				combatState.LastAutoStrikeAt = now
-				totalExtra += sd
-				events = append(events, TalentTriggerEvent{
-					TalentID: "armor_auto_strike", Name: "自动打击触发", EffectType: "auto_strike",
-					ExtraDamage: sd, Message: "自动打击触发",
-				})
-				damageTypeOverride = "trueDamage"
-			}
-		}
-	}
-
-	if compiledTalents.Has("armor_ultimate") && part.Type == PartTypeHeavy {
-		pk := TalentPartKey(part.X, part.Y)
-		jdTrigger := compiledTalents.Armor.UltimateTrigger
-		hpCut := compiledTalents.Armor.UltimateHpCut
-		if !combatState.JudgmentDayUsed[pk] && combatState.PartHeavyClickCount[pk] >= jdTrigger {
-			combatState.JudgmentDayUsed[pk] = true
-			cd := min(int64(float64(boss.MaxHP)*hpCut), part.CurrentHP)
-			_, cd, _ = applyBossPartDamageDelta(boss, part, cd)
-			totalExtra += cd
-			events = append(events, TalentTriggerEvent{
-				TalentID: "armor_ultimate", Name: "审判日触发！削除 50% 最大生命", EffectType: "judgment_day",
-				ExtraDamage: cd, Message: "审判日触发！削除 50% 最大生命",
-			})
-			damageTypeOverride = "judgement"
-		}
-	}
-
-	if compiledTalents.Has("crit_bleed") && isCritical {
-		if bd := int64(float64(baseDamage) * compiledTalents.Crit.BleedRatio); bd > 0 {
-			totalExtra += bd
-			events = append(events, TalentTriggerEvent{
-				TalentID: "crit_bleed", Name: "致命出血", EffectType: "bleed",
-				ExtraDamage: bd, Message: "致命出血",
-				PartX: part.X, PartY: part.Y,
-			})
-		}
-	}
-
-	if compiledTalents.Has("crit_final_cut") && isCritical {
-		combatState.CritCount++
-		triggerCount := compiledTalents.Crit.FinalCutTrigger
-		hpCut := compiledTalents.Crit.FinalCutHpCut
-		if combatState.CritCount >= triggerCount && now-combatState.LastFinalCutAt >= 30 {
-			combatState.LastFinalCutAt = now
-			cd := min(int64(float64(boss.MaxHP)*hpCut), part.CurrentHP)
-			_, cd, _ = applyBossPartDamageDelta(boss, part, cd)
-			totalExtra += cd
-			events = append(events, TalentTriggerEvent{
-				TalentID: "crit_final_cut", Name: "终末血斩！", EffectType: "final_cut",
-				ExtraDamage: cd, Message: "终末血斩！",
-				PartX: part.X, PartY: part.Y,
-			})
-			damageTypeOverride = "doomsday"
-		}
-	}
-
-	if compiledTalents.Has("crit_death_ecstasy") && combatState.OmenStacks >= 100 {
-		if compiledTalents.Crit.DeathEcstasyMult > 0 {
-			// 消耗 100 层（多余保留）
-			consumed := min(combatState.OmenStacks, 100)
-			combatState.OmenStacks -= consumed
-
-			// 层数系数锁死 100 上限
-			effStacks := min(consumed, 100)
-			ed := min(int64(float64(baseDamage)*float64(effStacks)*compiledTalents.Crit.DeathEcstasyMult), part.CurrentHP)
-			_, ed, _ = applyBossPartDamageDelta(boss, part, ed)
-			totalExtra += ed
-			events = append(events, TalentTriggerEvent{
-				TalentID: "crit_death_ecstasy", Name: "死亡狂喜", EffectType: "death_ecstasy_ult",
-				ExtraDamage: ed, Message: "死亡狂喜！",
-				PartX: part.X, PartY: part.Y,
-			})
-			damageTypeOverride = "doomsday"
-		}
-	}
-
-	if compiledTalents.Has("crit_doom_judgment") && !part.Alive && len(combatState.DoomMarks) > 0 {
-		for _, idx := range combatState.DoomMarks {
-			if idx == partIndex {
-				omenReward := compiledTalents.Crit.DoomOmenPerMark
-				combatState.OmenStacks += omenReward
-				events = append(events, TalentTriggerEvent{
-					TalentID: "crit_doom_judgment", Name: "末日审判", EffectType: "doom_mark",
-					Message: fmt.Sprintf("标记触发！+%d 死兆", omenReward),
-					PartX:   part.X, PartY: part.Y,
-				})
-				damageTypeOverride = "doomsday"
-				break
-			}
-		}
+	for _, trigger := range compiledTalents.triggers {
+		trigger(triggerCtx)
 	}
 
 	if combatState.CollapseEndsAt > 0 && now >= combatState.CollapseEndsAt {
@@ -1858,7 +1710,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		combatState.CollapseEndsAt = 0
 	}
 
-	return totalExtra, events, damageTypeOverride
+	return triggerCtx.totalExtra, triggerCtx.events, triggerCtx.damageTypeOverride
 }
 
 func (s *Store) selectTargetPart(parts []BossPart, nickname string) int {

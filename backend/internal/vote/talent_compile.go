@@ -39,10 +39,12 @@ type CompiledTalentSet struct {
 	learned  map[string]struct{}
 	tierFull map[TalentTree]map[int]bool
 
-	Modifiers *TalentModifiers
-	Normal    compiledNormalTalents
-	Armor     compiledArmorTalents
-	Crit      compiledCritTalents
+	Modifiers    *TalentModifiers
+	Normal       compiledNormalTalents
+	Armor        compiledArmorTalents
+	Crit         compiledCritTalents
+	triggers     []compiledTalentTrigger
+	triggerNames []string
 }
 
 func (c *CompiledTalentSet) Has(talentID string) bool {
@@ -101,6 +103,7 @@ func compileTalentSet(state *TalentState) *CompiledTalentSet {
 	compiled.Normal = compileNormalTalents(compiled)
 	compiled.Armor = compileArmorTalents(compiled)
 	compiled.Crit = compileCritTalents(compiled)
+	compiled.triggers, compiled.triggerNames = compiled.buildTriggerHandlers()
 
 	return compiled
 }

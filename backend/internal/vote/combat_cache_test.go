@@ -234,3 +234,27 @@ func TestApplyBossPartDamageDeltaCapsOverflowDamage(t *testing.T) {
 		t.Fatalf("expected boss/part hp to reach zero, got boss=%d part=%d alive=%v", boss.CurrentHP, part.CurrentHP, part.Alive)
 	}
 }
+
+func TestCompileTalentSetCollectsEnabledTriggerHandlersInStableOrder(t *testing.T) {
+	compiled := compileTalentSet(&TalentState{
+		Talents: map[string]int{
+			"normal_core":        1,
+			"armor_auto_strike":  1,
+			"crit_bleed":         1,
+			"crit_doom_judgment": 1,
+		},
+	})
+
+	if len(compiled.triggers) != 4 {
+		t.Fatalf("expected 4 compiled triggers, got %d", len(compiled.triggers))
+	}
+	if compiled.triggerNames[0] != "normal_core" {
+		t.Fatalf("expected first trigger normal_core, got %+v", compiled.triggerNames)
+	}
+	if compiled.triggerNames[1] != "armor_auto_strike" {
+		t.Fatalf("expected second trigger armor_auto_strike, got %+v", compiled.triggerNames)
+	}
+	if compiled.triggerNames[2] != "crit_bleed" || compiled.triggerNames[3] != "crit_doom_judgment" {
+		t.Fatalf("expected crit triggers to keep declaration order, got %+v", compiled.triggerNames)
+	}
+}
