@@ -91,6 +91,10 @@ body {
   overflow-x: hidden;
 }
 
+.boss-part-grid-with-combo {
+  cursor: none;
+}
+
 button,
 input,
 textarea,
@@ -847,6 +851,54 @@ select {
   padding: 22px;
   border-radius: 32px;
 }
+
+.boss-right-panel {
+  position: absolute;
+  right: 6px;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 1;
+  pointer-events: none;
+  width: 144px;
+}
+
+.boss-right-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 5px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(71, 85, 105, 0.35);
+  backdrop-filter: blur(4px);
+}
+.boss-right-legend__title {
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.45);
+  padding-bottom: 3px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 2px;
+}
+.boss-right-legend__item {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  border: 1px solid;
+}
+.boss-right-legend__item--normal    { color: #e2e8f0; border-color: rgba(226,232,240,0.3); }
+.boss-right-legend__item--critical  { color: #fbbf24; border-color: rgba(251,191,36,0.35); }
+.boss-right-legend__item--weak      { color: #facc15; border-color: rgba(239,68,68,0.35); text-shadow: 0 0 4px rgba(239,68,68,0.3); }
+.boss-right-legend__item--pursuit   { color: #60a5fa; border-color: rgba(96,165,250,0.3); }
+.boss-right-legend__item--true      { color: #9ca3af; border-color: rgba(156,163,175,0.3); }
+.boss-right-legend__item--doomsday  { color: #c084fc; border-color: rgba(192,132,252,0.3); }
+.boss-right-legend__item--judgement { color: #fde047; border-color: rgba(251,191,36,0.35); text-shadow: 0 0 6px rgba(251,191,36,0.4); }
 
 .leaderboard-card--stacked {
   display: grid;
@@ -2751,8 +2803,8 @@ select {
   gap: 6px;
   padding: 10px 8px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(71, 85, 105, 0.4);
   backdrop-filter: blur(4px);
   min-width: 0;
   flex-shrink: 0;
@@ -2763,9 +2815,9 @@ select {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.55);
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .boss-part-info__item {
@@ -2785,7 +2837,7 @@ select {
 }
 
 .boss-part-info__label {
-  color: var(--ink);
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .boss-part-info__value {
@@ -2865,7 +2917,6 @@ select {
 .boss-zone-button {
   position: relative;
   border-style: solid;
-  cursor: none;
   overflow: visible;
   text-align: center;
 }
@@ -2873,10 +2924,6 @@ select {
 .boss-zone-button:not(:disabled):active {
   transform: translateY(2px) scale(0.99);
   box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.34);
-}
-
-.boss-zone-button:disabled {
-  cursor: none;
 }
 
 .boss-zone-button--pending {
@@ -2907,6 +2954,17 @@ select {
   border-color: rgba(239, 68, 68, 0.6);
   box-shadow: 0 0 14px rgba(239, 68, 68, 0.2);
   animation: boss-weak-pulse 0.8s ease-in-out infinite;
+}
+
+.boss-part-cell--center {
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.35), 0 0 30px rgba(34, 197, 94, 0.12);
+  animation: boss-center-breathe 1.3s ease-in-out infinite alternate;
+  z-index: 2;
+}
+@keyframes boss-center-breathe {
+  0%   { box-shadow: 0 0 8px rgba(34, 197, 94, 0.25), 0 0 18px rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.4); }
+  100% { box-shadow: 0 0 18px rgba(34, 197, 94, 0.55), 0 0 38px rgba(34, 197, 94, 0.18); border-color: rgba(34, 197, 94, 0.9); }
 }
 
 .boss-part-cell--low {
@@ -3000,11 +3058,11 @@ select {
   transform: translateX(-50%) translate(var(--damage-offset-x), var(--damage-offset-y))
     scale(var(--damage-scale));
   transform-origin: center;
-  font-size: clamp(2.3rem, 4.4vw, 3.4rem);
+  font-size: clamp(1.15rem, 2.2vw, 1.7rem);
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.02em;
-  text-shadow: 0 4px 14px rgba(15, 23, 42, 0.65);
+  text-shadow: 0 2px 8px rgba(15, 23, 42, 0.65);
   white-space: nowrap;
   animation: boss-damage-float var(--damage-ttl) cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -3015,7 +3073,7 @@ select {
 
 .boss-zone-button__damage-burst--critical {
   color: #facc15;
-  text-shadow: 0 0 14px rgba(250, 204, 21, 0.5), 0 4px 14px rgba(15, 23, 42, 0.65);
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.5), 0 2px 8px rgba(15, 23, 42, 0.65);
   animation:
     boss-damage-float var(--damage-ttl) cubic-bezier(0.22, 1, 0.36, 1) forwards,
     boss-damage-shake 100ms ease-in-out 0s 1;
@@ -3023,11 +3081,19 @@ select {
 
 .boss-zone-button__damage-burst--weakCritical {
   color: #facc15;
-  -webkit-text-stroke: 0.8px #dc2626;
-  text-shadow: 0 0 16px rgba(250, 204, 21, 0.55), 0 0 30px rgba(239, 68, 68, 0.3), 0 4px 14px rgba(15, 23, 42, 0.65);
+  -webkit-text-stroke: 0.6px #dc2626;
+  text-shadow: 0 0 12px rgba(250, 204, 21, 0.55), 0 0 22px rgba(239, 68, 68, 0.3), 0 2px 8px rgba(15, 23, 42, 0.65);
   animation:
     boss-damage-float var(--damage-ttl) cubic-bezier(0.22, 1, 0.36, 1) forwards,
     boss-damage-shake 150ms ease-in-out 0s 1;
+}
+
+.boss-zone-button__damage-label {
+  display: block;
+  font-size: 0.5em;
+  letter-spacing: 0.14em;
+  opacity: 0.9;
+  text-transform: uppercase;
 }
 
 .boss-zone-button__damage-burst--pursuit {
@@ -3036,14 +3102,9 @@ select {
 }
 
 .boss-zone-button__damage-burst--trueDamage {
-  color: #c084fc;
-  text-shadow: 0 0 14px rgba(192, 132, 252, 0.55), 0 4px 14px rgba(15, 23, 42, 0.65);
-}
-
-.boss-zone-button__damage-burst--trueDamage::before {
-  content: '⚡';
-  font-size: 0.7em;
-  margin-right: 2px;
+  color: #9ca3af;
+  font-size: 0.85em;
+  text-shadow: 0 2px 6px rgba(15, 23, 42, 0.55);
 }
 
 .boss-zone-button__damage-burst--doomsday {
@@ -3074,42 +3135,42 @@ select {
 }
 
 .damage-stage--flash::after {
-  background: radial-gradient(circle at 50% 45%, rgba(125, 211, 252, 0.32), rgba(15, 23, 42, 0.06) 58%, transparent 72%);
-  animation: boss-stage-flash 180ms ease-out forwards;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.45), rgba(125, 211, 252, 0.25) 40%, transparent 70%);
+  animation: boss-stage-flash 220ms ease-out forwards;
 }
 
 .damage-stage--doom::after {
-  background: radial-gradient(circle at 50% 40%, rgba(192, 132, 252, 0.42), rgba(30, 41, 59, 0.16) 56%, transparent 74%);
-  animation: boss-stage-doom 240ms ease-out forwards;
+  background: radial-gradient(circle at 50% 40%, rgba(192, 132, 252, 0.6), rgba(124, 58, 237, 0.3) 45%, transparent 72%);
+  animation: boss-stage-doom 300ms ease-out forwards;
 }
 
 .damage-stage--blade::before {
   content: '';
   position: absolute;
-  left: -12%;
-  right: -12%;
-  top: 42%;
-  height: 8px;
-  background: linear-gradient(90deg, transparent 0%, rgba(244, 114, 182, 0.1) 28%, rgba(249, 115, 22, 0.65) 45%, rgba(244, 114, 182, 0.1) 72%, transparent 100%);
-  filter: blur(0.4px);
-  transform: rotate(-5deg) scaleX(0.4);
+  left: -18%;
+  right: -18%;
+  top: 38%;
+  height: 12px;
+  background: linear-gradient(90deg, transparent 0%, rgba(244, 114, 182, 0.15) 22%, rgba(249, 115, 22, 0.85) 45%, rgba(251, 191, 36, 0.6) 48%, rgba(244, 114, 182, 0.15) 72%, transparent 100%);
+  filter: blur(0.6px);
+  transform: rotate(-5deg) scaleX(0.3);
   transform-origin: center;
   pointer-events: none;
   z-index: 3;
-  animation: boss-stage-blade 260ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+  animation: boss-stage-blade 280ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
 }
 
 .damage-stage--vignette::after {
-  background: radial-gradient(circle at 50% 45%, rgba(2, 6, 23, 0) 38%, rgba(2, 6, 23, 0.52) 100%);
-  animation: boss-stage-vignette 360ms ease-out forwards;
+  background: radial-gradient(circle at 50% 45%, rgba(2, 6, 23, 0) 32%, rgba(2, 6, 23, 0.72) 100%);
+  animation: boss-stage-vignette 450ms ease-out forwards;
 }
 
 .damage-stage--shake {
-  animation: boss-stage-shake 180ms linear;
+  animation: boss-stage-shake 220ms linear;
 }
 
 .damage-stage--slowmo .boss-part-grid {
-  animation: boss-stage-slowmo 360ms ease-out;
+  animation: boss-stage-slowmo 450ms ease-out;
 }
 
 @keyframes boss-damage-float {
@@ -3175,60 +3236,72 @@ select {
 }
 
 @keyframes boss-stage-flash {
-  0% { opacity: 0.58; }
+  0% { opacity: 0.85; }
+  60% { opacity: 0.2; }
   100% { opacity: 0; }
 }
 
 @keyframes boss-stage-doom {
   0% {
-    opacity: 0.74;
-    transform: scale(0.96);
+    opacity: 0.9;
+    transform: scale(0.92);
+  }
+  40% {
+    opacity: 0.5;
+    transform: scale(1.04);
   }
   100% {
     opacity: 0;
-    transform: scale(1.08);
+    transform: scale(1.12);
   }
 }
 
 @keyframes boss-stage-blade {
   0% {
     opacity: 0;
-    transform: rotate(-10deg) scaleX(0.2);
+    transform: rotate(-12deg) scaleX(0.15);
   }
-  18% {
-    opacity: 0.95;
+  15% {
+    opacity: 1;
+  }
+  35% {
+    opacity: 0.7;
+    transform: rotate(0deg) scaleX(1.1);
   }
   100% {
     opacity: 0;
-    transform: rotate(2deg) scaleX(1.08);
+    transform: rotate(3deg) scaleX(1.3);
   }
 }
 
 @keyframes boss-stage-vignette {
-  0% { opacity: 0.7; }
+  0% { opacity: 0.85; }
+  40% { opacity: 0.6; }
   100% { opacity: 0; }
 }
 
 @keyframes boss-stage-shake {
   0% { transform: translate3d(0, 0, 0); }
-  20% { transform: translate3d(-2px, 0, 0); }
-  40% { transform: translate3d(2px, 0, 0); }
-  60% { transform: translate3d(-1px, 0, 0); }
-  80% { transform: translate3d(1px, 0, 0); }
+  15% { transform: translate3d(-5px, 2px, 0); }
+  30% { transform: translate3d(4px, -2px, 0); }
+  45% { transform: translate3d(-3px, -1px, 0); }
+  60% { transform: translate3d(3px, 1px, 0); }
+  75% { transform: translate3d(-1px, -1px, 0); }
+  90% { transform: translate3d(1px, 0, 0); }
   100% { transform: translate3d(0, 0, 0); }
 }
 
 @keyframes boss-stage-slowmo {
   0% {
-    filter: brightness(0.72) saturate(0.6);
-    transform: scale(0.97);
+    filter: brightness(0.55) saturate(0.4);
+    transform: scale(0.95);
   }
-  68% {
-    filter: brightness(1.06) saturate(1.1);
-    transform: scale(1.008);
+  50% {
+    filter: brightness(0.8) saturate(0.7);
+    transform: scale(0.98);
   }
   100% {
-    filter: brightness(1) saturate(1);
+    filter: brightness(1.1) saturate(1.2);
     transform: scale(1);
   }
 }
@@ -3240,8 +3313,12 @@ select {
 
 /* ===== 像素剑光标 ===== */
 
-.boss-part-grid-with-combo {
-  cursor: none;
+.sword-spark {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9998;
+  image-rendering: pixelated;
+  border-radius: 1px;
 }
 
 #boss-sword-cursor {
@@ -3252,28 +3329,19 @@ select {
   height: 96px;
   background: url('https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png') center/contain no-repeat;
   image-rendering: pixelated;
-  transform: translate(calc(-45% - 50px), -30%) rotate(0deg);
   transition: transform 0.08s ease-out;
   will-change: transform, left, top;
 }
 #boss-sword-cursor.swinging {
-  transform: translate(calc(-45% - 50px), -30%) rotate(60deg);
+  transform: rotate(60deg);
   transition: transform 0.06s ease-out;
 }
 #boss-sword-cursor.recovering {
-  transform: translate(calc(-45% - 50px), -30%) rotate(0deg);
+  transform: rotate(0deg);
   transition: transform 0.12s ease-out;
 }
 
-/* ===== 挥剑粒子 ===== */
-.sword-particle {
-  position: fixed;
-  pointer-events: none;
-  z-index: 9998;
-  image-rendering: pixelated;
-}
-
-/* ===== Boss 命中与屏幕特效 ===== */
+/* ===== Boss 命中闪光 ===== */
 
 .boss-part-cell.hit-flash {
   animation: boss-hit-flash 0.25s ease-out;
@@ -3281,43 +3349,6 @@ select {
 @keyframes boss-hit-flash {
   0%   { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 24px rgba(255, 255, 255, 0.25); }
   100% { background: rgba(30, 41, 59, 0.7); }
-}
-
-.boss-part-grid-container.shake      { animation: boss-shake 0.12s ease-out; }
-.boss-part-grid-container.shake-hard { animation: boss-shake-hard 0.18s ease-out; }
-@keyframes boss-shake {
-  0%,100% { transform: translate(0); }
-  20% { transform: translate(-3px, 1px); }
-  40% { transform: translate(2px, -2px); }
-  60% { transform: translate(-1px, -1px); }
-  80% { transform: translate(2px, 1px); }
-}
-@keyframes boss-shake-hard {
-  0%,100% { transform: translate(0); }
-  15% { transform: translate(-6px, 2px); }
-  30% { transform: translate(4px, -3px); }
-  60% { transform: translate(5px, 1px); }
-  90% { transform: translate(3px, 2px); }
-}
-
-.screen-flash {
-  position: fixed; inset: 0; pointer-events: none; z-index: 100;
-  animation: boss-flash-burst 0.5s ease-out forwards;
-}
-@keyframes boss-flash-burst {
-  0% { background: rgba(251, 191, 36, 0.3); }
-  100% { background: transparent; }
-}
-
-.screen-vignette {
-  position: fixed; inset: 0; pointer-events: none; z-index: 99;
-  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%);
-  animation: boss-vignette-in 0.6s ease-out forwards;
-}
-@keyframes boss-vignette-in {
-  0% { opacity: 0; }
-  30% { opacity: 1; }
-  100% { opacity: 0; }
 }
 
 /* ===== 天赋特效 ===== */
@@ -4034,6 +4065,30 @@ select {
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
 }
+.combo-box__count--bounce {
+  animation: combo-bounce 0.2s ease;
+}
+@keyframes combo-bounce {
+  0%   { transform: scale(0.6); }
+  50%  { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+
+.combo-box__count--gold {
+  background: linear-gradient(135deg, #fde047, #fbbf24, #f59e0b, #fef08a, #fde047);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.3));
+  animation: combo-bounce 0.2s ease, combo-gold-shimmer 2s linear infinite;
+}
+@keyframes combo-gold-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
 
 .combo-box__bonus {
   font-size: 0.8rem;
@@ -4044,11 +4099,16 @@ select {
 }
 
 .combo-box__timeout-text {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: #86efac;
-  margin-left: auto;
-  flex: 0 0 auto;
+  text-align: right;
+}
+
+.combo-box--gold {
+  border-color: rgba(251, 191, 36, 0.6) !important;
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.2), inset 0 0 10px rgba(251, 191, 36, 0.06);
+  transition: border-color 0.5s, box-shadow 0.5s;
 }
 
 .combo-box__count--idle {

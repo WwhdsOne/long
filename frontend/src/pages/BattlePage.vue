@@ -52,22 +52,33 @@ const {
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
+
+const comboColor = computed(() => {
+  const t = Math.min(comboCount.value / 200, 1)
+  const hue = 120 - t * 120 // 绿 → 黄 → 红
+  return `hsl(${hue}, 90%, ${55 - t * 15}%)`
+})
+
+const comboIsGold = computed(() => comboCount.value >= 200)
+
+const comboBounce = ref(false)
+watch(() => comboCount.value, () => {
+  if (comboCount.value > 0) {
+    comboBounce.value = true
+    setTimeout(() => { comboBounce.value = false }, 200)
+  }
+})
 const talentEffectOverlayRef = ref(null)
 
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
 let tickTimer = 0
 
-// 像素剑光标
+// 像素剑光标（全站）
 let swordCursor = null
-let cursorVisible = false
-let swordSwung = false
 let recoverTimer = 0
 let lastAttackTime = 0
-
-function getGridArea() {
-  return document.querySelector('.boss-part-grid-with-combo')
-}
+let lastPointerDown = 0
 
 function updateCursorPos(e) {
   if (!swordCursor) return
@@ -75,79 +86,72 @@ function updateCursorPos(e) {
   swordCursor.style.top = e.clientY + 'px'
 }
 
-function showCursor() {
-  if (!swordCursor) return
-  swordCursor.style.display = 'block'
-  cursorVisible = true
+// 剑挥火花（按部位类型变色，参照 DAMAGE_VARIANTS）
+const sparkPresets = {
+  weak:     { colors: ['#facc15','#ef4444','#f87171','#fbbf24','#f59e0b','#dc2626'], count: 12, gravity: 0.04 },
+  heavy:    { colors: ['#9ca3af','#787888','#64748b','#94a3b8'], count: 5, gravity: 0.18 },
+  soft:     { colors: ['#f8fafc','#e2e8f0','#cbd5e1','#fafaff'], count: 6, gravity: 0.08 },
 }
 
-function hideCursor() {
-  if (!swordCursor) return
-  swordCursor.style.display = 'none'
-  cursorVisible = false
-  clearTimeout(recoverTimer)
-  swordCursor.classList.remove('swinging', 'recovering')
-  swordSwung = false
+function detectCellType(el) {
+  const cell = el?.closest?.('.boss-part-cell')
+  if (!cell) return 'soft'
+  if (cell.classList.contains('boss-part-cell--weak')) return 'weak'
+  if (cell.classList.contains('boss-part-cell--heavy')) return 'heavy'
+  return 'soft'
 }
 
-// 挥剑粒子系统
-const swordParticles = []
-const PARTICLE_COLORS = {
-  soft:  { colors: ['#e8e8f4','#fafaff','#d0d0dc'], count: 8,  size: [3,5], speed: [3,7], gravity: 0.08 },
-  heavy: { colors: ['#9ca3af','#787888','#64748b'], count: 5,  size: [2,4], speed: [2,5], gravity: 0.18 },
-  weak:  { colors: ['#fcd34d','#fbbf24','#f59e0b','#ef4444','#fef3c7'], count: 14, size: [4,7], speed: [5,10], gravity: 0.05 },
-}
+const sparks = []
+let sparksRunning = false
+let particleRaf = 0
 
-function spawnSwordParticles(cx, cy, cellType) {
-  const cfg = PARTICLE_COLORS[cellType] || PARTICLE_COLORS.soft
-  for (let i = 0; i < cfg.count; i++) {
+function spawnSparks(cx, cy, cellType) {
+  const preset = sparkPresets[cellType] || sparkPresets.soft
+  for (let i = 0; i < preset.count; i++) {
     const el = document.createElement('div')
-    el.className = 'sword-particle'
-    const angle = Math.PI * 0.15 + Math.random() * Math.PI * 0.4
-    const speed = cfg.speed[0] + Math.random() * (cfg.speed[1] - cfg.speed[0])
-    const sz = cfg.size[0] + Math.floor(Math.random() * (cfg.size[1] - cfg.size[0] + 1))
+    el.className = 'sword-spark'
+    const angle = Math.PI * 0.1 + Math.random() * Math.PI * 0.5
+    const speed = 4 + Math.random() * 10
+    const sz = 4 + Math.floor(Math.random() * 8)
     el.style.width = el.style.height = sz + 'px'
-    el.style.background = cfg.colors[Math.floor(Math.random() * cfg.colors.length)]
-    el.style.left = cx + 'px'
-    el.style.top = cy + 'px'
+    el.style.background = preset.colors[Math.floor(Math.random() * preset.colors.length)]
+    el.style.left = cx + 'px'; el.style.top = cy + 'px'
     document.body.appendChild(el)
-    swordParticles.push({ el, x: cx, y: cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, gravity: cfg.gravity, decay: 0.02 + Math.random() * 0.03 })
+    sparks.push({ el, x: cx, y: cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, gravity: preset.gravity, decay: 0.03 + Math.random() * 0.04 })
   }
-  updateSwordParticles()
+  if (!sparksRunning) { sparksRunning = true; particleRaf = requestAnimationFrame(updateSparks) }
 }
 
-function updateSwordParticles() {
-  for (let i = swordParticles.length - 1; i >= 0; i--) {
-    const p = swordParticles[i]
-    p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life -= p.decay
-    p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px'; p.el.style.opacity = p.life
-    if (p.life <= 0) { p.el.remove(); swordParticles.splice(i, 1) }
+function updateSparks() {
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i]; s.x += s.vx; s.y += s.vy; s.vy += s.gravity; s.life -= s.decay
+    s.el.style.left = s.x + 'px'; s.el.style.top = s.y + 'px'; s.el.style.opacity = s.life
+    if (s.life <= 0) { s.el.remove(); sparks.splice(i, 1) }
   }
-  if (swordParticles.length > 0) requestAnimationFrame(updateSwordParticles)
+  if (sparks.length > 0) { particleRaf = requestAnimationFrame(updateSparks) }
+  else { sparksRunning = false; particleRaf = 0 }
 }
 
 function doCursorAttack(e) {
+  updateCursorPos(e)
   const now = Date.now()
-  if (now - lastAttackTime < 32) return
+  if (now - lastAttackTime < 16) return
   lastAttackTime = now
   e.preventDefault()
   if (!swordCursor) return
 
   clearTimeout(recoverTimer)
-  swordCursor.classList.remove('recovering')
+  swordCursor.classList.remove('swinging', 'recovering')
+  void swordCursor.offsetWidth // 强制重排，连续点击动画重新触发
   swordCursor.classList.add('swinging')
-  swordSwung = true
+
   recoverTimer = setTimeout(() => {
     if (!swordCursor) return
     swordCursor.classList.remove('swinging')
     swordCursor.classList.add('recovering')
-    swordSwung = false
   }, 50)
 
-  // 粒子特效
-  const cell = e.target.closest('.boss-part-cell')
-  const cellType = cell ? (cell.classList.contains('boss-part-cell--weak') ? 'weak' : cell.classList.contains('boss-part-cell--heavy') ? 'heavy' : 'soft') : 'soft'
-  spawnSwordParticles(e.clientX, e.clientY, cellType)
+  spawnSparks(e.clientX, e.clientY, detectCellType(e.target))
 }
 
 onMounted(() => {
@@ -155,41 +159,40 @@ onMounted(() => {
     nowTick.value++
   }, 250)
 
-  // 像素剑光标（文档级事件，动态检测区域）
   swordCursor = document.getElementById('boss-sword-cursor')
 
+  // 仅战斗区内显示和追踪
   document.addEventListener('pointermove', (e) => {
-    const grid = getGridArea()
+    const grid = document.querySelector('.boss-part-grid-with-combo')
     if (!grid) return
-    const inside = grid.contains(e.target)
-    if (inside) {
-      if (!cursorVisible) showCursor()
+    if (grid.contains(e.target)) {
+      if (swordCursor.style.display === 'none') swordCursor.style.display = 'block'
       updateCursorPos(e)
-    } else if (cursorVisible) {
-      hideCursor()
+    } else {
+      swordCursor.style.display = 'none'
     }
   })
 
   document.addEventListener('pointerdown', (e) => {
-    const grid = getGridArea()
-    if (grid && grid.contains(e.target)) doCursorAttack(e)
+    const grid = document.querySelector('.boss-part-grid-with-combo')
+    if (!grid || !grid.contains(e.target)) return
+    lastPointerDown = Date.now()
+    doCursorAttack(e)
   })
-
   document.addEventListener('click', (e) => {
-    const grid = getGridArea()
-    if (grid && grid.contains(e.target)) doCursorAttack(e)
-  })
-
-  document.addEventListener('pointerup', () => {
-    if (!swordSwung && swordCursor) {
-      swordCursor.classList.remove('swinging')
-      swordCursor.classList.add('recovering')
-    }
+    const grid = document.querySelector('.boss-part-grid-with-combo')
+    if (!grid || !grid.contains(e.target)) return
+    if (Date.now() - lastPointerDown < 48) return
+    doCursorAttack(e)
   })
 })
 
 onBeforeUnmount(() => {
   clearInterval(tickTimer)
+  cancelAnimationFrame(particleRaf)
+  clearTimeout(recoverTimer)
+  sparks.forEach(s => s.el.remove())
+  sparks.length = 0
 })
 
 const bossZones = computed(() => {
@@ -557,49 +560,23 @@ const collapseRemaining = computed(() => {
         <div v-else class="boss-part-grid-container">
           <!-- 左侧面板列 -->
           <div class="boss-left-panels">
-            <!-- 1. 部位系数 -->
-            <div class="boss-part-info">
-              <div class="boss-part-info__title">部位系数</div>
-              <div class="boss-part-info__item boss-part-info__item--soft">
-                <span class="boss-part-info__dot"></span>
-                <span class="boss-part-info__label">软组织</span>
-                <span class="boss-part-info__value">x1.0</span>
-              </div>
-              <div class="boss-part-info__item boss-part-info__item--heavy">
-                <span class="boss-part-info__dot"></span>
-                <span class="boss-part-info__label">重甲</span>
-                <span class="boss-part-info__value">x0.4</span>
-              </div>
-              <div class="boss-part-info__item boss-part-info__item--weak">
-                <span class="boss-part-info__dot"></span>
-                <span class="boss-part-info__label">弱点</span>
-                <span class="boss-part-info__value">x2.5</span>
-              </div>
-              <div class="boss-part-info__divider"></div>
-              <div class="boss-part-info__item boss-part-info__item--armor">
-                <span class="boss-part-info__dot"></span>
-                <span class="boss-part-info__label">护甲</span>
-                <span class="boss-part-info__value">减伤</span>
-              </div>
-            </div>
-
-            <!-- 2. 连击框：始终可见 -->
-            <div class="combo-box">
+            <!-- 1. 连击框：始终可见 -->
+            <div class="combo-box" :class="{ 'combo-box--gold': comboIsGold }">
               <template v-if="comboCount > 0">
                 <div class="combo-box__row">
-                  <span class="combo-box__count">连击 x{{ comboCount }}</span>
+                  <span class="combo-box__count" :class="{ 'combo-box__count--bounce': comboBounce, 'combo-box__count--gold': comboIsGold }" :style="comboIsGold ? {} : { color: comboColor, textShadow: `0 0 14px ${comboColor}80` }">连击 x{{ comboCount }}</span>
                   <span v-if="Math.floor(comboCount / 50) > 0" class="combo-box__bonus">
                     伤害 +{{ Math.floor(comboCount / 50) * 5 }}%
                   </span>
-                  <span class="combo-box__timeout-text">
-                    {{ Math.ceil(comboTimeoutPercent / 20) }}s
-                  </span>
                 </div>
-                <span class="combo-box__timeout-bar">
+                <span class="combo-box__timeout-bar" :style="comboIsGold ? { borderColor: 'rgba(251,191,36,0.5)' } : { borderColor: comboColor + '40' }">
                   <span
                       class="combo-box__timeout-fill"
-                      :style="{ width: comboTimeoutPercent + '%' }"
+                      :style="comboIsGold ? { width: comboTimeoutPercent + '%', background: 'linear-gradient(90deg, #fde047, #fbbf24, #f59e0b)', boxShadow: '0 0 10px rgba(251,191,36,0.6)' } : { width: comboTimeoutPercent + '%', background: `linear-gradient(90deg, ${comboColor}, ${comboColor}cc)`, boxShadow: `0 0 8px ${comboColor}80` }"
                   ></span>
+                </span>
+                <span class="combo-box__timeout-text" :style="{ color: comboColor }">
+                  {{ Math.ceil(comboTimeoutPercent / 20) }}s
                 </span>
               </template>
               <template v-else>
@@ -678,6 +655,7 @@ const collapseRemaining = computed(() => {
             'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
             'boss-zone-button--damage': zoneDamageBursts(zone).length > 0,
             'boss-part-cell--fracture': zone && isPartFractured(zone),
+            'boss-part-cell--center': xi === 2 && yi === 2,
             'talent-hammer-strike': zone && isPartCollapsed(zone),
           }"
                     :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
@@ -710,7 +688,7 @@ const collapseRemaining = computed(() => {
                   '--damage-ttl': `${burst.ttl}ms`,
                 }"
               >
-                {{ burst.value }}
+                <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{ burst.value }}
               </span>
                         <span
                             v-for="p in (burst.particles || [])"
@@ -756,8 +734,46 @@ const collapseRemaining = computed(() => {
             </div>
           </div>
 
+          <!-- 右侧面板：部位系数 + 伤害类型 -->
+          <div class="boss-right-panel">
+            <div class="boss-part-info">
+              <div class="boss-part-info__title">部位系数</div>
+              <div class="boss-part-info__item boss-part-info__item--soft">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">软组织</span>
+                <span class="boss-part-info__value">x1.0</span>
+              </div>
+              <div class="boss-part-info__item boss-part-info__item--heavy">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">重甲</span>
+                <span class="boss-part-info__value">x0.4</span>
+              </div>
+              <div class="boss-part-info__item boss-part-info__item--weak">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">弱点</span>
+                <span class="boss-part-info__value">x2.5</span>
+              </div>
+              <div class="boss-part-info__divider"></div>
+              <div class="boss-part-info__item boss-part-info__item--armor">
+                <span class="boss-part-info__dot"></span>
+                <span class="boss-part-info__label">护甲</span>
+                <span class="boss-part-info__value">减伤</span>
+              </div>
+            </div>
+            <div class="boss-right-legend">
+              <div class="boss-right-legend__title">伤害类型</div>
+              <span class="boss-right-legend__item boss-right-legend__item--normal">普通</span>
+              <span class="boss-right-legend__item boss-right-legend__item--critical">暴击 CRIT!</span>
+              <span class="boss-right-legend__item boss-right-legend__item--weak">弱点暴击 WEAK!</span>
+              <span class="boss-right-legend__item boss-right-legend__item--pursuit">追击</span>
+              <span class="boss-right-legend__item boss-right-legend__item--true">重甲</span>
+              <span class="boss-right-legend__item boss-right-legend__item--doomsday">💀 削血</span>
+              <span class="boss-right-legend__item boss-right-legend__item--judgement">K.O. 终结</span>
+            </div>
+          </div>
+
         </div>
-        <div id="boss-sword-cursor" style="display:none;"></div>
+        <div id="boss-sword-cursor"></div>
         <!-- 天赋瞬发特效覆盖层 -->
         <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
           <div v-if="hasRecentTrigger('storm_combo')"

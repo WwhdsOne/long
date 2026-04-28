@@ -22,6 +22,7 @@ const DAMAGE_VARIANTS = {
         stageFx: [],
         particles: 6,
         colors: ['#f8fafc', '#e2e8f0', '#cbd5e1'],
+        label: '',
     },
     pursuit: {
         scale: 1,
@@ -30,14 +31,16 @@ const DAMAGE_VARIANTS = {
         stageFx: ['flash'],
         particles: 8,
         colors: ['#60a5fa', '#93bbfd', '#3b82f6', '#bfdbfe'],
+        label: '',
     },
     trueDamage: {
-        scale: 1,
-        ttl: 1500,
+        scale: 0.85,
+        ttl: 1200,
         shake: 0,
-        stageFx: ['flash'],
-        particles: 10,
-        colors: ['#c084fc', '#a78bfa', '#8b5cf6', '#ddd6fe'],
+        stageFx: [],
+        particles: 5,
+        colors: ['#9ca3af', '#787888', '#64748b', '#94a3b8'],
+        label: '',
     },
     critical: {
         scale: 1.5,
@@ -46,6 +49,7 @@ const DAMAGE_VARIANTS = {
         stageFx: ['shake'],
         particles: 14,
         colors: ['#facc15', '#fbbf24', '#f59e0b', '#fef08a', '#eab308'],
+        label: 'CRIT!',
     },
     weakCritical: {
         scale: 2.0,
@@ -54,6 +58,7 @@ const DAMAGE_VARIANTS = {
         stageFx: ['shake', 'flash'],
         particles: 20,
         colors: ['#facc15', '#ef4444', '#f87171', '#fbbf24', '#f59e0b', '#dc2626'],
+        label: 'WEAK!',
     },
     doomsday: {
         scale: 2.8,
@@ -62,6 +67,7 @@ const DAMAGE_VARIANTS = {
         stageFx: ['shake', 'doom', 'blade'],
         particles: 28,
         colors: ['#c084fc', '#a78bfa', '#8b5cf6', '#7c3aed', '#ddd6fe', '#ede9fe'],
+        label: '💀',
     },
     judgement: {
         scale: 4.0,
@@ -70,6 +76,7 @@ const DAMAGE_VARIANTS = {
         stageFx: ['shake', 'slowMo', 'vignette'],
         particles: 36,
         colors: ['#fde047', '#facc15', '#fbbf24', '#fef08a', '#eab308', '#f59e0b'],
+        label: 'K.O.',
     },
 }
 
@@ -1506,6 +1513,9 @@ function resolveDamageVariant(payload, part, damageValue, source) {
     if (critical) {
         return 'critical'
     }
+    if (part?.type === 'heavy') {
+        return 'trueDamage'
+    }
     if (source === 'auto' || source === 'afk') {
         return 'pursuit'
     }
@@ -1564,6 +1574,7 @@ function buildDamageBurst(key, payload, part, source) {
         type: variant,
         priority: rankDamageVariant(variant),
         value: formatNumber(damageValue),
+        label: config.label || '',
         scale: config.scale,
         ttl: config.ttl,
         offsetX: offset.x,
