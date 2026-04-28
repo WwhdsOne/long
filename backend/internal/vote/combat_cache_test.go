@@ -258,3 +258,54 @@ func TestCompileTalentSetCollectsEnabledTriggerHandlersInStableOrder(t *testing.
 		t.Fatalf("expected crit triggers to keep declaration order, got %+v", compiled.triggerNames)
 	}
 }
+
+func TestClickBossPartPersistsCombatStateAfterDynamicThresholdUpdate(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	ctx := context.Background()
+	nickname := "持久化测试"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed talent points: %v", err)
+	}
+	if err := store.UpgradeTalent(ctx, nickname, "normal_core", 5); err != nil {
+		t.Fatalf("upgrade normal_core: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "persist-boss",
+		Name:  "持久化 Boss",
+		MaxHP: 1000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1000, CurrentHP: 1000, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+	if result.Boss == nil {
+		t.Fatal("expected click result boss state")
+	}
+
+	storedBoss, err := store.currentBoss(ctx)
+	if err != nil {
+		t.Fatalf("load current boss: %v", err)
+	}
+	if storedBoss.CurrentHP != result.Boss.CurrentHP {
+		t.Fatalf("expected stored boss hp %d, got %d", result.Boss.CurrentHP, storedBoss.CurrentHP)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "persist-boss")
+	if err != nil {
+		t.Fatalf("get stored combat state: %v", err)
+	}
+	if combatState.NormalTriggerCount != int64(normalCoreTriggerCountForLevel(5)) {
+		t.Fatalf("expected stored normal trigger count %d, got %d", normalCoreTriggerCountForLevel(5), combatState.NormalTriggerCount)
+	}
+}

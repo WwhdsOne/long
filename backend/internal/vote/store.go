@@ -1590,8 +1590,6 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		result.DamageType = damageTypeOverride
 	}
 
-	_ = s.SaveTalentCombatState(ctx, nickname, boss.ID, combatState)
-
 	// 计算动态触发阈值（受天赋影响）
 	if compiledTalents.Has("normal_core") {
 		combatState.NormalTriggerCount = compiledTalents.Normal.TriggerCount
@@ -1628,12 +1626,17 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if boss.DefeatedAt != 0 {
 		bossValues["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
 	}
+	combatStateRaw, marshalCombatStateErr := sonic.Marshal(combatState)
+	if marshalCombatStateErr != nil {
+		return result, nil
+	}
 
 	pipe := s.client.TxPipeline()
 	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
 	if totalDamage > 0 {
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
+	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
 	if _, execErr := pipe.Exec(ctx); execErr != nil {
 		return result, nil
 	}
