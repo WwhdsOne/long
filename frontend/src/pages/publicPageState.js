@@ -1,4 +1,4 @@
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 
 import {mergeBossState} from '../utils/bossState'
 import {formatDropRate} from '../utils/buttonBoard'
@@ -93,18 +93,6 @@ const publicPages = [
 const buttonTotalVotes = ref(0)
 const leaderboard = ref([])
 const boss = ref(null)
-const bossTheme = ref('cyberpunk')
-
-const BOSS_THEMES = ['cyberpunk', 'arcane', 'cosmic']
-
-function pickBossTheme() {
-  const idx = Math.floor(Math.random() * BOSS_THEMES.length)
-  bossTheme.value = BOSS_THEMES[idx]
-}
-
-watch(() => boss.value?.id, (next, prev) => {
-  if (next && next !== prev) pickBossTheme()
-})
 
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
@@ -2104,7 +2092,6 @@ export function usePublicPageState() {
         buttonTotalVotes,
         leaderboard,
         boss,
-        bossTheme,
         bossLeaderboard,
         bossLoot,
         bossGoldRange,
