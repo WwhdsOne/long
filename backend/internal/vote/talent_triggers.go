@@ -111,35 +111,52 @@ func applyArmorCoreTrigger(tc *talentTriggerContext) {
 }
 
 func applyArmorAutoStrikeTrigger(tc *talentTriggerContext) {
-	asInterval := tc.compiledTalents.Armor.AutoStrikeInterval
-	asRatio := tc.compiledTalents.Armor.AutoStrikeRatio
-	if tc.now-tc.combatState.LastAutoStrikeAt < asInterval {
+	partKey := TalentPartKey(tc.part.X, tc.part.Y)
+	if tc.combatState.AutoStrikeExpiresAt > 0 && tc.now > tc.combatState.AutoStrikeExpiresAt {
+		resetAutoStrikeCombo(tc.combatState)
+	}
+	if tc.part.Type != PartTypeHeavy {
+		resetAutoStrikeCombo(tc.combatState)
 		return
 	}
 
-	var best *BossPart
-	for i := range tc.boss.Parts {
-		p := &tc.boss.Parts[i]
-		if !p.Alive || p.Type != PartTypeHeavy {
-			continue
-		}
-		if best == nil || p.CurrentHP > best.CurrentHP {
-			best = p
-		}
+	if tc.combatState.AutoStrikeTargetPart != partKey {
+		tc.combatState.AutoStrikeTargetPart = partKey
+		tc.combatState.AutoStrikeComboCount = 0
 	}
-	if best == nil {
+
+	tc.combatState.AutoStrikeComboCount++
+	tc.combatState.AutoStrikeExpiresAt = tc.now + TalentAutoStrikeWindowSec
+
+	asTrigger := tc.compiledTalents.Armor.AutoStrikeTrigger
+	asRatio := tc.compiledTalents.Armor.AutoStrikeRatio
+	if tc.combatState.AutoStrikeComboCount < asTrigger {
+		return
+	}
+	if !tc.part.Alive {
+		resetAutoStrikeCombo(tc.combatState)
 		return
 	}
 
 	sd := int64(float64(tc.baseDamage) * asRatio)
-	_, sd, _ = applyBossPartDamageDelta(tc.boss, best, sd)
-	tc.combatState.LastAutoStrikeAt = tc.now
+	_, sd, _ = applyBossPartDamageDelta(tc.boss, tc.part, sd)
 	tc.totalExtra += sd
 	tc.events = append(tc.events, TalentTriggerEvent{
 		TalentID: "armor_auto_strike", Name: "自动打击触发", EffectType: "auto_strike",
-		ExtraDamage: sd, Message: "自动打击触发",
+		ExtraDamage: sd, Message: "碎甲重击触发",
+		PartX: tc.part.X, PartY: tc.part.Y,
 	})
-	tc.damageTypeOverride = "trueDamage"
+	resetAutoStrikeCombo(tc.combatState)
+	tc.damageTypeOverride = "pursuit"
+}
+
+func resetAutoStrikeCombo(state *TalentCombatState) {
+	if state == nil {
+		return
+	}
+	state.AutoStrikeTargetPart = ""
+	state.AutoStrikeComboCount = 0
+	state.AutoStrikeExpiresAt = 0
 }
 
 func applyArmorUltimateTrigger(tc *talentTriggerContext) {
@@ -233,7 +250,7 @@ func applyCritDoomJudgmentTrigger(tc *talentTriggerContext) {
 			continue
 		}
 		omenReward := tc.compiledTalents.Crit.DoomOmenPerMark
-		tc.combatState.OmenStacks += omenReward
+		tc.combatState.OmenStacks, _ = applyOmenStackDelta(tc.combatState.OmenStacks, omenReward)
 		tc.events = append(tc.events, TalentTriggerEvent{
 			TalentID: "crit_doom_judgment", Name: "末日审判", EffectType: "doom_mark",
 			Message: fmt.Sprintf("标记触发！+%d 死兆", omenReward),

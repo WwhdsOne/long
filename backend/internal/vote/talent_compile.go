@@ -11,13 +11,13 @@ type compiledNormalTalents struct {
 }
 
 type compiledArmorTalents struct {
-	CollapseTrigger    int64
-	CollapseDuration   int64
-	AutoStrikeInterval int64
-	AutoStrikeRatio    float64
-	RuinAmp            float64
-	UltimateTrigger    int64
-	UltimateHpCut      float64
+	CollapseTrigger      int64
+	CollapseDuration     int64
+	AutoStrikeTrigger    int64
+	AutoStrikeRatio      float64
+	RuinAmp              float64
+	UltimateTrigger      int64
+	UltimateHpCut        float64
 }
 
 type compiledCritTalents struct {
@@ -215,11 +215,7 @@ func buildTalentModifiersFromCompiled(compiled *CompiledTalentSet) *TalentModifi
 			}
 		case "omen_crit_damage":
 			if p, ok := val["critDmgPerOmen"].(float64); ok {
-				if id == "crit_omen_resonate" {
-					mods.OmenCritDmgExtra += critOmenResonateForLevel(level)
-				} else {
-					mods.OmenCritDmgExtra += p * levelFactor
-				}
+				mods.OmenCritDmgExtra += p * levelFactor
 			}
 		case "overkill":
 			if _, ok := val["baseCritBonus"].(float64); ok {
@@ -227,6 +223,9 @@ func buildTalentModifiersFromCompiled(compiled *CompiledTalentSet) *TalentModifi
 			}
 			if ratio, ok := val["overflowToCritDmg"].(float64); ok {
 				mods.OverflowToCritDmgRatio = ratio
+			}
+			if _, ok := val["critDmgPerOmen"].(float64); ok {
+				mods.OmenCritDmgExtra += critOmenResonateForLevel(level)
 			}
 		}
 	}
@@ -297,7 +296,7 @@ func compileArmorTalents(compiled *CompiledTalentSet) compiledArmorTalents {
 	}
 	if compiled.Has("armor_auto_strike") {
 		level := compiled.Level("armor_auto_strike")
-		armor.AutoStrikeInterval = int64(armorAutoStrikeIntervalForLevel(level))
+		armor.AutoStrikeTrigger = int64(armorAutoStrikeTriggerCountForLevel(level))
 		armor.AutoStrikeRatio = armorAutoStrikeRatioForLevel(level)
 	}
 	if compiled.Has("armor_ruin") {
@@ -327,8 +326,8 @@ func compileCritTalents(compiled *CompiledTalentSet) compiledCritTalents {
 		crit.OmenKillThreshold = critOmenKillThresholdForLevel(level)
 		crit.OmenKillDmgPerOmen = critOmenKillDmgPerOmenForLevel(level)
 	}
-	if compiled.Has("crit_omen_resonate") {
-		crit.OmenResonatePerOmen = critOmenResonateForLevel(compiled.Level("crit_omen_resonate"))
+	if compiled.Has("crit_core") {
+		crit.OmenResonatePerOmen = critOmenResonateForLevel(compiled.Level("crit_core"))
 	}
 	if compiled.Has("crit_bleed") {
 		crit.BleedRatio = critBleedRatioForLevel(compiled.Level("crit_bleed"))

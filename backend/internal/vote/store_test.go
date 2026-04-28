@@ -3,6 +3,7 @@ package vote
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -387,6 +388,154 @@ func TestSilverStormUsesTimeWindowInsteadOfAttackCountdown(t *testing.T) {
 	}
 	if combatState.SilverStormActive {
 		t.Fatal("expected silver storm inactive after expiry")
+	}
+}
+
+func TestArmorAutoStrikeTriggersOnSameHeavyPartWithinFiveSeconds(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	baseNow := time.Unix(1_700_100_000, 0)
+	store.now = func() time.Time { return baseNow }
+
+	ctx := context.Background()
+	nickname := "自动打击测试"
+
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"armor_auto_strike": 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed armor auto strike state: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "auto-strike-test",
+		Name:  "自动打击测试Boss",
+		MaxHP: 5000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeHeavy, MaxHP: 2000, CurrentHP: 2000, Alive: true, Armor: 0},
+			{X: 1, Y: 0, Type: PartTypeHeavy, MaxHP: 2000, CurrentHP: 2000, Alive: true, Armor: 0},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	requiredHits := armorAutoStrikeTriggerCountForLevel(5)
+	for i := 1; i < requiredHits; i++ {
+		result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+		if err != nil {
+			t.Fatalf("click %d: %v", i, err)
+		}
+		for _, ev := range result.TalentEvents {
+			if ev.TalentID == "armor_auto_strike" {
+				t.Fatalf("expected no auto strike trigger before hit %d, got %+v", i, ev)
+			}
+		}
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("trigger auto strike: %v", err)
+	}
+
+	var autoStrikeEvent *TalentTriggerEvent
+	for _, ev := range result.TalentEvents {
+		if ev.TalentID == "armor_auto_strike" {
+			autoStrikeEvent = &ev
+			break
+		}
+	}
+	if autoStrikeEvent == nil {
+		t.Fatalf("expected armor_auto_strike trigger on hit %d, got %+v", requiredHits, result.TalentEvents)
+	}
+	if autoStrikeEvent.PartX != 0 || autoStrikeEvent.PartY != 0 {
+		t.Fatalf("expected auto strike target part (0,0), got (%d,%d)", autoStrikeEvent.PartX, autoStrikeEvent.PartY)
+	}
+	if result.Boss == nil {
+		t.Fatal("expected boss state in click result")
+	}
+	if result.Boss.Parts[0].CurrentHP >= result.Boss.Parts[1].CurrentHP {
+		t.Fatalf("expected focused heavy part to take extra strike damage, got hp0=%d hp1=%d", result.Boss.Parts[0].CurrentHP, result.Boss.Parts[1].CurrentHP)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "auto-strike-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if combatState.AutoStrikeComboCount != 0 {
+		t.Fatalf("expected auto strike combo reset after trigger, got %d", combatState.AutoStrikeComboCount)
+	}
+}
+
+func TestArmorAutoStrikeComboExpiresAfterFiveSeconds(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	baseNow := time.Unix(1_700_200_000, 0)
+	store.now = func() time.Time { return baseNow }
+
+	ctx := context.Background()
+	nickname := "自动打击超时测试"
+
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"armor_auto_strike": 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed armor auto strike state: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "auto-strike-expire-test",
+		Name:  "自动打击超时测试Boss",
+		MaxHP: 5000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeHeavy, MaxHP: 3000, CurrentHP: 3000, Alive: true, Armor: 0},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	requiredHits := armorAutoStrikeTriggerCountForLevel(5)
+	for i := 1; i < requiredHits; i++ {
+		result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+		if err != nil {
+			t.Fatalf("click %d: %v", i, err)
+		}
+		for _, ev := range result.TalentEvents {
+			if ev.TalentID == "armor_auto_strike" {
+				t.Fatalf("expected no auto strike trigger before timeout test, got %+v", ev)
+			}
+		}
+	}
+
+	baseNow = baseNow.Add(6 * time.Second)
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("click after combo expiry: %v", err)
+	}
+	for _, ev := range result.TalentEvents {
+		if ev.TalentID == "armor_auto_strike" {
+			t.Fatalf("expected expired combo to reset, but got auto strike event %+v", ev)
+		}
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "auto-strike-expire-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if combatState.AutoStrikeComboCount != 1 {
+		t.Fatalf("expected combo to restart from 1 after expiry, got %d", combatState.AutoStrikeComboCount)
+	}
+	if combatState.AutoStrikeTargetPart != TalentPartKey(0, 0) {
+		t.Fatalf("expected combo target to restart on current heavy part, got %q", combatState.AutoStrikeTargetPart)
 	}
 }
 
@@ -1228,4 +1377,131 @@ func TestArmorCoreCollapseTrigger(t *testing.T) {
 		t.Fatal("崩塌结束时间应在未来")
 	}
 	t.Logf("崩塌状态正确: parts=%v, endsAt=%d", combatState.CollapseParts, combatState.CollapseEndsAt)
+}
+
+func TestArmorCoreCollapseCountDoesNotResetWhenCollapseExpires(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	currentTime := time.Unix(1_700_000_000, 0)
+	store.now = func() time.Time { return currentTime }
+	store.critical.CriticalChancePercent = 0
+
+	ctx := context.Background()
+	nickname := "崩塌续算测试"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed points: %v", err)
+	}
+	if err := store.UpgradeTalent(ctx, nickname, "armor_core", 1); err != nil {
+		t.Fatalf("learn armor_core: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "collapse-expire-keep-count",
+		Name:  "崩塌续算Boss",
+		MaxHP: 2_000_000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeHeavy, MaxHP: 2_000_000, CurrentHP: 2_000_000, Alive: true, Armor: 100},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	clickKey := "boss-part:0-0"
+	for i := 0; i < 50; i++ {
+		if _, err := store.ClickBossPart(ctx, clickKey, nickname); err != nil {
+			t.Fatalf("trigger collapse click %d: %v", i+1, err)
+		}
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := store.ClickBossPart(ctx, clickKey, nickname); err != nil {
+			t.Fatalf("during collapse click %d: %v", i+1, err)
+		}
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "collapse-expire-keep-count")
+	if err != nil {
+		t.Fatalf("get combat state before expire: %v", err)
+	}
+	if got := combatState.PartHeavyClickCount["0-0"]; got != 10 {
+		t.Fatalf("expected heavy click count 10 during collapse, got %d", got)
+	}
+
+	currentTime = currentTime.Add(9 * time.Second)
+	if _, err := store.ClickBossPart(ctx, clickKey, nickname); err != nil {
+		t.Fatalf("post-expire click: %v", err)
+	}
+
+	combatState, err = store.GetTalentCombatState(ctx, nickname, "collapse-expire-keep-count")
+	if err != nil {
+		t.Fatalf("get combat state after expire: %v", err)
+	}
+	if got := combatState.PartHeavyClickCount["0-0"]; got != 11 {
+		t.Fatalf("expected heavy click count continue to 11 after collapse expired, got %d", got)
+	}
+}
+
+func TestOmenOverflowCapsAt100AndCompensatesDamage(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 100
+	ctx := context.Background()
+	nickname := "死兆溢出测试"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed points: %v", err)
+	}
+	if err := store.UpgradeTalent(ctx, nickname, "crit_core", 1); err != nil {
+		t.Fatalf("learn crit_core: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "omen-overflow-test",
+		Name:  "死兆溢出Boss",
+		MaxHP: 100000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 10000, CurrentHP: 10000, Alive: true, Armor: 0},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	state := NewTalentCombatState()
+	state.OmenStacks = TalentOmenStackCap
+	if err := store.SaveTalentCombatState(ctx, nickname, "omen-overflow-test", state); err != nil {
+		t.Fatalf("save combat state: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("click: %v", err)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "omen-overflow-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if combatState.OmenStacks != TalentOmenStackCap {
+		t.Fatalf("expected omen stacks capped at %d, got %d", TalentOmenStackCap, combatState.OmenStacks)
+	}
+
+	var overflowEvent *TalentTriggerEvent
+	for i := range result.TalentEvents {
+		if result.TalentEvents[i].EffectType == "omen_overflow" {
+			overflowEvent = &result.TalentEvents[i]
+			break
+		}
+	}
+	if overflowEvent == nil {
+		t.Fatal("expected omen_overflow talent event")
+	}
+	if overflowEvent.ExtraDamage <= 0 {
+		t.Fatalf("expected omen overflow extra damage > 0, got %d", overflowEvent.ExtraDamage)
+	}
+	if !strings.Contains(overflowEvent.Message, "溢出") || !strings.Contains(overflowEvent.Message, "+") {
+		t.Fatalf("expected omen overflow message to include overflow and damage, got %q", overflowEvent.Message)
+	}
 }
