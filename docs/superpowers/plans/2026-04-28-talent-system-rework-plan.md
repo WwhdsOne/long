@@ -1,5 +1,12 @@
 # 天赋系统重构 实施计划
 
+> 状态：实施记录。
+>
+> 本文保留“如何落地”的执行步骤与历史提交语义，但当前正式数值与成本模型以设计文档和成本总结为准：
+>
+> - `docs/superpowers/specs/2026-04-28-talent-system-rework-design.md`
+> - `docs/2026-04-28-天赋成本调整总结.md`
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 三系天赋树全部改为 Lv1~Lv5 等级制，暴击系重构（死兆收割→被动、死亡狂喜→终极、末日审判→小技能），全系数值大幅提高，前端增加节点等级视觉表现。
@@ -51,7 +58,7 @@ type TalentDef struct {
 ```go
 const (
 	// 主节点 Lv1 基准成本（等级制）
-	TalentCostTier0Main int64 = 5    // 基石
+	TalentCostTier0Main int64 = 20   // 基石
 	TalentCostTier1Main int64 = 30   // 一阶
 	TalentCostTier2Main int64 = 80   // 二阶
 	TalentCostTier3Main int64 = 150  // 三阶
@@ -59,33 +66,34 @@ const (
 
 	// 小节点 Lv1 基准成本
 	TalentCostTier1Filler int64 = 15
-	TalentCostTier2Filler int64 = 40
-	TalentCostTier3Filler int64 = 80
+	TalentCostTier2Filler int64 = 35
+	TalentCostTier3Filler int64 = 60
 
 	// 默认最高等级
 	TalentDefaultMaxLevel = 5
 )
 
-// TalentLevelCost 计算升级到指定等级的总消耗（差价制）
-// 公式：level 0→1 = base × 1.5, 1→2 = base × 3.0, 2→3 = base × 4.5 ...
+// TalentLevelCost 计算升到指定等级这一次的单级消耗。
+// 公式：cost(level) = round(base × level^0.85 × 1.8)
 func TalentLevelCost(base int64, targetLevel int) int64 {
-	return int64(float64(base) * float64(targetLevel) * 1.5)
+	if base <= 0 || targetLevel <= 0 {
+		return 0
+	}
+	return int64(math.Round(float64(base) * math.Pow(float64(targetLevel), 0.85) * 1.8))
 }
 
 // TalentLevelCostDiff 从当前等级升到目标等级需要支付的差价
 func TalentLevelCostDiff(base int64, currentLevel, targetLevel int) int64 {
-	costTarget := TalentLevelCost(base, targetLevel)
-	costCurrent := TalentLevelCost(base, currentLevel)
-	return costTarget - costCurrent
+	var total int64
+	for lv := currentLevel + 1; lv <= targetLevel; lv++ {
+		total += TalentLevelCost(base, lv)
+	}
+	return total
 }
 
 // TalentCumulativeCost 计算从 0 级升到目标等级的累计总消耗
 func TalentCumulativeCost(base int64, targetLevel int) int64 {
-	var total int64
-	for lv := 1; lv <= targetLevel; lv++ {
-		total += TalentLevelCost(base, lv)
-	}
-	return total
+	return TalentLevelCostDiff(base, 0, targetLevel)
 }
 ```
 
@@ -1172,7 +1180,7 @@ func TestUpgradeTalentConsumesPointsAndResetRefunds(t *testing.T) {
 	// 种子天赋点
 	require.NoError(t, store.client.HSet(ctx, key, "talent_points", int64(5000)).Err())
 
-	// Lv1 学习 normal_core (base=5, Lv1 cost = 5*1*1.5 = 7.5 → int64=7)
+	// Lv1 学习 normal_core (base=20, Lv1 cost = round(20*1^0.85*1.8) = 36)
 	err := store.UpgradeTalent(ctx, nickname, "normal_core", 1)
 	require.NoError(t, err)
 

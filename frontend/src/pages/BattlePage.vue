@@ -1,5 +1,5 @@
 <script setup>
-import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import {effectAssetUrl} from '../utils/effectAssets'
 
@@ -24,6 +24,8 @@ const {
   armorCombo,
   stormProgress,
   armorProgress,
+  stormTrigger,
+  armorTrigger,
   comboTriggerFlash,
   comboTimeoutPercent,
   damageStageFx,
@@ -149,7 +151,7 @@ function zoneDamageBursts(zone) {
 const talentEdgeGlowClass = computed(() => {
   const vs = talentVisualState.value
   if (vs.deathEcstasyActive) return 'talent-edge-glow--crit'
-  if (vs.silverStormActive) return ''
+  if (silverStormActive.value) return ''
   const recent = talentTriggerFeed.value[0]
   if (recent && recent.name === '暴风连击') {
     return 'talent-edge-glow--normal'
@@ -157,7 +159,7 @@ const talentEdgeGlowClass = computed(() => {
   return ''
 })
 
-const showSilverFlash = computed(() => talentVisualState.value.silverStormActive && talentVisualState.value.silverStormRemaining >= 14)
+const showSilverFlash = computed(() => silverStormActive.value && silverStormCountdown.value >= 14)
 const TALENT_EFFECT_WINDOW_MS = 1350
 
 function slashOverlayStyle() {
@@ -274,13 +276,20 @@ const deathEcstasyRemaining = computed(() => {
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
 })
 
-const collapseActive = computed(() => talentVisualState.value.collapsePartKeys.length > 0)
-const collapseRemaining = computed(() => {
+const silverStormCountdown = computed(() => {
   void nowTick.value
-  const endsAt = talentVisualState.value.collapseEndsAt
-  if (!endsAt) return 0
+  const endsAt = talentVisualState.value.silverStormEndsAt
+  if (!endsAt) return talentVisualState.value.silverStormRemaining || 0
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
 })
+
+const silverStormActive = computed(() => {
+  void nowTick.value
+  if (!talentVisualState.value.silverStormActive) return false
+  if (!talentVisualState.value.silverStormEndsAt) return talentVisualState.value.silverStormRemaining > 0
+  return talentVisualState.value.silverStormEndsAt > Date.now() / 1000
+})
+
 const collapsePartNames = computed(() => {
   const parts = boss.value?.parts
   if (!Array.isArray(parts)) return []
@@ -288,8 +297,39 @@ const collapsePartNames = computed(() => {
       .map(key => {
         const [x, y] = key.split('-').map(Number)
         const part = parts.find(p => p.x === x && p.y === y)
-        return part?.displayName || partTypeLabels[part?.type] || key
+        if (!part || !part.alive) return null
+        return part.displayName || partTypeLabels[part?.type] || key
       })
+      .filter(Boolean)
+})
+const collapseActive = computed(() => collapsePartNames.value.length > 0)
+
+const collapseTick = ref(0)
+let collapseTickTimer = 0
+watch(collapseActive, (val) => {
+  if (val) {
+    collapseTickTimer = setInterval(() => { collapseTick.value++ }, 200)
+  } else {
+    clearInterval(collapseTickTimer)
+    collapseTick.value = 0
+  }
+})
+onBeforeUnmount(() => { clearInterval(collapseTickTimer) })
+
+const collapsePercent = computed(() => {
+  void collapseTick.value
+  const endsAt = talentVisualState.value.collapseEndsAt
+  const duration = talentVisualState.value.collapseDuration || 8
+  if (!endsAt || !duration) return 0
+  const remaining = Math.max(0, endsAt - Date.now() / 1000)
+  return Math.min(100, Math.round((remaining / duration) * 100))
+})
+
+const collapseRemaining = computed(() => {
+  void collapseTick.value
+  const endsAt = talentVisualState.value.collapseEndsAt
+  if (!endsAt) return 0
+  return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
 })
 </script>
 
@@ -440,13 +480,13 @@ const collapsePartNames = computed(() => {
                     p.name
                   }}</span>
                 <span class="part-progress-panel__track part-progress-panel__track--storm">
-                  追击 {{ p.storm }}/100
+                  追击 {{ p.storm }}/{{ stormTrigger }}
                   <span class="part-progress-panel__bar"><span
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--storm"
                       :style="{ width: p.stormProgress + '%' }"></span></span>
                 </span>
                 <span v-if="p.type === 'heavy'" class="part-progress-panel__track part-progress-panel__track--armor">
-                  破甲 {{ p.armor }}/100
+                  破甲 {{ p.armor }}/{{ armorTrigger }}
                   <span class="part-progress-panel__bar"><span
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor"
                       :style="{ width: p.armorProgress + '%' }"></span></span>
@@ -460,7 +500,7 @@ const collapsePartNames = computed(() => {
               <div v-for="name in collapsePartNames" :key="name" class="collapse-panel__part">{{ name }}</div>
               <span class="collapse-panel__bar">
                 <span class="collapse-panel__bar-fill"
-                      :style="{ width: Math.min(100, Math.round((collapseRemaining / 8) * 100)) + '%' }"></span>
+                      :style="{ width: collapsePercent + '%' }"></span>
               </span>
               <span class="collapse-panel__count">{{ collapseRemaining }}s</span>
             </div>
@@ -662,11 +702,11 @@ const collapsePartNames = computed(() => {
                }))"></div>
         </div>
         <div
-            v-if="talentVisualState.silverStormActive || talentVisualState.omenStacks > 0 || talentVisualState.doomCritBuff"
+            v-if="silverStormActive || talentVisualState.omenStacks > 0 || talentVisualState.doomCritBuff"
             class="talent-status-bar">
-          <span v-if="talentVisualState.silverStormActive"
+          <span v-if="silverStormActive"
                 class="talent-status-bar__item talent-status-bar__item--silver">
-            白银风暴 {{ talentVisualState.silverStormRemaining }}
+            白银风暴 {{ silverStormCountdown }}s
           </span>
           <span v-if="showOmenRing" class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
             <svg class="talent-omen-ring__svg" viewBox="0 0 40 40">

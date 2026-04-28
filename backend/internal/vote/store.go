@@ -42,6 +42,8 @@ var ErrTalentNotFound = errors.New("talent not found")
 var ErrInvalidTalentTree = errors.New("invalid talent tree")
 var ErrTalentPointsInsufficient = errors.New("talent points insufficient")
 var ErrTalentInvalidCost = errors.New("talent invalid cost")
+var ErrTalentInvalidLevel = errors.New("invalid level")
+var ErrTalentMaxLevel = errors.New("already at max level")
 
 const (
 	bossStatusActive   = "active"
@@ -1360,8 +1362,10 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	talentState, _ := s.GetTalentState(ctx, nickname)
 	learned := make(map[string]struct{})
 	if talentState != nil {
-		for _, id := range talentState.Talents {
-			learned[id] = struct{}{}
+		for id, level := range talentState.Talents {
+			if level > 0 {
+				learned[id] = struct{}{}
+			}
 		}
 	}
 
@@ -1369,13 +1373,19 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if combatState == nil {
 		combatState = NewTalentCombatState()
 	}
+	if combatState.SilverStormActive {
+		if combatState.SilverStormEndsAt > 0 && now >= combatState.SilverStormEndsAt {
+			combatState.SilverStormActive = false
+			combatState.SilverStormRemaining = 0
+			combatState.SilverStormEndsAt = 0
+		} else if combatState.SilverStormEndsAt > 0 {
+			combatState.SilverStormRemaining = int(maxInt64(0, combatState.SilverStormEndsAt-now))
+		}
+	}
 
 	effectivePartType := part.Type
 	if combatState.SilverStormActive {
 		effectivePartType = PartTypeSoft
-	}
-	if combatState.DeathEcstasyEndsAt > now {
-		effectivePartType = PartTypeWeak
 	}
 	partKey := TalentPartKey(part.X, part.Y)
 	if endsAt, ok := combatState.SkinnerParts[partKey]; ok && now < endsAt {
@@ -1400,25 +1410,59 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 	if critical {
 		partDamage = damageStats.CriticalDamage
-		if combatState.DeathEcstasyEndsAt > now {
-			partDamage = int64(float64(partDamage) * 3.0)
-		}
-		if combatState.DoomCritBuff {
-			partDamage = int64(float64(partDamage) * 3.0)
-		}
+
 	}
 
 	if inCollapse && hasTalent(learned, "armor_ruin") {
-		partDamage = int64(float64(partDamage) * 2.0)
+		ruinAmp := 2.0
+		if def, ok := talentDefs["armor_ruin"]; ok {
+			ruinAmp = armorRuinAmpForLevel(GetTalentLevel(talentState, def.ID))
+		}
+		partDamage = int64(float64(partDamage) * ruinAmp)
 	}
 
 	hpRatio := float64(part.CurrentHP) / float64(maxInt64(1, boss.MaxHP))
-	if hasTalent(learned, "crit_omen_kill") && hpRatio < 0.35 && combatState.OmenStacks > 0 {
-		partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*0.01))
+	if hasTalent(learned, "crit_omen_kill") && combatState.OmenStacks > 0 {
+		threshold := 0.35
+		dmgPerOmen := 0.01
+		if def, ok := talentDefs["crit_omen_kill"]; ok {
+			level := GetTalentLevel(talentState, def.ID)
+			threshold = critOmenKillThresholdForLevel(level)
+			dmgPerOmen = critOmenKillDmgPerOmenForLevel(level)
+		}
+		if hpRatio < threshold {
+			partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*dmgPerOmen))
+		}
 	}
 
 	if critical && hasTalent(learned, "crit_omen_resonate") && combatState.OmenStacks > 0 {
-		partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*0.003))
+		perOmen := 0.003
+		if def, ok := talentDefs["crit_omen_resonate"]; ok {
+			perOmen = critOmenResonateForLevel(GetTalentLevel(talentState, def.ID))
+		}
+		partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*perOmen))
+	}
+
+	// 死兆收割被动：根据死兆层数档位提供增伤（不消耗层数）
+	if hasTalent(learned, "crit_omen_reap") && combatState.OmenStacks >= 30 {
+		def, ok := talentDefs["crit_omen_reap"]
+		if ok {
+			val, _ := def.EffectValue.(map[string]any)
+			thresholds, _ := val["thresholds"].([]float64)
+			damageMults, _ := val["damageMult"].([]float64)
+			if thresholds != nil && damageMults != nil && len(thresholds) == len(damageMults) {
+				var reapMult float64 = 1.0
+				for i := len(thresholds) - 1; i >= 0; i-- {
+					if float64(combatState.OmenStacks) >= thresholds[i] {
+						reapMult = damageMults[i]
+						break
+					}
+				}
+				if reapMult > 1.0 {
+					partDamage = int64(float64(partDamage) * reapMult)
+				}
+			}
+		}
 	}
 
 	beforeHP := part.CurrentHP
@@ -1439,13 +1483,28 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 	partJustDied := partWasAlive && !part.Alive
 
-	if critical && effectivePartType == PartTypeWeak && partWasAlive && hasTalent(learned, "crit_core") {
-		combatState.OmenStacks++
+	// 死兆层数获取：弱点暴击 +2，普通暴击 +1，击碎部位 +5
+	if critical && hasTalent(learned, "crit_core") {
+		if effectivePartType == PartTypeWeak && partWasAlive {
+			combatState.OmenStacks += 2
+		} else {
+			combatState.OmenStacks++
+		}
+	}
+	if partJustDied && hasTalent(learned, "crit_core") {
+		combatState.OmenStacks += 5
 	}
 
 	if critical && part.Type != PartTypeWeak && effectivePartType != PartTypeWeak && hasTalent(learned, "crit_skinner") {
-		if s.roll != nil && s.roll(100) < 30 {
-			combatState.SkinnerParts[partKey] = now + 5
+		chance := 0.30
+		duration := int64(5)
+		if def, ok := talentDefs["crit_skinner"]; ok {
+			level := GetTalentLevel(talentState, def.ID)
+			chance = critSkinnerChanceForLevel(level)
+			duration = int64(critSkinnerDurationForLevel(level))
+		}
+		if s.roll != nil && s.roll(100) < int(math.Round(chance*100)) {
+			combatState.SkinnerParts[partKey] = now + duration
 		}
 	}
 
@@ -1460,7 +1519,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		PartType: string(part.Type),
 	})
 
-	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, learned, combatState, now)
+	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, learned, combatState, talentState, now)
 	if extraDamage > 0 {
 		totalDamage += extraDamage
 		result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
@@ -1478,24 +1537,27 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	if partJustDied && hasTalent(learned, "normal_ultimate") {
 		combatState.SilverStormActive = true
-		combatState.SilverStormRemaining = 15
+		duration := 15
+		if def, ok := talentDefs["normal_ultimate"]; ok {
+			duration = normalSilverStormDurationForLevel(GetTalentLevel(talentState, def.ID))
+		}
+		combatState.SilverStormRemaining = duration
+		combatState.SilverStormEndsAt = now + int64(duration)
 		result.TalentEvents = append(result.TalentEvents, TalentTriggerEvent{
 			TalentID:   "normal_ultimate",
 			Name:       "silverstorm",
 			EffectType: "silver_storm",
-			Message:    "白银风暴激活！15 次攻击视为软组织",
+			Message:    fmt.Sprintf("白银风暴激活！持续 %d 秒", duration),
 		})
 	}
-	if combatState.SilverStormActive {
-		combatState.SilverStormRemaining--
-		if combatState.SilverStormRemaining <= 0 {
-			combatState.SilverStormActive = false
-			combatState.SilverStormRemaining = 0
-		}
-	}
 
-	if hasTalent(learned, "crit_ultimate") && len(combatState.DoomMarks) == 0 && len(boss.Parts) >= 2 {
-		combatState.DoomMarks = randomMarkIndices(len(boss.Parts), 2, s.roll)
+	if hasTalent(learned, "crit_doom_judgment") && len(combatState.DoomMarks) == 0 && len(boss.Parts) >= 2 {
+		def, ok := talentDefs["crit_doom_judgment"]
+		if ok {
+			markCount := critDoomMarkCountForLevel(GetTalentLevel(talentState, def.ID))
+			if markCount > len(boss.Parts) { markCount = len(boss.Parts) }
+			combatState.DoomMarks = randomMarkIndices(len(boss.Parts), markCount, s.roll)
+		}
 	}
 
 	result.BossDamage = totalDamage
@@ -1512,6 +1574,31 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	_ = s.SaveTalentCombatState(ctx, nickname, boss.ID, combatState)
+
+	// 计算动态触发阈值（受天赋影响）
+	if talentState != nil && len(talentState.Talents) > 0 {
+		if def, ok := talentDefs["normal_core"]; ok {
+			level := GetTalentLevel(talentState, def.ID)
+			combatState.NormalTriggerCount = int64(normalCoreTriggerCountForLevel(level))
+		}
+		if combatState.NormalTriggerCount == 0 {
+			combatState.NormalTriggerCount = 100
+		}
+		if isLearnedTierFull(TalentTreeNormal, 2, talentState.Talents) {
+			combatState.NormalTriggerCount -= 20
+		}
+
+		if def, ok := talentDefs["armor_core"]; ok {
+			combatState.ArmorTriggerCount = int64(armorCoreCollapseTriggerForLevel(GetTalentLevel(talentState, def.ID)))
+		}
+		if combatState.ArmorTriggerCount == 0 {
+			combatState.ArmorTriggerCount = 100
+		}
+		if isLearnedTierFull(TalentTreeArmor, 1, talentState.Talents) {
+			combatState.ArmorTriggerCount -= 30
+		}
+	}
+
 	result.TalentCombatState = combatState
 
 	allDead := true
@@ -1564,7 +1651,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	return result, nil
 }
 
-func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, learned map[string]struct{}, combatState *TalentCombatState, now int64) (int64, []TalentTriggerEvent, string) {
+func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, learned map[string]struct{}, combatState *TalentCombatState, talentState *TalentState, now int64) (int64, []TalentTriggerEvent, string) {
 	if boss == nil || part == nil || strings.TrimSpace(nickname) == "" || clickCount <= 0 {
 		return 0, nil, ""
 	}
@@ -1576,26 +1663,38 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 	if hasTalent(learned, "normal_core") {
 		def, ok := talentDefs["normal_core"]
 		if ok {
-			triggerCount := int64(TalentNormalStormTriggerCount)
-			extraHits := int64(TalentNormalStormExtraHits)
+			coreLevel := GetTalentLevel(talentState, def.ID)
+			triggerCount := int64(normalCoreTriggerCountForLevel(coreLevel))
+			extraHits := int64(normalCoreExtraHitsForLevel(coreLevel))
 			chaseRatio := TalentNormalStormChaseRatio
-			val, _ := def.EffectValue.(map[string]any)
-			if v, ok := val["triggerCount"].(float64); ok && v > 0 { triggerCount = int64(v) }
-			if v, ok := val["extraHits"].(float64); ok && v > 0 { extraHits = int64(v) }
-			if v, ok := val["chaseRatio"].(float64); ok && v > 0 { chaseRatio = v }
+			// 层满奖励：第 3 层满 触发次数 -20
+			if talentState != nil && isLearnedTierFull(TalentTreeNormal, 2, talentState.Talents) {
+				triggerCount -= 20
+			}
+			if triggerCount < 1 { triggerCount = 1 }
 			if hasTalent(learned, "normal_chase_up") {
 				if def2, ok2 := talentDefs["normal_chase_up"]; ok2 {
-					if val2, ok3 := def2.EffectValue.(map[string]any); ok3 {
-						if v, ok4 := val2["chaseRatio"].(float64); ok4 && v > chaseRatio { chaseRatio = v }
+					if v := normalChaseUpgradeRatioForLevel(GetTalentLevel(talentState, def2.ID)); v > chaseRatio {
+						chaseRatio = v
 					}
 				}
 			}
 			if hasTalent(learned, "normal_combo_ext") {
 				if def2, ok2 := talentDefs["normal_combo_ext"]; ok2 {
+					extraHits += int64(normalComboExtendHitsForLevel(GetTalentLevel(talentState, def2.ID)))
+				}
+			}
+			if hasTalent(learned, "normal_filler_t2a") {
+				if def2, ok2 := talentDefs["normal_filler_t2a"]; ok2 {
 					if val2, ok3 := def2.EffectValue.(map[string]any); ok3 {
-						if v, ok4 := val2["extraHits"].(float64); ok4 && v > 0 { extraHits += int64(v) }
+						if v, ok4 := val2["percent"].(float64); ok4 && v > 0 {
+							chaseRatio += v * float64(max(GetTalentLevel(talentState, def2.ID), 1))
+						}
 					}
 				}
+			}
+			if talentState != nil && isLearnedTierFull(TalentTreeNormal, 4, talentState.Talents) {
+				extraHits += 5
 			}
 
 			partKey := TalentPartKey(part.X, part.Y)
@@ -1614,7 +1713,11 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 						PartX: part.X, PartY: part.Y,
 					})
 					if hasTalent(learned, "normal_charge") {
-						combatState.PartStormComboCount[partKey] = int64(float64(triggerCount) * 0.30)
+						retainPercent := 0.30
+						if def2, ok2 := talentDefs["normal_charge"]; ok2 {
+							retainPercent = normalChargeRetainPercentForLevel(GetTalentLevel(talentState, def2.ID))
+						}
+						combatState.PartStormComboCount[partKey] = int64(float64(triggerCount) * retainPercent)
 					} else {
 						combatState.PartStormComboCount[partKey] = 0
 					}
@@ -1626,11 +1729,27 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 	if hasTalent(learned, "armor_core") && part.Type == PartTypeHeavy {
 		partKey := TalentPartKey(part.X, part.Y)
 		combatState.PartHeavyClickCount[partKey]++
-		if combatState.PartHeavyClickCount[partKey] >= 100 {
+
+		// 读取崩塌触发阈值（受天赋定义和层满奖励影响）
+		collapseTrigger := int64(100)
+		if defArmor, ok := talentDefs["armor_core"]; ok {
+			collapseTrigger = int64(armorCoreCollapseTriggerForLevel(GetTalentLevel(talentState, defArmor.ID)))
+		}
+		if talentState != nil && isLearnedTierFull(TalentTreeArmor, 1, talentState.Talents) {
+			collapseTrigger -= 30
+		}
+		if collapseTrigger < 1 { collapseTrigger = 1 }
+
+		if combatState.PartHeavyClickCount[partKey] >= collapseTrigger {
 			cd := int64(8)
-			if hasTalent(learned, "armor_collapse_ext") { cd = 15 }
+			if hasTalent(learned, "armor_collapse_ext") {
+				if defExt, okExt := talentDefs["armor_collapse_ext"]; okExt {
+					cd = int64(armorCollapseExtendForLevel(GetTalentLevel(talentState, defExt.ID)))
+				}
+			}
 			combatState.CollapseParts = append(combatState.CollapseParts, partIndex)
 			combatState.CollapseEndsAt = now + cd
+			combatState.CollapseDuration = cd
 			events = append(events, TalentTriggerEvent{
 				TalentID: "armor_core", Name: "灭绝穿甲", EffectType: "collapse_trigger",
 				Message:  fmt.Sprintf("结构崩塌！护甲归零 %d 秒", cd),
@@ -1641,7 +1760,15 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		}
 	}
 
-	if hasTalent(learned, "armor_auto_strike") && now-combatState.LastAutoStrikeAt >= 20 {
+	if hasTalent(learned, "armor_auto_strike") {
+		asInterval := int64(20)
+		asRatio := 3.0
+		if defAS, ok := talentDefs["armor_auto_strike"]; ok {
+			level := GetTalentLevel(talentState, defAS.ID)
+			asInterval = int64(armorAutoStrikeIntervalForLevel(level))
+			asRatio = armorAutoStrikeRatioForLevel(level)
+		}
+		if now-combatState.LastAutoStrikeAt >= asInterval {
 		var best *BossPart
 		for i := range boss.Parts {
 			p := &boss.Parts[i]
@@ -1649,7 +1776,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			if best == nil || p.CurrentHP > best.CurrentHP { best = p }
 		}
 		if best != nil {
-			sd := int64(float64(baseDamage) * 3.0)
+			sd := int64(float64(baseDamage) * asRatio)
 			if sd > best.CurrentHP { sd = best.CurrentHP }
 			best.CurrentHP -= sd
 			if best.CurrentHP <= 0 { best.CurrentHP = 0; best.Alive = false }
@@ -1660,14 +1787,25 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 				ExtraDamage: sd, Message: "自动打击触发",
 			})
 			damageTypeOverride = "trueDamage"
+			}
 		}
 	}
 
 	if hasTalent(learned, "armor_ultimate") && part.Type == PartTypeHeavy {
 		pk := TalentPartKey(part.X, part.Y)
-		if !combatState.JudgmentDayUsed[pk] && combatState.PartHeavyClickCount[pk] >= 100 {
+		jdTrigger := int64(100)
+		hpCut := 0.50
+		if defAU, ok := talentDefs["armor_ultimate"]; ok {
+			level := GetTalentLevel(talentState, defAU.ID)
+			jdTrigger = int64(armorUltimateTriggerCountForLevel(level))
+			hpCut = armorUltimateHpCutForLevel(level)
+		}
+		if !combatState.JudgmentDayUsed[pk] && combatState.PartHeavyClickCount[pk] >= jdTrigger {
 			combatState.JudgmentDayUsed[pk] = true
-			cd := boss.MaxHP / 2
+			if talentState != nil && isLearnedTierFull(TalentTreeArmor, 4, talentState.Talents) {
+				hpCut += 0.10
+			}
+			cd := int64(float64(boss.MaxHP) * hpCut)
 			if cd > part.CurrentHP { cd = part.CurrentHP }
 			part.CurrentHP -= cd
 			if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
@@ -1682,7 +1820,11 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 	}
 
 	if hasTalent(learned, "crit_bleed") && isCritical {
-		if bd := int64(float64(baseDamage) * 0.60); bd > 0 {
+		ratio := 0.60
+		if def, ok := talentDefs["crit_bleed"]; ok {
+			ratio = critBleedRatioForLevel(GetTalentLevel(talentState, def.ID))
+		}
+		if bd := int64(float64(baseDamage) * ratio); bd > 0 {
 			totalExtra += bd
 			events = append(events, TalentTriggerEvent{
 				TalentID: "crit_bleed", Name: "致命出血", EffectType: "bleed",
@@ -1692,26 +1834,20 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		}
 	}
 
-	if hasTalent(learned, "crit_omen_reap") && combatState.OmenStacks >= 30 {
-		rd := int64(float64(baseDamage) * 2.0)
-		if rd > part.CurrentHP { rd = part.CurrentHP }
-		part.CurrentHP -= rd
-		if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
-		boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
-		totalExtra += rd
-		events = append(events, TalentTriggerEvent{
-			TalentID: "crit_omen_reap", Name: "死兆收割", EffectType: "omen_harvest",
-			ExtraDamage: rd, Message: "死兆收割",
-			PartX: part.X, PartY: part.Y,
-		})
-		if rd > baseDamage*5 { damageTypeOverride = "doomsday" }
-	}
+
 
 	if hasTalent(learned, "crit_final_cut") && isCritical {
 		combatState.CritCount++
-		if combatState.CritCount >= 120 && now-combatState.LastFinalCutAt >= 30 {
+		triggerCount := int64(120)
+		hpCut := 0.12
+		if def, ok := talentDefs["crit_final_cut"]; ok {
+			level := GetTalentLevel(talentState, def.ID)
+			triggerCount = int64(critFinalCutCountForLevel(level))
+			hpCut = critFinalCutHpCutForLevel(level)
+		}
+		if combatState.CritCount >= triggerCount && now-combatState.LastFinalCutAt >= 30 {
 			combatState.LastFinalCutAt = now
-			cd := int64(float64(boss.MaxHP) * 0.12)
+			cd := int64(float64(boss.MaxHP) * hpCut)
 			if cd > part.CurrentHP { cd = part.CurrentHP }
 			part.CurrentHP -= cd
 			if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
@@ -1726,37 +1862,51 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		}
 	}
 
-	if hasTalent(learned, "crit_death_ecstasy") && combatState.OmenStacks >= 50 && combatState.DeathEcstasyEndsAt <= now {
-		combatState.OmenStacks -= 50
-		combatState.DeathEcstasyEndsAt = now + 6
-		events = append(events, TalentTriggerEvent{
-			TalentID: "crit_death_ecstasy", Name: "死亡狂喜激活！6 秒内暴伤 +200%，全攻击视为弱点", EffectType: "death_ecstasy",
-			Message: "死亡狂喜激活！6 秒内暴伤 +200%，全攻击视为弱点",
-			PartX: part.X, PartY: part.Y,
-		})
+	if hasTalent(learned, "crit_death_ecstasy") && combatState.OmenStacks >= 100 {
+		def, ok := talentDefs["crit_death_ecstasy"]
+		if ok {
+			critDmgMult := critDeathEcstasyMultForLevel(GetTalentLevel(talentState, def.ID))
+			if talentState != nil && isLearnedTierFull(TalentTreeCrit, 4, talentState.Talents) {
+				critDmgMult += 2.0
+			}
+
+			// 消耗 100 层（多余保留）
+			consumed := 100
+			if combatState.OmenStacks < consumed {
+				consumed = combatState.OmenStacks
+			}
+			combatState.OmenStacks -= consumed
+
+			// 层数系数锁死 100 上限
+			effStacks := min(consumed, 100)
+			ed := int64(float64(baseDamage) * float64(effStacks) * critDmgMult)
+			if ed > part.CurrentHP { ed = part.CurrentHP }
+			part.CurrentHP -= ed
+			if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
+			boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+			totalExtra += ed
+			events = append(events, TalentTriggerEvent{
+				TalentID: "crit_death_ecstasy", Name: "死亡狂喜", EffectType: "death_ecstasy_ult",
+				ExtraDamage: ed, Message: "死亡狂喜！",
+				PartX: part.X, PartY: part.Y,
+			})
+			damageTypeOverride = "doomsday"
+		}
 	}
 
-	if hasTalent(learned, "crit_ultimate") && !part.Alive && len(combatState.DoomMarks) > 0 {
+	if hasTalent(learned, "crit_doom_judgment") && !part.Alive && len(combatState.DoomMarks) > 0 {
 		for _, idx := range combatState.DoomMarks {
 			if idx == partIndex {
-				combatState.DoomDestroyed++
-				if combatState.DoomDestroyed == 1 {
-					combatState.OmenStacks += 100
-					combatState.DoomCritBuff = true
-					events = append(events, TalentTriggerEvent{
-						TalentID: "crit_ultimate", Name: "末日审判", EffectType: "doom_judgment",
-						Message: "终结标记击碎！+100 死兆，下次暴伤 x3",
-						PartX: part.X, PartY: part.Y,
-					})
-					damageTypeOverride = "doomsday"
-				} else if combatState.DoomDestroyed >= 2 && combatState.DoomCritBuff {
-					events = append(events, TalentTriggerEvent{
-						TalentID: "crit_ultimate", Name: "末日审判", EffectType: "doom_judgment",
-						Message: "双标记击碎！暴伤 x6",
-						PartX: part.X, PartY: part.Y,
-					})
-					damageTypeOverride = "doomsday"
-				}
+				def, ok := talentDefs["crit_doom_judgment"]
+				if !ok { break }
+				omenReward := critDoomOmenPerMarkForLevel(GetTalentLevel(talentState, def.ID))
+				combatState.OmenStacks += omenReward
+				events = append(events, TalentTriggerEvent{
+					TalentID: "crit_doom_judgment", Name: "末日审判", EffectType: "doom_mark",
+					Message: fmt.Sprintf("标记触发！+%d 死兆", omenReward),
+					PartX: part.X, PartY: part.Y,
+				})
+				damageTypeOverride = "doomsday"
 				break
 			}
 		}
@@ -1772,12 +1922,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		combatState.CollapseParts = nil
 		combatState.CollapseEndsAt = 0
 	}
-	if combatState.DeathEcstasyEndsAt > 0 && now >= combatState.DeathEcstasyEndsAt {
-		combatState.DeathEcstasyEndsAt = 0
-	}
-	if hasTalent(learned, "crit_omen_reap") && combatState.OmenStacks >= 30 {
-		combatState.OmenStacks -= 30
-	}
+
 
 	return totalExtra, events, damageTypeOverride
 }
@@ -2070,8 +2215,8 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 
 	attackPower, armorPen, critRate, critDmgMult := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
-	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 0.80)
-	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent+critRate*100, 0, 100)
+	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 1.0)
+	stats.CriticalChancePercent += critRate * 100
 	stats.CritDamageMultiplier += critDmgMult
 
 	mods, err := s.ComputeTalentModifiers(ctx, nickname)
@@ -2080,8 +2225,9 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 	}
 	if mods != nil {
 		stats.AttackPower = int64(float64(stats.AttackPower) * (1 + max(0.0, mods.AttackPowerPercent)))
-		stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+mods.ArmorPenExtra, 0, 0.80)
+		stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+mods.ArmorPenExtra, 0, 1.0)
 		stats.AllDamageAmplify += mods.AllDamageAmplify
+		stats.CriticalChancePercent += mods.CritRateBonus
 		stats.CritDamageMultiplier += mods.CritDamagePercentBonus
 		stats.PerPartDamagePercent = max(0.0, mods.PerPartDamagePercent)
 		stats.LowHpMultiplier = max(1.0, mods.LowHpMultiplier)
@@ -2089,7 +2235,16 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 		stats.PartTypeDamageSoft += max(0.0, mods.PartTypeBonus[PartTypeSoft])
 		stats.PartTypeDamageHeavy += max(0.0, mods.PartTypeBonus[PartTypeHeavy])
 		stats.PartTypeDamageWeak += max(0.0, mods.PartTypeBonus[PartTypeWeak])
+		if mods.PenToAmplifyRatio > 0 {
+			stats.AllDamageAmplify += stats.ArmorPenPercent * mods.PenToAmplifyRatio
+		}
+		if mods.OverflowToCritDmgRatio > 0 && stats.CriticalChancePercent > 100 {
+			overflow := stats.CriticalChancePercent - 100
+			stats.CritDamageMultiplier += overflow * mods.OverflowToCritDmgRatio
+			stats.CriticalChancePercent = 100
+		}
 	}
+	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent, 0, 100)
 
 	result := deriveCombatStats(stats)
 	return result, nil

@@ -56,7 +56,7 @@ type ButtonStore interface {
 	DeleteMessage(context.Context, string) error
 	// 天赋系统
 	GetTalentState(context.Context, string) (*vote.TalentState, error)
-	LearnTalent(context.Context, string, string) error
+	UpgradeTalent(context.Context, string, string, int) error
 	ResetTalents(context.Context, string) error
 	ComputeTalentModifiers(context.Context, string) (*vote.TalentModifiers, error)
 }

@@ -36,6 +36,27 @@
 - `frontend/`: Vue 页面、样式和 Vite 配置
 - `backend/`: Hertz Go 服务、Redis 读写、SSE、限流和测试
 
+## 天赋文档入口
+
+当前天赋系统文档已经按“正式口径 / 实施记录 / 历史草案”分层整理。
+
+- 正式口径：
+  - [docs/superpowers/specs/2026-04-28-talent-system-rework-design.md](./docs/superpowers/specs/2026-04-28-talent-system-rework-design.md)
+  - [docs/2026-04-28-天赋成本调整总结.md](./docs/2026-04-28-天赋成本调整总结.md)
+- 实施记录：
+  - [docs/superpowers/plans/2026-04-28-talent-system-rework-plan.md](./docs/superpowers/plans/2026-04-28-talent-system-rework-plan.md)
+- 当前开发参考：
+  - [docs/developer-reference/2026-04-26-天赋系统开发参考.md](./docs/developer-reference/2026-04-26-天赋系统开发参考.md)
+  - [docs/developer-reference/2026-04-27-均衡攻势工作原理.md](./docs/developer-reference/2026-04-27-均衡攻势工作原理.md)
+  - [docs/developer-reference/2026-04-27-碎盾攻坚工作原理.md](./docs/developer-reference/2026-04-27-碎盾攻坚工作原理.md)
+  - [docs/developer-reference/2026-04-27-致命洞察工作原理.md](./docs/developer-reference/2026-04-27-致命洞察工作原理.md)
+
+说明：
+
+- 查当前数值、公式、总成本时，只看“正式口径”两份文档。
+- 查落地步骤、接口替换过程时，再看“实施记录”。
+- `docs/designs/` 里的旧天赋草案已标注为历史文档，不再作为当前实现依据。
+
 ## Redis 数据结构
 
 每个按钮使用一个 Redis `Hash`，键名格式：

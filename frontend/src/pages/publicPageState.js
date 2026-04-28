@@ -135,13 +135,13 @@ function defaultTalentVisualState() {
     omenStacks: 0,
     silverStormActive: false,
     silverStormRemaining: 0,
+    silverStormEndsAt: 0,
     deathEcstasyActive: false,
-    deathEcstasyEndsAt: 0,
     collapsePartKeys: [],
     collapseEndsAt: 0,
+    collapseDuration: 8,
     doomMarks: [],
-    doomDestroyed: 0,
-    doomCritBuff: false,
+    doomMarkCumDamage: {},
     finalCutCooldown: 0,
   }
 }
@@ -161,8 +161,10 @@ const talentCombatState = ref(null)
 
 // 连击计数系统
 const COMBO_TIMEOUT_MS = 5000
-const STORM_TRIGGER = 100
-const ARMOR_TRIGGER = 100
+const DEFAULT_STORM_TRIGGER = 100
+const DEFAULT_ARMOR_TRIGGER = 100
+const stormTrigger = computed(() => talentCombatState.value?.normalTriggerCount || DEFAULT_STORM_TRIGGER)
+const armorTrigger = computed(() => talentCombatState.value?.armorTriggerCount || DEFAULT_ARMOR_TRIGGER)
 const comboCount = ref(0)
 const stormCombo = ref(0)
 const armorCombo = ref(0)
@@ -225,8 +227,8 @@ function scheduleComboClear() {
   comboTimer = setTimeout(() => { if (Date.now() - comboLastClickAt.value >= COMBO_TIMEOUT_MS) clearComboState() }, COMBO_TIMEOUT_MS + 300)
 }
 
-const stormProgress = computed(() => Math.min(100, Math.round((stormCombo.value / STORM_TRIGGER) * 100)))
-const armorProgress = computed(() => Math.min(100, Math.round((armorCombo.value / ARMOR_TRIGGER) * 100)))
+const stormProgress = computed(() => Math.min(100, Math.round((stormCombo.value / stormTrigger.value) * 100)))
+const armorProgress = computed(() => Math.min(100, Math.round((armorCombo.value / armorTrigger.value) * 100)))
 
 const partProgressList = computed(() => {
   const parts = boss.value?.parts
@@ -240,6 +242,7 @@ const partProgressList = computed(() => {
     const storm = Number(stormMap[key]) || 0
     const armor = Number(heavyMap[key]) || 0
     if (storm <= 0 && armor <= 0) continue
+    if (!part.alive) continue
     result.push({
       key,
       name: part.displayName || partTypeLabel(part.type),
@@ -247,9 +250,9 @@ const partProgressList = computed(() => {
       x: part.x,
       y: part.y,
       storm,
-      stormProgress: Math.min(100, Math.round((storm / 100) * 100)),
+      stormProgress: Math.min(100, Math.round((storm / stormTrigger.value) * 100)),
       armor,
-      armorProgress: Math.min(100, Math.round((armor / 100) * 100)),
+      armorProgress: Math.min(100, Math.round((armor / armorTrigger.value) * 100)),
       alive: part.alive,
     })
   }
@@ -1007,6 +1010,7 @@ function applyPublicState(payload) {
         if (previousBoss?.id && boss.value?.id && previousBoss.id !== boss.value.id) {
             clearTalentVisualState()
             clearComboState()
+            talentCombatState.value = null
         }
     } else if (boss.value?.id && !lastBossResourceVersion) {
         void loadBossResources(true)
@@ -1150,13 +1154,14 @@ function applyTalentCombatState(state) {
   const vs = talentVisualState.value
   vs.omenStacks = Number(state.omenStacks) || 0
 
-  vs.silverStormActive = Boolean(state.silverStormActive)
-  vs.silverStormRemaining = Number(state.silverStormRemaining) || 0
+  vs.silverStormEndsAt = Number(state.silverStormEndsAt) || 0
+  vs.silverStormActive = Boolean(state.silverStormActive) && (!vs.silverStormEndsAt || vs.silverStormEndsAt > Date.now() / 1000)
+  vs.silverStormRemaining = vs.silverStormEndsAt
+    ? Math.max(0, Math.ceil(vs.silverStormEndsAt - Date.now() / 1000))
+    : (Number(state.silverStormRemaining) || 0)
 
-  vs.deathEcstasyActive = state.deathEcstasyEndsAt > Math.floor(Date.now() / 1000)
-	  vs.deathEcstasyEndsAt = Number(state.deathEcstasyEndsAt) || 0
-  vs.doomDestroyed = Math.min(2, Number(state.doomDestroyed) || 0)
-  vs.doomCritBuff = Boolean(state.doomCritBuff)
+  vs.deathEcstasyActive = Boolean(state.deathEcstasyActive)
+	  vs.doomMarkCumDamage = state.doomMarkCumDamage || {}
 
   // doomMarks: indices → "x-y" keys
   vs.doomMarks = Array.isArray(state.doomMarks)
@@ -1167,6 +1172,7 @@ function applyTalentCombatState(state) {
     ? state.collapseParts.map(indexToPartKey).filter(Boolean)
     : []
   vs.collapseEndsAt = Number(state.collapseEndsAt) || 0
+  vs.collapseDuration = Number(state.collapseDuration) || 8
 }
 
 function applyTalentVisualState(events) {
@@ -1181,8 +1187,6 @@ function applyTalentVisualState(events) {
                 onStormComboTrigger()
                 break
             case 'silver_storm':
-                vs.silverStormActive = true
-                vs.silverStormRemaining = 15
                 onStormComboTrigger()
                 break
             case 'death_ecstasy':
@@ -1198,8 +1202,6 @@ function applyTalentVisualState(events) {
                 }
                 break
             case 'doom_judgment':
-                vs.doomDestroyed = Math.min(2, vs.doomDestroyed + 1)
-                vs.doomCritBuff = true
                 break
             case 'auto_strike':
             case 'bleed':
@@ -2114,6 +2116,8 @@ export function usePublicPageState() {
         armorCombo,
         stormProgress,
         armorProgress,
+        stormTrigger,
+        armorTrigger,
         partProgressList,
         talentCombatState,
         comboTriggerFlash,

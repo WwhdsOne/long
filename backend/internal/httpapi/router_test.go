@@ -16,6 +16,7 @@ import (
 
 type mockStore struct {
 	state                 vote.State
+	talentState           *vote.TalentState
 	snapshot              vote.Snapshot
 	equipState            vote.State
 	adminState            vote.AdminState
@@ -376,10 +377,20 @@ func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
 
 
 func (m *mockStore) GetTalentState(_ context.Context, _ string) (*vote.TalentState, error) {
-	return nil, nil
+	if m.talentState != nil {
+		return m.talentState, nil
+	}
+	return &vote.TalentState{Talents: map[string]int{}}, nil
 }
 
-func (m *mockStore) LearnTalent(_ context.Context, _ string, _ string) error {
+func (m *mockStore) UpgradeTalent(_ context.Context, _ string, _ string, _ int) error {
+	if m.talentState == nil {
+		m.talentState = &vote.TalentState{Talents: map[string]int{}}
+	}
+	if m.talentState.Talents == nil {
+		m.talentState.Talents = map[string]int{}
+	}
+	m.talentState.Talents["normal_core"] = 2
 	return nil
 }
 
@@ -455,6 +466,7 @@ func (m *mockChangePublisher) PublishChange(_ context.Context, change vote.State
 	m.changes = append(m.changes, change)
 	return nil
 }
+
 func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 	store := &mockStore{
 		bossHistory: []vote.BossHistoryEntry{
@@ -501,6 +513,112 @@ func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 	}
 	if len(payload[0].Damage) != 1 || payload[0].Damage[0].Nickname != "阿明" {
 		t.Fatalf("unexpected history damage payload: %+v", payload[0].Damage)
+	}
+}
+
+func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			TalentPoints: 345,
+		},
+		talentState: &vote.TalentState{
+			Talents: map[string]int{
+				"normal_core": 2,
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:               store,
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{verifyNickname: "阿明"},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/talents/state", nil)
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload map[string]any
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	effectLines, ok := payload["effectLines"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected effectLines map in payload, got %+v", payload["effectLines"])
+	}
+	normalCore, ok := effectLines["normal_core"].([]any)
+	if !ok || len(normalCore) != 3 {
+		t.Fatalf("expected normal_core effect lines, got %+v", effectLines["normal_core"])
+	}
+	firstLine, ok := normalCore[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first line object, got %+v", normalCore[0])
+	}
+	if firstLine["label"] != "触发次数" || firstLine["text"] != "45 → 40" {
+		t.Fatalf("expected trigger count preview from backend, got %+v", firstLine)
+	}
+}
+
+func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
+	store := &mockStore{
+		state: vote.State{
+			TalentPoints: 338,
+		},
+		talentState: &vote.TalentState{
+			Talents: map[string]int{
+				"normal_core": 1,
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:               store,
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{verifyNickname: "阿明"},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/talents/upgrade", strings.NewReader(`{"talentId":"normal_core","targetLevel":2}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload map[string]any
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	effectLines, ok := payload["effectLines"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected effectLines map in payload, got %+v", payload["effectLines"])
+	}
+	normalCore, ok := effectLines["normal_core"].([]any)
+	if !ok || len(normalCore) != 3 {
+		t.Fatalf("expected normal_core effect lines, got %+v", effectLines["normal_core"])
+	}
+	secondLine, ok := normalCore[1].(map[string]any)
+	if !ok {
+		t.Fatalf("expected second line object, got %+v", normalCore[1])
+	}
+	if secondLine["label"] != "追击段数" || secondLine["text"] != "24 → 28" {
+		t.Fatalf("expected updated preview from backend, got %+v", secondLine)
+	}
+	firstLine, ok := normalCore[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected first line object, got %+v", normalCore[0])
+	}
+	if firstLine["label"] != "触发次数" || firstLine["text"] != "45 → 40" {
+		t.Fatalf("expected updated trigger count preview from backend, got %+v", firstLine)
 	}
 }
 

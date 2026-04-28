@@ -12,7 +12,8 @@ import (
 )
 
 type talentLearnRequest struct {
-	TalentID string `json:"talentId"`
+	TalentID    string `json:"talentId"`
+	TargetLevel int    `json:"targetLevel"`
 }
 
 type talentAPI struct {
@@ -30,7 +31,7 @@ func registerTalentRoutes(router route.IRouter, options Options) {
 	talentGroup.Use(requireTalentAuth(h.auth))
 	{
 		talentGroup.GET("/state", h.getState)
-		talentGroup.POST("/learn", h.learn)
+		talentGroup.POST("/upgrade", h.upgrade)
 		talentGroup.POST("/reset", h.reset)
 		talentGroup.GET("/defs", h.getDefs)
 	}
@@ -73,10 +74,11 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 		"trees":        allTrees,
 		"talents":      state.Talents,
 		"talentPoints": userState.TalentPoints,
+		"effectLines":  vote.BuildTalentEffectLineMap(state),
 	})
 }
 
-func (h *talentAPI) learn(ctx context.Context, c *app.RequestContext) {
+func (h *talentAPI) upgrade(ctx context.Context, c *app.RequestContext) {
 	nickname, _ := c.Get("nickname")
 	nickStr, _ := nickname.(string)
 
@@ -86,7 +88,11 @@ func (h *talentAPI) learn(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	if err := h.store.LearnTalent(ctx, nickStr, req.TalentID); err != nil {
+	targetLevel := req.TargetLevel
+	if targetLevel < 1 {
+		targetLevel = 1
+	}
+	if err := h.store.UpgradeTalent(ctx, nickStr, req.TalentID, targetLevel); err != nil {
 		c.JSON(talentErrorStatus(err), map[string]string{
 			"error":   talentErrorCode(err),
 			"message": talentErrorMessage(err),
@@ -94,6 +100,11 @@ func (h *talentAPI) learn(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	state, err := h.store.GetTalentState(ctx, nickStr)
+	if err != nil {
+		c.JSON(consts.StatusInternalServerError, map[string]string{"error": "talent state fetch failed"})
+		return
+	}
 	userState, err := h.store.GetUserState(ctx, nickStr)
 	if err != nil {
 		c.JSON(consts.StatusInternalServerError, map[string]string{"error": "user state fetch failed"})
@@ -101,7 +112,9 @@ func (h *talentAPI) learn(ctx context.Context, c *app.RequestContext) {
 	}
 	c.JSON(consts.StatusOK, map[string]any{
 		"status":       "ok",
+		"talents":      state.Talents,
 		"talentPoints": userState.TalentPoints,
+		"effectLines":  vote.BuildTalentEffectLineMap(state),
 	})
 }
 
@@ -162,6 +175,7 @@ func defsToMap(defs []vote.TalentDef) []map[string]any {
 			"effectType":        d.EffectType,
 			"effectValue":       d.EffectValue,
 			"effectDescription": vote.TalentEffectDescription(d),
+			"maxLevel":          d.MaxLevel,
 			"cost":              d.Cost,
 			"prerequisite":      d.Prerequisite,
 			"prerequisiteName":  vote.TalentPrerequisiteName(d),
@@ -178,6 +192,8 @@ func talentErrorStatus(err error) int {
 		errors.Is(err, vote.ErrTalentPrerequisite),
 		errors.Is(err, vote.ErrTalentAlreadyLearned),
 		errors.Is(err, vote.ErrTalentInvalidCost),
+		errors.Is(err, vote.ErrTalentMaxLevel),
+		errors.Is(err, vote.ErrTalentInvalidLevel),
 		errors.Is(err, vote.ErrInvalidTalentTree):
 		return consts.StatusBadRequest
 	default:
@@ -199,6 +215,10 @@ func talentErrorCode(err error) string {
 		return "INVALID_TALENT_TREE"
 	case errors.Is(err, vote.ErrTalentNotFound):
 		return "TALENT_NOT_FOUND"
+	case errors.Is(err, vote.ErrTalentMaxLevel):
+		return "TALENT_MAX_LEVEL"
+	case errors.Is(err, vote.ErrTalentInvalidLevel):
+		return "TALENT_INVALID_LEVEL"
 	default:
 		return "TALENT_OPERATION_FAILED"
 	}
@@ -218,6 +238,10 @@ func talentErrorMessage(err error) string {
 		return "天赋树选择无效。"
 	case errors.Is(err, vote.ErrTalentNotFound):
 		return "未找到该天赋节点。"
+	case errors.Is(err, vote.ErrTalentMaxLevel):
+		return "已达到最大等级。"
+	case errors.Is(err, vote.ErrTalentInvalidLevel):
+		return "无效的等级参数。"
 	default:
 		return "天赋操作失败，请稍后重试。"
 	}

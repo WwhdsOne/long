@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, reactive } from 'vue'
 import { usePublicPageState } from './publicPageState'
 import { effectAssetUrl } from '../utils/effectAssets'
 import { watch } from 'vue'
@@ -10,10 +10,46 @@ const { isLoggedIn, talentPoints: sharedTalentPoints } = usePublicPageState()
 const loading = ref(false)
 const learnLoading = ref(false)
 const errorMsg = ref('')
+const toastMsg = ref('')
+let toastTimer = 0
+
+function showToast(msg) {
+  toastMsg.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toastMsg.value = '' }, 2500)
+}
+
 const treeDefs = ref(null)
 const talentState = ref(null)
+const talentEffectLines = ref({})
 const selectedTree = ref('normal')
 const selectedMarker = ref({ panel: 'main', id: '' })
+
+const confirmModal = reactive({
+  show: false,
+  title: '',
+  message: '',
+  resolve: null,
+})
+
+function showConfirm(title, message) {
+  return new Promise((resolve) => {
+    confirmModal.title = title
+    confirmModal.message = message
+    confirmModal.resolve = resolve
+    confirmModal.show = true
+  })
+}
+
+function confirmOK() {
+  confirmModal.show = false
+  if (confirmModal.resolve) confirmModal.resolve(true)
+}
+
+function confirmCancel() {
+  confirmModal.show = false
+  if (confirmModal.resolve) confirmModal.resolve(false)
+}
 
 const treeConfig = {
   normal: { name: '均衡攻势', color: '#2bb873' },
@@ -26,8 +62,14 @@ const tierRadiusPercent = { 0: 14, 1: 28, 2: 42, 3: 56, 4: 70 }
 const trees = ['normal', 'armor', 'crit']
 const arcStartAngle = 135
 const arcEndAngle = 45
+const talentCostLevelExponent = 0.85
+const talentCostMultiplier = 1.8
 
-const learnedSet = computed(() => new Set(talentState.value?.talents || []))
+const learnedMap = reactive(talentState.value?.talents || {})
+
+function nodeLevel(talentId) {
+  return learnedMap[talentId] || 0
+}
 
 function isFillerNode(id) {
   if (!id) return false
@@ -46,14 +88,17 @@ function talentIconPath(id) {
 const tierNodeCount = { 0: 1, 1: 5, 2: 5, 3: 4, 4: 1 }
 
 function learnedInTierCount(tree, tier) {
-  return (talentState.value?.talents || []).filter((id) => {
-    const def = findDef(id)
-    return def && def.tree === tree && def.tier === tier
-  }).length
+  let count = 0
+  for (const def of treeDefs.value?.trees?.[tree]?.talents || []) {
+    if (def.tier === tier && nodeLevel(def.id) > 0) count++
+  }
+  return count
 }
 
 function isTierFull(tree, tier) {
-  return learnedInTierCount(tree, tier) >= (tierNodeCount[tier] || 0)
+  const needed = tierNodeCount[tier] || 0
+  if (needed === 0) return false
+  return learnedInTierCount(tree, tier) >= needed
 }
 
 function isLayerLocked(def) {
@@ -104,33 +149,38 @@ function findDef(id) {
 }
 
 function isLearned(id) {
-  return learnedSet.value.has(id)
+  return nodeLevel(id) > 0
 }
 
 function isPrerequisiteMet(def) {
   if (!def?.prerequisite) return true
-  return learnedSet.value.has(def.prerequisite)
+  return nodeLevel(def.prerequisite) > 0
 }
 
 function canLearn(def) {
-  if (!def || isLearned(def.id)) return false
+  if (!def) return false
+  if (nodeLevel(def.id) >= (def.maxLevel || 5)) return false
+  if (isLearned(def.id)) return false
   if (isLayerLocked(def)) return false
   if (!isPrerequisiteMet(def)) return false
-  return availableTalentPoints.value >= Number(def.cost || 0)
+  return availableTalentPoints.value >= talentCostForLevel(def, 1)
 }
 
 function nodeState(def) {
-  if (isLearned(def.id)) return 'learned'
+  const lv = nodeLevel(def.id)
+  if (lv >= (def.maxLevel || 5)) return 'maxed'
+  if (lv > 0) return 'upgradable'
   if (isLayerLocked(def)) return 'layer-locked'
   if (!isPrerequisiteMet(def)) return 'locked'
-  if (availableTalentPoints.value < Number(def.cost || 0)) return 'insufficient'
+  if (availableTalentPoints.value < talentCostForLevel(def, 1)) return 'insufficient'
   return 'available'
 }
 
 function stateLabel(def) {
   const state = nodeState(def)
   const map = {
-    learned: '已学习',
+    upgradable: '可升级',
+    maxed: '已满级',
     available: '可学习',
     insufficient: '天赋点不足',
     locked: '前置未满足',
@@ -149,14 +199,39 @@ function effectDescription(def) {
   return def?.effectDescription || def?.description || def?.effect || '暂无效果说明'
 }
 
+function effectLines(def, curLv) {
+  return talentEffectLines.value?.[def?.id] || []
+}
+
 function stateReason(def) {
   const state = nodeState(def)
-  if (state === 'learned') return '该天赋已生效'
+  if (state === 'upgradable') return '点击可升级'
+  if (state === 'maxed') return '已提升至最高等级'
   if (state === 'available') return '点击即可学习'
   if (state === 'insufficient') return '当前天赋点不足'
   if (state === 'locked') return '需要先学习前置天赋'
   if (state === 'layer-locked') return '需要先点满上一层天赋'
   return ''
+}
+
+function talentCostForLevel(def, targetLevel) {
+  if (!def?.cost || !targetLevel || targetLevel < 1) return 0
+  return Math.round(def.cost * Math.pow(targetLevel, talentCostLevelExponent) * talentCostMultiplier)
+}
+
+function talentCostToUpgrade(def, fromLevel, toLevel) {
+  if (!def?.cost || !toLevel || toLevel <= fromLevel) return 0
+  let total = 0
+  for (let level = fromLevel + 1; level <= toLevel; level += 1) {
+    total += talentCostForLevel(def, level)
+  }
+  return total
+}
+
+function upgradeCost(def) {
+  const lv = nodeLevel(def.id)
+  if (lv >= (def.maxLevel || 5)) return 0
+  return talentCostToUpgrade(def, lv, lv + 1)
 }
 
 function toPolarPoint(radius, angle) {
@@ -304,6 +379,12 @@ async function loadState() {
     }
 
     talentState.value = await res.json()
+    talentEffectLines.value = talentState.value?.effectLines || {}
+    // Sync learnedMap from API response (talents is now {talentId: level} object)
+    Object.keys(learnedMap).forEach(k => delete learnedMap[k])
+    if (talentState.value?.talents) {
+      Object.assign(learnedMap, talentState.value.talents)
+    }
     if (!selectedTree.value) selectedTree.value = 'normal'
   } catch (error) {
     errorMsg.value = error.message || '加载天赋状态失败'
@@ -316,35 +397,52 @@ async function selectTree(tree) {
   await loadState()
 }
 
-async function learnTalent(def) {
-  if (!isLoggedIn.value || learnLoading.value || !def || !canLearn(def)) return
+async function handleNodeClick(item) {
+  if (!isLoggedIn.value || learnLoading.value) return
+  const currentLevel = nodeLevel(item.id)
+  const maxLevel = item.maxLevel || 5
+
+  if (currentLevel >= maxLevel) return // 已满级
+
+  const targetLevel = currentLevel + 1
+  const cost = talentCostToUpgrade(item, currentLevel, targetLevel)
+
+  if (cost > availableTalentPoints.value) {
+    showToast('天赋点不足')
+    return
+  }
+
+  // Confirmation for upgrade (skip for Lv1 first-learn)
+  if (currentLevel > 0) {
+    if (!(await showConfirm('确认升级', `将 ${item.name} 从 Lv${currentLevel} 升级到 Lv${targetLevel}，消耗 ${cost} 天赋点？`))) {
+      return
+    }
+  }
+
   learnLoading.value = true
   errorMsg.value = ''
   try {
-    const res = await fetch('/api/talents/learn', {
+    const resp = await fetch('/api/talents/upgrade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ talentId: def.id }),
+      body: JSON.stringify({ talentId: item.id, targetLevel }),
     })
-
-    if (!res.ok) {
-      const payload = await safeJSON(res)
-      throw new Error(payload?.message || '学习天赋失败')
+    if (!resp.ok) {
+      const data = await safeJSON(resp)
+      throw new Error(data?.message || '升级失败')
     }
-
-    await loadState()
-  } catch (error) {
-    errorMsg.value = error.message || '学习天赋失败'
+    const data = await resp.json()
+    talentState.value.talentPoints = data.talentPoints
+    if (data.talents) {
+      talentState.value.talents = data.talents
+    }
+    talentEffectLines.value = data.effectLines || talentEffectLines.value
+    learnedMap[item.id] = targetLevel
+  } catch (e) {
+    showToast(e.message)
   } finally {
     learnLoading.value = false
-  }
-}
-
-function clickNode(def) {
-  selectNode(def)
-  if (canLearn(def)) {
-    void learnTalent(def)
   }
 }
 
@@ -354,7 +452,7 @@ function clearNode() {
 
 async function resetTalents() {
   if (!isLoggedIn.value) return
-  if (!window.confirm('确定洗点并返还已消耗天赋点吗？')) return
+  if (!(await showConfirm('确认洗点', '确定洗点并返还已消耗天赋点吗？'))) return
 
   loading.value = true
   errorMsg.value = ''
@@ -439,6 +537,9 @@ watch(isLoggedIn, (val) => {
         </header>
 
         <div class="talent-half-ring" :style="{ '--active-color': treeConfig[selectedTree]?.color }">
+          <Transition name="toast">
+            <div v-if="toastMsg" class="talent-toast">{{ toastMsg }}</div>
+          </Transition>
           <div v-if="activeTierBonuses.length > 0" class="talent-tier-bonuses">
             <span
                 v-for="b in activeTierBonuses"
@@ -464,14 +565,18 @@ watch(isLoggedIn, (val) => {
               class="talent-dot"
               :class="[
               `talent-dot--${nodeState(item)}`,
-              { 'talent-dot--selected': selectedMarker.id === item.id },
+              `talent-dot--lv${nodeLevel(item.id)}`,
               { 'talent-dot--filler': isFillerNode(item.id) },
+              { 'talent-dot--selected': selectedMarker?.id === item.id },
             ]"
               :style="ringNodeStyle(item)"
+              @click="handleNodeClick(item)"
               @mouseenter="selectNode(item)"
               @mouseleave="clearNode"
-              @click="learnTalent(item)"
           >
+            <span class="talent-dot__level" v-if="nodeLevel(item.id) > 0">
+              Lv{{ nodeLevel(item.id) }}
+            </span>
             <img
                 v-if="talentIconPath(item.id)"
                 :src="talentIconPath(item.id)"
@@ -480,15 +585,25 @@ watch(isLoggedIn, (val) => {
                 alt=""
             />
             <span class="talent-dot__name">{{ item.name }}</span>
-            <span class="talent-dot__meta">{{ tierLabels[item.tier] }} · {{ item.cost }}</span>
+            <span class="talent-dot__meta">{{ tierLabels[item.tier] || '' }} · {{ item.cost }}点</span>
           </button>
 
           <div v-if="selectedNode" class="talent-float" :style="detailFloatStyle()">
             <strong>{{ selectedNode.name }}</strong>
             <p>状态：{{ stateLabel(selectedNode) }}</p>
-            <p>消耗：{{ selectedNode.cost }} 天赋点</p>
+            <p v-if="nodeLevel(selectedNode.id) > 0">
+              等级：Lv{{ nodeLevel(selectedNode.id) }} / Lv{{ selectedNode.maxLevel || 5 }}
+            </p>
+            <p v-if="nodeState(selectedNode) === 'upgradable'">
+              下一级消耗：{{ upgradeCost(selectedNode) }} 天赋点
+            </p>
             <p>前置：{{ prerequisiteLabel(selectedNode) }}</p>
-            <p>效果：{{ effectDescription(selectedNode) }}</p>
+            <div class="talent-float__effects">
+              <div v-for="line in effectLines(selectedNode, nodeLevel(selectedNode.id))" :key="line.label" class="talent-float__effect-line">
+                <span class="talent-float__effect-label">{{ line.label }}</span>
+                <span class="talent-float__effect-value">{{ line.text }}</span>
+              </div>
+            </div>
             <p class="talent-float__hint">{{ stateReason(selectedNode) }}</p>
           </div>
 
@@ -498,6 +613,19 @@ watch(isLoggedIn, (val) => {
         </div>
       </article>
     </template>
+
+    <Teleport to="body">
+      <div v-if="confirmModal.show" class="confirm-overlay" @click.self="confirmCancel">
+        <div class="confirm-dialog">
+          <h3 class="confirm-dialog__title">{{ confirmModal.title }}</h3>
+          <p class="confirm-dialog__message">{{ confirmModal.message }}</p>
+          <div class="confirm-dialog__actions">
+            <button class="confirm-dialog__btn confirm-dialog__btn--cancel" @click="confirmCancel">取消</button>
+            <button class="confirm-dialog__btn confirm-dialog__btn--ok" @click="confirmOK">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -676,7 +804,8 @@ watch(isLoggedIn, (val) => {
   font-size: 0.52rem;
 }
 
-.talent-dot--learned {
+.talent-dot--learned,
+.talent-dot--upgradable {
   border-color: #4ece8e;
   background: #1a3d2d;
 }
@@ -799,5 +928,153 @@ watch(isLoggedIn, (val) => {
     width: 68px;
     height: 68px;
   }
+}
+
+/* Level brightness progression */
+.talent-dot--lv1 { filter: brightness(1.0); }
+.talent-dot--lv2 { filter: brightness(1.1); box-shadow: 0 0 8px var(--active-color); }
+.talent-dot--lv3 { filter: brightness(1.2); box-shadow: 0 0 14px var(--active-color), 0 0 28px color-mix(in srgb, var(--active-color) 30%, transparent); }
+.talent-dot--lv4 { filter: brightness(1.35); box-shadow: 0 0 22px var(--active-color), 0 0 44px color-mix(in srgb, var(--active-color) 40%, transparent); }
+.talent-dot--lv5 { filter: brightness(1.5); box-shadow: 0 0 30px var(--active-color), 0 0 60px color-mix(in srgb, var(--active-color) 50%, transparent); animation: lv5-pulse 2s ease-in-out infinite; }
+
+.talent-dot--maxed {
+  border-color: #f0cd92 !important;
+}
+
+@keyframes lv5-pulse {
+  0%, 100% { box-shadow: 0 0 28px var(--active-color), 0 0 56px color-mix(in srgb, var(--active-color) 45%, transparent); }
+  50% { box-shadow: 0 0 34px var(--active-color), 0 0 68px color-mix(in srgb, var(--active-color) 60%, transparent); }
+}
+
+.talent-dot__level {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  font-size: 0.52rem;
+  font-weight: 700;
+  color: #0f1a22;
+  background: var(--active-color, #2bb873);
+  border-radius: 999px;
+  padding: 0.08rem 0.24rem;
+  line-height: 1;
+  z-index: 2;
+}
+
+/* 确认弹窗 */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(4, 8, 14, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-dialog {
+  width: min(340px, 88vw);
+  background: #0f1c23;
+  border: 1px solid #2d3f48;
+  border-radius: 1rem;
+  padding: 1.4rem 1.2rem 1rem;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.confirm-dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #f4f9fc;
+}
+
+.confirm-dialog__message {
+  margin: 0 0 1.2rem;
+  font-size: 0.82rem;
+  color: #8faabb;
+  line-height: 1.5;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.confirm-dialog__btn {
+  min-width: 80px;
+  min-height: 40px;
+  border-radius: 0.6rem;
+  border: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.4rem 1rem;
+  transition: opacity 0.15s;
+}
+
+.confirm-dialog__btn:active {
+  opacity: 0.8;
+}
+
+.confirm-dialog__btn--cancel {
+  color: #8faabb;
+  background: #15242e;
+  border: 1px solid #2d3f48;
+}
+
+.confirm-dialog__btn--ok {
+  color: #fff7fa;
+  background: linear-gradient(135deg, #e11d48, #be123c);
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.28);
+}
+
+/* Toast 悬浮提示 */
+.talent-toast {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 0.42rem 1rem;
+  border-radius: 0.6rem;
+  background: rgba(225, 29, 72, 0.92);
+  color: #fff7fa;
+  font-size: 0.82rem;
+  font-weight: 700;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.toast-enter-active { transition: opacity 0.2s, transform 0.2s; }
+.toast-leave-active { transition: opacity 0.35s, transform 0.35s; }
+.toast-enter-from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+.toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+
+/* 效果数值列表 */
+.talent-float__effects {
+  margin: 0.35rem 0 0;
+  padding-top: 0.35rem;
+  border-top: 1px solid #253540;
+}
+
+.talent-float__effect-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.12rem;
+  font-size: 0.72rem;
+}
+
+.talent-float__effect-label {
+  color: #7f99aa;
+  flex-shrink: 0;
+}
+
+.talent-float__effect-value {
+  color: #f0cd92;
+  text-align: right;
+  font-weight: 600;
+  word-break: keep-all;
 }
 </style>

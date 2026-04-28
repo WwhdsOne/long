@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/nickname"
@@ -158,15 +159,15 @@ func TestLearnTalentConsumesTalentPointsAndResetRefunds(t *testing.T) {
 		t.Fatalf("seed talent points: %v", err)
 	}
 
-	if err := store.LearnTalent(ctx, nickname, "normal_core"); err != nil {
+	if err := store.UpgradeTalent(ctx, nickname, "normal_core", 1); err != nil {
 		t.Fatalf("learn normal_core: %v", err)
 	}
 	userState, err := store.GetUserState(ctx, nickname)
 	if err != nil {
 		t.Fatalf("get user state: %v", err)
 	}
-	if userState.TalentPoints != 4900 {
-		t.Fatalf("expected talent points to be deducted to 4900, got %d", userState.TalentPoints)
+	if userState.TalentPoints != 4964 {
+		t.Fatalf("expected talent points to be deducted to 4964, got %d", userState.TalentPoints)
 	}
 
 	if err := store.ResetTalents(ctx, nickname); err != nil {
@@ -187,12 +188,172 @@ func TestLearnTalentRejectsWhenTalentPointsInsufficient(t *testing.T) {
 
 	ctx := context.Background()
 	nickname := "阿明"
-	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "50").Err(); err != nil {
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5").Err(); err != nil {
 		t.Fatalf("seed talent points: %v", err)
 	}
 
-	if err := store.LearnTalent(ctx, nickname, "normal_core"); !errors.Is(err, ErrTalentPointsInsufficient) {
+	if err := store.UpgradeTalent(ctx, nickname, "normal_core", 1); !errors.Is(err, ErrTalentPointsInsufficient) {
 		t.Fatalf("expected ErrTalentPointsInsufficient, got %v", err)
+	}
+}
+
+func TestBuildTalentEffectLinesReturnsUpgradePreviewForNormalCore(t *testing.T) {
+	def, ok := talentDefs["normal_core"]
+	if !ok {
+		t.Fatal("expected normal_core talent def")
+	}
+
+	lines := BuildTalentEffectLines(def, 2)
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 effect lines, got %+v", lines)
+	}
+
+	if lines[0].Label != "触发次数" || lines[0].Text != "45 → 40" {
+		t.Fatalf("expected trigger count preview, got %+v", lines[0])
+	}
+	if lines[1].Label != "追击段数" || lines[1].Text != "24 → 28" {
+		t.Fatalf("expected extra hits preview, got %+v", lines[1])
+	}
+	if lines[2].Label != "追击倍率" || lines[2].Text != "100% → 150%" {
+		t.Fatalf("expected chase ratio preview, got %+v", lines[2])
+	}
+}
+
+func TestNormalCoreLevelFiveTriggersAtThirtyHits(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	ctx := context.Background()
+	nickname := "暴风测试"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed points: %v", err)
+	}
+	if err := store.UpgradeTalent(ctx, nickname, "normal_core", 5); err != nil {
+		t.Fatalf("upgrade normal_core to lv5: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "storm-test",
+		Name:  "暴风测试Boss",
+		MaxHP: 100000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100000, CurrentHP: 100000, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	for i := 1; i <= 29; i++ {
+		result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+		if err != nil {
+			t.Fatalf("click %d: %v", i, err)
+		}
+		for _, ev := range result.TalentEvents {
+			if ev.TalentID == "normal_core" {
+				t.Fatalf("expected no normal_core trigger before 30 hits, got event at click %d: %+v", i, ev)
+			}
+		}
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("click 30: %v", err)
+	}
+	found := false
+	for _, ev := range result.TalentEvents {
+		if ev.TalentID == "normal_core" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected normal_core trigger on 30th hit, got %+v", result.TalentEvents)
+	}
+}
+
+func TestSilverStormUsesTimeWindowInsteadOfAttackCountdown(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	baseNow := time.Unix(1_700_000_000, 0)
+	store.now = func() time.Time { return baseNow }
+
+	ctx := context.Background()
+	nickname := "白银风暴测试"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
+		t.Fatalf("seed points: %v", err)
+	}
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"normal_ultimate": 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed normal ultimate state: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "silverstorm-test",
+		Name:  "白银风暴Boss",
+		MaxHP: 1000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1, CurrentHP: 1, Alive: true},
+			{X: 1, Y: 0, Type: PartTypeHeavy, MaxHP: 1000, CurrentHP: 1000, Alive: true, Armor: 100},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("trigger silver storm: %v", err)
+	}
+	if len(result.TalentEvents) == 0 {
+		t.Fatalf("expected silver storm event, got %+v", result.TalentEvents)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "silverstorm-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if !combatState.SilverStormActive {
+		t.Fatal("expected silver storm active after part break")
+	}
+	if combatState.SilverStormEndsAt != baseNow.Unix()+20 {
+		t.Fatalf("expected silver storm ends at %d, got %d", baseNow.Unix()+20, combatState.SilverStormEndsAt)
+	}
+	if combatState.SilverStormRemaining != 20 {
+		t.Fatalf("expected silver storm remaining 20, got %d", combatState.SilverStormRemaining)
+	}
+
+	_, err = store.ClickBossPart(ctx, "boss-part:1-0", nickname)
+	if err != nil {
+		t.Fatalf("attack during silver storm: %v", err)
+	}
+	combatState, err = store.GetTalentCombatState(ctx, nickname, "silverstorm-test")
+	if err != nil {
+		t.Fatalf("get combat state during silver storm: %v", err)
+	}
+	if combatState.SilverStormRemaining != 20 {
+		t.Fatalf("expected silver storm remaining unchanged within same second, got %d", combatState.SilverStormRemaining)
+	}
+
+	baseNow = baseNow.Add(21 * time.Second)
+	_, err = store.ClickBossPart(ctx, "boss-part:1-0", nickname)
+	if err != nil {
+		t.Fatalf("attack after silver storm expired: %v", err)
+	}
+	combatState, err = store.GetTalentCombatState(ctx, nickname, "silverstorm-test")
+	if err != nil {
+		t.Fatalf("get combat state after expiry: %v", err)
+	}
+	if combatState.SilverStormActive {
+		t.Fatal("expected silver storm inactive after expiry")
 	}
 }
 
@@ -979,15 +1140,15 @@ func TestArmorCoreCollapseTrigger(t *testing.T) {
 	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
 		t.Fatalf("seed points: %v", err)
 	}
-	if err := store.LearnTalent(ctx, nickname, "armor_core"); err != nil {
+	if err := store.UpgradeTalent(ctx, nickname, "armor_core", 1); err != nil {
 		t.Fatalf("learn armor_core: %v", err)
 	}
 
 	// 2. 创建一个有重甲部位的 Boss
 	if _, err := store.ActivateBoss(ctx, BossUpsert{
-		ID:      "collapse-test",
-		Name:    "崩塌测试Boss",
-		MaxHP:   100000,
+		ID:    "collapse-test",
+		Name:  "崩塌测试Boss",
+		MaxHP: 100000,
 		Parts: []BossPart{
 			{X: 0, Y: 0, Type: PartTypeHeavy, MaxHP: 10000, CurrentHP: 10000, Alive: true, Armor: 100},
 		},
@@ -995,15 +1156,15 @@ func TestArmorCoreCollapseTrigger(t *testing.T) {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	// 3. 点击重甲 100 次，第 100 次应该触发崩塌
+	// 3. 点击重甲 50 次，第 50 次应该触发崩塌
 	var collapseEvent *TalentTriggerEvent
-	for i := 1; i <= 100; i++ {
+	for i := 1; i <= 50; i++ {
 		clickKey := "boss-part:0-0"
 		result, err := store.ClickBossPart(ctx, clickKey, nickname)
 		if err != nil {
 			t.Fatalf("click %d: %v", i, err)
 		}
-		if i == 100 {
+		if i == 50 {
 			for _, ev := range result.TalentEvents {
 				if ev.EffectType == "collapse_trigger" {
 					collapseEvent = &ev
@@ -1015,7 +1176,7 @@ func TestArmorCoreCollapseTrigger(t *testing.T) {
 
 	// 4. 验证
 	if collapseEvent == nil {
-		t.Fatal("第100次点击应该触发崩塌事件，但未收到 collapse_trigger")
+		t.Fatal("第50次点击应该触发崩塌事件，但未收到 collapse_trigger")
 	}
 	if collapseEvent.PartX != 0 || collapseEvent.PartY != 0 {
 		t.Fatalf("崩塌事件的 PartX/Y 应为 (0,0)，实际 (%d,%d)", collapseEvent.PartX, collapseEvent.PartY)
