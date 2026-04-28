@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bytedance/sonic"
@@ -300,16 +301,16 @@ type Snapshot struct {
 
 // UserState 个人实时状态，只推送给对应昵称的连接
 type UserState struct {
-	UserStats         *UserStats          `json:"userStats,omitempty"`
-	MyBossStats       *BossUserStats      `json:"myBossStats,omitempty"`
-	Inventory         []InventoryItem     `json:"inventory"`
-	Loadout           Loadout             `json:"loadout"`
-	CombatStats       CombatStats         `json:"combatStats"`
-	Gold              int64               `json:"gold"`
-	Stones            int64               `json:"stones"`
-	TalentPoints      int64               `json:"talentPoints"`
-	RecentRewards     []Reward            `json:"recentRewards,omitempty"`
-	TalentCombatState *TalentCombatState  `json:"talentCombatState,omitempty"`
+	UserStats         *UserStats         `json:"userStats,omitempty"`
+	MyBossStats       *BossUserStats     `json:"myBossStats,omitempty"`
+	Inventory         []InventoryItem    `json:"inventory"`
+	Loadout           Loadout            `json:"loadout"`
+	CombatStats       CombatStats        `json:"combatStats"`
+	Gold              int64              `json:"gold"`
+	Stones            int64              `json:"stones"`
+	TalentPoints      int64              `json:"talentPoints"`
+	RecentRewards     []Reward           `json:"recentRewards,omitempty"`
+	TalentCombatState *TalentCombatState `json:"talentCombatState,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -369,15 +370,15 @@ type BulkSalvageResult struct {
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
 type ClickResult struct {
-	Delta            int64                  `json:"delta"`
-	BossDamage       int64                  `json:"bossDamage,omitempty"`
-	DamageType       string                 `json:"damageType,omitempty"`
-	Critical         bool                   `json:"critical"`
-	UserStats        UserStats              `json:"userStats"`
-	Boss             *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard  []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
-	MyBossStats      *BossUserStats         `json:"myBossStats,omitempty"`
-	RecentRewards    []Reward               `json:"recentRewards,omitempty"`
+	Delta             int64                  `json:"delta"`
+	BossDamage        int64                  `json:"bossDamage,omitempty"`
+	DamageType        string                 `json:"damageType,omitempty"`
+	Critical          bool                   `json:"critical"`
+	UserStats         UserStats              `json:"userStats"`
+	Boss              *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
+	MyBossStats       *BossUserStats         `json:"myBossStats,omitempty"`
+	RecentRewards     []Reward               `json:"recentRewards,omitempty"`
 	TalentEvents      []TalentTriggerEvent   `json:"talentEvents,omitempty"`
 	TalentCombatState *TalentCombatState     `json:"talentCombatState,omitempty"`
 	PartStateDeltas   []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
@@ -468,6 +469,13 @@ type Store struct {
 	roll                    func(int) int
 	now                     func() time.Time
 	validator               interface{ Validate(string) error }
+
+	leaderboardCache   []LeaderboardEntry
+	leaderboardCacheAt time.Time
+	leaderboardCacheMu sync.Mutex
+
+	combatStatsCache   map[string]CombatStats
+	combatStatsCacheMu sync.RWMutex
 }
 
 // NewStore 创建 Redis 投票存储实例
@@ -511,9 +519,39 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		roll: func(limit int) int {
 			return rand.IntN(limit)
 		},
-		now:       time.Now,
-		validator: validator,
+		now:              time.Now,
+		validator:        validator,
+		combatStatsCache: make(map[string]CombatStats),
 	}
+}
+
+func (s *Store) cachedCombatStats(nickname string) (CombatStats, bool) {
+	s.combatStatsCacheMu.RLock()
+	defer s.combatStatsCacheMu.RUnlock()
+
+	stats, ok := s.combatStatsCache[nickname]
+	return stats, ok
+}
+
+func (s *Store) storeCombatStatsCache(nickname string, stats CombatStats) {
+	s.combatStatsCacheMu.Lock()
+	defer s.combatStatsCacheMu.Unlock()
+
+	s.combatStatsCache[nickname] = stats
+}
+
+func (s *Store) invalidateCombatStatsCache(nickname string) {
+	s.combatStatsCacheMu.Lock()
+	defer s.combatStatsCacheMu.Unlock()
+
+	delete(s.combatStatsCache, nickname)
+}
+
+func (s *Store) invalidateAllCombatStatsCaches() {
+	s.combatStatsCacheMu.Lock()
+	defer s.combatStatsCacheMu.Unlock()
+
+	clear(s.combatStatsCache)
 }
 
 // ValidateNickname checks whether the provided nickname is usable.
@@ -704,6 +742,7 @@ func (s *Store) EquipItem(ctx context.Context, nickname string, instanceID strin
 	if _, err := pipe.Exec(ctx); err != nil {
 		return State{}, err
 	}
+	s.invalidateCombatStatsCache(normalizedNickname)
 
 	return s.GetState(ctx, normalizedNickname)
 }
@@ -739,6 +778,7 @@ func (s *Store) UnequipItem(ctx context.Context, nickname string, instanceID str
 	if _, err := pipe.Exec(ctx); err != nil {
 		return State{}, err
 	}
+	s.invalidateCombatStatsCache(normalizedNickname)
 
 	return s.GetState(ctx, normalizedNickname)
 }
@@ -796,6 +836,7 @@ func (s *Store) EnhanceItem(ctx context.Context, nickname string, instanceID str
 	if _, err := pipe.Exec(ctx); err != nil {
 		return State{}, err
 	}
+	s.invalidateCombatStatsCache(normalizedNickname)
 
 	return s.GetState(ctx, normalizedNickname)
 }
@@ -1056,11 +1097,20 @@ func (s *Store) ListBossLeaderboard(ctx context.Context, bossID string, limit in
 	return leaderboard, nil
 }
 
-// ListLeaderboard 获取排行榜前 N 名
+// ListLeaderboard 获取排行榜前 N 名（10 分钟缓存，降低 Redis 读取频率）。
 func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]LeaderboardEntry, error) {
 	if limit <= 0 {
 		limit = 10
 	}
+
+	s.leaderboardCacheMu.Lock()
+	if time.Since(s.leaderboardCacheAt) < 10*time.Minute && int64(len(s.leaderboardCache)) >= limit {
+		cached := make([]LeaderboardEntry, limit)
+		copy(cached, s.leaderboardCache[:limit])
+		s.leaderboardCacheMu.Unlock()
+		return cached, nil
+	}
+	s.leaderboardCacheMu.Unlock()
 
 	scores, err := s.client.ZRevRangeWithScores(ctx, s.leaderboardKey, 0, limit-1).Result()
 	if err != nil {
@@ -1080,6 +1130,11 @@ func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]Leaderboard
 			ClickCount: int64(score.Score),
 		})
 	}
+
+	s.leaderboardCacheMu.Lock()
+	s.leaderboardCache = leaderboard
+	s.leaderboardCacheAt = time.Now()
+	s.leaderboardCacheMu.Unlock()
 
 	return leaderboard, nil
 }
@@ -1211,14 +1266,8 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 		return ClickResult{}, nil
 	}
 
-	damage := int64(math.Floor(float64(maxInt64(0, combatStats.AttackPower)) * 0.5))
-	if damage < 0 {
-		damage = 0
-	}
-	actualDamage := damage
-	if actualDamage > part.CurrentHP {
-		actualDamage = part.CurrentHP
-	}
+	damage := max(int64(math.Floor(float64(maxInt64(0, combatStats.AttackPower))*0.5)), 0)
+	actualDamage := min(damage, part.CurrentHP)
 	part.CurrentHP -= damage
 	if part.CurrentHP < 0 {
 		part.CurrentHP = 0
@@ -1394,12 +1443,9 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	effectiveArmor := part.Armor
 	inCollapse := false
-	for _, idx := range combatState.CollapseParts {
-		if idx == targetIdx {
-			effectiveArmor = 0
-			inCollapse = true
-			break
-		}
+	if slices.Contains(combatState.CollapseParts, targetIdx) {
+		effectiveArmor = 0
+		inCollapse = true
 	}
 
 	damageStats := CalcBossPartDamage(combatStats, effectivePartType, effectiveArmor, aliveCount, boss.CurrentHP, boss.MaxHP)
@@ -1466,10 +1512,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	beforeHP := part.CurrentHP
-	actualDamage := partDamage
-	if actualDamage > part.CurrentHP {
-		actualDamage = part.CurrentHP
-	}
+	actualDamage := min(partDamage, part.CurrentHP)
 	if actualDamage < 0 {
 		actualDamage = 0
 	}
@@ -1554,8 +1597,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if hasTalent(learned, "crit_doom_judgment") && len(combatState.DoomMarks) == 0 && len(boss.Parts) >= 2 {
 		def, ok := talentDefs["crit_doom_judgment"]
 		if ok {
-			markCount := critDoomMarkCountForLevel(GetTalentLevel(talentState, def.ID))
-			if markCount > len(boss.Parts) { markCount = len(boss.Parts) }
+			markCount := min(critDoomMarkCountForLevel(GetTalentLevel(talentState, def.ID)), len(boss.Parts))
 			combatState.DoomMarks = randomMarkIndices(len(boss.Parts), markCount, s.roll)
 		}
 	}
@@ -1671,7 +1713,9 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			if talentState != nil && isLearnedTierFull(TalentTreeNormal, 2, talentState.Talents) {
 				triggerCount -= 20
 			}
-			if triggerCount < 1 { triggerCount = 1 }
+			if triggerCount < 1 {
+				triggerCount = 1
+			}
 			if hasTalent(learned, "normal_chase_up") {
 				if def2, ok2 := talentDefs["normal_chase_up"]; ok2 {
 					if v := normalChaseUpgradeRatioForLevel(GetTalentLevel(talentState, def2.ID)); v > chaseRatio {
@@ -1702,9 +1746,14 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			if combatState.PartStormComboCount[partKey] >= triggerCount {
 				burst := int64(math.Floor(float64(maxInt64(1, baseDamage)) * chaseRatio * float64(maxInt64(1, extraHits))))
 				if burst > 0 {
-					if burst > part.CurrentHP { burst = part.CurrentHP }
+					if burst > part.CurrentHP {
+						burst = part.CurrentHP
+					}
 					part.CurrentHP -= burst
-					if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
+					if part.CurrentHP <= 0 {
+						part.CurrentHP = 0
+						part.Alive = false
+					}
 					boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
 					totalExtra += burst
 					events = append(events, TalentTriggerEvent{
@@ -1738,7 +1787,9 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		if talentState != nil && isLearnedTierFull(TalentTreeArmor, 1, talentState.Talents) {
 			collapseTrigger -= 30
 		}
-		if collapseTrigger < 1 { collapseTrigger = 1 }
+		if collapseTrigger < 1 {
+			collapseTrigger = 1
+		}
 
 		if combatState.PartHeavyClickCount[partKey] >= collapseTrigger {
 			cd := int64(8)
@@ -1752,9 +1803,9 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			combatState.CollapseDuration = cd
 			events = append(events, TalentTriggerEvent{
 				TalentID: "armor_core", Name: "灭绝穿甲", EffectType: "collapse_trigger",
-				Message:  fmt.Sprintf("结构崩塌！护甲归零 %d 秒", cd),
-				PartX:    part.X,
-				PartY:    part.Y,
+				Message: fmt.Sprintf("结构崩塌！护甲归零 %d 秒", cd),
+				PartX:   part.X,
+				PartY:   part.Y,
 			})
 			combatState.PartHeavyClickCount[partKey] = 0 // 触发后归零，允许多次崩塌
 		}
@@ -1769,24 +1820,30 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			asRatio = armorAutoStrikeRatioForLevel(level)
 		}
 		if now-combatState.LastAutoStrikeAt >= asInterval {
-		var best *BossPart
-		for i := range boss.Parts {
-			p := &boss.Parts[i]
-			if !p.Alive || p.Type != PartTypeHeavy { continue }
-			if best == nil || p.CurrentHP > best.CurrentHP { best = p }
-		}
-		if best != nil {
-			sd := int64(float64(baseDamage) * asRatio)
-			if sd > best.CurrentHP { sd = best.CurrentHP }
-			best.CurrentHP -= sd
-			if best.CurrentHP <= 0 { best.CurrentHP = 0; best.Alive = false }
-			combatState.LastAutoStrikeAt = now
-			totalExtra += sd
-			events = append(events, TalentTriggerEvent{
-				TalentID: "armor_auto_strike", Name: "自动打击触发", EffectType: "auto_strike",
-				ExtraDamage: sd, Message: "自动打击触发",
-			})
-			damageTypeOverride = "trueDamage"
+			var best *BossPart
+			for i := range boss.Parts {
+				p := &boss.Parts[i]
+				if !p.Alive || p.Type != PartTypeHeavy {
+					continue
+				}
+				if best == nil || p.CurrentHP > best.CurrentHP {
+					best = p
+				}
+			}
+			if best != nil {
+				sd := min(int64(float64(baseDamage)*asRatio), best.CurrentHP)
+				best.CurrentHP -= sd
+				if best.CurrentHP <= 0 {
+					best.CurrentHP = 0
+					best.Alive = false
+				}
+				combatState.LastAutoStrikeAt = now
+				totalExtra += sd
+				events = append(events, TalentTriggerEvent{
+					TalentID: "armor_auto_strike", Name: "自动打击触发", EffectType: "auto_strike",
+					ExtraDamage: sd, Message: "自动打击触发",
+				})
+				damageTypeOverride = "trueDamage"
 			}
 		}
 	}
@@ -1805,10 +1862,12 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			if talentState != nil && isLearnedTierFull(TalentTreeArmor, 4, talentState.Talents) {
 				hpCut += 0.10
 			}
-			cd := int64(float64(boss.MaxHP) * hpCut)
-			if cd > part.CurrentHP { cd = part.CurrentHP }
+			cd := min(int64(float64(boss.MaxHP)*hpCut), part.CurrentHP)
 			part.CurrentHP -= cd
-			if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
+			if part.CurrentHP <= 0 {
+				part.CurrentHP = 0
+				part.Alive = false
+			}
 			boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
 			totalExtra += cd
 			events = append(events, TalentTriggerEvent{
@@ -1834,8 +1893,6 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		}
 	}
 
-
-
 	if hasTalent(learned, "crit_final_cut") && isCritical {
 		combatState.CritCount++
 		triggerCount := int64(120)
@@ -1847,10 +1904,12 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		}
 		if combatState.CritCount >= triggerCount && now-combatState.LastFinalCutAt >= 30 {
 			combatState.LastFinalCutAt = now
-			cd := int64(float64(boss.MaxHP) * hpCut)
-			if cd > part.CurrentHP { cd = part.CurrentHP }
+			cd := min(int64(float64(boss.MaxHP)*hpCut), part.CurrentHP)
 			part.CurrentHP -= cd
-			if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
+			if part.CurrentHP <= 0 {
+				part.CurrentHP = 0
+				part.Alive = false
+			}
 			boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
 			totalExtra += cd
 			events = append(events, TalentTriggerEvent{
@@ -1871,18 +1930,17 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			}
 
 			// 消耗 100 层（多余保留）
-			consumed := 100
-			if combatState.OmenStacks < consumed {
-				consumed = combatState.OmenStacks
-			}
+			consumed := min(combatState.OmenStacks, 100)
 			combatState.OmenStacks -= consumed
 
 			// 层数系数锁死 100 上限
 			effStacks := min(consumed, 100)
-			ed := int64(float64(baseDamage) * float64(effStacks) * critDmgMult)
-			if ed > part.CurrentHP { ed = part.CurrentHP }
+			ed := min(int64(float64(baseDamage)*float64(effStacks)*critDmgMult), part.CurrentHP)
 			part.CurrentHP -= ed
-			if part.CurrentHP <= 0 { part.CurrentHP = 0; part.Alive = false }
+			if part.CurrentHP <= 0 {
+				part.CurrentHP = 0
+				part.Alive = false
+			}
 			boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
 			totalExtra += ed
 			events = append(events, TalentTriggerEvent{
@@ -1898,13 +1956,15 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		for _, idx := range combatState.DoomMarks {
 			if idx == partIndex {
 				def, ok := talentDefs["crit_doom_judgment"]
-				if !ok { break }
+				if !ok {
+					break
+				}
 				omenReward := critDoomOmenPerMarkForLevel(GetTalentLevel(talentState, def.ID))
 				combatState.OmenStacks += omenReward
 				events = append(events, TalentTriggerEvent{
 					TalentID: "crit_doom_judgment", Name: "末日审判", EffectType: "doom_mark",
 					Message: fmt.Sprintf("标记触发！+%d 死兆", omenReward),
-					PartX: part.X, PartY: part.Y,
+					PartX:   part.X, PartY: part.Y,
 				})
 				damageTypeOverride = "doomsday"
 				break
@@ -1922,7 +1982,6 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		combatState.CollapseParts = nil
 		combatState.CollapseEndsAt = 0
 	}
-
 
 	return totalExtra, events, damageTypeOverride
 }
@@ -2211,6 +2270,10 @@ func (s *Store) nextIncrement(ctx context.Context, nickname string) (int64, bool
 }
 
 func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loadout Loadout) (CombatStats, error) {
+	if cached, ok := s.cachedCombatStats(nickname); ok {
+		return cached, nil
+	}
+
 	stats := s.baseCombatStats()
 
 	attackPower, armorPen, critRate, critDmgMult := loadoutBonuses(loadout)
@@ -2247,6 +2310,7 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent, 0, 100)
 
 	result := deriveCombatStats(stats)
+	s.storeCombatStatsCache(nickname, result)
 	return result, nil
 }
 
@@ -2296,10 +2360,7 @@ func deriveCombatStats(stats CombatStats) CombatStats {
 	}
 
 	countBasedCriticalDamage := max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
-	multiplierBasedCriticalDamage := int64(float64(stats.NormalDamage) * stats.CritDamageMultiplier)
-	if multiplierBasedCriticalDamage < stats.NormalDamage {
-		multiplierBasedCriticalDamage = stats.NormalDamage
-	}
+	multiplierBasedCriticalDamage := max(int64(float64(stats.NormalDamage)*stats.CritDamageMultiplier), stats.NormalDamage)
 	stats.CriticalDamage = max(countBasedCriticalDamage, multiplierBasedCriticalDamage)
 
 	return stats
@@ -2322,10 +2383,7 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 	coeff := partType.DamageCoefficient()
 
 	// 有效护甲 = partArmor * (1 - 破甲率)，上限 80% 减免
-	effectiveArmor := int64(float64(partArmor) * (1.0 - clampFloat(stats.ArmorPenPercent, 0, 0.80)))
-	if effectiveArmor < 0 {
-		effectiveArmor = 0
-	}
+	effectiveArmor := max(int64(float64(partArmor)*(1.0-clampFloat(stats.ArmorPenPercent, 0, 0.80))), 0)
 
 	// 基础伤害 = max(攻击力 * 系数 - 护甲, 1)
 	baseDamage := max(atk*int64(coeff*100)/100-effectiveArmor, 1)
@@ -2349,7 +2407,7 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 			hpRatio = float64(max(0, bossCurrentHP)) / float64(max(1, bossMaxHP))
 		}
 		if hpRatio <= stats.LowHpThreshold {
-			amplifyBonus += (stats.LowHpMultiplier - 1)
+			amplifyBonus += stats.LowHpMultiplier - 1
 		}
 	}
 
@@ -2359,15 +2417,9 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 	critMult := max(1.0, stats.CritDamageMultiplier)
 
 	// 最终伤害
-	normalDamage := int64(float64(baseDamage) * amplify)
-	if normalDamage < 1 {
-		normalDamage = 1
-	}
+	normalDamage := max(int64(float64(baseDamage)*amplify), 1)
 
-	criticalDamage := int64(float64(baseDamage) * amplify * critMult)
-	if criticalDamage < 1 {
-		criticalDamage = 1
-	}
+	criticalDamage := max(int64(float64(baseDamage)*amplify*critMult), 1)
 
 	return CombatStats{
 		NormalDamage:          normalDamage,

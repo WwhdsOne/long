@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"strings"
@@ -741,9 +742,7 @@ func TalentTierCompletionBonusLabels(tree TalentTree) map[int]string {
 		return map[int]string{}
 	}
 	out := make(map[int]string, len(labels))
-	for tier, label := range labels {
-		out[tier] = label
-	}
+	maps.Copy(out, labels)
 	return out
 }
 
@@ -961,6 +960,9 @@ func (s *Store) UpgradeTalent(ctx context.Context, nickname string, talentID str
 	pipe.HSet(ctx, s.talentKey(nickname), "talents", string(talentsJSON))
 	pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", -diff)
 	_, err = pipe.Exec(ctx)
+	if err == nil {
+		s.invalidateCombatStatsCache(nickname)
+	}
 	return err
 }
 
@@ -989,6 +991,9 @@ func (s *Store) ResetTalents(ctx context.Context, nickname string) error {
 		pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", refund)
 	}
 	_, err = pipe.Exec(ctx)
+	if err == nil {
+		s.invalidateCombatStatsCache(nickname)
+	}
 	return err
 }
 

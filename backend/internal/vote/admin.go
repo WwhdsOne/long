@@ -118,6 +118,9 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 	pipe.HSet(ctx, s.equipmentKey(itemID), values)
 	pipe.SAdd(ctx, s.equipmentIndexKey, itemID)
 	_, err := pipe.Exec(ctx)
+	if err == nil {
+		s.invalidateAllCombatStatsCaches()
+	}
 	return err
 }
 
@@ -132,6 +135,9 @@ func (s *Store) DeleteEquipmentDefinition(ctx context.Context, itemID string) er
 	pipe.Del(ctx, s.equipmentKey(itemID))
 	pipe.SRem(ctx, s.equipmentIndexKey, itemID)
 	_, err := pipe.Exec(ctx)
+	if err == nil {
+		s.invalidateAllCombatStatsCaches()
+	}
 	return err
 }
 
