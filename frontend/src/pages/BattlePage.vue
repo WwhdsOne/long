@@ -89,7 +89,8 @@ onMounted(() => {
       updatePos(e)
     })
 
-    gridArea.addEventListener('pointerleave', () => {
+    gridArea.addEventListener('pointerleave', (e) => {
+      if (gridArea.contains(e.relatedTarget)) return
       swordCursor.style.display = 'none'
       cursorVisible = false
       clearTimeout(recoverTimer)

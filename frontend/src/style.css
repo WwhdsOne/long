@@ -3239,8 +3239,9 @@ select {
 
 /* ===== 像素剑光标 ===== */
 
-.boss-part-grid-with-combo {
-  cursor: none;
+.boss-part-grid-with-combo,
+.boss-part-grid-with-combo * {
+  cursor: none !important;
 }
 
 #boss-sword-cursor {
