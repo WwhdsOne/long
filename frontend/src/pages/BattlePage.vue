@@ -6,7 +6,6 @@ import PixelShatter from '../components/PixelShatter.vue'
 
 const {
   boss,
-  bossTheme,
   bossLeaderboard,
   bossLoot,
   bossGoldRange,
@@ -422,7 +421,7 @@ const collapseRemaining = computed(() => {
         <div v-else-if="bossZones.length === 0" class="feedback-panel feedback-panel--compact">
           <p>当前 Boss 尚未配置可攻击分区。</p>
         </div>
-        <div v-else class="boss-part-grid-container" :class="`boss-theme--${bossTheme}`">
+        <div v-else class="boss-part-grid-container">
           <!-- 左侧面板列 -->
           <div class="boss-left-panels">
             <!-- 1. 部位系数 -->
