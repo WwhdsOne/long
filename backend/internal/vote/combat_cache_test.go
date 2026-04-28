@@ -197,3 +197,40 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 		t.Fatalf("expected doom mark count %d, got %d", critDoomMarkCountForLevel(2), compiled.Crit.DoomMarkCount)
 	}
 }
+
+func TestApplyBossPartDamageDeltaUpdatesBossCurrentHPIncrementally(t *testing.T) {
+	boss := &Boss{
+		CurrentHP: 150,
+		Parts: []BossPart{
+			{X: 0, Y: 0, CurrentHP: 100, MaxHP: 100, Alive: true},
+			{X: 1, Y: 0, CurrentHP: 50, MaxHP: 50, Alive: true},
+		},
+	}
+	part := &boss.Parts[0]
+
+	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, 30)
+	if beforeHP != 100 || actualDamage != 30 || partJustDied {
+		t.Fatalf("expected before=100 damage=30 alive, got before=%d damage=%d died=%v", beforeHP, actualDamage, partJustDied)
+	}
+	if boss.CurrentHP != 120 || part.CurrentHP != 70 {
+		t.Fatalf("expected incremental hp update to 120/70, got boss=%d part=%d", boss.CurrentHP, part.CurrentHP)
+	}
+}
+
+func TestApplyBossPartDamageDeltaCapsOverflowDamage(t *testing.T) {
+	boss := &Boss{
+		CurrentHP: 25,
+		Parts: []BossPart{
+			{X: 0, Y: 0, CurrentHP: 25, MaxHP: 25, Alive: true},
+		},
+	}
+	part := &boss.Parts[0]
+
+	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, 99)
+	if beforeHP != 25 || actualDamage != 25 || !partJustDied {
+		t.Fatalf("expected before=25 damage=25 died=true, got before=%d damage=%d died=%v", beforeHP, actualDamage, partJustDied)
+	}
+	if boss.CurrentHP != 0 || part.CurrentHP != 0 || part.Alive {
+		t.Fatalf("expected boss/part hp to reach zero, got boss=%d part=%d alive=%v", boss.CurrentHP, part.CurrentHP, part.Alive)
+	}
+}

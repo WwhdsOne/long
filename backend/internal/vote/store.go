@@ -1298,16 +1298,7 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 	}
 
 	damage := max(int64(math.Floor(float64(maxInt64(0, combatStats.AttackPower))*0.5)), 0)
-	actualDamage := min(damage, part.CurrentHP)
-	part.CurrentHP -= damage
-	if part.CurrentHP < 0 {
-		part.CurrentHP = 0
-	}
-	if part.CurrentHP <= 0 {
-		part.Alive = false
-	}
-
-	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+	_, actualDamage, _ := applyBossPartDamageDelta(boss, part, damage)
 	allDead := true
 	for _, p := range boss.Parts {
 		if p.Alive {
@@ -1522,20 +1513,8 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		}
 	}
 
-	beforeHP := part.CurrentHP
-	actualDamage := min(partDamage, part.CurrentHP)
-	if actualDamage < 0 {
-		actualDamage = 0
-	}
-	part.CurrentHP -= partDamage
-	if part.CurrentHP < 0 {
-		part.CurrentHP = 0
-	}
-	partWasAlive := part.Alive
-	if part.CurrentHP <= 0 {
-		part.Alive = false
-	}
-	partJustDied := partWasAlive && !part.Alive
+	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, partDamage)
+	partWasAlive := beforeHP > 0
 
 	// 死兆层数获取：弱点暴击 +2，普通暴击 +1，击碎部位 +5
 	if critical && compiledTalents.Has("crit_core") {
@@ -1555,7 +1534,6 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		}
 	}
 
-	boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
 	totalDamage := actualDamage
 	result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
 		X:        part.X,
@@ -1674,6 +1652,29 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	return result, nil
 }
 
+func applyBossPartDamageDelta(boss *Boss, part *BossPart, damage int64) (beforeHP int64, actualDamage int64, partJustDied bool) {
+	if boss == nil || part == nil {
+		return 0, 0, false
+	}
+
+	beforeHP = maxInt64(0, part.CurrentHP)
+	actualDamage = min(maxInt64(damage, 0), beforeHP)
+	part.CurrentHP = beforeHP - actualDamage
+	partWasAlive := part.Alive
+	if part.CurrentHP <= 0 {
+		part.CurrentHP = 0
+		part.Alive = false
+	}
+	if boss.CurrentHP > 0 {
+		boss.CurrentHP -= actualDamage
+		if boss.CurrentHP < 0 {
+			boss.CurrentHP = 0
+		}
+	}
+
+	return beforeHP, actualDamage, partWasAlive && !part.Alive
+}
+
 func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now int64) (int64, []TalentTriggerEvent, string) {
 	if boss == nil || part == nil || strings.TrimSpace(nickname) == "" || clickCount <= 0 {
 		return 0, nil, ""
@@ -1698,15 +1699,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			if combatState.PartStormComboCount[partKey] >= triggerCount {
 				burst := int64(math.Floor(float64(maxInt64(1, baseDamage)) * chaseRatio * float64(maxInt64(1, extraHits))))
 				if burst > 0 {
-					if burst > part.CurrentHP {
-						burst = part.CurrentHP
-					}
-					part.CurrentHP -= burst
-					if part.CurrentHP <= 0 {
-						part.CurrentHP = 0
-						part.Alive = false
-					}
-					boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+					_, burst, _ = applyBossPartDamageDelta(boss, part, burst)
 					totalExtra += burst
 					events = append(events, TalentTriggerEvent{
 						TalentID: "normal_core", Name: def.Name, EffectType: def.EffectType,
@@ -1759,12 +1752,8 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 				}
 			}
 			if best != nil {
-				sd := min(int64(float64(baseDamage)*asRatio), best.CurrentHP)
-				best.CurrentHP -= sd
-				if best.CurrentHP <= 0 {
-					best.CurrentHP = 0
-					best.Alive = false
-				}
+				sd := int64(float64(baseDamage) * asRatio)
+				_, sd, _ = applyBossPartDamageDelta(boss, best, sd)
 				combatState.LastAutoStrikeAt = now
 				totalExtra += sd
 				events = append(events, TalentTriggerEvent{
@@ -1783,12 +1772,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		if !combatState.JudgmentDayUsed[pk] && combatState.PartHeavyClickCount[pk] >= jdTrigger {
 			combatState.JudgmentDayUsed[pk] = true
 			cd := min(int64(float64(boss.MaxHP)*hpCut), part.CurrentHP)
-			part.CurrentHP -= cd
-			if part.CurrentHP <= 0 {
-				part.CurrentHP = 0
-				part.Alive = false
-			}
-			boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+			_, cd, _ = applyBossPartDamageDelta(boss, part, cd)
 			totalExtra += cd
 			events = append(events, TalentTriggerEvent{
 				TalentID: "armor_ultimate", Name: "审判日触发！削除 50% 最大生命", EffectType: "judgment_day",
@@ -1816,12 +1800,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		if combatState.CritCount >= triggerCount && now-combatState.LastFinalCutAt >= 30 {
 			combatState.LastFinalCutAt = now
 			cd := min(int64(float64(boss.MaxHP)*hpCut), part.CurrentHP)
-			part.CurrentHP -= cd
-			if part.CurrentHP <= 0 {
-				part.CurrentHP = 0
-				part.Alive = false
-			}
-			boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+			_, cd, _ = applyBossPartDamageDelta(boss, part, cd)
 			totalExtra += cd
 			events = append(events, TalentTriggerEvent{
 				TalentID: "crit_final_cut", Name: "终末血斩！", EffectType: "final_cut",
@@ -1841,12 +1820,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 			// 层数系数锁死 100 上限
 			effStacks := min(consumed, 100)
 			ed := min(int64(float64(baseDamage)*float64(effStacks)*compiledTalents.Crit.DeathEcstasyMult), part.CurrentHP)
-			part.CurrentHP -= ed
-			if part.CurrentHP <= 0 {
-				part.CurrentHP = 0
-				part.Alive = false
-			}
-			boss.CurrentHP = sumBossPartCurrentHP(boss.Parts)
+			_, ed, _ = applyBossPartDamageDelta(boss, part, ed)
 			totalExtra += ed
 			events = append(events, TalentTriggerEvent{
 				TalentID: "crit_death_ecstasy", Name: "死亡狂喜", EffectType: "death_ecstasy_ult",
