@@ -902,6 +902,21 @@ func (s *Store) GetTalentState(ctx context.Context, nickname string) (*TalentSta
 	return state, nil
 }
 
+func (s *Store) compiledTalentSetForNickname(ctx context.Context, nickname string) (*CompiledTalentSet, error) {
+	if compiled, ok := s.cachedCompiledTalentSet(nickname); ok {
+		return compiled, nil
+	}
+
+	state, err := s.GetTalentState(ctx, nickname)
+	if err != nil {
+		return nil, err
+	}
+
+	compiled := compileTalentSet(state)
+	s.storeCompiledTalentCache(nickname, compiled)
+	return compiled, nil
+}
+
 // UpgradeTalent 升级天赋节点到指定等级。
 func (s *Store) UpgradeTalent(ctx context.Context, nickname string, talentID string, targetLevel int) error {
 	if targetLevel < 1 {
@@ -961,7 +976,7 @@ func (s *Store) UpgradeTalent(ctx context.Context, nickname string, talentID str
 	pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", -diff)
 	_, err = pipe.Exec(ctx)
 	if err == nil {
-		s.invalidateCombatStatsCache(nickname)
+		s.invalidatePlayerCombatCaches(nickname)
 	}
 	return err
 }
@@ -992,7 +1007,7 @@ func (s *Store) ResetTalents(ctx context.Context, nickname string) error {
 	}
 	_, err = pipe.Exec(ctx)
 	if err == nil {
-		s.invalidateCombatStatsCache(nickname)
+		s.invalidatePlayerCombatCaches(nickname)
 	}
 	return err
 }
@@ -1028,166 +1043,14 @@ type TalentModifiers struct {
 
 // ComputeTalentModifiers 计算玩家天赋提供的全量修正。
 func (s *Store) ComputeTalentModifiers(ctx context.Context, nickname string) (*TalentModifiers, error) {
-	state, err := s.GetTalentState(ctx, nickname)
+	compiled, err := s.compiledTalentSetForNickname(ctx, nickname)
 	if err != nil {
 		return nil, err
 	}
-	if state == nil || len(state.Talents) == 0 {
-		return &TalentModifiers{}, nil
+	if compiled == nil || compiled.Modifiers == nil {
+		return &TalentModifiers{PartTypeBonus: make(map[PartType]float64)}, nil
 	}
-
-	mods := &TalentModifiers{
-		PartTypeBonus: make(map[PartType]float64),
-		Learned:       make([]string, 0, len(state.Talents)),
-	}
-
-	for id, level := range state.Talents {
-		if level <= 0 {
-			continue
-		}
-		def, ok := talentDefs[id]
-		if !ok {
-			continue
-		}
-
-		mods.Learned = append(mods.Learned, id)
-		val, _ := def.EffectValue.(map[string]any)
-		levelFactor := float64(level)
-
-		switch def.EffectType {
-		case "attack_power_percent":
-			if p, ok := val["percent"].(float64); ok {
-				mods.AttackPowerPercent += p * levelFactor
-			}
-		case "all_damage_amplify":
-			if p, ok := val["percent"].(float64); ok {
-				mods.AllDamageAmplify += p * levelFactor
-			}
-		case "part_type_damage":
-			partTypeStr, _ := val["partType"].(string)
-			percent, _ := val["percent"].(float64)
-			if id == "normal_soft_atk" {
-				percent = normalCoreScaledPartDamage(level, 0.80, 3.00)
-			}
-			if id == "armor_heavy_atk" {
-				percent = normalCoreScaledPartDamage(level, 1.00, 3.00)
-			}
-			if partTypeStr != "" {
-				mods.PartTypeBonus[PartType(partTypeStr)] += percent
-			}
-		case "armor_pen_extra":
-			if p, ok := val["extraPen"].(float64); ok {
-				if id == "armor_pen_up" {
-					mods.ArmorPenExtra += armorPenUpExtraForLevel(level)
-				} else {
-					mods.ArmorPenExtra += p * levelFactor
-				}
-			}
-		case "crit_damage_bonus":
-			if p, ok := val["percent"].(float64); ok {
-				if id == "crit_cruel" {
-					mods.CritDamagePercentBonus += critCruelBonusForLevel(level)
-				} else {
-					mods.CritDamagePercentBonus += p * levelFactor
-				}
-			}
-		case "per_part_damage":
-			if p, ok := val["percentPerPart"].(float64); ok {
-				mods.PerPartDamagePercent += p * levelFactor
-			}
-		case "low_hp_bonus":
-			if m, ok := val["multiplier"].(float64); ok {
-				if id == "normal_low_hp" {
-					mods.LowHpMultiplier = normalLowHPMultiplierForLevel(level)
-				} else {
-					mods.LowHpMultiplier += m * levelFactor
-				}
-			}
-			if threshold, ok := val["hpThreshold"].(float64); ok {
-				t := threshold * levelFactor
-				if id == "normal_low_hp" {
-					t = normalLowHPThresholdForLevel(level)
-				}
-				if t > mods.LowHpThreshold {
-					mods.LowHpThreshold = t
-				}
-			}
-		case "collapse_extend":
-			if d, ok := val["extraDuration"].(float64); ok {
-				if id == "armor_collapse_ext" {
-					mods.CollapseDuration = armorCollapseExtendForLevel(level)
-				} else {
-					mods.CollapseDuration += int(d) * level
-				}
-			}
-		case "pen_to_amplify":
-			if r, ok := val["convertRatio"].(float64); ok {
-				if id == "armor_pen_convert" {
-					mods.PenToAmplifyRatio = armorPenConvertRatioForLevel(level)
-				} else {
-					mods.PenToAmplifyRatio = r * levelFactor
-				}
-			}
-		case "chase_ratio_bonus":
-			if p, ok := val["percent"].(float64); ok {
-				mods.ChaseRatioBonus += p * levelFactor
-			}
-		case "omen_crit_damage":
-			if p, ok := val["critDmgPerOmen"].(float64); ok {
-				if id == "crit_omen_resonate" {
-					mods.OmenCritDmgExtra += critOmenResonateForLevel(level)
-				} else {
-					mods.OmenCritDmgExtra += p * levelFactor
-				}
-			}
-		case "overkill":
-			if p, ok := val["baseCritBonus"].(float64); ok {
-				_ = p
-				mods.CritRateBonus += critCoreBaseCritBonusForLevel(level) * 100
-			}
-			if ratio, ok := val["overflowToCritDmg"].(float64); ok {
-				mods.OverflowToCritDmgRatio = ratio
-			}
-		}
-	}
-
-	// 层满奖励检测
-	learnedTrees := map[TalentTree]bool{}
-	for id, level := range state.Talents {
-		if level <= 0 {
-			continue
-		}
-		if def, ok := talentDefs[id]; ok {
-			learnedTrees[def.Tree] = true
-		}
-	}
-	for tree := range learnedTrees {
-		treeStr := string(tree)
-		for tier := 0; tier <= 4; tier++ {
-			count := 0
-			for id, level := range state.Talents {
-				if level <= 0 {
-					continue
-				}
-				def, ok := talentDefs[id]
-				if !ok {
-					continue
-				}
-				if def.Tier == tier && string(def.Tree) == treeStr {
-					count++
-				}
-			}
-			needed, ok := tierNodeCount[tier]
-			if !ok {
-				continue
-			}
-			if count >= needed {
-				applyTierCompletionBonus(mods, treeStr, tier)
-			}
-		}
-	}
-
-	return mods, nil
+	return cloneTalentModifiers(compiled.Modifiers), nil
 }
 
 func applyTierCompletionBonus(mods *TalentModifiers, treeStr string, tier int) {

@@ -94,3 +94,106 @@ func TestCombatStatsRefreshAfterTalentUpgradeAndReset(t *testing.T) {
 		t.Fatalf("expected attack to return to base after reset, before=%+v after=%+v", before.CombatStats, reset.CombatStats)
 	}
 }
+
+func TestCompileTalentSetBuildsNormalThresholdsAndTierFlags(t *testing.T) {
+	compiled := compileTalentSet(&TalentState{
+		Talents: map[string]int{
+			"normal_core":       5,
+			"normal_atk_up":     1,
+			"normal_dmg_amp":    1,
+			"normal_soft_atk":   1,
+			"normal_charge":     4,
+			"normal_chase_up":   3,
+			"normal_combo_ext":  2,
+			"normal_filler_t2a": 1,
+			"normal_filler_t2b": 1,
+			"normal_ultimate":   5,
+		},
+	})
+
+	if compiled == nil {
+		t.Fatal("expected compiled talent set")
+	}
+	if !compiled.Has("normal_core") || !compiled.Has("normal_ultimate") {
+		t.Fatalf("expected compiled set to record learned talents, got %+v", compiled)
+	}
+	if !compiled.IsTierFull(TalentTreeNormal, 2) {
+		t.Fatalf("expected normal tier 2 to be full, got %+v", compiled.tierFull)
+	}
+	if compiled.Normal.TriggerCount != int64(normalCoreTriggerCountForLevel(5)-20) {
+		t.Fatalf("expected compiled normal trigger count %d, got %d", normalCoreTriggerCountForLevel(5)-20, compiled.Normal.TriggerCount)
+	}
+	expectedHits := int64(normalCoreExtraHitsForLevel(5) + normalComboExtendHitsForLevel(2) + 5)
+	if compiled.Normal.ExtraHits != expectedHits {
+		t.Fatalf("expected compiled normal extra hits %d, got %d", expectedHits, compiled.Normal.ExtraHits)
+	}
+	expectedRatio := normalChaseUpgradeRatioForLevel(3) + 0.15
+	if compiled.Normal.ChaseRatio != expectedRatio {
+		t.Fatalf("expected compiled normal chase ratio %.2f, got %.2f", expectedRatio, compiled.Normal.ChaseRatio)
+	}
+	if compiled.Normal.RetainPercent != normalChargeRetainPercentForLevel(4) {
+		t.Fatalf("expected retain percent %.2f, got %.2f", normalChargeRetainPercentForLevel(4), compiled.Normal.RetainPercent)
+	}
+	if compiled.Normal.SilverStormDuration != int64(normalSilverStormDurationForLevel(5)) {
+		t.Fatalf("expected silver storm duration %d, got %d", normalSilverStormDurationForLevel(5), compiled.Normal.SilverStormDuration)
+	}
+}
+
+func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
+	compiled := compileTalentSet(&TalentState{
+		Talents: map[string]int{
+			"armor_core":         4,
+			"armor_pen_up":       1,
+			"armor_boss_hunter":  1,
+			"armor_heavy_scale":  1,
+			"armor_filler_t1a":   1,
+			"armor_filler_t1b":   1,
+			"armor_auto_strike":  2,
+			"armor_collapse_ext": 3,
+			"armor_ruin":         5,
+			"armor_ultimate":     4,
+			"crit_core":          5,
+			"crit_omen_resonate": 3,
+			"crit_cruel":         2,
+			"crit_skinner":       4,
+			"crit_doom_judgment": 2,
+			"crit_final_cut":     1,
+			"crit_death_ecstasy": 5,
+		},
+	})
+
+	if compiled == nil {
+		t.Fatal("expected compiled talent set")
+	}
+	if !compiled.IsTierFull(TalentTreeArmor, 1) {
+		t.Fatalf("expected armor tier 1 to be full, got %+v", compiled.tierFull)
+	}
+	expectedCollapseTrigger := int64(max(armorCoreCollapseTriggerForLevel(4)-30, 1))
+	if compiled.Armor.CollapseTrigger != expectedCollapseTrigger {
+		t.Fatalf("expected compiled collapse trigger %d, got %d", expectedCollapseTrigger, compiled.Armor.CollapseTrigger)
+	}
+	if compiled.Armor.AutoStrikeInterval != int64(armorAutoStrikeIntervalForLevel(2)) {
+		t.Fatalf("expected auto strike interval %d, got %d", armorAutoStrikeIntervalForLevel(2), compiled.Armor.AutoStrikeInterval)
+	}
+	if compiled.Armor.AutoStrikeRatio != armorAutoStrikeRatioForLevel(2) {
+		t.Fatalf("expected auto strike ratio %.2f, got %.2f", armorAutoStrikeRatioForLevel(2), compiled.Armor.AutoStrikeRatio)
+	}
+	if compiled.Armor.CollapseDuration != int64(armorCollapseExtendForLevel(3)) {
+		t.Fatalf("expected collapse duration %d, got %d", armorCollapseExtendForLevel(3), compiled.Armor.CollapseDuration)
+	}
+	if compiled.Armor.RuinAmp != armorRuinAmpForLevel(5) {
+		t.Fatalf("expected ruin amp %.2f, got %.2f", armorRuinAmpForLevel(5), compiled.Armor.RuinAmp)
+	}
+	if compiled.Crit.SkinnerChance != critSkinnerChanceForLevel(4) {
+		t.Fatalf("expected skinner chance %.2f, got %.2f", critSkinnerChanceForLevel(4), compiled.Crit.SkinnerChance)
+	}
+	if compiled.Crit.FinalCutTrigger != int64(critFinalCutCountForLevel(1)) {
+		t.Fatalf("expected final cut trigger %d, got %d", critFinalCutCountForLevel(1), compiled.Crit.FinalCutTrigger)
+	}
+	if compiled.Crit.DeathEcstasyMult != critDeathEcstasyMultForLevel(5)+2 {
+		t.Fatalf("expected death ecstasy mult %.2f, got %.2f", critDeathEcstasyMultForLevel(5)+2, compiled.Crit.DeathEcstasyMult)
+	}
+	if compiled.Crit.DoomMarkCount != critDoomMarkCountForLevel(2) {
+		t.Fatalf("expected doom mark count %d, got %d", critDoomMarkCountForLevel(2), compiled.Crit.DoomMarkCount)
+	}
+}
