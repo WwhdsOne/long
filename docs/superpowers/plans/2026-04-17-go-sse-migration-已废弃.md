@@ -1,3 +1,7 @@
+> **⚠️ 本文档已废弃**（2026-04-30 核查：与当前代码不符）
+>
+> REST API 端点已变更（GET /api/buttons 等已不存在），实时通信现为 WebSocket 优先 SSE 降级
+
 # Go + SSE Migration
 
 ## Goal

@@ -11,6 +11,19 @@ const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8
 const docsPath = path.resolve(currentDir, '../../../docs/2026-04-29-伤害动画解析优先级.md')
 
 describe('BattlePage 光标与伤害说明', () => {
+  it('死兆改到左侧统一全局状态面板，并按 100 层显示进度', () => {
+    expect(stateSource).toContain("kind: 'omen'")
+    expect(stateSource).toContain('const omenStacks = Math.max(0, Number(talentVisualState.value?.omenStacks) || 0)')
+    expect(stateSource).toContain("title: '死兆'")
+    expect(stateSource).toContain("primary: `${omenStacks} / 100`")
+    expect(battleSource).toContain('class="status-panel"')
+    expect(battleSource).not.toContain('class="talent-omen-ring__svg"')
+    expect(styleSource).toContain('background: linear-gradient(180deg, rgba(69, 10, 10, 0.94), rgba(127, 29, 29, 0.82));')
+    expect(styleSource).toContain('border: 1px solid rgba(248, 113, 113, 0.28);')
+    expect(styleSource).toContain('color: #fca5a5;')
+    expect(styleSource).toContain('color: #fee2e2;')
+  })
+
   it('改用局部原生事件，只在 Boss 5x5 网格内显示 PNG 光标', () => {
     expect(battleSource).toContain("ref=\"bossGridRef\"")
     expect(battleSource).toContain('@pointermove="handleBossGridPointerMove"')
@@ -40,13 +53,26 @@ describe('BattlePage 光标与伤害说明', () => {
     expect(styleSource).toContain('font-size: 1.1em;')
   })
 
+  it('削血和终结的实际伤害弹字单独缩小，不影响其他伤害类型', () => {
+    expect(styleSource).toContain('.boss-zone-button__damage-burst--doomsday {')
+    expect(styleSource).toContain('font-size: clamp(2.1rem, 4.4vw, 3.8rem);')
+    expect(styleSource).toContain('.boss-zone-button__damage-burst--judgement {')
+    expect(styleSource).toContain('font-size: clamp(2.4rem, 5vw, 4.4rem);')
+    expect(stateSource).toContain('scale: 2.15,')
+    expect(stateSource).toContain('scale: 2.75,')
+  })
+
   it('重甲格子有金属质感和低频扫光，只作用在 5x5 战斗格子', () => {
     expect(styleSource).toContain('.boss-part-cell--heavy::after')
     expect(styleSource).toContain('animation: boss-heavy-sheen 3.6s ease-in-out infinite;')
     expect(styleSource).toContain('@keyframes boss-heavy-sheen')
     expect(styleSource).not.toContain('overflow: hidden;\n  border-color: rgba(148, 163, 184, 0.72);')
+    expect(styleSource).toContain('.boss-zone-button--damage {')
+    expect(styleSource).toContain('z-index: 30;')
     expect(styleSource).toContain('.boss-zone-button__damage-layer {')
-    expect(styleSource).toContain('z-index: 12;')
+    expect(styleSource).toContain('z-index: 24;')
+    expect(styleSource).toContain('.boss-zone-button__damage-burst {')
+    expect(styleSource).toContain('z-index: 25;')
     expect(styleSource).toContain('.boss-zone-button__damage-particle {')
     expect(styleSource).toContain('z-index: 14;')
     expect(styleSource).not.toContain('.boss-part-info__item--heavy::after')

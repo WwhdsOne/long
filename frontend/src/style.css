@@ -2945,6 +2945,7 @@ select {
 }
 
 .boss-zone-button--damage {
+  z-index: 30;
   border-color: #f59e0b;
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2), 0 14px 24px rgba(245, 158, 11, 0.18);
 }
@@ -3094,7 +3095,7 @@ select {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 12;
+  z-index: 24;
   overflow: visible;
 }
 
@@ -3115,6 +3116,7 @@ select {
   letter-spacing: 0.02em;
   text-shadow: 0 2px 8px rgba(15, 23, 42, 0.65);
   white-space: nowrap;
+  z-index: 25;
   animation: boss-damage-float var(--damage-ttl) cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -3166,13 +3168,13 @@ select {
 
 .boss-zone-button__damage-burst--doomsday {
   color: #c084fc;
-  font-size: clamp(2.8rem, 6vw, 5.6rem);
+  font-size: clamp(2.1rem, 4.4vw, 3.8rem);
   text-shadow: 0 0 24px rgba(192, 132, 252, 0.8), 0 0 48px rgba(168, 85, 247, 0.4), 0 8px 18px rgba(15, 23, 42, 0.68);
 }
 
 .boss-zone-button__damage-burst--judgement {
   color: #fde047;
-  font-size: clamp(3.12rem, 7.2vw, 6.4rem);
+  font-size: clamp(2.4rem, 5vw, 4.4rem);
   text-shadow: 0 0 28px rgba(253, 224, 71, 0.9), 0 0 56px rgba(234, 179, 8, 0.5), 0 10px 20px rgba(15, 23, 42, 0.72);
 }
 
@@ -3654,19 +3656,23 @@ select {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 8;
-  overflow: hidden;
+  z-index: 40;
+  overflow: visible;
 }
-.talent-effect-overlay__hammer {
+.talent-canvas-fx {
   position: absolute;
-  top: 10%;
-  left: 50%;
-  width: 240px;
-  height: 480px;
-  margin-left: -120px;
-  image-rendering: pixelated;
-  animation: talent-hammer-slam 0.75s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+  display: block;
+  pointer-events: none;
+  z-index: 41;
 }
+
+.talent-canvas-fx canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: pixelated;
+}
+
 .talent-effect-overlay__bleed {
   position: absolute;
   top: 20%;
@@ -3676,43 +3682,22 @@ select {
   image-rendering: pixelated;
   animation: talent-blood-fall 1.8s ease-in forwards;
 }
-.talent-effect-overlay__crack-burst {
+/* 末日标记：纯 CSS 像素十字 */
+.boss-part-cell__doom-mark {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 320px;
-  height: 320px;
-  margin-left: -160px;
-  margin-top: -160px;
-  image-rendering: pixelated;
-  opacity: 0;
-  animation: talent-crack-burst 0.9s ease-out forwards;
-}
-@keyframes talent-crack-burst {
-  0% { opacity: 0; transform: scale(0.5); }
-  30% { opacity: 0.9; transform: scale(1.2); }
-  100% { opacity: 0; transform: scale(1.5); }
-}
-
-/* 崩塌裂纹覆盖层 */
-/* 末日审判准星标记 */
-.boss-part-cell__crosshair {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
   pointer-events: none;
   z-index: 6;
   image-rendering: pixelated;
-  filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.6));
-  animation: talent-crosshair-float 1.2s ease-in-out infinite alternate;
-}
-
-@keyframes talent-crosshair-float {
-  0% { opacity: 0.7; transform: scale(1); }
-  100% { opacity: 1; transform: scale(1.15); }
+  box-shadow:
+    0 -10px 0 0 #dc2626,
+    0 10px 0 0 #dc2626,
+    -10px 0 0 0 #dc2626,
+    10px 0 0 0 #dc2626;
 }
 
 /* 暴风连击绿色刀光 */
@@ -4091,13 +4076,13 @@ select {
 /* 左侧面板列容器 */
 .boss-left-panels {
   position: absolute;
-  left: 0;
+  left: max(0px, calc(50% - 518px));
   top: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 1;
-  width: 170px;
+  width: 200px;
 }
 
 /* 连击框 */
@@ -4288,6 +4273,310 @@ select {
   box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
 }
 
+/* 统一全局状态面板 */
+.status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(6px);
+}
+
+.status-panel__title {
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #cbd5e1;
+}
+
+.status-panel__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.status-panel__row--combo {
+  align-items: center;
+}
+
+.status-panel__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-panel__meta--combo {
+  margin-left: auto;
+}
+
+.status-panel__primary {
+  font-size: 1.02rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #f8fafc;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-panel__secondary {
+  font-size: 0.64rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.status-panel__count-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.status-panel__milestone-anchor {
+  position: absolute;
+  left: calc(100% - 2px);
+  top: -8px;
+  pointer-events: none;
+}
+
+.status-panel__milestone {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #fef3c7;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.55);
+}
+
+.status-panel__milestone--floating {
+  display: inline-block;
+  white-space: nowrap;
+  transform-origin: left bottom;
+  animation: combo-milestone-float 0.9s ease-out both;
+}
+
+.status-panel__hint {
+  font-size: 0.58rem;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.status-panel__hint--inline {
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.status-panel__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+}
+
+.status-panel__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.status-panel--combo {
+  border-color: rgba(74, 222, 128, 0.24);
+}
+
+.status-panel--combo .status-panel__primary {
+  color: #f0fdf4;
+}
+
+.status-panel__bar-fill--combo {
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.42);
+}
+
+.status-panel--omen {
+  background: linear-gradient(180deg, rgba(69, 10, 10, 0.94), rgba(127, 29, 29, 0.82));
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  box-shadow: 0 0 18px rgba(185, 28, 28, 0.18), inset 0 0 12px rgba(254, 226, 226, 0.05);
+}
+
+.status-panel--omen .status-panel__title {
+  color: #fca5a5;
+}
+
+.status-panel--omen .status-panel__primary {
+  color: #fee2e2;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.25);
+}
+
+.status-panel__bar-fill--omen {
+  background: linear-gradient(90deg, #f87171, #dc2626);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.42);
+}
+
+.status-panel--final_cut {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-panel--final_cut .status-panel__title {
+  color: #fca5a5;
+}
+
+.status-panel--final_cut .status-panel__primary {
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.status-panel__bar-fill--final_cut {
+  background: linear-gradient(90deg, #dc2626, #f87171);
+}
+
+.status-panel__bar-fill--silver_storm {
+  background: linear-gradient(90deg, #bfdbfe, #e2e8f0, #f8fafc);
+  box-shadow: 0 0 8px rgba(191, 219, 254, 0.45);
+}
+
+/* 死兆面板 */
+.omen-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(69, 10, 10, 0.94), rgba(127, 29, 29, 0.82));
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  box-shadow: 0 0 18px rgba(185, 28, 28, 0.18), inset 0 0 12px rgba(254, 226, 226, 0.05);
+  backdrop-filter: blur(6px);
+}
+
+.omen-panel__title {
+  font-size: 0.64rem;
+  font-weight: 800;
+  color: #fca5a5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.omen-panel__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.omen-panel__count {
+  font-size: 1.02rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #fee2e2;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.25);
+}
+
+.omen-panel__hint {
+  font-size: 0.58rem;
+  color: rgba(254, 226, 226, 0.82);
+}
+
+.omen-panel__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(127, 29, 29, 0.76);
+  overflow: hidden;
+}
+
+.omen-panel__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f87171, #dc2626);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.42);
+  transition: width 0.25s ease;
+}
+
+/* 终末血斩冷却倒计时 */
+.final-cut-cooldown-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  backdrop-filter: blur(6px);
+}
+
+.final-cut-cooldown-panel__title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fca5a5;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.final-cut-cooldown-panel__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.final-cut-cooldown-panel__timer {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #f87171;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.final-cut-cooldown-panel__hint {
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.final-cut-cooldown-panel__bar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(239, 68, 68, 0.15);
+  overflow: hidden;
+}
+
+.final-cut-cooldown-panel__timer--counting {
+  color: #fbbf24;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
+.final-cut-cooldown-panel__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #dc2626, #f87171);
+  transition: width 1s linear;
+}
+
+.final-cut-cooldown-panel__bar-fill--counting {
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+}
+
+.part-status-panel__bar {
+  display: block;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(51, 65, 85, 0.72);
+  overflow: hidden;
+}
+
+.part-status-panel__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.25s linear;
+}
+
+.part-status-panel__bar-fill--collapse {
+  background: linear-gradient(90deg, #f59e0b, #fcd34d);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.part-status-panel__bar-fill--skinner {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
 /* 崩塌面板 */
 .collapse-panel {
   display: flex;
@@ -4370,8 +4659,9 @@ select {
   text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
-/* 部位累计进度面板 */
-.part-progress-panel {
+/* 部位累计进度 / 部位状态面板 */
+.part-progress-panel,
+.part-status-panel {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -4382,7 +4672,8 @@ select {
   backdrop-filter: blur(6px);
 }
 
-.part-progress-panel__title {
+.part-progress-panel__title,
+.part-status-panel__title {
   font-size: 0.64rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -4392,13 +4683,15 @@ select {
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 
-.part-progress-panel__item {
+.part-progress-panel__item,
+.part-status-panel__item {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
-.part-progress-panel__name {
+.part-progress-panel__name,
+.part-status-panel__name {
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -4406,6 +4699,9 @@ select {
 .part-progress-panel__name--soft { color: #4ade80; }
 .part-progress-panel__name--heavy { color: #cbd5e1; }
 .part-progress-panel__name--weak { color: #f87171; }
+.part-status-panel__name--soft { color: #4ade80; }
+.part-status-panel__name--heavy { color: #cbd5e1; }
+.part-status-panel__name--weak { color: #f87171; }
 
 .part-progress-panel__track {
   display: flex;
@@ -4443,6 +4739,21 @@ select {
   box-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
 }
 
+.part-progress-panel__bar-fill--judgment-day {
+  background: linear-gradient(90deg, #fcd34d, #fef08a);
+  box-shadow: 0 0 6px rgba(253, 224, 71, 0.55);
+}
+
+.part-progress-panel__done {
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #fef08a;
+  background: rgba(245, 158, 11, 0.25);
+  padding: 0 4px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+
 .part-progress-panel__bar-fill--auto-strike {
   background: linear-gradient(90deg, #94a3b8, #e2e8f0);
   box-shadow: 0 0 6px rgba(226, 232, 240, 0.45);
@@ -4460,6 +4771,32 @@ select {
 .part-progress-panel__countdown {
   min-width: 2.4em;
   text-align: right;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.part-status-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.6rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.part-status-panel__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.8em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(248, 113, 113, 0.14);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.24);
+}
+
+.part-status-panel__countdown {
+  margin-left: auto;
   color: rgba(255, 255, 255, 0.82);
 }
 
@@ -4567,5 +4904,236 @@ select {
 
   .talent-buff-demo__panel {
     min-height: auto;
+  }
+}
+
+/* ======== 像素特效方案图鉴墙 (BattleFxGallery) ======== */
+.battle-fx-gallery-page {
+  padding: 36px 0 72px;
+  background: #0f172a;
+  min-height: 100vh;
+}
+
+.bfxg {
+  width: min(100% - 32px, 1380px);
+  margin: 0 auto;
+  display: grid;
+  gap: 36px;
+}
+
+.bfxg__header {
+  display: grid;
+  gap: 10px;
+}
+
+.bfxg__header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  color: #f1f5f9;
+}
+
+.bfxg__copy {
+  color: #94a3b8;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.bfxg__section {
+  display: grid;
+  gap: 18px;
+}
+
+.bfxg__section-head h2 {
+  font-size: 1.2rem;
+  color: #e2e8f0;
+  margin: 0 0 4px;
+}
+
+.bfxg__section-head p {
+  color: #64748b;
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* 图鉴墙卡片网格 */
+.bfxg__gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.bfxg__card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bfxg__card-preview {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.bfxg__canvas-wrap {
+  width: 180px;
+  height: 180px;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bfxg__canvas-wrap canvas {
+  width: 180px !important;
+  height: 180px !important;
+}
+
+.bfxg__card-body {
+  display: grid;
+  gap: 6px;
+}
+
+.bfxg__card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bfxg__card-head strong {
+  color: #f1f5f9;
+  font-size: 0.95rem;
+}
+
+.bfxg__card-head code {
+  background: #334155;
+  color: #94a3b8;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.72rem;
+}
+
+.bfxg__skill-line {
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.bfxg__skill-line span {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.bfxg__card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bfxg__layer {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.bfxg__tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.tag--soft  { background: #1e3a5f; color: #93c5fd; }
+.tag--heavy { background: #3b2f1e; color: #fcd34d; }
+.tag--weak  { background: #3b1e2f; color: #fda4af; }
+.tag--best  { background: #065f46; color: #6ee7b7; }
+
+.bfxg__card-note {
+  color: #94a3b8;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* 5x5 终极技能区 */
+.bfxg__ultimate-card {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.bfxg__ultimate-preview {
+  display: flex;
+  justify-content: center;
+}
+
+.bfxg__ultimate-grid {
+  position: relative;
+  width: min(100%, 560px);
+  max-width: 560px;
+  margin: 0;
+  overflow: visible;
+}
+
+.bfxg__ultimate-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+}
+
+.bfxg__ultimate-overlay canvas {
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: pixelated;
+}
+
+.bfxg__ultimate-grid .boss-zone-button {
+  cursor: default;
+}
+
+.bfxg__ultimate-grid .boss-part-cell__type {
+  font-size: 0.64rem;
+}
+
+.bfxg__ultimate-grid .boss-zone-button__label {
+  font-size: 0.76rem;
+}
+
+.bfxg__ultimate-grid .boss-zone-button__meta {
+  font-size: 0.54rem;
+  line-height: 1.2;
+}
+
+@media (max-width: 960px) {
+  .boss-left-panels {
+    left: 0;
+    width: 190px;
+  }
+
+  .bfxg {
+    width: min(100% - 20px, 1380px);
+  }
+
+  .bfxg__gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .bfxg__ultimate-card {
+    padding: 18px;
+  }
+
+  .bfxg__ultimate-grid {
+    width: 100%;
+    max-width: none;
   }
 }

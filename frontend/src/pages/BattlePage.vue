@@ -1,8 +1,7 @@
 <script setup>
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
-import {effectAssetUrl} from '../utils/effectAssets'
-import PixelShatter from '../components/PixelShatter.vue'
+import PixelEffectCanvas from '../components/PixelEffectCanvas.vue'
 
 const {
   boss,
@@ -27,8 +26,7 @@ const {
   stormTrigger,
   armorTrigger,
   autoStrikeTrigger,
-  comboTriggerFlash,
-  comboTimeoutPercent,
+  judgmentDayTrigger,
   damageStageFx,
   totalVotes,
   isLoggedIn,
@@ -49,7 +47,9 @@ const {
   rewardModal,
   closeRewardModal,
   clickButton,
+  globalStatusList,
   partProgressList,
+  partStatusList,
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
@@ -58,44 +58,27 @@ const swordCursorRef = ref(null)
 const bossCursorVisible = ref(false)
 const bossCursorX = ref(0)
 const bossCursorY = ref(0)
+const bossCellSizePx = ref(56)
 const bossSwordCursorUrl = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
 
-const comboColor = computed(() => {
-  const t = Math.min(comboCount.value / 200, 1)
-  const hue = 120 - t * 120 // 绿 → 黄 → 红
-  return `hsl(${hue}, 90%, ${55 - t * 15}%)`
-})
-
-const comboIsGold = computed(() => comboCount.value >= 200)
-const comboGoldEntering = ref(false)
 const comboMilestoneText = ref('')
 const comboMilestoneTick = ref(0)
 let comboMilestoneTimer = 0
 
-const comboBounce = ref(false)
-watch(() => comboCount.value, () => {
-  if (comboCount.value > 0) {
-    comboBounce.value = true
-    setTimeout(() => { comboBounce.value = false }, 200)
-  }
-})
 watch(() => comboCount.value, (next, prev) => {
   const nextMilestone = Math.floor(next / 25)
   const prevMilestone = Math.floor((prev || 0) / 25)
   if (nextMilestone <= 0 || nextMilestone === prevMilestone) return
-  comboMilestoneText.value = `连击加成 +${nextMilestone * 10}%`
+  comboMilestoneText.value = `+${nextMilestone * 10}%`
   comboMilestoneTick.value++
   clearTimeout(comboMilestoneTimer)
   comboMilestoneTimer = setTimeout(() => {
     comboMilestoneText.value = ''
   }, 900)
 })
-watch(comboIsGold, (next, prev) => {
-  if (!next || prev) return
-  comboGoldEntering.value = true
-  setTimeout(() => { comboGoldEntering.value = false }, 420)
-})
+
 const talentEffectOverlayRef = ref(null)
+let bossGridResizeObserver = null
 
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
@@ -111,6 +94,76 @@ function updateCursorPos(e) {
   const rect = grid.getBoundingClientRect()
   bossCursorX.value = e.clientX - rect.left
   bossCursorY.value = e.clientY - rect.top
+}
+
+function measureBossCellSize() {
+  const grid = bossGridRef.value
+  const cell = grid?.querySelector?.('.boss-part-cell')
+  if (!(cell instanceof HTMLElement)) return
+  const rect = cell.getBoundingClientRect()
+  if (rect.width > 0) {
+    bossCellSizePx.value = Math.round(rect.width)
+  }
+}
+
+function effectCanvasSize(scale) {
+  return Math.max(1, Math.round(bossCellSizePx.value * scale))
+}
+
+function ultimateEffectCanvasSize() {
+  return 90
+}
+
+function bossGridEffectSize() {
+  const rect = bossGridRef.value?.getBoundingClientRect?.()
+  const width = Math.round(rect?.width || 0)
+  const height = Math.round(rect?.height || 0)
+  return Math.max(1, Math.max(width, height, Math.round(bossCellSizePx.value * 5)))
+}
+
+function effectOffset(scale) {
+  return Math.round(bossCellSizePx.value * scale)
+}
+
+function effectFallback(scale, fallback = {}) {
+  const size = effectCanvasSize(scale)
+  return {
+    marginLeft: `-${Math.round(size / 2)}px`,
+    marginTop: `-${Math.round(size / 2)}px`,
+    ...fallback,
+  }
+}
+
+function effectOverlayStyle(type, options = {}) {
+  const {
+    anchor = 'part',
+    scale = 1,
+    offsetXScale = 0,
+    offsetYScale = 0,
+    fallback = {},
+  } = options
+  if (anchor === 'grid') {
+    const size = bossGridEffectSize()
+    return triggerOverlayStyle(type, {
+      width: size,
+      height: size,
+      anchor: gridOverlayAnchor(),
+      fallback: {
+        top: '50%',
+        left: '50%',
+        marginLeft: `-${Math.round(size / 2)}px`,
+        marginTop: `-${Math.round(size / 2)}px`,
+      },
+    })
+  }
+  const size = effectCanvasSize(scale)
+  return triggerOverlayStyle(type, {
+    width: size,
+    height: size,
+    offsetX: effectOffset(offsetXScale),
+    offsetY: effectOffset(offsetYScale),
+    fallback: effectFallback(scale, fallback),
+  })
 }
 
 // 剑挥火花（按部位类型变色，参照 DAMAGE_VARIANTS）
@@ -202,12 +255,23 @@ function handleBossGridClick(e) {
 }
 
 onMounted(() => {
+  measureBossCellSize()
+  if (typeof ResizeObserver !== 'undefined') {
+    bossGridResizeObserver = new ResizeObserver(() => {
+      measureBossCellSize()
+    })
+    if (bossGridRef.value instanceof HTMLElement) {
+      bossGridResizeObserver.observe(bossGridRef.value)
+    }
+  }
   tickTimer = setInterval(() => {
     nowTick.value++
   }, 250)
 })
 
 onBeforeUnmount(() => {
+  bossGridResizeObserver?.disconnect?.()
+  bossGridResizeObserver = null
   clearInterval(tickTimer)
   cancelAnimationFrame(particleRaf)
   clearTimeout(recoverTimer)
@@ -319,6 +383,8 @@ const talentEdgeGlowClass = computed(() => {
 
 const showSilverFlash = computed(() => silverStormActive.value && silverStormCountdown.value >= 14)
 const TALENT_EFFECT_WINDOW_MS = 1350
+const ULTIMATE_EFFECT_WINDOW_MS = 3200
+const JUDGMENT_DAY_EFFECT_WINDOW_MS = 5000
 
 function slashOverlayStyle() {
   const recent = talentTriggerFeed.value[0]
@@ -332,6 +398,20 @@ function latestTrigger(type) {
   return talentTriggerFeed.value.find((e) => e.effectType === type) || null
 }
 
+function effectWindowMs(type) {
+  if (type === 'death_ecstasy_ult' || type === 'silver_storm') {
+    return ULTIMATE_EFFECT_WINDOW_MS
+  }
+  if (type === 'judgment_day') {
+    return JUDGMENT_DAY_EFFECT_WINDOW_MS
+  }
+  return TALENT_EFFECT_WINDOW_MS
+}
+
+function recentTriggers(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
+  return talentTriggerFeed.value.filter((entry) => entry.effectType === type && isTriggerFresh(entry, windowMs))
+}
+
 function isTriggerFresh(entry, windowMs = TALENT_EFFECT_WINDOW_MS) {
   if (!entry) return false
   const at = Number(entry.triggeredAt || 0)
@@ -339,13 +419,13 @@ function isTriggerFresh(entry, windowMs = TALENT_EFFECT_WINDOW_MS) {
   return Date.now() - at <= windowMs
 }
 
-function hasRecentTrigger(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
-  return isTriggerFresh(latestTrigger(type), windowMs)
+function hasRecentTrigger(type, windowMs = null) {
+  return isTriggerFresh(latestTrigger(type), windowMs ?? effectWindowMs(type))
 }
 
-function triggerKey(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
+function triggerKey(type, windowMs = null) {
   const entry = latestTrigger(type)
-  if (!isTriggerFresh(entry, windowMs)) return ''
+  if (!isTriggerFresh(entry, windowMs ?? effectWindowMs(type))) return ''
   return `${type}-${entry.id}`
 }
 
@@ -358,8 +438,8 @@ function findBossZoneElement(partX, partY) {
   return document.querySelector(`.boss-part-cell[data-zone-key="${key}"]`)
 }
 
-function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
-  const entry = latestTrigger(type)
+function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS, entryOverride = null) {
+  const entry = entryOverride || latestTrigger(type)
   if (!isTriggerFresh(entry, windowMs)) return null
   const overlayEl = talentEffectOverlayRef.value
   const zoneEl = findBossZoneElement(entry.partX, entry.partY)
@@ -374,34 +454,40 @@ function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
   }
 }
 
+function gridOverlayAnchor() {
+  const overlayEl = talentEffectOverlayRef.value
+  const gridEl = bossGridRef.value
+  if (!(overlayEl instanceof HTMLElement) || !(gridEl instanceof HTMLElement)) {
+    return null
+  }
+  const overlayRect = overlayEl.getBoundingClientRect()
+  const gridRect = gridEl.getBoundingClientRect()
+  return {
+    left: gridRect.left - overlayRect.left + gridRect.width / 2,
+    top: gridRect.top - overlayRect.top + gridRect.height / 2,
+  }
+}
+
 function triggerOverlayStyle(type, options = {}) {
   const {
     width = 0,
     height = 0,
     offsetX = 0,
     offsetY = 0,
+    anchor: anchorOverride = null,
     fallback = {},
   } = options
-  const anchor = triggerAnchor(type)
+  const anchor = anchorOverride || triggerAnchor(type)
   if (!anchor) {
     return fallback
   }
   return {
+    width: width > 0 ? `${Math.round(width)}px` : undefined,
+    height: height > 0 ? `${Math.round(height)}px` : undefined,
     left: `${Math.round(anchor.left + offsetX)}px`,
     top: `${Math.round(anchor.top + offsetY)}px`,
     marginLeft: `${Math.round(-width / 2)}px`,
     marginTop: `${Math.round(-height / 2)}px`,
-  }
-}
-
-function effectSrc(filename) {
-  return effectAssetUrl(filename)
-}
-
-function spriteStyle(filename, style = {}) {
-  return {
-    ...style,
-    backgroundImage: `url("${effectSrc(filename)}")`,
   }
 }
 
@@ -421,86 +507,19 @@ function isPartDoomMarked(zone) {
   return talentVisualState.value.doomMarks.includes(`${zone.x}-${zone.y}`)
 }
 
-const showOmenRing = computed(() => talentVisualState.value.omenStacks > 0)
-const omenRingProgress = computed(() => {
-  const stacks = talentVisualState.value.omenStacks
-  return Math.min(1, stacks / 100)
-})
-
 const silverStormCountdown = computed(() => {
   void nowTick.value
   const endsAt = talentVisualState.value.silverStormEndsAt
   if (!endsAt) return talentVisualState.value.silverStormRemaining || 0
   return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
 })
-const silverStormRemainingSec = computed(() => {
-  void nowTick.value
-  const endsAt = talentVisualState.value.silverStormEndsAt
-  if (!endsAt) return Number(talentVisualState.value.silverStormRemaining) || 0
-  return Math.max(0, endsAt - Date.now() / 1000)
-})
-
 const silverStormActive = computed(() => {
   void nowTick.value
   if (!talentVisualState.value.silverStormActive) return false
   if (!talentVisualState.value.silverStormEndsAt) return talentVisualState.value.silverStormRemaining > 0
   return talentVisualState.value.silverStormEndsAt > Date.now() / 1000
 })
-const silverStormTotalSec = ref(0)
-watch([silverStormActive, silverStormCountdown], ([active, countdown]) => {
-  if (!active) {
-    silverStormTotalSec.value = 0
-    return
-  }
-  silverStormTotalSec.value = Math.max(silverStormTotalSec.value, countdown)
-}, { immediate: true })
-const silverStormPercent = computed(() => {
-  const total = silverStormTotalSec.value
-  if (!silverStormActive.value || total <= 0) return 0
-  return Math.min(100, Math.max(0, (silverStormRemainingSec.value / total) * 100))
-})
 
-const collapsePartNames = computed(() => {
-  const parts = boss.value?.parts
-  if (!Array.isArray(parts)) return []
-  return talentVisualState.value.collapsePartKeys
-      .map(key => {
-        const [x, y] = key.split('-').map(Number)
-        const part = parts.find(p => p.x === x && p.y === y)
-        if (!part || !part.alive) return null
-        return part.displayName || partTypeLabels[part?.type] || key
-      })
-      .filter(Boolean)
-})
-const collapseActive = computed(() => collapsePartNames.value.length > 0)
-
-const collapseTick = ref(0)
-let collapseTickTimer = 0
-watch(collapseActive, (val) => {
-  if (val) {
-    collapseTickTimer = setInterval(() => { collapseTick.value++ }, 200)
-  } else {
-    clearInterval(collapseTickTimer)
-    collapseTick.value = 0
-  }
-})
-onBeforeUnmount(() => { clearInterval(collapseTickTimer) })
-
-const collapsePercent = computed(() => {
-  void collapseTick.value
-  const endsAt = talentVisualState.value.collapseEndsAt
-  const duration = talentVisualState.value.collapseDuration || 8
-  if (!endsAt || !duration) return 0
-  const remaining = Math.max(0, endsAt - Date.now() / 1000)
-  return Math.min(100, Math.round((remaining / duration) * 100))
-})
-
-const collapseRemaining = computed(() => {
-  void collapseTick.value
-  const endsAt = talentVisualState.value.collapseEndsAt
-  if (!endsAt) return 0
-  return Math.max(0, Math.ceil(endsAt - Date.now() / 1000))
-})
 </script>
 
 <template>
@@ -580,40 +599,35 @@ const collapseRemaining = computed(() => {
         <div v-else class="boss-part-grid-container">
           <!-- 左侧面板列 -->
           <div class="boss-left-panels">
-            <!-- 1. 连击框：始终可见 -->
-            <div class="combo-box" :class="{ 'combo-box--gold': comboIsGold, 'combo-box--gold-enter': comboGoldEntering }">
-              <template v-if="comboCount > 0">
-                <div class="combo-box__row">
-                  <span class="combo-box__count-wrap">
-                    <span class="combo-box__count" :class="{ 'combo-box__count--bounce': comboBounce, 'combo-box__count--gold': comboIsGold }" :style="comboIsGold ? {} : { color: comboColor, textShadow: `0 0 14px ${comboColor}80` }">连击 x{{ comboCount }}</span>
-                    <span class="combo-box__milestone-anchor">
-                      <span v-if="comboMilestoneText" :key="comboMilestoneTick" class="combo-box__milestone combo-box__milestone--floating">
+            <div v-for="status in globalStatusList" :key="status.key" class="status-panel" :class="[`status-panel--${status.kind}`, { 'status-panel--gold': status.isGold }]" :style="status.panelStyle || null">
+              <template v-if="status.kind === 'combo'">
+                <div class="status-panel__row status-panel__row--combo">
+                  <span class="status-panel__title">{{ status.title }}</span>
+                  <span class="status-panel__count-wrap">
+                    <strong class="status-panel__primary" :style="status.primaryStyle || null">{{ status.primary }}</strong>
+                    <span class="status-panel__milestone-anchor">
+                      <span v-if="comboMilestoneText" :key="comboMilestoneTick" class="status-panel__milestone status-panel__milestone--floating">
                         {{ comboMilestoneText }}
                       </span>
                     </span>
                   </span>
-                  <span v-if="Math.floor(comboCount / 25) > 0" class="combo-box__bonus">
-                    伤害 +{{ Math.floor(comboCount / 25) * 10 }}%
+                  <span class="status-panel__meta status-panel__meta--combo">
+                    <span v-if="status.secondary" class="status-panel__secondary" :style="status.secondaryStyle || null">{{ status.secondary }}</span>
+                    <span v-if="status.hint" class="status-panel__hint status-panel__hint--inline" :style="status.hintStyle || null">{{ status.hint }}</span>
                   </span>
                 </div>
-                <span class="combo-box__timeout-bar" :style="comboIsGold ? { borderColor: 'rgba(251,191,36,0.5)' } : { borderColor: comboColor + '40' }">
-                  <span
-                      class="combo-box__timeout-fill"
-                      :style="comboIsGold ? { width: comboTimeoutPercent + '%', background: 'linear-gradient(90deg, #fde047, #fbbf24, #f59e0b)', boxShadow: '0 0 10px rgba(251,191,36,0.6)' } : { width: comboTimeoutPercent + '%', background: `linear-gradient(90deg, ${comboColor}, ${comboColor}cc)`, boxShadow: `0 0 8px ${comboColor}80` }"
-                  ></span>
-                </span>
-                <span class="combo-box__timeout-text" :style="comboIsGold ? { color: '#fde047', textShadow: '0 0 10px rgba(251,191,36,0.55)' } : { color: comboColor }">
-                  {{ Math.ceil(comboTimeoutPercent / 20) }}s
-                </span>
               </template>
               <template v-else>
-                <span class="combo-box__count combo-box__count--idle">
-                  连击 x 0
-                </span>
-                <span class="combo-box__timeout-bar combo-box__timeout-bar--empty">
-                  <span class="combo-box__timeout-fill"></span>
-                </span>
+                <div class="status-panel__title">{{ status.title }}</div>
+                <div class="status-panel__row">
+                  <strong class="status-panel__primary" :style="status.primaryStyle || null">{{ status.primary }}</strong>
+                  <span v-if="status.secondary" class="status-panel__secondary">{{ status.secondary }}</span>
+                </div>
+                <div v-if="status.hint" class="status-panel__hint" :style="status.hintStyle || null">{{ status.hint }}</div>
               </template>
+              <span class="status-panel__bar">
+                <span class="status-panel__bar-fill" :class="`status-panel__bar-fill--${status.kind}`" :style="{ width: `${status.progress}%`, ...(status.barStyle || {}) }"></span>
+              </span>
             </div>
 
             <!-- 3. 部位累计进度列表：仅当有进度时显示 -->
@@ -635,12 +649,18 @@ const collapseRemaining = computed(() => {
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor"
                       :style="{ width: p.armorProgress + '%' }"></span></span>
                 </span>
+                <span v-if="p.type === 'heavy' && p.judgmentDay > 0" class="part-progress-panel__track part-progress-panel__track--judgment-day">
+                  审判日 {{ p.judgmentDay }}/{{ judgmentDayTrigger }}
+                  <span class="part-progress-panel__bar"><span
+                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--judgment-day"
+                      :style="{ width: p.judgmentDayProgress + '%' }"></span></span>
+                </span>
                 <span v-if="p.type === 'heavy' && p.autoStrike > 0" class="part-progress-panel__track part-progress-panel__track--auto-strike">
                   碎甲重击 {{ p.autoStrike }}/{{ autoStrikeTrigger }}
                   <span class="part-progress-panel__bar"><span
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--auto-strike"
                       :style="{ width: p.autoStrikeProgress + '%' }"></span></span>
-                  <span class="part-progress-panel__countdown">{{ Math.ceil(p.autoStrikeCountdown) }}s</span>
+                  <span class="part-progress-panel__countdown">{{ Number.isFinite(p.autoStrikeCountdown) ? Math.ceil(p.autoStrikeCountdown) : 0 }}s</span>
                   <span class="part-progress-panel__bar part-progress-panel__bar--timer"><span
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--timer"
                       :style="{ width: p.autoStrikeTimeoutPercent + '%' }"></span></span>
@@ -648,16 +668,20 @@ const collapseRemaining = computed(() => {
               </div>
             </div>
 
-            <!-- 4. 崩塌倒计时 -->
-            <div v-if="collapseActive" class="collapse-panel">
-              <div class="collapse-panel__title">护甲崩塌</div>
-              <div v-for="name in collapsePartNames" :key="name" class="collapse-panel__part">{{ name }}</div>
-              <span class="collapse-panel__bar">
-                <span class="collapse-panel__bar-fill"
-                      :style="{ width: collapsePercent + '%' }"></span>
-              </span>
-              <span class="collapse-panel__count">{{ collapseRemaining }}s</span>
+            <div v-if="partStatusList.length > 0" class="part-status-panel">
+              <div class="part-status-panel__title">部位状态</div>
+              <div v-for="s in partStatusList" :key="s.key" class="part-status-panel__item">
+                <span class="part-status-panel__name" :class="`part-status-panel__name--${s.type}`">{{ s.name }}</span>
+                <div class="part-status-panel__row">
+                  <span class="part-status-panel__label">{{ s.statusLabel }}</span>
+                  <span class="part-status-panel__countdown">{{ s.remainingSec }}s</span>
+                </div>
+                <span class="part-status-panel__bar">
+                  <span class="part-status-panel__bar-fill" :class="`part-status-panel__bar-fill--${s.statusKey}`" :style="{ width: `${s.progress}%` }"></span>
+                </span>
+              </div>
             </div>
+
           </div>
 
 
@@ -738,15 +762,11 @@ const collapseRemaining = computed(() => {
                         ></span>
                       </template>
                     </div>
-                    <PixelShatter
-                        v-if="isPartCollapsed(zone)"
-                    />
-                    <img
+                    <span
                         v-if="isPartDoomMarked(zone)"
-                        class="boss-part-cell__crosshair"
-                        :src="effectSrc('crosshair-mark.png')"
-                        alt="末日审判标记"
-                    />
+                        class="boss-part-cell__doom-mark"
+                        aria-label="末日审判标记"
+                    ></span>
                     <div class="boss-part-cell__type">{{ partTypeLabels[zone.type] || zone.type }}</div>
                     <strong class="boss-zone-button__label">{{
                         zone.displayName || partTypeLabels[zone.type] || zone.type
@@ -830,120 +850,61 @@ const collapseRemaining = computed(() => {
           </div>
 
         </div>
-        <!-- 天赋瞬发特效覆盖层 -->
+        <!-- 天赋瞬发特效覆盖层（Canvas 像素粒子） -->
         <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
           <div v-if="hasRecentTrigger('storm_combo')"
                :key="triggerKey('storm_combo')"
-               class="talent-spritesheet talent-spritesheet--slash talent-spritesheet--playing"
-               :style="spriteStyle('slash-green-45.png', triggerOverlayStyle('storm_combo', {
-                 width: 480,
-                 height: 480,
-                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
-               }))"></div>
-          <img v-if="hasRecentTrigger('auto_strike')"
-               :key="triggerKey('auto_strike')"
-               class="talent-effect-overlay__hammer"
-               :src="effectSrc('hammer-impact.png')"
-               :style="triggerOverlayStyle('auto_strike', {
-                 width: 240,
-                 height: 480,
-                 offsetY: -80,
-                 fallback: { top: '10%', left: '50%', marginLeft: '-120px' },
-               })"
-               alt="碎甲重击"/>
-          <img v-if="hasRecentTrigger('bleed')"
-               :key="triggerKey('bleed')"
-               class="talent-effect-overlay__bleed"
-               :src="effectSrc('blood-drop-large.png')"
-               :style="triggerOverlayStyle('bleed', {
-                 width: 120,
-                 height: 160,
-                 offsetY: -30,
-                 fallback: { top: '20%', right: '30%' },
-               })"
-               alt="致命出血"/>
-          <div v-if="hasRecentTrigger('omen_harvest')"
-               :key="triggerKey('omen_harvest')"
-               class="talent-spritesheet talent-spritesheet--scythe talent-spritesheet--playing"
-               :style="spriteStyle('scythe-sweep-spritesheet.png', triggerOverlayStyle('omen_harvest', {
-                 width: 480,
-                 height: 480,
-                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
-               }))"></div>
-          <div v-if="hasRecentTrigger('final_cut')"
-               :key="triggerKey('final_cut')"
-               class="talent-spritesheet talent-spritesheet--blade talent-spritesheet--playing"
-               :style="spriteStyle('blood-blade-spritesheet.png', triggerOverlayStyle('final_cut', {
-                 width: 480,
-                 height: 480,
-                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
-               }))"></div>
-          <img v-if="hasRecentTrigger('collapse_trigger')"
-               :key="triggerKey('collapse_trigger')"
-               class="talent-effect-overlay__crack-burst"
-               :src="effectSrc('crack-pattern-3.png')"
-               :style="triggerOverlayStyle('collapse_trigger', {
-                 width: 320,
-                 height: 320,
-                 fallback: { top: '50%', left: '50%', marginLeft: '-160px', marginTop: '-160px' },
-               })"
-               alt="结构崩塌"/>
-          <div v-if="hasRecentTrigger('collapse_trigger')"
-               :key="`armor-break-${triggerKey('collapse_trigger')}`"
-               class="talent-spritesheet talent-spritesheet--armor-break talent-spritesheet--playing"
-               :style="spriteStyle('armor-break-spritesheet.png', triggerOverlayStyle('collapse_trigger', {
-                 width: 320,
-                 height: 320,
-                 fallback: { top: '50%', left: '50%', marginLeft: '-160px', marginTop: '-160px' },
-               }))"></div>
-          <div v-if="hasRecentTrigger('judgment_day')"
-               :key="triggerKey('judgment_day')"
-               class="talent-spritesheet talent-spritesheet--hammer-crack talent-spritesheet--playing"
-               :style="spriteStyle('hammer-crack-spritesheet.png', triggerOverlayStyle('judgment_day', {
-                 width: 320,
-                 height: 320,
-                 fallback: { top: '50%', left: '50%', marginLeft: '-160px', marginTop: '-160px' },
-               }))"></div>
-          <div v-if="hasRecentTrigger('doom_judgment')"
-               :key="triggerKey('doom_judgment')"
-               class="talent-spritesheet talent-spritesheet--ring talent-spritesheet--playing"
-               :style="spriteStyle('green-ring-spritesheet.png', triggerOverlayStyle('doom_judgment', {
-                 width: 480,
-                 height: 480,
-                 fallback: { top: '50%', left: '50%', marginLeft: '-240px', marginTop: '-240px' },
-               }))"></div>
-          <div v-if="hasRecentTrigger('silver_storm')"
-               :key="triggerKey('silver_storm')"
-               class="talent-spritesheet talent-spritesheet--scythe talent-spritesheet--playing"
-               :style="spriteStyle('scythe-sweep-spritesheet.png', triggerOverlayStyle('silver_storm', {
-                 width: 480,
-                 height: 480,
-                 fallback: { top: '40%', left: '30%', marginLeft: '-240px', marginTop: '-240px' },
-               }))"></div>
-        </div>
-        <div
-            v-if="silverStormActive || talentVisualState.omenStacks > 0"
-            class="talent-status-bar">
-          <div v-if="silverStormActive" class="talent-status-chip talent-status-chip--silver">
-            <span class="talent-status-chip__head">
-              <span class="talent-status-chip__label">白银风暴</span>
-              <span class="talent-status-chip__count">{{ silverStormCountdown }}s</span>
-            </span>
-            <span class="talent-status-chip__bar">
-              <span
-                  class="talent-status-chip__bar-fill talent-status-chip__bar-fill--silver"
-                  :style="{ width: silverStormPercent + '%' }"
-              ></span>
-            </span>
+               class="talent-canvas-fx"
+               :style="effectOverlayStyle('storm_combo', { scale: 1.65, fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="storm_combo" :size="effectCanvasSize(1.65)" :loop="false" />
           </div>
-          <span v-if="showOmenRing" class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
-            <svg class="talent-omen-ring__svg" viewBox="0 0 40 40">
-              <circle class="talent-omen-ring__track" cx="20" cy="20" r="16"/>
-              <circle class="talent-omen-ring__fill" cx="20" cy="20" r="16"
-                      :style="{ strokeDasharray: `${omenRingProgress * 100.5} ${100.5 - omenRingProgress * 100.5}` }"/>
-            </svg>
-            死兆 {{ talentVisualState.omenStacks }}
-          </span>
+          <div v-if="hasRecentTrigger('auto_strike')"
+               :key="triggerKey('auto_strike')"
+               class="talent-canvas-fx"
+               :style="effectOverlayStyle('auto_strike', { scale: 2.05, fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="auto_strike" :size="effectCanvasSize(2.05)" :loop="false" />
+          </div>
+          <div v-for="entry in recentTriggers('bleed')"
+               :key="entry.id"
+               class="talent-canvas-fx"
+               :style="triggerOverlayStyle('bleed', {
+                 width: effectCanvasSize(3.75),
+                 height: effectCanvasSize(3.75),
+                 anchor: triggerAnchor('bleed', TALENT_EFFECT_WINDOW_MS, entry),
+                 fallback: effectFallback(3.75, { top: '50%', left: '50%' }),
+               })">
+            <PixelEffectCanvas effect="bleed" :size="effectCanvasSize(3.75)" :loop="false" />
+          </div>
+          <div v-if="hasRecentTrigger('death_ecstasy_ult', ULTIMATE_EFFECT_WINDOW_MS)"
+               :key="triggerKey('death_ecstasy_ult', ULTIMATE_EFFECT_WINDOW_MS)"
+               class="talent-canvas-fx"
+               :style="effectOverlayStyle('death_ecstasy_ult', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="final_cut" :size="ultimateEffectCanvasSize()" :loop="false" />
+          </div>
+          <div v-if="hasRecentTrigger('collapse_trigger')"
+               :key="triggerKey('collapse_trigger')"
+               class="talent-canvas-fx"
+               :style="effectOverlayStyle('collapse_trigger', { scale: 1, fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="collapse_trigger" :size="effectCanvasSize(1)" :loop="false" />
+          </div>
+          <div v-if="hasRecentTrigger('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"
+               :key="triggerKey('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"
+               class="talent-canvas-fx"
+               :style="effectOverlayStyle('judgment_day', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="judgment_day" :size="bossGridEffectSize()" :loop="false" />
+          </div>
+          <div v-if="hasRecentTrigger('doom_mark')"
+               :key="triggerKey('doom_mark')"
+               class="talent-canvas-fx"
+               :style="effectOverlayStyle('doom_mark', { scale: 1.25, fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="doom_mark" :size="effectCanvasSize(1.25)" :loop="false" />
+          </div>
+          <div v-if="hasRecentTrigger('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)"
+               :key="triggerKey('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)"
+               class="talent-canvas-fx"
+               :style="effectOverlayStyle('silver_storm', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="silver_storm" :size="ultimateEffectCanvasSize()" :loop="false" />
+          </div>
         </div>
         <div class="vote-stage__boss-note vote-stage__boss-note--rules">
           <strong>挂机规则</strong>

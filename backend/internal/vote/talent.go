@@ -34,9 +34,9 @@ const (
 	TalentAutoStrikeWindowSec       = 5
 	TalentOmenStackCap              = 100
 
-	talentCostLevelExponent       = 0.85
-	talentCostMultiplier          = 1.8
-	talentTier0GrowthFactor       = 3.0
+	talentCostLevelExponent = 0.85
+	talentCostMultiplier    = 1.8
+	talentTier0GrowthFactor = 3.0
 
 	// ===== 普攻系关键参数（可直接调）=====
 	// 暴风连击：触发所需点击次数
@@ -130,15 +130,15 @@ var talentDefs = map[string]TalentDef{
 	"normal_combo_ext": {ID: "normal_combo_ext", Tree: TalentTreeNormal, Tier: 2, MaxLevel: 5, Name: "连击扩展", EffectType: "combo_extend", EffectValue: map[string]any{"extraHits": 30.0}},
 	"normal_encircle":  {ID: "normal_encircle", Tree: TalentTreeNormal, Tier: 3, MaxLevel: 5, Name: "围剿", EffectType: "per_part_damage", EffectValue: map[string]any{"percentPerPart": 0.20}},
 	"normal_low_hp":    {ID: "normal_low_hp", Tree: TalentTreeNormal, Tier: 3, MaxLevel: 5, Name: "残血收割", EffectType: "low_hp_bonus", EffectValue: map[string]any{"hpThreshold": 0.40, "multiplier": 3.0}},
-	"normal_ultimate":  {ID: "normal_ultimate", Tree: TalentTreeNormal, Tier: 4, MaxLevel: 5, Name: "白银风暴", EffectType: "silver_storm", EffectValue: map[string]any{"triggerHits": 15, "treatAllAs": "soft"}},
+	"normal_ultimate":  {ID: "normal_ultimate", Tree: TalentTreeNormal, Tier: 4, MaxLevel: 5, Name: "白银风暴", EffectType: "silver_storm", EffectValue: map[string]any{"triggerHits": 15, "damageRatio": 8.0}},
 
 	// ===== 破甲：碎盾攻坚 =====
-	"armor_core":         {ID: "armor_core", Tree: TalentTreeArmor, Tier: 0, MaxLevel: 5, Name: "灭绝穿甲", EffectType: "permanent_armor_pen", EffectValue: map[string]any{"penPercent": 0.60, "collapseTrigger": 50, "collapseDuration": 8}},
+	"armor_core":         {ID: "armor_core", Tree: TalentTreeArmor, Tier: 0, MaxLevel: 5, Name: "灭绝穿甲", EffectType: "permanent_armor_pen", EffectValue: map[string]any{"penPercent": 0.60, "collapseTrigger": 100, "collapseDuration": 8}},
 	"armor_pen_up":       {ID: "armor_pen_up", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "穿甲强化", EffectType: "armor_pen_extra", EffectValue: map[string]any{"extraPen": 0.50}},
 	"armor_boss_hunter":  {ID: "armor_boss_hunter", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "首领猎杀", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.60}},
 	"armor_heavy_scale":  {ID: "armor_heavy_scale", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "以强制强", EffectType: "armor_scaling", EffectValue: map[string]any{"damagePer100Armor": 0.04}},
 	"armor_heavy_atk":    {ID: "armor_heavy_atk", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "重甲特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "heavy", "percent": 1.00}},
-	"armor_collapse_ext": {ID: "armor_collapse_ext", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "崩塌延长", EffectType: "collapse_extend", EffectValue: map[string]any{"extraDuration": 20.0}},
+	"armor_collapse_ext": {ID: "armor_collapse_ext", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "崩塌共振", EffectType: "collapse_damage_amp", EffectValue: map[string]any{"extraPercent": 0.12}},
 	"armor_auto_strike":  {ID: "armor_auto_strike", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "自动打击", EffectType: "auto_strike", EffectValue: map[string]any{"triggerCount": 15.0, "damageRatio": 4.0}},
 	"armor_ruin":         {ID: "armor_ruin", Tree: TalentTreeArmor, Tier: 3, MaxLevel: 5, Name: "废墟打击", EffectType: "collapse_damage_amp", EffectValue: map[string]any{"extraPercent": 2.0}},
 	"armor_pen_convert":  {ID: "armor_pen_convert", Tree: TalentTreeArmor, Tier: 3, MaxLevel: 5, Name: "破甲转化", EffectType: "pen_to_amplify", EffectValue: map[string]any{"convertRatio": 0.60}},
@@ -205,7 +205,7 @@ var tierCompletionBonusLabels = map[TalentTree]map[int]string{
 	},
 	TalentTreeArmor: {
 		0: "全伤害 +10%",
-		1: "崩塌触发 -30 + 全伤害 +10%",
+		1: "全伤害 +10%",
 		2: "护甲穿透 +15%",
 		3: "崩塌易伤 +15%",
 		4: "审判日削除 +10%",
@@ -327,7 +327,7 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		}
 		return fmt.Sprintf("部位剩余血量低于 %s 时，伤害x%.0f。被动生效。", threshold, multiplier)
 	case "silver_storm":
-		return fmt.Sprintf("任意部位被击碎时立即触发，持续%d秒内所有部位视为%s（x1.0系数）。每部位击碎均可触发。", normalSilverStormDurationForLevel(currentFactor), talentPartTypeLabel(value["treatAllAs"]))
+		return fmt.Sprintf("任意部位被击碎时立即触发，持续%d秒内每次点击按本次最终伤害额外追加一次×%.1f的白银风暴伤害。每部位击碎均可触发。", normalSilverStormDurationForLevel(currentFactor), normalSilverStormDamageRatioForLevel(currentFactor))
 	case "permanent_armor_pen":
 		penPercent := talentPercentScaled(value["penPercent"], currentFactor)
 		collapseTrigger := talentInt(value["collapseTrigger"])
@@ -348,12 +348,6 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 			percent = talentPercent(armorHeavyScaleForLevel(currentFactor))
 		}
 		return fmt.Sprintf("每 100 护甲额外获得 %s 伤害增幅", percent)
-	case "collapse_extend":
-		duration := talentIntScaled(value["extraDuration"], currentFactor)
-		if def.ID == "armor_collapse_ext" {
-			duration = armorCollapseExtendForLevel(currentFactor)
-		}
-		return fmt.Sprintf("崩塌持续时间从8秒延长到 %d 秒。被动生效。", duration)
 	case "auto_strike":
 		triggerCount := talentInt(value["triggerCount"])
 		ratio := talentFloat(value["damageRatio"]) * float64(currentFactor)
@@ -364,6 +358,9 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		return fmt.Sprintf("5秒内连续命中同一重甲部位 %d 次后，追加一次 %.1fx 攻击力的碎甲重击。触发后重置累计。", triggerCount, ratio)
 	case "collapse_damage_amp":
 		percent := talentPercentScaled(value["extraPercent"], currentFactor)
+		if def.ID == "armor_collapse_ext" {
+			percent = talentPercent(armorCollapseResonanceAmpForLevel(currentFactor) - 1)
+		}
 		if def.ID == "armor_ruin" {
 			percent = talentPercent(armorRuinAmpForLevel(currentFactor))
 		}
@@ -499,12 +496,16 @@ func normalSilverStormDurationForLevel(level int) int {
 	return lerpTalentInt(level, 15, 20)
 }
 
+func normalSilverStormDamageRatioForLevel(level int) float64 {
+	return lerpTalentValue(level, 8.0, 12.0)
+}
+
 func armorCorePenPercentForLevel(level int) float64 {
 	return lerpTalentValue(level, 0.60, 0.90)
 }
 
 func armorCoreCollapseTriggerForLevel(level int) int {
-	return lerpTalentInt(level, 50, 20)
+	return lerpTalentInt(level, 100, 80)
 }
 
 func armorPenUpExtraForLevel(level int) float64 {
@@ -519,8 +520,8 @@ func armorHeavyAtkForLevel(level int) float64 {
 	return lerpTalentValue(level, 1.00, 3.00)
 }
 
-func armorCollapseExtendForLevel(level int) int {
-	return lerpTalentInt(level, 20, 35)
+func armorCollapseResonanceAmpForLevel(level int) float64 {
+	return lerpTalentValue(level, 1.12, 1.20)
 }
 
 func armorAutoStrikeTriggerCountForLevel(level int) int {
@@ -673,7 +674,8 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		add("低血阈值", talentPercentScaled(value["hpThreshold"], currentFactor), talentPercentScaled(value["hpThreshold"], nextLevel))
 		add("伤害倍率", talentMultiplierScaled(value["multiplier"], currentFactor), talentMultiplierScaled(value["multiplier"], nextLevel))
 	case "silver_storm":
-		add("持续轮次", fmt.Sprintf("%d", normalSilverStormDurationForLevel(currentFactor)), fmt.Sprintf("%d", normalSilverStormDurationForLevel(nextLevel)))
+		add("持续时间", fmt.Sprintf("%d 秒", normalSilverStormDurationForLevel(currentFactor)), fmt.Sprintf("%d 秒", normalSilverStormDurationForLevel(nextLevel)))
+		add("追加倍率", fmt.Sprintf("×%.1f", normalSilverStormDamageRatioForLevel(currentFactor)), fmt.Sprintf("×%.1f", normalSilverStormDamageRatioForLevel(nextLevel)))
 	case "permanent_armor_pen":
 		if def.ID == "armor_core" {
 			add("常驻破甲", talentPercent(armorCorePenPercentForLevel(currentFactor)), talentPercent(armorCorePenPercentForLevel(nextLevel)))
@@ -694,12 +696,6 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 			break
 		}
 		add("每100甲增伤", talentPercentScaled(value["damagePer100Armor"], currentFactor), talentPercentScaled(value["damagePer100Armor"], nextLevel))
-	case "collapse_extend":
-		if def.ID == "armor_collapse_ext" {
-			add("崩塌持续", fmt.Sprintf("%ds", armorCollapseExtendForLevel(currentFactor)), fmt.Sprintf("%ds", armorCollapseExtendForLevel(nextLevel)))
-			break
-		}
-		add("崩塌持续", talentDurationScaled(value["extraDuration"], currentFactor), talentDurationScaled(value["extraDuration"], nextLevel))
 	case "auto_strike":
 		if def.ID == "armor_auto_strike" {
 			add("触发次数", fmt.Sprintf("%d", armorAutoStrikeTriggerCountForLevel(currentFactor)), fmt.Sprintf("%d", armorAutoStrikeTriggerCountForLevel(nextLevel)))
@@ -709,6 +705,10 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		add("触发次数", talentIntString(value["triggerCount"]), talentIntString(value["triggerCount"]))
 		add("伤害倍率", talentMultiplierScaled(value["damageRatio"], currentFactor), talentMultiplierScaled(value["damageRatio"], nextLevel))
 	case "collapse_damage_amp":
+		if def.ID == "armor_collapse_ext" {
+			add("崩塌增伤", talentPercent(armorCollapseResonanceAmpForLevel(currentFactor)-1), talentPercent(armorCollapseResonanceAmpForLevel(nextLevel)-1))
+			break
+		}
 		if def.ID == "armor_ruin" {
 			add("崩塌增伤", talentPercent(armorRuinAmpForLevel(currentFactor)), talentPercent(armorRuinAmpForLevel(nextLevel)))
 			break
@@ -1125,7 +1125,6 @@ type TalentModifiers struct {
 	// 层满奖励效果
 	StormTriggerReduce     float64 `json:"stormTriggerReduce"`
 	StormExtraHits         int     `json:"stormExtraHits"`
-	CollapseTriggerReduce  int     `json:"collapseTriggerReduce"`
 	CollapseVulnerability  float64 `json:"collapseVulnerability"`
 	JudgmentDayBoost       float64 `json:"judgmentDayBoost"`
 	CritRateBonus          float64 `json:"critRateBonus"`
@@ -1165,7 +1164,6 @@ func applyTierCompletionBonus(mods *TalentModifiers, treeStr string, tier int) {
 	case treeStr == "armor" && tier == 0:
 		mods.AllDamageAmplify += 0.10
 	case treeStr == "armor" && tier == 1:
-		mods.CollapseTriggerReduce += 30
 		mods.AllDamageAmplify += 0.10
 	case treeStr == "armor" && tier == 2:
 		mods.ArmorPenExtra += 0.15
@@ -1254,10 +1252,12 @@ type TalentCombatState struct {
 	PartRetainedClicks     map[string]int64 `json:"partRetainedClicks"`
 	PartStormComboCount    map[string]int64 `json:"partStormComboCount"`
 	CritCount              int64            `json:"critCount"`
+	FinalCutTriggerCount   int64            `json:"finalCutTriggerCount"`
 	SkinnerParts           map[string]int64 `json:"skinnerParts"`
 	NormalTriggerCount     int64            `json:"normalTriggerCount"`
-	ArmorTriggerCount      int64            `json:"armorTriggerCount"`
-	AutoStrikeTriggerCount int64            `json:"autoStrikeTriggerCount"`
+	ArmorTriggerCount       int64            `json:"armorTriggerCount"`
+	JudgmentDayTriggerCount int64            `json:"judgmentDayTriggerCount"`
+	AutoStrikeTriggerCount  int64            `json:"autoStrikeTriggerCount"`
 	AutoStrikeWindowSec    int64            `json:"autoStrikeWindowSec"`
 }
 

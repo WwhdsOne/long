@@ -3,6 +3,7 @@ package vote
 import (
 	"fmt"
 	"math"
+	"slices"
 )
 
 type compiledTalentTrigger func(*talentTriggerContext)
@@ -92,13 +93,19 @@ func applyArmorCoreTrigger(tc *talentTriggerContext) {
 
 	partKey := TalentPartKey(tc.part.X, tc.part.Y)
 	tc.combatState.PartHeavyClickCount[partKey]++
+	if tc.combatState.CollapseEndsAt > tc.now && slices.Contains(tc.combatState.CollapseParts, tc.partIndex) {
+		return
+	}
+
 	collapseTrigger := tc.compiledTalents.Armor.CollapseTrigger
 	if tc.combatState.PartHeavyClickCount[partKey] < collapseTrigger {
 		return
 	}
 
 	cd := tc.compiledTalents.Armor.CollapseDuration
-	tc.combatState.CollapseParts = append(tc.combatState.CollapseParts, tc.partIndex)
+	if !slices.Contains(tc.combatState.CollapseParts, tc.partIndex) {
+		tc.combatState.CollapseParts = append(tc.combatState.CollapseParts, tc.partIndex)
+	}
 	tc.combatState.CollapseEndsAt = tc.now + cd
 	tc.combatState.CollapseDuration = cd
 	tc.events = append(tc.events, TalentTriggerEvent{
@@ -123,10 +130,13 @@ func applyArmorAutoStrikeTrigger(tc *talentTriggerContext) {
 	if tc.combatState.AutoStrikeTargetPart != partKey {
 		tc.combatState.AutoStrikeTargetPart = partKey
 		tc.combatState.AutoStrikeComboCount = 0
+		tc.combatState.AutoStrikeExpiresAt = 0
 	}
 
+	if tc.combatState.AutoStrikeExpiresAt == 0 {
+		tc.combatState.AutoStrikeExpiresAt = tc.now + TalentAutoStrikeWindowSec
+	}
 	tc.combatState.AutoStrikeComboCount++
-	tc.combatState.AutoStrikeExpiresAt = tc.now + TalentAutoStrikeWindowSec
 
 	asTrigger := tc.compiledTalents.Armor.AutoStrikeTrigger
 	asRatio := tc.compiledTalents.Armor.AutoStrikeRatio
@@ -201,13 +211,18 @@ func applyCritFinalCutTrigger(tc *talentTriggerContext) {
 		return
 	}
 
-	tc.combatState.CritCount++
-	triggerCount := tc.compiledTalents.Crit.FinalCutTrigger
-	hpCut := tc.compiledTalents.Crit.FinalCutHpCut
-	if tc.combatState.CritCount < triggerCount || tc.now-tc.combatState.LastFinalCutAt < 30 {
+	if tc.now-tc.combatState.LastFinalCutAt < 30 {
 		return
 	}
 
+	tc.combatState.CritCount++
+	triggerCount := tc.compiledTalents.Crit.FinalCutTrigger
+	hpCut := tc.compiledTalents.Crit.FinalCutHpCut
+	if tc.combatState.CritCount < triggerCount {
+		return
+	}
+
+	tc.combatState.CritCount = 0
 	tc.combatState.LastFinalCutAt = tc.now
 	cd := min(int64(float64(tc.boss.MaxHP)*hpCut), tc.part.CurrentHP)
 	_, cd, _ = applyBossPartDamageDelta(tc.boss, tc.part, cd)

@@ -1,3 +1,7 @@
+> **⚠️ 本文档已废弃**（2026-04-30 核查：与当前代码不符）
+>
+> 同上，整个架构已不存在
+
 # Redis Vote Wall Design
 
 **Goal:** Build a Vue + Node.js application that shows a shared vote wall with dynamic buttons backed by Redis, supports realtime count updates for all visitors, and ships as a single app container.

@@ -3,21 +3,22 @@ package vote
 import "maps"
 
 type compiledNormalTalents struct {
-	TriggerCount        int64
-	ExtraHits           int64
-	ChaseRatio          float64
-	RetainPercent       float64
-	SilverStormDuration int64
+	TriggerCount           int64
+	ExtraHits              int64
+	ChaseRatio             float64
+	RetainPercent          float64
+	SilverStormDuration    int64
+	SilverStormDamageRatio float64
 }
 
 type compiledArmorTalents struct {
-	CollapseTrigger      int64
-	CollapseDuration     int64
-	AutoStrikeTrigger    int64
-	AutoStrikeRatio      float64
-	RuinAmp              float64
-	UltimateTrigger      int64
-	UltimateHpCut        float64
+	CollapseTrigger   int64
+	CollapseDuration  int64
+	AutoStrikeTrigger int64
+	AutoStrikeRatio   float64
+	CollapseAmp       float64
+	UltimateTrigger   int64
+	UltimateHpCut     float64
 }
 
 type compiledCritTalents struct {
@@ -193,14 +194,6 @@ func buildTalentModifiersFromCompiled(compiled *CompiledTalentSet) *TalentModifi
 					mods.LowHpThreshold = t
 				}
 			}
-		case "collapse_extend":
-			if d, ok := val["extraDuration"].(float64); ok {
-				if id == "armor_collapse_ext" {
-					mods.CollapseDuration = armorCollapseExtendForLevel(level)
-				} else {
-					mods.CollapseDuration += int(d) * level
-				}
-			}
 		case "pen_to_amplify":
 			if r, ok := val["convertRatio"].(float64); ok {
 				if id == "armor_pen_convert" {
@@ -273,6 +266,7 @@ func compileNormalTalents(compiled *CompiledTalentSet) compiledNormalTalents {
 	}
 	if compiled.Has("normal_ultimate") {
 		normal.SilverStormDuration = int64(normalSilverStormDurationForLevel(compiled.Level("normal_ultimate")))
+		normal.SilverStormDamageRatio = normalSilverStormDamageRatioForLevel(compiled.Level("normal_ultimate"))
 	}
 
 	return normal
@@ -281,18 +275,16 @@ func compileNormalTalents(compiled *CompiledTalentSet) compiledNormalTalents {
 func compileArmorTalents(compiled *CompiledTalentSet) compiledArmorTalents {
 	armor := compiledArmorTalents{
 		CollapseDuration: 8,
+		CollapseAmp:      1.0,
 	}
 	if compiled.Has("armor_core") {
 		armor.CollapseTrigger = int64(armorCoreCollapseTriggerForLevel(compiled.Level("armor_core")))
-		if compiled.IsTierFull(TalentTreeArmor, 1) {
-			armor.CollapseTrigger -= 30
-		}
 		if armor.CollapseTrigger < 1 {
 			armor.CollapseTrigger = 1
 		}
 	}
 	if compiled.Has("armor_collapse_ext") {
-		armor.CollapseDuration = int64(armorCollapseExtendForLevel(compiled.Level("armor_collapse_ext")))
+		armor.CollapseAmp *= armorCollapseResonanceAmpForLevel(compiled.Level("armor_collapse_ext"))
 	}
 	if compiled.Has("armor_auto_strike") {
 		level := compiled.Level("armor_auto_strike")
@@ -300,7 +292,7 @@ func compileArmorTalents(compiled *CompiledTalentSet) compiledArmorTalents {
 		armor.AutoStrikeRatio = armorAutoStrikeRatioForLevel(level)
 	}
 	if compiled.Has("armor_ruin") {
-		armor.RuinAmp = armorRuinAmpForLevel(compiled.Level("armor_ruin"))
+		armor.CollapseAmp *= armorRuinAmpForLevel(compiled.Level("armor_ruin"))
 	}
 	if compiled.Has("armor_ultimate") {
 		level := compiled.Level("armor_ultimate")

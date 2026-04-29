@@ -1443,9 +1443,6 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	effectivePartType := part.Type
-	if combatState.SilverStormActive {
-		effectivePartType = PartTypeSoft
-	}
 	partKey := TalentPartKey(part.X, part.Y)
 	if endsAt, ok := combatState.SkinnerParts[partKey]; ok && now < endsAt {
 		effectivePartType = PartTypeWeak
@@ -1466,8 +1463,8 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	}
 
-	if inCollapse && compiledTalents.Has("armor_ruin") {
-		partDamage = int64(float64(partDamage) * compiledTalents.Armor.RuinAmp)
+	if inCollapse && compiledTalents.Armor.CollapseAmp > 1 {
+		partDamage = int64(float64(partDamage) * compiledTalents.Armor.CollapseAmp)
 	}
 
 	hpRatio := float64(part.CurrentHP) / float64(maxInt64(1, boss.MaxHP))
@@ -1516,7 +1513,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 			omenGain += 5
 		}
 	}
-	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, partDamage)
+	beforeHP, actualDamage, _ := applyBossPartDamageDelta(boss, part, partDamage)
 
 	// 死兆层数获取：弱点暴击 +2，普通暴击 +1，击碎部位 +5
 	if compiledTalents.Has("crit_core") && omenGain > 0 {
@@ -1555,7 +1552,34 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		result.TalentEvents = append(result.TalentEvents, talentEvents...)
 	}
 
-	if partJustDied && compiledTalents.Has("normal_ultimate") {
+	if combatState.SilverStormActive && compiledTalents.Normal.SilverStormDamageRatio > 0 && part.Alive {
+		silverStormDamage := int64(float64(maxInt64(1, totalDamage)) * compiledTalents.Normal.SilverStormDamageRatio)
+		if silverStormDamage > 0 {
+			silverBeforeHP, silverActualDamage, _ := applyBossPartDamageDelta(boss, part, silverStormDamage)
+			if silverActualDamage > 0 {
+				totalDamage += silverActualDamage
+				result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
+					X:        part.X,
+					Y:        part.Y,
+					Damage:   silverActualDamage,
+					BeforeHP: silverBeforeHP,
+					AfterHP:  part.CurrentHP,
+					PartType: string(part.Type),
+				})
+				result.TalentEvents = append(result.TalentEvents, TalentTriggerEvent{
+					TalentID:    "normal_ultimate",
+					Name:        "白银风暴",
+					ExtraDamage: silverActualDamage,
+					Message:     "银风斩击",
+					PartX:       part.X,
+					PartY:       part.Y,
+				})
+			}
+		}
+	}
+
+	partDiedThisClick := partWasAlive && !part.Alive
+	if partDiedThisClick && compiledTalents.Has("normal_ultimate") {
 		combatState.SilverStormActive = true
 		duration := int(compiledTalents.Normal.SilverStormDuration)
 		combatState.SilverStormRemaining = duration
@@ -1591,12 +1615,18 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if compiledTalents.Has("normal_core") {
 		combatState.NormalTriggerCount = compiledTalents.Normal.TriggerCount
 	}
+	if compiledTalents.Has("crit_final_cut") {
+		combatState.FinalCutTriggerCount = compiledTalents.Crit.FinalCutTrigger
+	}
 	if compiledTalents.Has("armor_core") {
 		combatState.ArmorTriggerCount = compiledTalents.Armor.CollapseTrigger
 	}
 	if compiledTalents.Has("armor_auto_strike") {
 		combatState.AutoStrikeTriggerCount = compiledTalents.Armor.AutoStrikeTrigger
 		combatState.AutoStrikeWindowSec = TalentAutoStrikeWindowSec
+	}
+	if compiledTalents.Has("armor_ultimate") {
+		combatState.JudgmentDayTriggerCount = compiledTalents.Armor.UltimateTrigger
 	}
 
 	result.TalentCombatState = combatState

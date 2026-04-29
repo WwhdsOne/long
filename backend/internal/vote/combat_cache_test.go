@@ -139,6 +139,9 @@ func TestCompileTalentSetBuildsNormalThresholdsAndTierFlags(t *testing.T) {
 	if compiled.Normal.SilverStormDuration != int64(normalSilverStormDurationForLevel(5)) {
 		t.Fatalf("expected silver storm duration %d, got %d", normalSilverStormDurationForLevel(5), compiled.Normal.SilverStormDuration)
 	}
+	if compiled.Normal.SilverStormDamageRatio != normalSilverStormDamageRatioForLevel(5) {
+		t.Fatalf("expected silver storm damage ratio %.1f, got %.1f", normalSilverStormDamageRatioForLevel(5), compiled.Normal.SilverStormDamageRatio)
+	}
 }
 
 func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
@@ -169,7 +172,7 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 	if !compiled.IsTierFull(TalentTreeArmor, 1) {
 		t.Fatalf("expected armor tier 1 to be full, got %+v", compiled.tierFull)
 	}
-	expectedCollapseTrigger := int64(max(armorCoreCollapseTriggerForLevel(4)-30, 1))
+	expectedCollapseTrigger := int64(armorCoreCollapseTriggerForLevel(4))
 	if compiled.Armor.CollapseTrigger != expectedCollapseTrigger {
 		t.Fatalf("expected compiled collapse trigger %d, got %d", expectedCollapseTrigger, compiled.Armor.CollapseTrigger)
 	}
@@ -179,11 +182,12 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 	if compiled.Armor.AutoStrikeRatio != armorAutoStrikeRatioForLevel(2) {
 		t.Fatalf("expected auto strike ratio %.2f, got %.2f", armorAutoStrikeRatioForLevel(2), compiled.Armor.AutoStrikeRatio)
 	}
-	if compiled.Armor.CollapseDuration != int64(armorCollapseExtendForLevel(3)) {
-		t.Fatalf("expected collapse duration %d, got %d", armorCollapseExtendForLevel(3), compiled.Armor.CollapseDuration)
+	if compiled.Armor.CollapseDuration != 8 {
+		t.Fatalf("expected collapse duration remain 8, got %d", compiled.Armor.CollapseDuration)
 	}
-	if compiled.Armor.RuinAmp != armorRuinAmpForLevel(5) {
-		t.Fatalf("expected ruin amp %.2f, got %.2f", armorRuinAmpForLevel(5), compiled.Armor.RuinAmp)
+	expectedCollapseAmp := armorCollapseResonanceAmpForLevel(3) * armorRuinAmpForLevel(5)
+	if compiled.Armor.CollapseAmp != expectedCollapseAmp {
+		t.Fatalf("expected collapse amp %.2f, got %.2f", expectedCollapseAmp, compiled.Armor.CollapseAmp)
 	}
 	if compiled.Crit.SkinnerChance != critSkinnerChanceForLevel(4) {
 		t.Fatalf("expected skinner chance %.2f, got %.2f", critSkinnerChanceForLevel(4), compiled.Crit.SkinnerChance)
@@ -199,6 +203,41 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 	}
 	if compiled.Crit.OmenResonatePerOmen != critOmenResonateForLevel(5) {
 		t.Fatalf("expected core omen crit bonus %.3f, got %.3f", critOmenResonateForLevel(5), compiled.Crit.OmenResonatePerOmen)
+	}
+}
+
+func TestArmorCoreCollapseTriggerCurveAndTierBonus(t *testing.T) {
+	expected := map[int]int{
+		1: 100,
+		2: 95,
+		3: 90,
+		4: 85,
+		5: 80,
+	}
+	for level, want := range expected {
+		if got := armorCoreCollapseTriggerForLevel(level); got != want {
+			t.Fatalf("expected armor core level %d collapse trigger %d, got %d", level, want, got)
+		}
+	}
+
+	compiled := compileTalentSet(&TalentState{
+		Talents: map[string]int{
+			"armor_core":        5,
+			"armor_pen_up":      1,
+			"armor_boss_hunter": 1,
+			"armor_heavy_scale": 1,
+			"armor_filler_t1a":  1,
+			"armor_filler_t1b":  1,
+		},
+	})
+	if compiled == nil {
+		t.Fatal("expected compiled talent set")
+	}
+	if !compiled.IsTierFull(TalentTreeArmor, 1) {
+		t.Fatalf("expected armor tier 1 to be full, got %+v", compiled.tierFull)
+	}
+	if compiled.Armor.CollapseTrigger != 80 {
+		t.Fatalf("expected tier-full armor collapse trigger remain 80, got %d", compiled.Armor.CollapseTrigger)
 	}
 }
 

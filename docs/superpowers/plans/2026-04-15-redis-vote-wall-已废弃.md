@@ -1,3 +1,7 @@
+> **⚠️ 本文档已废弃**（2026-04-30 核查：与当前代码不符）
+>
+> 系统已完全迁移至 Go + Boss 部位架构，Node.js/Express/Socket.IO/按钮 REST API 均不存在
+
 # Redis Vote Wall Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
