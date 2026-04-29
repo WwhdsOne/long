@@ -34,9 +34,9 @@ const (
 )
 
 type realtimeClientMessage struct {
-	Type      string `json:"type"`
-	RequestID string `json:"requestId"`
-	Nickname  string `json:"nickname"`
+	Type       string `json:"type"`
+	RequestID  string `json:"requestId"`
+	Nickname   string `json:"nickname"`
 	Slug       string `json:"slug"`
 	ComboCount int64  `json:"comboCount"`
 }
@@ -64,15 +64,17 @@ type realtimeSnapshotUser struct {
 }
 
 type realtimeClickAckPayload struct {
-	Delta            int64                     `json:"delta"`
-	Critical         bool                      `json:"critical"`
-	BossDamage       int64                     `json:"bossDamage,omitempty"`
-	DamageType       string                    `json:"damageType,omitempty"`
-	TalentEvents     []vote.TalentTriggerEvent `json:"talentEvents,omitempty"`
-	PartStateDeltas  []vote.BossPartStateDelta `json:"partStateDeltas,omitempty"`
-	TalentCombatState *vote.TalentCombatState   `json:"talentCombatState,omitempty"`
-	UserDelta        *realtimeUserDelta        `json:"userDelta,omitempty"`
-	Button           struct {
+	Delta                int64                     `json:"delta"`
+	Critical             bool                      `json:"critical"`
+	BossDamage           int64                     `json:"bossDamage,omitempty"`
+	MyBossDamage         int64                     `json:"myBossDamage,omitempty"`
+	BossLeaderboardCount int                       `json:"bossLeaderboardCount,omitempty"`
+	DamageType           string                    `json:"damageType,omitempty"`
+	TalentEvents         []vote.TalentTriggerEvent `json:"talentEvents,omitempty"`
+	PartStateDeltas      []vote.BossPartStateDelta `json:"partStateDeltas,omitempty"`
+	TalentCombatState    *vote.TalentCombatState   `json:"talentCombatState,omitempty"`
+	UserDelta            *realtimeUserDelta        `json:"userDelta,omitempty"`
+	Button               struct {
 		Key string `json:"key"`
 	} `json:"button"`
 }
@@ -269,13 +271,15 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		ack := realtimeClickAckMessage{
 			Type: realtimeMessageTypeClickAck,
 			Payload: realtimeClickAckPayload{
-				Delta:           result.Delta,
-				Critical:        result.Critical,
-				BossDamage:      result.BossDamage,
-				DamageType:      result.DamageType,
-				TalentEvents:    result.TalentEvents,
-				PartStateDeltas:   result.PartStateDeltas,
-				TalentCombatState: result.TalentCombatState,
+				Delta:                result.Delta,
+				Critical:             result.Critical,
+				BossDamage:           result.BossDamage,
+				MyBossDamage:         result.MyBossDamage,
+				BossLeaderboardCount: result.BossLeaderboardCount,
+				DamageType:           result.DamageType,
+				TalentEvents:         result.TalentEvents,
+				PartStateDeltas:      result.PartStateDeltas,
+				TalentCombatState:    result.TalentCombatState,
 				Button: struct {
 					Key string `json:"key"`
 				}{

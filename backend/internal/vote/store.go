@@ -370,19 +370,21 @@ type BulkSalvageResult struct {
 
 // ClickResult 点击结果，包含更新后的增量与状态摘要
 type ClickResult struct {
-	Delta             int64                  `json:"delta"`
-	BossDamage        int64                  `json:"bossDamage,omitempty"`
-	DamageType        string                 `json:"damageType,omitempty"`
-	Critical          bool                   `json:"critical"`
-	UserStats         UserStats              `json:"userStats"`
-	Boss              *Boss                  `json:"boss,omitempty"`
-	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
-	MyBossStats       *BossUserStats         `json:"myBossStats,omitempty"`
-	RecentRewards     []Reward               `json:"recentRewards,omitempty"`
-	TalentEvents      []TalentTriggerEvent   `json:"talentEvents,omitempty"`
-	TalentCombatState *TalentCombatState     `json:"talentCombatState,omitempty"`
-	PartStateDeltas   []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
-	BroadcastUserAll  bool                   `json:"-"`
+	Delta                int64                  `json:"delta"`
+	BossDamage           int64                  `json:"bossDamage,omitempty"`
+	MyBossDamage         int64                  `json:"myBossDamage,omitempty"`
+	BossLeaderboardCount int                    `json:"bossLeaderboardCount,omitempty"`
+	DamageType           string                 `json:"damageType,omitempty"`
+	Critical             bool                   `json:"critical"`
+	UserStats            UserStats              `json:"userStats"`
+	Boss                 *Boss                  `json:"boss,omitempty"`
+	BossLeaderboard      []BossLeaderboardEntry `json:"bossLeaderboard,omitempty"`
+	MyBossStats          *BossUserStats         `json:"myBossStats,omitempty"`
+	RecentRewards        []Reward               `json:"recentRewards,omitempty"`
+	TalentEvents         []TalentTriggerEvent   `json:"talentEvents,omitempty"`
+	TalentCombatState    *TalentCombatState     `json:"talentCombatState,omitempty"`
+	PartStateDeltas      []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
+	BroadcastUserAll     bool                   `json:"-"`
 }
 
 // TalentTriggerEvent 描述一次天赋触发事件，供前端战斗反馈显示。
@@ -1324,11 +1326,20 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 			Critical:    false,
 			BossDamage:  actualDamage,
 			BossMaxHP:   boss.MaxHP,
+			IsCollapsed: false,
 			IsAfkAttack: true,
 		}),
 		UserStats: UserStats{
 			Nickname: normalizedNickname,
 		},
+	}
+	if actualDamage > 0 {
+		if myBossDamage, summaryErr := s.client.ZScore(ctx, s.bossDamageKey(boss.ID), normalizedNickname).Result(); summaryErr == nil {
+			result.MyBossDamage = int64(math.Round(myBossDamage))
+		}
+		if bossLeaderboardCount, summaryErr := s.client.ZCard(ctx, s.bossDamageKey(boss.ID)).Result(); summaryErr == nil {
+			result.BossLeaderboardCount = int(bossLeaderboardCount)
+		}
 	}
 
 	if allDead {
@@ -1449,10 +1460,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	damageStats := CalcBossPartDamage(combatStats, effectivePartType, effectiveArmor, aliveCount, boss.CurrentHP, boss.MaxHP)
 	partDamage := damageStats.NormalDamage
-	if comboCount >= 50 {
-		comboAmplify := float64(comboCount/50) * 0.05
-		partDamage = int64(float64(partDamage) * (1.0 + comboAmplify))
-	}
+	partDamage = applyComboDamageAmplify(partDamage, comboCount)
 	if critical {
 		partDamage = damageStats.CriticalDamage
 
@@ -1508,15 +1516,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 			omenGain += 5
 		}
 	}
-	_, omenOverflow := applyOmenStackDelta(combatState.OmenStacks, omenGain)
-	omenOverflowBonus := int64(0)
-	if omenOverflow > 0 {
-		omenOverflowBonus = maxInt64(1, int64(math.Round(float64(maxInt64(1, partDamage))*TalentOmenOverflowDamageRatio*float64(omenOverflow))))
-	}
-
-	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, partDamage+omenOverflowBonus)
-	mainActualDamage := min(partDamage, beforeHP)
-	omenOverflowActualDamage := maxInt64(0, actualDamage-mainActualDamage)
+	beforeHP, actualDamage, partJustDied := applyBossPartDamageDelta(boss, part, partDamage)
 
 	// 死兆层数获取：弱点暴击 +2，普通暴击 +1，击碎部位 +5
 	if compiledTalents.Has("crit_core") && omenGain > 0 {
@@ -1530,17 +1530,6 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	totalDamage := actualDamage
-	if omenOverflowActualDamage > 0 {
-		result.TalentEvents = append(result.TalentEvents, TalentTriggerEvent{
-			TalentID:    "crit_core",
-			Name:        "溢杀",
-			EffectType:  "omen_overflow",
-			ExtraDamage: omenOverflowActualDamage,
-			Message:     fmt.Sprintf("死兆溢出 %d 层，转化额外伤害 +%d", omenOverflow, omenOverflowActualDamage),
-			PartX:       part.X,
-			PartY:       part.Y,
-		})
-	}
 	result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
 		X:        part.X,
 		Y:        part.Y,
@@ -1585,11 +1574,13 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	result.BossDamage = totalDamage
 	result.Critical = critical
+	isCollapsed := slices.Contains(combatState.CollapseParts, targetIdx)
 	result.DamageType = resolveBossDamageType(resolveBossDamageTypeInput{
 		PartType:    part.Type,
 		Critical:    critical,
 		BossDamage:  totalDamage,
 		BossMaxHP:   boss.MaxHP,
+		IsCollapsed: isCollapsed,
 		IsAfkAttack: false,
 	})
 	if damageTypeOverride != "" {
@@ -1651,6 +1642,15 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		return result, nil
 	}
 
+	if totalDamage > 0 {
+		if myBossDamage, summaryErr := s.client.ZScore(ctx, s.bossDamageKey(boss.ID), nickname).Result(); summaryErr == nil {
+			result.MyBossDamage = int64(math.Round(myBossDamage))
+		}
+		if bossLeaderboardCount, summaryErr := s.client.ZCard(ctx, s.bossDamageKey(boss.ID)).Result(); summaryErr == nil {
+			result.BossLeaderboardCount = int(bossLeaderboardCount)
+		}
+	}
+
 	result.Boss = boss
 
 	if allDead {
@@ -1663,6 +1663,17 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	return result, nil
+}
+
+func applyComboDamageAmplify(baseDamage int64, comboCount int64) int64 {
+	if baseDamage <= 0 {
+		return baseDamage
+	}
+	if comboCount < 25 {
+		return baseDamage
+	}
+	comboAmplify := float64(comboCount/25) * 0.10
+	return int64(float64(baseDamage) * (1.0 + comboAmplify))
 }
 
 func applyBossPartDamageDelta(boss *Boss, part *BossPart, damage int64) (beforeHP int64, actualDamage int64, partJustDied bool) {
@@ -1788,6 +1799,7 @@ type resolveBossDamageTypeInput struct {
 	Critical    bool
 	BossDamage  int64
 	BossMaxHP   int64
+	IsCollapsed bool
 	IsAfkAttack bool
 }
 
@@ -1799,7 +1811,7 @@ func resolveBossDamageType(input resolveBossDamageTypeInput) string {
 	if damageRatio >= 0.2 {
 		return "doomsday"
 	}
-	if input.Critical && damageRatio >= 0.11 {
+	if input.Critical && damageRatio >= 0.10 {
 		return "judgement"
 	}
 	if input.Critical && input.PartType == PartTypeWeak {
@@ -1808,8 +1820,11 @@ func resolveBossDamageType(input resolveBossDamageTypeInput) string {
 	if input.Critical {
 		return "critical"
 	}
-	if input.PartType == PartTypeHeavy {
+	if input.IsCollapsed {
 		return "trueDamage"
+	}
+	if input.PartType == PartTypeHeavy {
+		return "heavy"
 	}
 	if input.IsAfkAttack {
 		return "pursuit"

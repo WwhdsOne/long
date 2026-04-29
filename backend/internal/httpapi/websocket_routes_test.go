@@ -305,8 +305,10 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 			CombatStats: vote.CombatStats{EffectiveIncrement: 2},
 		},
 		result: vote.ClickResult{
-			Delta:    1,
-			Critical: false,
+			Delta:                1,
+			Critical:             false,
+			MyBossDamage:         61,
+			BossLeaderboardCount: 2,
 			UserStats: vote.UserStats{
 				Nickname:   "阿明",
 				ClickCount: 5,
@@ -345,8 +347,10 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	ack := decodeRealtimeMessage[struct {
 		Type    string `json:"type"`
 		Payload struct {
-			Delta    int64 `json:"delta"`
-			Critical bool  `json:"critical"`
+			Delta                int64 `json:"delta"`
+			Critical             bool  `json:"critical"`
+			MyBossDamage         int64 `json:"myBossDamage"`
+			BossLeaderboardCount int   `json:"bossLeaderboardCount"`
 		} `json:"payload"`
 	}](t, messages[0])
 	if ack.Type != realtimeMessageTypeClickAck {
@@ -354,6 +358,9 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	}
 	if ack.Payload.Delta != 1 || ack.Payload.Critical {
 		t.Fatalf("unexpected click ack payload: %+v", ack.Payload)
+	}
+	if ack.Payload.MyBossDamage != 61 || ack.Payload.BossLeaderboardCount != 2 {
+		t.Fatalf("expected realtime ack to carry boss summary fields, got %+v", ack.Payload)
 	}
 
 	readHubEventSet(t, sseClient, map[string]struct{}{
@@ -382,8 +389,10 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 			},
 		},
 		result: vote.ClickResult{
-			Delta:    1,
-			Critical: false,
+			Delta:                1,
+			Critical:             false,
+			MyBossDamage:         61,
+			BossLeaderboardCount: 1,
 			Boss: &vote.Boss{
 				ID:        "boss-1",
 				Name:      "木桩王",
@@ -428,8 +437,10 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	ack := decodeRealtimeMessage[struct {
 		Type    string `json:"type"`
 		Payload struct {
-			Delta    int64 `json:"delta"`
-			Critical bool  `json:"critical"`
+			Delta                int64 `json:"delta"`
+			Critical             bool  `json:"critical"`
+			MyBossDamage         int64 `json:"myBossDamage"`
+			BossLeaderboardCount int   `json:"bossLeaderboardCount"`
 		} `json:"payload"`
 	}](t, messages[0])
 	if ack.Type != realtimeMessageTypeClickAck {
@@ -437,6 +448,9 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	}
 	if ack.Payload.Delta != 1 {
 		t.Fatalf("unexpected boss click ack payload: %+v", ack.Payload)
+	}
+	if ack.Payload.MyBossDamage != 61 || ack.Payload.BossLeaderboardCount != 1 {
+		t.Fatalf("expected boss summary in boss click ack, got %+v", ack.Payload)
 	}
 	sseUserEvent := readHubPublicAndUserEvent(t, sseClient)
 	wsUserEvent := readHubPublicAndUserEvent(t, wsClient)

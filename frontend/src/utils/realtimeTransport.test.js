@@ -146,6 +146,7 @@ describe('realtimeTransport', () => {
     expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({
       type: 'click',
       slug: 'feel',
+      comboCount: 0,
     }))
 
     sockets[0].emitMessage({
@@ -154,6 +155,8 @@ describe('realtimeTransport', () => {
         button: { key: 'feel', count: 4 },
         delta: 1,
         critical: false,
+        myBossDamage: 61,
+        bossLeaderboardCount: 2,
       },
     })
 
@@ -162,6 +165,8 @@ describe('realtimeTransport', () => {
         button: { key: 'feel', count: 4 },
         delta: 1,
         critical: false,
+        myBossDamage: 61,
+        bossLeaderboardCount: 2,
       },
     ])
   })

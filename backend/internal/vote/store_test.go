@@ -3,7 +3,6 @@ package vote
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -213,6 +212,60 @@ func TestTier0TalentUpgradeAndResetRefundUsesNewCurve(t *testing.T) {
 	}
 	if userState.TalentPoints != 5000 {
 		t.Fatalf("expected tier0 refund after reset to 5000, got %d", userState.TalentPoints)
+	}
+}
+
+func TestResolveBossDamageTypeHeavyDefaultsToHeavy(t *testing.T) {
+	got := resolveBossDamageType(resolveBossDamageTypeInput{
+		PartType:    PartTypeHeavy,
+		Critical:    false,
+		BossDamage:  25,
+		BossMaxHP:   1000,
+		IsCollapsed: false,
+		IsAfkAttack: false,
+	})
+	if got != "heavy" {
+		t.Fatalf("expected heavy default damage type, got %q", got)
+	}
+}
+
+func TestResolveBossDamageTypeJudgementUsesTenPercentThreshold(t *testing.T) {
+	got := resolveBossDamageType(resolveBossDamageTypeInput{
+		PartType:    PartTypeSoft,
+		Critical:    true,
+		BossDamage:  100,
+		BossMaxHP:   1000,
+		IsCollapsed: false,
+		IsAfkAttack: false,
+	})
+	if got != "judgement" {
+		t.Fatalf("expected judgement at 10%% max hp critical threshold, got %q", got)
+	}
+}
+
+func TestResolveBossDamageTypeCollapsedPartUsesTrueDamage(t *testing.T) {
+	got := resolveBossDamageType(resolveBossDamageTypeInput{
+		PartType:    PartTypeHeavy,
+		Critical:    false,
+		BossDamage:  25,
+		BossMaxHP:   1000,
+		IsCollapsed: true,
+		IsAfkAttack: false,
+	})
+	if got != "trueDamage" {
+		t.Fatalf("expected collapsed part to use trueDamage, got %q", got)
+	}
+}
+
+func TestApplyComboDamageAmplifyUsesTwentyFiveHitSteps(t *testing.T) {
+	if got := applyComboDamageAmplify(100, 24); got != 100 {
+		t.Fatalf("expected no combo amplify below 25 hits, got %d", got)
+	}
+	if got := applyComboDamageAmplify(100, 25); got != 110 {
+		t.Fatalf("expected 25 combo to add 10%% damage, got %d", got)
+	}
+	if got := applyComboDamageAmplify(100, 50); got != 120 {
+		t.Fatalf("expected 50 combo to add 20%% damage, got %d", got)
 	}
 }
 
@@ -1143,6 +1196,38 @@ func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
 	}
 }
 
+func TestClickBossPartReturnsRealtimeBossSummaryFields(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	ctx := context.Background()
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "realtime-summary-boss",
+		Name:  "实时摘要 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+	if result.MyBossDamage != result.BossDamage {
+		t.Fatalf("expected realtime myBossDamage=%d, got %+v", result.BossDamage, result)
+	}
+	if result.BossLeaderboardCount != 1 {
+		t.Fatalf("expected realtime boss leaderboard count 1, got %+v", result)
+	}
+	if len(result.BossLeaderboard) != 0 {
+		t.Fatalf("expected click result not to carry full boss leaderboard, got %+v", result.BossLeaderboard)
+	}
+}
+
 func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -1347,6 +1432,9 @@ func TestArmorCoreCollapseTrigger(t *testing.T) {
 			t.Fatalf("click %d: %v", i, err)
 		}
 		if i == 50 {
+			if result.DamageType != "trueDamage" {
+				t.Fatalf("第50次点击触发崩塌后应返回 trueDamage，实际 %q", result.DamageType)
+			}
 			for _, ev := range result.TalentEvents {
 				if ev.EffectType == "collapse_trigger" {
 					collapseEvent = &ev
@@ -1443,65 +1531,3 @@ func TestArmorCoreCollapseCountDoesNotResetWhenCollapseExpires(t *testing.T) {
 	}
 }
 
-func TestOmenOverflowCapsAt100AndCompensatesDamage(t *testing.T) {
-	store, cleanup := newTestStore(t)
-	defer cleanup()
-
-	store.critical.CriticalChancePercent = 100
-	ctx := context.Background()
-	nickname := "死兆溢出测试"
-
-	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "5000").Err(); err != nil {
-		t.Fatalf("seed points: %v", err)
-	}
-	if err := store.UpgradeTalent(ctx, nickname, "crit_core", 1); err != nil {
-		t.Fatalf("learn crit_core: %v", err)
-	}
-
-	if _, err := store.ActivateBoss(ctx, BossUpsert{
-		ID:    "omen-overflow-test",
-		Name:  "死兆溢出Boss",
-		MaxHP: 100000,
-		Parts: []BossPart{
-			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 10000, CurrentHP: 10000, Alive: true, Armor: 0},
-		},
-	}); err != nil {
-		t.Fatalf("activate boss: %v", err)
-	}
-
-	state := NewTalentCombatState()
-	state.OmenStacks = TalentOmenStackCap
-	if err := store.SaveTalentCombatState(ctx, nickname, "omen-overflow-test", state); err != nil {
-		t.Fatalf("save combat state: %v", err)
-	}
-
-	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
-	if err != nil {
-		t.Fatalf("click: %v", err)
-	}
-
-	combatState, err := store.GetTalentCombatState(ctx, nickname, "omen-overflow-test")
-	if err != nil {
-		t.Fatalf("get combat state: %v", err)
-	}
-	if combatState.OmenStacks != TalentOmenStackCap {
-		t.Fatalf("expected omen stacks capped at %d, got %d", TalentOmenStackCap, combatState.OmenStacks)
-	}
-
-	var overflowEvent *TalentTriggerEvent
-	for i := range result.TalentEvents {
-		if result.TalentEvents[i].EffectType == "omen_overflow" {
-			overflowEvent = &result.TalentEvents[i]
-			break
-		}
-	}
-	if overflowEvent == nil {
-		t.Fatal("expected omen_overflow talent event")
-	}
-	if overflowEvent.ExtraDamage <= 0 {
-		t.Fatalf("expected omen overflow extra damage > 0, got %d", overflowEvent.ExtraDamage)
-	}
-	if !strings.Contains(overflowEvent.Message, "溢出") || !strings.Contains(overflowEvent.Message, "+") {
-		t.Fatalf("expected omen overflow message to include overflow and damage, got %q", overflowEvent.Message)
-	}
-}

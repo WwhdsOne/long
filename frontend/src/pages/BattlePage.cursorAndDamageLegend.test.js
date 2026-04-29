@@ -1,0 +1,68 @@
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { describe, expect, it } from 'vitest'
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url))
+const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
+const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
+const docsPath = path.resolve(currentDir, '../../../docs/2026-04-29-伤害动画解析优先级.md')
+
+describe('BattlePage 光标与伤害说明', () => {
+  it('改用局部原生事件，只在 Boss 5x5 网格内显示 PNG 光标', () => {
+    expect(battleSource).toContain("ref=\"bossGridRef\"")
+    expect(battleSource).toContain('@pointermove="handleBossGridPointerMove"')
+    expect(battleSource).toContain('@pointerleave="handleBossGridPointerLeave"')
+    expect(battleSource).toContain('https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png')
+    expect(styleSource).toContain('.boss-part-grid-with-combo * {')
+    expect(styleSource).toContain('cursor: none !important;')
+    expect(styleSource).toContain('width: 128px;')
+    expect(styleSource).toContain('height: 128px;')
+    expect(battleSource).not.toContain("document.addEventListener('pointermove'")
+    expect(battleSource).not.toContain("document.addEventListener('pointerdown'")
+    expect(battleSource).not.toContain("document.addEventListener('click'")
+  })
+
+  it('右侧伤害类型说明把重甲替换为真实伤害', () => {
+    expect(battleSource).toContain('boss-right-legend__icon">⚡</span>')
+    expect(battleSource).toContain('boss-right-legend__item--true"><span class="boss-right-legend__icon">⚡</span>真实伤害</span>')
+    expect(battleSource).not.toContain('boss-right-legend__item--true">重甲</span>')
+    expect(stateSource).toContain("label: '⚡'")
+    expect(stateSource).toContain("heavy: {")
+    expect(stateSource).toContain("return 'heavy'")
+    expect(stateSource).toContain("talentVisualState.value.collapsePartKeys.includes(`${part.x}-${part.y}`)")
+    expect(stateSource).toContain("return 'trueDamage'")
+    expect(styleSource).toContain('.boss-right-legend__item--true      { color: #c084fc; border-color: rgba(192,132,252,0.3); }')
+    expect(styleSource).toContain('.boss-zone-button__damage-burst--heavy {')
+    expect(styleSource).toContain('.boss-zone-button__damage-burst--trueDamage {')
+    expect(styleSource).toContain('font-size: 1.1em;')
+  })
+
+  it('重甲格子有金属质感和低频扫光，只作用在 5x5 战斗格子', () => {
+    expect(styleSource).toContain('.boss-part-cell--heavy::after')
+    expect(styleSource).toContain('animation: boss-heavy-sheen 3.6s ease-in-out infinite;')
+    expect(styleSource).toContain('@keyframes boss-heavy-sheen')
+    expect(styleSource).not.toContain('overflow: hidden;\n  border-color: rgba(148, 163, 184, 0.72);')
+    expect(styleSource).toContain('.boss-zone-button__damage-layer {')
+    expect(styleSource).toContain('z-index: 12;')
+    expect(styleSource).toContain('.boss-zone-button__damage-particle {')
+    expect(styleSource).toContain('z-index: 14;')
+    expect(styleSource).not.toContain('.boss-part-info__item--heavy::after')
+  })
+})
+
+describe('伤害动画解析优先级文档', () => {
+  it('补充说明文档并记录当前前端优先级', () => {
+    expect(existsSync(docsPath)).toBe(true)
+    const docsSource = readFileSync(docsPath, 'utf8')
+    expect(stateSource).toContain("const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'pursuit', 'heavy', 'normal']")
+    expect(docsSource).toContain('doomsday -> judgement -> weakCritical -> critical -> trueDamage -> pursuit -> heavy -> normal')
+    expect(docsSource).toContain('普通命中重甲')
+    expect(docsSource).toContain('10%')
+    expect(docsSource).toContain('崩塌')
+    expect(docsSource).toContain('resolveDamageVariant')
+    expect(docsSource).toContain('triggerDamageBurst')
+  })
+})

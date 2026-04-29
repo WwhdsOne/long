@@ -8,7 +8,9 @@ describe('clickResponse', () => {
       userStats: { nickname: '阿明', clickCount: 11 },
       boss: { id: 'boss-1', status: 'active', currentHp: 40, maxHp: 100 },
       bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 60 }],
+      bossLeaderboardCount: 1,
       myBossStats: { nickname: '阿明', damage: 60 },
+      myBossDamage: 60,
       recentRewards: [{ itemId: 'club', itemName: '木棒' }],
     }
 
@@ -26,7 +28,9 @@ describe('clickResponse', () => {
       userStats: { nickname: '阿明', clickCount: 11 },
       boss: { id: 'boss-1', status: 'active', currentHp: 40, maxHp: 100 },
       bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 60 }],
+      bossLeaderboardCount: 1,
       myBossStats: { nickname: '阿明', damage: 60 },
+      myBossDamage: 60,
       recentRewards: [{ itemId: 'club', itemName: '木棒' }],
     }
 
@@ -34,15 +38,17 @@ describe('clickResponse', () => {
       mergeClickFallbackState(current, {
         userStats: { nickname: '阿明', clickCount: 12 },
         boss: { id: 'boss-1', status: 'active', currentHp: 39, maxHp: 100 },
-        bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 61 }],
-        myBossStats: { nickname: '阿明', damage: 61 },
+        bossLeaderboardCount: 2,
+        myBossDamage: 61,
         recentRewards: [{ itemId: 'axe', itemName: '短斧' }],
       }),
     ).toEqual({
       userStats: { nickname: '阿明', clickCount: 12 },
       boss: { id: 'boss-1', status: 'active', currentHp: 39, maxHp: 100 },
-      bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 61 }],
-      myBossStats: { nickname: '阿明', damage: 61 },
+      bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 60 }],
+      bossLeaderboardCount: 2,
+      myBossStats: { nickname: '阿明', damage: 60 },
+      myBossDamage: 61,
       recentRewards: [{ itemId: 'axe', itemName: '短斧' }],
     })
   })

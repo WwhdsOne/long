@@ -37,7 +37,6 @@ const (
 	talentCostLevelExponent       = 0.85
 	talentCostMultiplier          = 1.8
 	talentTier0GrowthFactor       = 3.0
-	TalentOmenOverflowDamageRatio = 0.02
 
 	// ===== 普攻系关键参数（可直接调）=====
 	// 暴风连击：触发所需点击次数
@@ -195,15 +194,6 @@ var talentTierFillerCosts = map[int]int64{
 	3: TalentCostTier3Filler,
 }
 
-// tierNodeCount 每层节点总数（主 + 小），用于层锁判定。
-var tierNodeCount = map[int]int{
-	0: 1, // 1 核心
-	1: 5, // 3 主 + 2 小
-	2: 5, // 3 主 + 2 小
-	3: 4, // 2 主 + 2 小
-	4: 1, // 1 终极
-}
-
 // tierCompletionBonusLabels 层满奖励文案，供前端直接展示。
 var tierCompletionBonusLabels = map[TalentTree]map[int]string{
 	TalentTreeNormal: {
@@ -255,26 +245,21 @@ func init() {
 	}
 }
 
-// isLearnedTierFull 检查指定天赋树某一层的所有节点（主 + 小）是否已全部学习。
+// isLearnedTierFull 检查指定天赋树某一层的所有节点是否已全部学习。
+// 通过遍历 talentDefs 动态统计该树该层的实际节点数，而非硬编码。
 func isLearnedTierFull(tree TalentTree, tier int, talents map[string]int) bool {
-	needed := tierNodeCount[tier]
-	if needed == 0 {
-		return true
-	}
-	count := 0
-	for id, level := range talents {
-		if level <= 0 {
+	total := 0
+	learned := 0
+	for id, def := range talentDefs {
+		if def.Tree != tree || def.Tier != tier {
 			continue
 		}
-		def, ok := talentDefs[id]
-		if !ok {
-			continue
-		}
-		if def.Tree == tree && def.Tier == tier {
-			count++
+		total++
+		if talents[id] > 0 {
+			learned++
 		}
 	}
-	return count >= needed
+	return total > 0 && learned >= total
 }
 
 // TalentEffectDescription 返回 Lv1 天赋效果中文描述，供静态定义展示。
@@ -402,7 +387,7 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		if def.ID == "crit_core" {
 			baseCritBonus = talentPercent(critCoreBaseCritBonusForLevel(currentFactor))
 		}
-		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤；每层死兆额外提供 %s 暴击伤害。死兆最多累积至 %d 层，溢出转化为额外伤害。弱点暴击+2层死兆，普通暴击+1层，击碎部位+5层。", baseCritBonus, talentPercent(value["overflowToCritDmg"]), talentPercent(critOmenResonateForLevel(currentFactor)), TalentOmenStackCap)
+		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤；每层死兆额外提供 %s 暴击伤害。死兆最多累积至 %d 层。弱点暴击+2层死兆，普通暴击+1层，击碎部位+5层。", baseCritBonus, talentPercent(value["overflowToCritDmg"]), talentPercent(critOmenResonateForLevel(currentFactor)), TalentOmenStackCap)
 	case "omen_crit_damage":
 		critDmgPerOmen := talentFloat(value["critDmgPerOmen"]) * float64(currentFactor)
 		return fmt.Sprintf("每层死兆叠加 %s 暴击伤害（例：100层=+%.0f%%暴伤）。", talentPercent(critDmgPerOmen), critDmgPerOmen*100)
@@ -746,13 +731,11 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 	case "overkill":
 		if def.ID == "crit_core" {
 			add("暴击率", talentPercent(critCoreBaseCritBonusForLevel(currentFactor)), talentPercent(critCoreBaseCritBonusForLevel(nextLevel)))
-			add("溢出转暴伤", talentPercent(value["overflowToCritDmg"]), talentPercent(value["overflowToCritDmg"]))
 			add("每层暴伤", talentPercent(critOmenResonateForLevel(currentFactor)), talentPercent(critOmenResonateForLevel(nextLevel)))
 			add("弱点暴击获层", talentIntString(value["omenPerWeakCrit"]), talentIntString(value["omenPerWeakCrit"]))
 			break
 		}
 		add("暴击率", talentPercentScaled(value["baseCritBonus"], currentFactor), talentPercentScaled(value["baseCritBonus"], nextLevel))
-		add("溢出转暴伤", talentPercent(value["overflowToCritDmg"]), talentPercent(value["overflowToCritDmg"]))
 		add("弱点暴击获层", talentIntString(value["omenPerWeakCrit"]), talentIntString(value["omenPerWeakCrit"]))
 	case "omen_crit_damage":
 		add("每层暴伤", talentPercentScaled(value["critDmgPerOmen"], currentFactor), talentPercentScaled(value["critDmgPerOmen"], nextLevel))

@@ -13,7 +13,7 @@ const AUTO_CLICK_RATE_LABEL = '每秒固定 3 次'
 const EQUIPMENT_ENHANCE_COST = 10
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
 const AFK_HEARTBEAT_INTERVAL_MS = 15000
-const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'pursuit', 'normal']
+const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'pursuit', 'heavy', 'normal']
 const DAMAGE_VARIANTS = {
     normal: {
         scale: 1,
@@ -33,14 +33,23 @@ const DAMAGE_VARIANTS = {
         colors: ['#60a5fa', '#93bbfd', '#3b82f6', '#bfdbfe'],
         label: '',
     },
-    trueDamage: {
-        scale: 0.85,
+    heavy: {
+        scale: 0.9,
         ttl: 1200,
         shake: 0,
         stageFx: [],
         particles: 5,
-        colors: ['#9ca3af', '#787888', '#64748b', '#94a3b8'],
+        colors: ['#b0b0c0', '#9ca3af', '#787888', '#64748b'],
         label: '',
+    },
+    trueDamage: {
+        scale: 1.05,
+        ttl: 1200,
+        shake: 0,
+        stageFx: [],
+        particles: 5,
+        colors: ['#c084fc', '#a78bfa', '#8b5cf6', '#7c3aed'],
+        label: '⚡',
     },
     critical: {
         scale: 1.5,
@@ -110,6 +119,8 @@ const announcementVersion = ref('')
 const latestAnnouncement = ref(null)
 const announcements = ref([])
 const myBossStats = ref(null)
+const myBossDamageValue = ref(0)
+const bossLeaderboardCountValue = ref(-1)
 const inventory = ref([])
 const loadout = ref(emptyLoadout())
 const combatStats = ref(defaultCombatStats())
@@ -341,7 +352,18 @@ const myRank = computed(() => {
     const matched = leaderboard.value.find((entry) => entry.nickname === nickname.value)
     return matched?.rank ?? null
 })
-const myBossDamage = computed(() => myBossStats.value?.damage ?? 0)
+const myBossDamage = computed(() => {
+    if (Number.isFinite(myBossDamageValue.value)) {
+        return myBossDamageValue.value
+    }
+    return myBossStats.value?.damage ?? 0
+})
+const bossLeaderboardCount = computed(() => {
+    if (Number.isFinite(bossLeaderboardCountValue.value) && bossLeaderboardCountValue.value >= 0) {
+        return bossLeaderboardCountValue.value
+    }
+    return bossLeaderboard.value.length
+})
 const myBossRank = computed(() => {
     if (!nickname.value || !boss.value) return null
     if (myBossStats.value?.rank) return myBossStats.value.rank
@@ -996,6 +1018,10 @@ function applyPublicState(payload) {
     }
     if ('bossLeaderboard' in payload) {
         bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
+        bossLeaderboardCountValue.value = bossLeaderboard.value.length
+    }
+    if ('bossLeaderboardCount' in payload) {
+        bossLeaderboardCountValue.value = Math.max(0, Number(payload.bossLeaderboardCount ?? 0))
     }
     if ('bossGoldRange' in payload && payload.bossGoldRange) {
         bossGoldRange.value = payload.bossGoldRange
@@ -1063,6 +1089,10 @@ function applyBattleUserState(payload) {
     }
     if ('myBossStats' in payload) {
         myBossStats.value = payload.myBossStats ?? null
+        myBossDamageValue.value = myBossStats.value?.damage ?? 0
+    }
+    if ('myBossDamage' in payload) {
+        myBossDamageValue.value = Math.max(0, Number(payload.myBossDamage ?? 0))
     }
     if ('combatStats' in payload) {
         combatStats.value = payload.combatStats ?? defaultCombatStats()
@@ -1141,7 +1171,9 @@ function applyClickResult(payload) {
             userStats: userStats.value,
             boss: boss.value,
             bossLeaderboard: bossLeaderboard.value,
+            bossLeaderboardCount: bossLeaderboardCountValue.value,
             myBossStats: myBossStats.value,
+            myBossDamage: myBossDamageValue.value,
             recentRewards: recentRewards.value,
         },
         payload,
@@ -1149,7 +1181,9 @@ function applyClickResult(payload) {
     userStats.value = nextClickState.userStats
     boss.value = nextClickState.boss
     bossLeaderboard.value = nextClickState.bossLeaderboard
+    bossLeaderboardCountValue.value = nextClickState.bossLeaderboardCount
     myBossStats.value = nextClickState.myBossStats
+    myBossDamageValue.value = nextClickState.myBossDamage
     recentRewards.value = nextClickState.recentRewards
     appendTalentTriggerEvents(payload.talentEvents)
     if (payload.talentCombatState) {
@@ -1263,6 +1297,8 @@ function clearUserRealtimeState() {
     stones.value = 0
     talentPoints.value = 0
     myBossStats.value = null
+    myBossDamageValue.value = 0
+    bossLeaderboardCountValue.value = -1
     recentRewards.value = []
     rewardModal.value = null
     rewardSignatureReady = false
@@ -1484,6 +1520,7 @@ function normalizeDamageVariant(rawType) {
         weakcritical: 'weakCritical',
         critical: 'critical',
         crit: 'critical',
+        heavy: 'heavy',
         true: 'trueDamage',
         true_damage: 'trueDamage',
         truedamage: 'trueDamage',
@@ -1513,8 +1550,11 @@ function resolveDamageVariant(payload, part, damageValue, source) {
     if (critical) {
         return 'critical'
     }
-    if (part?.type === 'heavy') {
+    if (part?.x != null && part?.y != null && talentVisualState.value.collapsePartKeys.includes(`${part.x}-${part.y}`)) {
         return 'trueDamage'
+    }
+    if (part?.type === 'heavy') {
+        return 'heavy'
     }
     if (source === 'auto' || source === 'afk') {
         return 'pursuit'
@@ -2179,6 +2219,7 @@ export function usePublicPageState() {
         myClicks,
         myRank,
         myBossDamage,
+        bossLeaderboardCount,
         myBossRank,
         effectiveIncrement,
         normalDamage,

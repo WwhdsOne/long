@@ -35,6 +35,7 @@ const {
   myClicks,
   myRank,
   myBossDamage,
+  bossLeaderboardCount,
   talentPoints,
   myBossRank,
   effectiveIncrement,
@@ -52,6 +53,12 @@ const {
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
+const bossGridRef = ref(null)
+const swordCursorRef = ref(null)
+const bossCursorVisible = ref(false)
+const bossCursorX = ref(0)
+const bossCursorY = ref(0)
+const bossSwordCursorUrl = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
 
 const comboColor = computed(() => {
   const t = Math.min(comboCount.value / 200, 1)
@@ -60,6 +67,10 @@ const comboColor = computed(() => {
 })
 
 const comboIsGold = computed(() => comboCount.value >= 200)
+const comboGoldEntering = ref(false)
+const comboMilestoneText = ref('')
+const comboMilestoneTick = ref(0)
+let comboMilestoneTimer = 0
 
 const comboBounce = ref(false)
 watch(() => comboCount.value, () => {
@@ -68,22 +79,38 @@ watch(() => comboCount.value, () => {
     setTimeout(() => { comboBounce.value = false }, 200)
   }
 })
+watch(() => comboCount.value, (next, prev) => {
+  const nextMilestone = Math.floor(next / 25)
+  const prevMilestone = Math.floor((prev || 0) / 25)
+  if (nextMilestone <= 0 || nextMilestone === prevMilestone) return
+  comboMilestoneText.value = `连击加成 +${nextMilestone * 10}%`
+  comboMilestoneTick.value++
+  clearTimeout(comboMilestoneTimer)
+  comboMilestoneTimer = setTimeout(() => {
+    comboMilestoneText.value = ''
+  }, 900)
+})
+watch(comboIsGold, (next, prev) => {
+  if (!next || prev) return
+  comboGoldEntering.value = true
+  setTimeout(() => { comboGoldEntering.value = false }, 420)
+})
 const talentEffectOverlayRef = ref(null)
 
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
 let tickTimer = 0
 
-// 像素剑光标（全站）
-let swordCursor = null
 let recoverTimer = 0
 let lastAttackTime = 0
 let lastPointerDown = 0
 
 function updateCursorPos(e) {
-  if (!swordCursor) return
-  swordCursor.style.left = e.clientX + 'px'
-  swordCursor.style.top = e.clientY + 'px'
+  const grid = bossGridRef.value
+  if (!grid) return
+  const rect = grid.getBoundingClientRect()
+  bossCursorX.value = e.clientX - rect.left
+  bossCursorY.value = e.clientY - rect.top
 }
 
 // 剑挥火花（按部位类型变色，参照 DAMAGE_VARIANTS）
@@ -138,6 +165,7 @@ function doCursorAttack(e) {
   if (now - lastAttackTime < 16) return
   lastAttackTime = now
   e.preventDefault()
+  const swordCursor = swordCursorRef.value
   if (!swordCursor) return
 
   clearTimeout(recoverTimer)
@@ -154,43 +182,36 @@ function doCursorAttack(e) {
   spawnSparks(e.clientX, e.clientY, detectCellType(e.target))
 }
 
+function handleBossGridPointerMove(e) {
+  bossCursorVisible.value = true
+  updateCursorPos(e)
+}
+
+function handleBossGridPointerLeave() {
+  bossCursorVisible.value = false
+}
+
+function handleBossGridPointerDown(e) {
+  lastPointerDown = Date.now()
+  doCursorAttack(e)
+}
+
+function handleBossGridClick(e) {
+  if (Date.now() - lastPointerDown < 48) return
+  doCursorAttack(e)
+}
+
 onMounted(() => {
   tickTimer = setInterval(() => {
     nowTick.value++
   }, 250)
-
-  swordCursor = document.getElementById('boss-sword-cursor')
-
-  // 仅战斗区内显示和追踪
-  document.addEventListener('pointermove', (e) => {
-    const grid = document.querySelector('.boss-part-grid-with-combo')
-    if (!grid) return
-    if (grid.contains(e.target)) {
-      if (swordCursor.style.display === 'none') swordCursor.style.display = 'block'
-      updateCursorPos(e)
-    } else {
-      swordCursor.style.display = 'none'
-    }
-  })
-
-  document.addEventListener('pointerdown', (e) => {
-    const grid = document.querySelector('.boss-part-grid-with-combo')
-    if (!grid || !grid.contains(e.target)) return
-    lastPointerDown = Date.now()
-    doCursorAttack(e)
-  })
-  document.addEventListener('click', (e) => {
-    const grid = document.querySelector('.boss-part-grid-with-combo')
-    if (!grid || !grid.contains(e.target)) return
-    if (Date.now() - lastPointerDown < 48) return
-    doCursorAttack(e)
-  })
 })
 
 onBeforeUnmount(() => {
   clearInterval(tickTimer)
   cancelAnimationFrame(particleRaf)
   clearTimeout(recoverTimer)
+  clearTimeout(comboMilestoneTimer)
   sparks.forEach(s => s.el.remove())
   sparks.length = 0
 })
@@ -533,8 +554,7 @@ const collapseRemaining = computed(() => {
           <div>
             <div class="vote-stage__head">
               <div>
-                <h1 class="vote-stage__worldBoss">世界 Boss 战场</h1>
-                <p class="vote-stage__eyebrow">当前 Boss</p>
+                <p class="vote-stage__eyebrow">当前世界 Boss</p>
                 <h2>{{ boss?.name || '等待 Boss 登场' }}</h2>
               </div>
             </div>
@@ -561,12 +581,19 @@ const collapseRemaining = computed(() => {
           <!-- 左侧面板列 -->
           <div class="boss-left-panels">
             <!-- 1. 连击框：始终可见 -->
-            <div class="combo-box" :class="{ 'combo-box--gold': comboIsGold }">
+            <div class="combo-box" :class="{ 'combo-box--gold': comboIsGold, 'combo-box--gold-enter': comboGoldEntering }">
               <template v-if="comboCount > 0">
                 <div class="combo-box__row">
-                  <span class="combo-box__count" :class="{ 'combo-box__count--bounce': comboBounce, 'combo-box__count--gold': comboIsGold }" :style="comboIsGold ? {} : { color: comboColor, textShadow: `0 0 14px ${comboColor}80` }">连击 x{{ comboCount }}</span>
-                  <span v-if="Math.floor(comboCount / 50) > 0" class="combo-box__bonus">
-                    伤害 +{{ Math.floor(comboCount / 50) * 5 }}%
+                  <span class="combo-box__count-wrap">
+                    <span class="combo-box__count" :class="{ 'combo-box__count--bounce': comboBounce, 'combo-box__count--gold': comboIsGold }" :style="comboIsGold ? {} : { color: comboColor, textShadow: `0 0 14px ${comboColor}80` }">连击 x{{ comboCount }}</span>
+                    <span class="combo-box__milestone-anchor">
+                      <span v-if="comboMilestoneText" :key="comboMilestoneTick" class="combo-box__milestone combo-box__milestone--floating">
+                        {{ comboMilestoneText }}
+                      </span>
+                    </span>
+                  </span>
+                  <span v-if="Math.floor(comboCount / 25) > 0" class="combo-box__bonus">
+                    伤害 +{{ Math.floor(comboCount / 25) * 10 }}%
                   </span>
                 </div>
                 <span class="combo-box__timeout-bar" :style="comboIsGold ? { borderColor: 'rgba(251,191,36,0.5)' } : { borderColor: comboColor + '40' }">
@@ -575,7 +602,7 @@ const collapseRemaining = computed(() => {
                       :style="comboIsGold ? { width: comboTimeoutPercent + '%', background: 'linear-gradient(90deg, #fde047, #fbbf24, #f59e0b)', boxShadow: '0 0 10px rgba(251,191,36,0.6)' } : { width: comboTimeoutPercent + '%', background: `linear-gradient(90deg, ${comboColor}, ${comboColor}cc)`, boxShadow: `0 0 8px ${comboColor}80` }"
                   ></span>
                 </span>
-                <span class="combo-box__timeout-text" :style="{ color: comboColor }">
+                <span class="combo-box__timeout-text" :style="comboIsGold ? { color: '#fde047', textShadow: '0 0 10px rgba(251,191,36,0.55)' } : { color: comboColor }">
                   {{ Math.ceil(comboTimeoutPercent / 20) }}s
                 </span>
               </template>
@@ -637,7 +664,14 @@ const collapseRemaining = computed(() => {
 
           <!-- 右侧：5×5 Boss 网格 + 连击计数 -->
           <div class="boss-part-grid-with-combo">
-            <div class="boss-part-grid">
+            <div
+                ref="bossGridRef"
+                class="boss-part-grid"
+                @pointermove="handleBossGridPointerMove"
+                @pointerleave="handleBossGridPointerLeave"
+                @pointerdown="handleBossGridPointerDown"
+                @click="handleBossGridClick"
+            >
               <div v-for="(row, yi) in bossZones" :key="yi" class="boss-part-grid__row">
                 <button
                     v-for="(zone, xi) in row"
@@ -731,6 +765,16 @@ const collapseRemaining = computed(() => {
                   <span v-else class="boss-part-cell__empty"></span>
                 </button>
               </div>
+              <div
+                  id="boss-sword-cursor"
+                  ref="swordCursorRef"
+                  :style="{
+                    left: `${bossCursorX}px`,
+                    top: `${bossCursorY}px`,
+                    opacity: bossCursorVisible ? 1 : 0,
+                    backgroundImage: `url('${bossSwordCursorUrl}')`,
+                  }"
+              ></div>
             </div>
           </div>
 
@@ -766,14 +810,26 @@ const collapseRemaining = computed(() => {
               <span class="boss-right-legend__item boss-right-legend__item--critical">暴击 CRIT!</span>
               <span class="boss-right-legend__item boss-right-legend__item--weak">弱点暴击 WEAK!</span>
               <span class="boss-right-legend__item boss-right-legend__item--pursuit">追击</span>
-              <span class="boss-right-legend__item boss-right-legend__item--true">重甲</span>
+              <span class="boss-right-legend__item boss-right-legend__item--true"><span class="boss-right-legend__icon">⚡</span>真实伤害</span>
               <span class="boss-right-legend__item boss-right-legend__item--doomsday">💀 削血</span>
               <span class="boss-right-legend__item boss-right-legend__item--judgement">K.O. 终结</span>
+            </div>
+            <div class="boss-right-summary">
+              <div class="boss-right-summary__stats">
+                <span>我的伤害 {{ myBossDamage }}</span>
+                <span>Boss 榜 {{ bossLeaderboardCount }} 人</span>
+              </div>
+              <p class="boss-right-summary__rule">对 Boss 造成至少 1% 生命值的伤害，才有资格掉落装备与资源。</p>
+              <div class="boss-right-summary__drop">
+                <button type="button" @click="openBossDropPool">
+                  点击查看 Boss 掉落池
+                </button>
+                <span>{{ bossDropPool.length }} 件掉落物</span>
+              </div>
             </div>
           </div>
 
         </div>
-        <div id="boss-sword-cursor"></div>
         <!-- 天赋瞬发特效覆盖层 -->
         <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
           <div v-if="hasRecentTrigger('storm_combo')"
@@ -888,20 +944,6 @@ const collapseRemaining = computed(() => {
             </svg>
             死兆 {{ talentVisualState.omenStacks }}
           </span>
-        </div>
-        <div class="vote-stage__boss-hud-stats">
-          <span>我的伤害 {{ myBossDamage }}</span>
-          <span>Boss 榜 {{ bossLeaderboard.length }} 人</span>
-          <span>掉落池 {{ bossDropPool.length }} 件</span>
-        </div>
-        <div class="vote-stage__boss-note">
-          <span>只有对 Boss 造成至少 1% 生命值的伤害，才有资格掉落装备与资源。</span>
-          <span v-if="boss" class="boss-drop-link">
-              <button type="button" @click="openBossDropPool">
-                点击查看 Boss 掉落池
-              </button>
-              <span>{{ bossDropPool.length }} 件掉落物</span>
-            </span>
         </div>
         <div class="vote-stage__boss-note vote-stage__boss-note--rules">
           <strong>挂机规则</strong>
