@@ -2527,26 +2527,31 @@ func (s *Store) bossStatsForNickname(ctx context.Context, bossID string, nicknam
 		return nil, nil
 	}
 
-	score, err := s.client.ZScore(ctx, s.bossDamageKey(bossID), nickname).Result()
-	if err != nil {
-		if errors.Is(err, redis.Nil) {
+	pipe := s.client.Pipeline()
+	scoreCmd := pipe.ZScore(ctx, s.bossDamageKey(bossID), nickname)
+	rankCmd := pipe.ZRevRank(ctx, s.bossDamageKey(bossID), nickname)
+	_, err := pipe.Exec(ctx)
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return nil, err
+	}
+	if scoreErr := scoreCmd.Err(); scoreErr != nil {
+		if errors.Is(scoreErr, redis.Nil) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, scoreErr
 	}
 
 	stats := &BossUserStats{
 		Nickname: nickname,
-		Damage:   int64(score),
+		Damage:   int64(scoreCmd.Val()),
 	}
 
-	rank, err := s.client.ZRevRank(ctx, s.bossDamageKey(bossID), nickname).Result()
-	if err != nil {
-		if !errors.Is(err, redis.Nil) {
-			return nil, err
+	if rankErr := rankCmd.Err(); rankErr != nil {
+		if !errors.Is(rankErr, redis.Nil) {
+			return nil, rankErr
 		}
 	} else {
-		stats.Rank = int(rank) + 1
+		stats.Rank = int(rankCmd.Val()) + 1
 	}
 
 	return stats, nil

@@ -1495,6 +1495,46 @@ func TestClickBossPartReturnsRealtimeBossSummaryFields(t *testing.T) {
 	}
 }
 
+func TestBossStatsForNicknameReturnsScoreAndRank(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	bossID := "boss-rank-check"
+	if err := store.client.ZAdd(ctx, store.bossDamageKey(bossID),
+		redis.Z{Score: 120, Member: "小红"},
+		redis.Z{Score: 80, Member: "阿明"},
+		redis.Z{Score: 30, Member: "小蓝"},
+	).Err(); err != nil {
+		t.Fatalf("seed boss damage leaderboard: %v", err)
+	}
+
+	stats, err := store.bossStatsForNickname(ctx, bossID, "阿明")
+	if err != nil {
+		t.Fatalf("bossStatsForNickname: %v", err)
+	}
+	if stats == nil {
+		t.Fatalf("expected boss stats, got nil")
+	}
+	if stats.Damage != 80 || stats.Rank != 2 {
+		t.Fatalf("expected damage=80 rank=2, got %+v", stats)
+	}
+}
+
+func TestBossStatsForNicknameReturnsNilWhenMissing(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	stats, err := store.bossStatsForNickname(ctx, "boss-rank-missing", "阿明")
+	if err != nil {
+		t.Fatalf("bossStatsForNickname: %v", err)
+	}
+	if stats != nil {
+		t.Fatalf("expected nil boss stats when player is missing, got %+v", stats)
+	}
+}
+
 func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
