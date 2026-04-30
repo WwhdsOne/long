@@ -7,6 +7,8 @@
   - [designs/2026-04-26-金币与强化石获取系统策划案](./designs/2026-04-26-金币与强化石获取系统策划案.md)
   - [designs/2026-04-26-装备实例化与强化背包系统策划案](./designs/2026-04-26-装备实例化与强化背包系统策划案.md)
 - 天赋系统当前正式文档：
+  - [designs/2026-04-30-天赋系统数值策划案-V2.0](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
+  - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
   - [superpowers/specs/2026-04-28-talent-system-rework-design](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
   - [2026-04-28-天赋成本调整总结](./2026-04-28-天赋成本调整总结.md)
 - 天赋系统当前开发参考：
@@ -14,6 +16,7 @@
   - [developer-reference/2026-04-27-均衡攻势工作原理](./developer-reference/2026-04-27-均衡攻势工作原理.md)
   - [developer-reference/2026-04-27-碎盾攻坚工作原理](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
   - [developer-reference/2026-04-27-致命洞察工作原理](./developer-reference/2026-04-27-致命洞察工作原理.md)
+  - [developer-reference/2026-04-30-V2伤害计算链路总览](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
 - 相关设计与实施：
   - [designs/2026-04-25-Boss分区基础视觉与点击口径设计](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
   - [reports/2026-04-25-Boss分区改造实施记录](./reports/2026-04-25-Boss分区改造实施记录.md)
@@ -57,15 +60,19 @@
 ### 6) 天赋系统文档分层
 
 - 正式口径：
+  - [designs/2026-04-30-天赋系统数值策划案-V2.0](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
+  - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
   - [superpowers/specs/2026-04-28-talent-system-rework-design](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
   - [2026-04-28-天赋成本调整总结](./2026-04-28-天赋成本调整总结.md)
 - 实施记录：
   - [superpowers/plans/2026-04-28-talent-system-rework-plan](./superpowers/plans/2026-04-28-talent-system-rework-plan.md)
+  - [superpowers/plans/2026-04-30-talent-v2-buff-and-damage-rework-plan](./superpowers/plans/2026-04-30-talent-v2-buff-and-damage-rework-plan.md)
 - 当前开发参考：
   - [developer-reference/2026-04-26-天赋系统开发参考](./developer-reference/2026-04-26-天赋系统开发参考.md)
   - [developer-reference/2026-04-27-均衡攻势工作原理](./developer-reference/2026-04-27-均衡攻势工作原理.md)
   - [developer-reference/2026-04-27-碎盾攻坚工作原理](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
   - [developer-reference/2026-04-27-致命洞察工作原理](./developer-reference/2026-04-27-致命洞察工作原理.md)
+  - [developer-reference/2026-04-30-V2伤害计算链路总览](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
 - 历史草案：
   - [designs/2026-04-23-玩家技能树系统策划案](./designs/2026-04-23-玩家技能树系统策划案.md)
   - [designs/2026-04-25-Boss多部位战斗与装备系统总策划案](./designs/2026-04-25-Boss多部位战斗与装备系统总策划案.md)
