@@ -13,9 +13,9 @@ const smallEffects = [
 const ultimateSkills = [
   {
     key: 'final_cut',
-    name: '死亡狂喜',
-    skill: '死亡狂喜',
-    trigger: 'death_ecstasy_ult',
+    name: '终末血斩',
+    skill: '终末血斩',
+    trigger: 'final_cut',
     tag: '终结',
     tagClass: 'tag--heavy',
     note: '终极技能演示区按真实战斗页 5x5 Boss 网格 1:1 复刻。下层是同尺寸格子，上层叠加终结斩特效；内部仍使用低分辨率像素画布，再按 5x5 战斗区等比放大。',

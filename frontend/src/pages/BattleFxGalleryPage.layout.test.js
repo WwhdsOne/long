@@ -84,6 +84,7 @@ describe('BattleFxGalleryPage 页面结构', () => {
     expect(pageSource).toContain('终极技能画布为 5x5')
     expect(pageSource).toContain('const ultimateSkills = [')
     expect(pageSource).toContain("key: 'final_cut'")
+    expect(pageSource).toContain("trigger: 'final_cut'")
     expect(pageSource).toContain("key: 'silver_storm'")
     expect(pageSource).toContain('class="boss-part-grid bfxg__ultimate-grid"')
     expect(pageSource).toContain('class="bfxg__ultimate-overlay"')

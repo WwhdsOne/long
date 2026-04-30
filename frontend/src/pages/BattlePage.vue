@@ -371,8 +371,7 @@ function zoneDamageBursts(zone) {
 
 // 天赋视觉状态
 const talentEdgeGlowClass = computed(() => {
-  const vs = talentVisualState.value
-  if (vs.deathEcstasyActive) return 'talent-edge-glow--crit'
+  if (hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)) return 'talent-edge-glow--crit'
   if (silverStormActive.value) return ''
   const recent = talentTriggerFeed.value[0]
   if (recent && recent.name === '暴风连击') {
@@ -399,7 +398,7 @@ function latestTrigger(type) {
 }
 
 function effectWindowMs(type) {
-  if (type === 'death_ecstasy_ult' || type === 'silver_storm') {
+  if (type === 'final_cut' || type === 'silver_storm') {
     return ULTIMATE_EFFECT_WINDOW_MS
   }
   if (type === 'judgment_day') {
@@ -668,15 +667,16 @@ const silverStormActive = computed(() => {
               </div>
             </div>
 
-            <div v-if="partStatusList.length > 0" class="part-status-panel">
+              <div v-if="partStatusList.length > 0" class="part-status-panel">
               <div class="part-status-panel__title">部位状态</div>
               <div v-for="s in partStatusList" :key="s.key" class="part-status-panel__item">
                 <span class="part-status-panel__name" :class="`part-status-panel__name--${s.type}`">{{ s.name }}</span>
                 <div class="part-status-panel__row">
                   <span class="part-status-panel__label">{{ s.statusLabel }}</span>
-                  <span class="part-status-panel__countdown">{{ s.remainingSec }}s</span>
+                  <span v-if="s.showCountdown !== false" class="part-status-panel__countdown">{{ s.remainingSec }}s</span>
                 </div>
-                <span class="part-status-panel__bar">
+                <div v-if="s.statusMeta" class="status-panel__hint">{{ s.statusMeta }}</div>
+                <span v-if="s.showProgress !== false" class="part-status-panel__bar">
                   <span class="part-status-panel__bar-fill" :class="`part-status-panel__bar-fill--${s.statusKey}`" :style="{ width: `${s.progress}%` }"></span>
                 </span>
               </div>
@@ -875,10 +875,10 @@ const silverStormActive = computed(() => {
                })">
             <PixelEffectCanvas effect="bleed" :size="effectCanvasSize(3.75)" :loop="false" />
           </div>
-          <div v-if="hasRecentTrigger('death_ecstasy_ult', ULTIMATE_EFFECT_WINDOW_MS)"
-               :key="triggerKey('death_ecstasy_ult', ULTIMATE_EFFECT_WINDOW_MS)"
+          <div v-if="hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)"
+               :key="triggerKey('final_cut', ULTIMATE_EFFECT_WINDOW_MS)"
                class="talent-canvas-fx"
-               :style="effectOverlayStyle('death_ecstasy_ult', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+               :style="effectOverlayStyle('final_cut', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
             <PixelEffectCanvas effect="final_cut" :size="ultimateEffectCanvasSize()" :loop="false" />
           </div>
           <div v-if="hasRecentTrigger('collapse_trigger')"

@@ -22,17 +22,24 @@ type compiledArmorTalents struct {
 }
 
 type compiledCritTalents struct {
-	SkinnerChance       float64
-	SkinnerDuration     int64
-	OmenKillThreshold   float64
-	OmenKillDmgPerOmen  float64
-	OmenResonatePerOmen float64
-	BleedRatio          float64
-	FinalCutTrigger     int64
-	FinalCutHpCut       float64
-	DeathEcstasyMult    float64
-	DoomMarkCount       int
-	DoomOmenPerMark     int
+	OmenCap               int
+	OmenPerWeakCrit       int
+	SkinnerChance         float64
+	SkinnerDuration       int64
+	SkinnerCooldown       int64
+	OmenKillThreshold     float64
+	OmenKillDmgPerOmen    float64
+	OmenResonatePerOmen   float64
+	OmenReapThresholds    []int
+	OmenReapDamageMults   []float64
+	BleedRatio            float64
+	BleedDuration         int64
+	WeakspotInsightMult   float64
+	FinalCutOmenTrigger   int
+	FinalCutDamageRatio   float64
+	DoomMarkThreshold     float64
+	DoomMarkCount         int
+	DoomOmenPerMark       int
 }
 
 type CompiledTalentSet struct {
@@ -312,6 +319,7 @@ func compileCritTalents(compiled *CompiledTalentSet) compiledCritTalents {
 		level := compiled.Level("crit_skinner")
 		crit.SkinnerChance = critSkinnerChanceForLevel(level)
 		crit.SkinnerDuration = int64(critSkinnerDurationForLevel(level))
+		crit.SkinnerCooldown = critSkinnerCooldownForLevel(level)
 	}
 	if compiled.Has("crit_omen_kill") {
 		level := compiled.Level("crit_omen_kill")
@@ -319,24 +327,30 @@ func compileCritTalents(compiled *CompiledTalentSet) compiledCritTalents {
 		crit.OmenKillDmgPerOmen = critOmenKillDmgPerOmenForLevel(level)
 	}
 	if compiled.Has("crit_core") {
+		crit.OmenCap = TalentOmenStackCap
+		crit.OmenPerWeakCrit = talentInt(talentDefs["crit_core"].EffectValue.(map[string]any)["omenPerWeakCrit"])
 		crit.OmenResonatePerOmen = critOmenResonateForLevel(compiled.Level("crit_core"))
 	}
+	if compiled.Has("crit_omen_reap") {
+		crit.OmenReapThresholds = []int{15, 30, 60, 90, 120}
+		crit.OmenReapDamageMults = []float64{1.10, 1.20, 1.30, 1.40, 1.50}
+	}
 	if compiled.Has("crit_bleed") {
-		crit.BleedRatio = critBleedRatioForLevel(compiled.Level("crit_bleed"))
+		level := compiled.Level("crit_bleed")
+		crit.BleedRatio = critBleedRatioForLevel(level)
+		crit.BleedDuration = critBleedDurationForLevel(level)
 	}
 	if compiled.Has("crit_final_cut") {
 		level := compiled.Level("crit_final_cut")
-		crit.FinalCutTrigger = int64(critFinalCutCountForLevel(level))
-		crit.FinalCutHpCut = critFinalCutHpCutForLevel(level)
+		crit.FinalCutOmenTrigger = critFinalCutOmenTriggerForLevel(level)
+		crit.FinalCutDamageRatio = critFinalCutDamageRatioForLevel(level)
 	}
 	if compiled.Has("crit_death_ecstasy") {
-		crit.DeathEcstasyMult = critDeathEcstasyMultForLevel(compiled.Level("crit_death_ecstasy"))
-		if compiled.IsTierFull(TalentTreeCrit, 4) {
-			crit.DeathEcstasyMult += 2
-		}
+		crit.WeakspotInsightMult = critWeakspotInsightMultiplierForLevel(compiled.Level("crit_death_ecstasy"))
 	}
 	if compiled.Has("crit_doom_judgment") {
 		level := compiled.Level("crit_doom_judgment")
+		crit.DoomMarkThreshold = 0.35
 		crit.DoomMarkCount = critDoomMarkCountForLevel(level)
 		crit.DoomOmenPerMark = critDoomOmenPerMarkForLevel(level)
 	}

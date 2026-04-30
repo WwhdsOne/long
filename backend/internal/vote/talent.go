@@ -32,7 +32,7 @@ const (
 	TalentCostTier3Filler     int64 = 60
 	TalentDefaultMaxLevel           = 5
 	TalentAutoStrikeWindowSec       = 5
-	TalentOmenStackCap              = 100
+	TalentOmenStackCap              = 150
 
 	talentCostLevelExponent = 0.85
 	talentCostMultiplier    = 1.8
@@ -145,15 +145,15 @@ var talentDefs = map[string]TalentDef{
 	"armor_ultimate":     {ID: "armor_ultimate", Tree: TalentTreeArmor, Tier: 4, MaxLevel: 5, Name: "审判日", EffectType: "judgment_day", EffectValue: map[string]any{"triggerCount": 60.0, "hpCutPercent": 0.60}},
 
 	// ===== 暴击：致命洞察 =====
-	"crit_core":          {ID: "crit_core", Tree: TalentTreeCrit, Tier: 0, MaxLevel: 5, Name: "溢杀", EffectType: "overkill", EffectValue: map[string]any{"baseCritBonus": 0.35, "overflowToCritDmg": 0.02, "omenPerWeakCrit": 2, "critDmgPerOmen": 0.008}},
-	"crit_cruel":         {ID: "crit_cruel", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "残忍", EffectType: "crit_damage_bonus", EffectValue: map[string]any{"percent": 1.20}},
-	"crit_skinner":       {ID: "crit_skinner", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "剥皮", EffectType: "force_weak", EffectValue: map[string]any{"chance": 0.50, "duration": 8}},
-	"crit_doom_judgment": {ID: "crit_doom_judgment", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "末日审判", EffectType: "doom_mark", EffectValue: map[string]any{"markCount": 2.0, "omenPerMark": 25.0, "hpThreshold": 0.30}},
-	"crit_bleed":         {ID: "crit_bleed", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "致命出血", EffectType: "bleed", EffectValue: map[string]any{"duration": 4, "damageRatio": 1.00}},
-	"crit_omen_kill":     {ID: "crit_omen_kill", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "斩杀预兆", EffectType: "omen_low_hp", EffectValue: map[string]any{"hpThreshold": 0.50, "dmgPerOmen": 0.02}},
-	"crit_omen_reap":     {ID: "crit_omen_reap", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "死兆收割", EffectType: "omen_reap_passive", EffectValue: map[string]any{"thresholds": []float64{30, 60, 90, 120}, "damageMult": []float64{1.5, 2.0, 2.5, 3.0}}},
-	"crit_final_cut":     {ID: "crit_final_cut", Tree: TalentTreeCrit, Tier: 3, MaxLevel: 5, Name: "终末血斩", EffectType: "final_cut", EffectValue: map[string]any{"critCount": 80.0, "hpCutPercent": 0.15, "cooldown": 30}},
-	"crit_death_ecstasy": {ID: "crit_death_ecstasy", Tree: TalentTreeCrit, Tier: 4, MaxLevel: 5, Name: "死亡狂喜", EffectType: "death_ecstasy_ult", EffectValue: map[string]any{"omenCost": 100.0, "critDmgMult": 1.0}},
+	"crit_core":          {ID: "crit_core", Tree: TalentTreeCrit, Tier: 0, MaxLevel: 5, Name: "溢杀", EffectType: "overkill", EffectValue: map[string]any{"baseCritBonus": 0.15, "overflowToCritDmg": 0.01, "omenPerWeakCrit": 1, "critDmgPerOmen": 0.005}},
+	"crit_cruel":         {ID: "crit_cruel", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "残忍", EffectType: "crit_damage_bonus", EffectValue: map[string]any{"percent": 0.60}},
+	"crit_skinner":       {ID: "crit_skinner", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "剥皮", EffectType: "force_weak", EffectValue: map[string]any{"chance": 1.0, "duration": 6.0, "cooldown": 30.0}},
+	"crit_doom_judgment": {ID: "crit_doom_judgment", Tree: TalentTreeCrit, Tier: 1, MaxLevel: 5, Name: "末日审判", EffectType: "doom_mark", EffectValue: map[string]any{"markCount": 1.0, "omenPerMark": 15.0, "hpThreshold": 0.35}},
+	"crit_bleed":         {ID: "crit_bleed", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "致命出血", EffectType: "bleed", EffectValue: map[string]any{"duration": 3.0, "damageRatio": 0.40}},
+	"crit_omen_kill":     {ID: "crit_omen_kill", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "斩杀预兆", EffectType: "omen_low_hp", EffectValue: map[string]any{"hpThreshold": 0.45, "dmgPerOmen": 0.01}},
+	"crit_omen_reap":     {ID: "crit_omen_reap", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "死兆收割", EffectType: "omen_reap_passive", EffectValue: map[string]any{"thresholds": []float64{15, 30, 60, 90, 120}, "damageMult": []float64{1.10, 1.20, 1.30, 1.40, 1.50}}},
+	"crit_death_ecstasy": {ID: "crit_death_ecstasy", Tree: TalentTreeCrit, Tier: 3, MaxLevel: 5, Name: "弱点洞察", EffectType: "weakspot_insight", EffectValue: map[string]any{"multiplier": 2.50}},
+	"crit_final_cut":     {ID: "crit_final_cut", Tree: TalentTreeCrit, Tier: 4, MaxLevel: 5, Name: "终末血斩", EffectType: "final_cut", EffectValue: map[string]any{"omenTrigger": 150.0, "damageRatio": 15.0}},
 
 	// ===== 均衡攻势 小节点 =====
 	"normal_filler_t1a": {ID: "normal_filler_t1a", Tree: TalentTreeNormal, Tier: 1, MaxLevel: 5, Name: "锐锋", EffectType: "attack_power_percent", EffectValue: map[string]any{"percent": 0.15}},
@@ -384,7 +384,7 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		if def.ID == "crit_core" {
 			baseCritBonus = talentPercent(critCoreBaseCritBonusForLevel(currentFactor))
 		}
-		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤；每层死兆额外提供 %s 暴击伤害。死兆最多累积至 %d 层。弱点暴击+2层死兆，普通暴击+1层，击碎部位+5层。", baseCritBonus, talentPercent(value["overflowToCritDmg"]), talentPercent(critOmenResonateForLevel(currentFactor)), TalentOmenStackCap)
+		return fmt.Sprintf("基础暴击率 +%s。暴击率超过100%%的部分按 %s 比例转为暴伤；每层死兆额外提供 %s 暴击伤害。死兆最多累积至 %d 层。弱点暴击+1层死兆。", baseCritBonus, talentPercent(value["overflowToCritDmg"]), talentPercent(critOmenResonateForLevel(currentFactor)), TalentOmenStackCap)
 	case "omen_crit_damage":
 		critDmgPerOmen := talentFloat(value["critDmgPerOmen"]) * float64(currentFactor)
 		return fmt.Sprintf("每层死兆叠加 %s 暴击伤害（例：100层=+%.0f%%暴伤）。", talentPercent(critDmgPerOmen), critDmgPerOmen*100)
@@ -401,13 +401,13 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 			chance = talentPercent(critSkinnerChanceForLevel(currentFactor))
 			duration = critSkinnerDurationForLevel(currentFactor)
 		}
-		return fmt.Sprintf("暴击时有 %s 概率将当前部位视为弱点（x2.5系数），持续 %d 秒。", chance, duration)
+		return fmt.Sprintf("暴击时有 %s 概率随机将一个非弱点部位视为弱点，持续 %d 秒。触发后进入 %d 秒冷却。", chance, duration, critSkinnerCooldownForLevel(currentFactor))
 	case "bleed":
 		ratio := talentPercentScaled(value["damageRatio"], currentFactor)
 		if def.ID == "crit_bleed" {
 			ratio = talentPercent(critBleedRatioForLevel(currentFactor))
 		}
-		return fmt.Sprintf("暴击时附加真伤 = 本次伤害 x %s。一次性结算。", ratio)
+		return fmt.Sprintf("暴击时附加 3 秒致命出血，总伤害 = 本次基础伤害 x %s。重复暴击刷新持续时间，不叠加。", ratio)
 	case "omen_low_hp":
 		hpThreshold := talentPercentScaled(value["hpThreshold"], currentFactor)
 		dmgPerOmen := talentPercentScaled(value["dmgPerOmen"], currentFactor)
@@ -417,23 +417,16 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		}
 		return fmt.Sprintf("部位血量低于 %s 时，每层死兆额外 +%s 伤害（例：47层=+47%%）。被动生效。", hpThreshold, dmgPerOmen)
 	case "omen_reap_passive":
-		thresholds := "30/60/90/120"
-		mults := "×1.5/×2.0/×2.5/×3.0"
+		thresholds := "15/30/60/90/120"
+		mults := "×1.1/×1.2/×1.3/×1.4/×1.5"
 		return fmt.Sprintf("死兆达%s层时，伤害自动提升至%s（不消耗层数）。被动生效。", thresholds, mults)
-	case "death_ecstasy_ult":
-		mult := talentMultiplierScaled(value["critDmgMult"], currentFactor)
-		if def.ID == "crit_death_ecstasy" {
-			mult = fmt.Sprintf("×%.1f", critDeathEcstasyMultForLevel(currentFactor))
-		}
-		return fmt.Sprintf("死兆达到%d层时消耗%d层，造成 baseDamage × 层数，再乘以 %s 的巨额伤害。", talentInt(value["omenCost"]), talentInt(value["omenCost"]), mult)
+	case "weakspot_insight":
+		return fmt.Sprintf("对弱点部位暴击时额外乘以 ×%.2f 的独立倍率。", critWeakspotInsightMultiplierForLevel(currentFactor))
 	case "final_cut":
-		critCount := talentInt(value["critCount"])
-		hpCutPercent := talentPercentScaled(value["hpCutPercent"], currentFactor)
 		if def.ID == "crit_final_cut" {
-			critCount = critFinalCutCountForLevel(currentFactor)
-			hpCutPercent = talentPercent(critFinalCutHpCutForLevel(currentFactor))
+			return fmt.Sprintf("死兆达到 %d 层时自动触发，消耗全部死兆并造成 ×%.1f 的终末血斩伤害。", critFinalCutOmenTriggerForLevel(currentFactor), critFinalCutDamageRatioForLevel(currentFactor))
 		}
-		return fmt.Sprintf("累计 %d 次暴击后削除Boss最大生命值的 %s（%d 秒冷却）。", critCount, hpCutPercent, talentInt(value["cooldown"]))
+		return fmt.Sprintf("死兆达到 %s 层时自动触发，造成 ×%s 的终末血斩伤害。", talentIntString(value["omenTrigger"]), talentMultiplierScaled(value["damageRatio"], currentFactor))
 	case "doom_mark":
 		markCount := talentIntScaled(value["markCount"], currentFactor)
 		omenPerMark := talentIntScaled(value["omenPerMark"], currentFactor)
@@ -441,7 +434,7 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 			markCount = critDoomMarkCountForLevel(currentFactor)
 			omenPerMark = critDoomOmenPerMarkForLevel(currentFactor)
 		}
-		return fmt.Sprintf("开局随机标记%d个部位。被标记部位被击碎时触发+%d死兆。可升级增加标记数和层数。", markCount, omenPerMark)
+		return fmt.Sprintf("Boss 血量低于 %s 时，随机标记 %d 个部位。被标记部位被击碎时触发 +%d 死兆。每场 Boss 战仅触发一次。", talentPercent(0.35), markCount, omenPerMark)
 	case "chase_ratio_bonus":
 		return fmt.Sprintf("追击爆发单段倍率额外 +%s。被动生效。", talentPercentScaled(value["percent"], currentFactor))
 	default:
@@ -553,51 +546,59 @@ func critCoreBaseCritBonusForLevel(level int) float64 {
 }
 
 func critCruelBonusForLevel(level int) float64 {
-	return lerpTalentValue(level, 1.20, 4.00)
+	return lerpTalentValue(level, 0.60, 1.40)
 }
 
 func critDoomMarkCountForLevel(level int) int {
-	return lerpTalentInt(level, 2, 15)
+	return lerpTalentInt(level, 1, 5)
 }
 
 func critDoomOmenPerMarkForLevel(level int) int {
-	return lerpTalentInt(level, 25, 40)
+	return lerpTalentInt(level, 15, 27)
 }
 
 func critOmenResonateForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.008, 0.020)
+	return lerpTalentValue(level, 0.005, 0.013)
 }
 
 func critSkinnerChanceForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.50, 0.80)
+	return 1.0
 }
 
 func critSkinnerDurationForLevel(level int) int {
-	return lerpTalentInt(level, 8, 15)
+	return lerpTalentInt(level, 6, 10)
+}
+
+func critSkinnerCooldownForLevel(level int) int64 {
+	return int64(lerpTalentInt(level, 30, 20))
 }
 
 func critBleedRatioForLevel(level int) float64 {
-	return lerpTalentValue(level, 1.00, 3.00)
+	return lerpTalentValue(level, 0.40, 1.00)
+}
+
+func critBleedDurationForLevel(level int) int64 {
+	return 3
 }
 
 func critOmenKillThresholdForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.50, 0.65)
+	return lerpTalentValue(level, 0.45, 0.55)
 }
 
 func critOmenKillDmgPerOmenForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.02, 0.05)
+	return lerpTalentValue(level, 0.01, 0.03)
 }
 
-func critFinalCutCountForLevel(level int) int {
-	return lerpTalentInt(level, 80, 40)
+func critFinalCutOmenTriggerForLevel(level int) int {
+	return 150
 }
 
-func critFinalCutHpCutForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.15, 0.25)
+func critFinalCutDamageRatioForLevel(level int) float64 {
+	return lerpTalentValue(level, 15.0, 30.0)
 }
 
-func critDeathEcstasyMultForLevel(level int) float64 {
-	return lerpTalentValue(level, 1.0, 3.0)
+func critWeakspotInsightMultiplierForLevel(level int) float64 {
+	return lerpTalentValue(level, 2.50, 3.50)
 }
 
 func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine {
@@ -749,13 +750,15 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		if def.ID == "crit_skinner" {
 			add("触发几率", talentPercent(critSkinnerChanceForLevel(currentFactor)), talentPercent(critSkinnerChanceForLevel(nextLevel)))
 			add("弱点持续", fmt.Sprintf("%ds", critSkinnerDurationForLevel(currentFactor)), fmt.Sprintf("%ds", critSkinnerDurationForLevel(nextLevel)))
+			add("冷却时间", fmt.Sprintf("%ds", critSkinnerCooldownForLevel(currentFactor)), fmt.Sprintf("%ds", critSkinnerCooldownForLevel(nextLevel)))
 			break
 		}
 		add("触发几率", talentPercentScaled(value["chance"], currentFactor), talentPercentScaled(value["chance"], nextLevel))
 		add("弱点持续", talentDurationScaled(value["duration"], currentFactor), talentDurationScaled(value["duration"], nextLevel))
 	case "bleed":
 		if def.ID == "crit_bleed" {
-			add("真伤比例", talentPercent(critBleedRatioForLevel(currentFactor)), talentPercent(critBleedRatioForLevel(nextLevel)))
+			add("持续时间", fmt.Sprintf("%ds", critBleedDurationForLevel(currentFactor)), fmt.Sprintf("%ds", critBleedDurationForLevel(nextLevel)))
+			add("伤害倍率", talentPercent(critBleedRatioForLevel(currentFactor)), talentPercent(critBleedRatioForLevel(nextLevel)))
 			break
 		}
 		add("真伤比例", talentPercentScaled(value["damageRatio"], currentFactor), talentPercentScaled(value["damageRatio"], nextLevel))
@@ -768,22 +771,17 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		add("触发阈值", talentPercentScaled(value["hpThreshold"], currentFactor), talentPercentScaled(value["hpThreshold"], nextLevel))
 		add("每层增伤", talentPercentScaled(value["dmgPerOmen"], currentFactor), talentPercentScaled(value["dmgPerOmen"], nextLevel))
 	case "omen_reap_passive":
-		add("档位增伤", "30层×1.5 / 60层×2.0 / 90层×2.5 / 120层×3.0", "")
+		add("档位增伤", "15层×1.1 / 30层×1.2 / 60层×1.3 / 90层×1.4 / 120层×1.5", "")
+	case "weakspot_insight":
+		add("弱点暴击倍率", fmt.Sprintf("×%.2f", critWeakspotInsightMultiplierForLevel(currentFactor)), fmt.Sprintf("×%.2f", critWeakspotInsightMultiplierForLevel(nextLevel)))
 	case "final_cut":
 		if def.ID == "crit_final_cut" {
-			add("需暴击次数", fmt.Sprintf("%d", critFinalCutCountForLevel(currentFactor)), fmt.Sprintf("%d", critFinalCutCountForLevel(nextLevel)))
-			add("削除生命", talentPercent(critFinalCutHpCutForLevel(currentFactor)), talentPercent(critFinalCutHpCutForLevel(nextLevel)))
+			add("触发层数", fmt.Sprintf("%d", critFinalCutOmenTriggerForLevel(currentFactor)), fmt.Sprintf("%d", critFinalCutOmenTriggerForLevel(nextLevel)))
+			add("伤害倍率", fmt.Sprintf("×%.1f", critFinalCutDamageRatioForLevel(currentFactor)), fmt.Sprintf("×%.1f", critFinalCutDamageRatioForLevel(nextLevel)))
 			break
 		}
-		add("需暴击次数", talentIntString(value["critCount"]), talentIntString(value["critCount"]))
-		add("削除生命", talentPercentScaled(value["hpCutPercent"], currentFactor), talentPercentScaled(value["hpCutPercent"], nextLevel))
-	case "death_ecstasy_ult":
-		add("消耗层数", talentIntString(value["omenCost"]), talentIntString(value["omenCost"]))
-		if def.ID == "crit_death_ecstasy" {
-			add("暴伤倍率", fmt.Sprintf("×%.1f", critDeathEcstasyMultForLevel(currentFactor)), fmt.Sprintf("×%.1f", critDeathEcstasyMultForLevel(nextLevel)))
-			break
-		}
-		add("暴伤倍率", talentMultiplierScaled(value["critDmgMult"], currentFactor), talentMultiplierScaled(value["critDmgMult"], nextLevel))
+		add("触发层数", talentIntString(value["omenTrigger"]), talentIntString(value["omenTrigger"]))
+		add("伤害倍率", talentMultiplierScaled(value["damageRatio"], currentFactor), talentMultiplierScaled(value["damageRatio"], nextLevel))
 	case "doom_mark":
 		if def.ID == "crit_doom_judgment" {
 			add("标记数量", fmt.Sprintf("%d", critDoomMarkCountForLevel(currentFactor)), fmt.Sprintf("%d", critDoomMarkCountForLevel(nextLevel)))
@@ -1232,44 +1230,57 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 	}
 }
 
+type TalentBleedState struct {
+	StartedAt     int64 `json:"startedAt"`
+	EndsAt        int64 `json:"endsAt"`
+	Duration      int64 `json:"duration"`
+	TotalDamage   int64 `json:"totalDamage"`
+	AppliedDamage int64 `json:"appliedDamage"`
+}
+
 // TalentCombatState 玩家在单场 Boss 战中的天赋战斗状态。
 type TalentCombatState struct {
-	OmenStacks             int              `json:"omenStacks"`
-	CollapseParts          []int            `json:"collapseParts"`
-	CollapseEndsAt         int64            `json:"collapseEndsAt"`
-	CollapseDuration       int64            `json:"collapseDuration"`
-	DoomMarks              []int            `json:"doomMarks"`
-	DoomMarkCumDamage      map[string]int64 `json:"doomMarkCumDamage"`
-	SilverStormRemaining   int              `json:"silverStormRemaining"`
-	SilverStormEndsAt      int64            `json:"silverStormEndsAt"`
-	SilverStormActive      bool             `json:"silverStormActive"`
-	AutoStrikeTargetPart   string           `json:"autoStrikeTargetPart"`
-	AutoStrikeComboCount   int64            `json:"autoStrikeComboCount"`
-	AutoStrikeExpiresAt    int64            `json:"autoStrikeExpiresAt"`
-	LastFinalCutAt         int64            `json:"lastFinalCutAt"`
-	JudgmentDayUsed        map[string]bool  `json:"judgmentDayUsed"`
-	PartHeavyClickCount    map[string]int64 `json:"partHeavyClickCount"`
-	PartRetainedClicks     map[string]int64 `json:"partRetainedClicks"`
-	PartStormComboCount    map[string]int64 `json:"partStormComboCount"`
-	CritCount              int64            `json:"critCount"`
-	FinalCutTriggerCount   int64            `json:"finalCutTriggerCount"`
-	SkinnerParts           map[string]int64 `json:"skinnerParts"`
-	NormalTriggerCount     int64            `json:"normalTriggerCount"`
-	ArmorTriggerCount       int64            `json:"armorTriggerCount"`
-	JudgmentDayTriggerCount int64            `json:"judgmentDayTriggerCount"`
-	AutoStrikeTriggerCount  int64            `json:"autoStrikeTriggerCount"`
-	AutoStrikeWindowSec    int64            `json:"autoStrikeWindowSec"`
+	OmenStacks              int                         `json:"omenStacks"`
+	Bleeds                  map[string]TalentBleedState `json:"bleeds"`
+	CollapseParts           []int                       `json:"collapseParts"`
+	CollapseEndsAt          int64                       `json:"collapseEndsAt"`
+	CollapseDuration        int64                       `json:"collapseDuration"`
+	DoomMarks               []int                       `json:"doomMarks"`
+	HasTriggeredDoom        bool                        `json:"hasTriggeredDoom"`
+	DoomMarkCumDamage       map[string]int64            `json:"doomMarkCumDamage"`
+	SilverStormRemaining    int                         `json:"silverStormRemaining"`
+	SilverStormEndsAt       int64                       `json:"silverStormEndsAt"`
+	SilverStormActive       bool                        `json:"silverStormActive"`
+	AutoStrikeTargetPart    string                      `json:"autoStrikeTargetPart"`
+	AutoStrikeComboCount    int64                       `json:"autoStrikeComboCount"`
+	AutoStrikeExpiresAt     int64                       `json:"autoStrikeExpiresAt"`
+	LastFinalCutAt          int64                       `json:"lastFinalCutAt"`
+	JudgmentDayUsed         map[string]bool             `json:"judgmentDayUsed"`
+	PartHeavyClickCount     map[string]int64            `json:"partHeavyClickCount"`
+	PartRetainedClicks      map[string]int64            `json:"partRetainedClicks"`
+	PartStormComboCount     map[string]int64            `json:"partStormComboCount"`
+	SkinnerParts            map[string]int64            `json:"skinnerParts"`
+	SkinnerDurationByPart   map[string]int64            `json:"skinnerDurationByPart"`
+	SkinnerCooldownEndsAt   int64                       `json:"skinnerCooldownEndsAt"`
+	SkinnerCooldownDuration int64                       `json:"skinnerCooldownDuration"`
+	NormalTriggerCount      int64                       `json:"normalTriggerCount"`
+	ArmorTriggerCount       int64                       `json:"armorTriggerCount"`
+	JudgmentDayTriggerCount int64                       `json:"judgmentDayTriggerCount"`
+	AutoStrikeTriggerCount  int64                       `json:"autoStrikeTriggerCount"`
+	AutoStrikeWindowSec     int64                       `json:"autoStrikeWindowSec"`
 }
 
 // NewTalentCombatState 创建空天赋战斗状态。
 func NewTalentCombatState() *TalentCombatState {
 	return &TalentCombatState{
-		JudgmentDayUsed:     make(map[string]bool),
-		PartHeavyClickCount: make(map[string]int64),
-		PartStormComboCount: make(map[string]int64),
-		PartRetainedClicks:  make(map[string]int64),
-		DoomMarkCumDamage:   make(map[string]int64),
-		SkinnerParts:        make(map[string]int64),
+		Bleeds:                make(map[string]TalentBleedState),
+		JudgmentDayUsed:       make(map[string]bool),
+		PartHeavyClickCount:   make(map[string]int64),
+		PartStormComboCount:   make(map[string]int64),
+		PartRetainedClicks:    make(map[string]int64),
+		DoomMarkCumDamage:     make(map[string]int64),
+		SkinnerParts:          make(map[string]int64),
+		SkinnerDurationByPart: make(map[string]int64),
 	}
 }
 
@@ -1299,8 +1310,14 @@ func (s *Store) GetTalentCombatState(ctx context.Context, nickname, bossID strin
 	if state.PartRetainedClicks == nil {
 		state.PartRetainedClicks = make(map[string]int64)
 	}
+	if state.Bleeds == nil {
+		state.Bleeds = make(map[string]TalentBleedState)
+	}
 	if state.SkinnerParts == nil {
 		state.SkinnerParts = make(map[string]int64)
+	}
+	if state.SkinnerDurationByPart == nil {
+		state.SkinnerDurationByPart = make(map[string]int64)
 	}
 	if state.DoomMarkCumDamage == nil {
 		state.DoomMarkCumDamage = make(map[string]int64)
@@ -1351,6 +1368,13 @@ func (s *Store) ConsumeOmenStacks(ctx context.Context, nickname, bossID string, 
 // TalentPartKey 生成部位标识 key。
 func TalentPartKey(x, y int) string {
 	return fmt.Sprintf("%d-%d", x, y)
+}
+
+func ParseTalentPartKey(key string) (x int, y int, ok bool) {
+	if _, err := fmt.Sscanf(key, "%d-%d", &x, &y); err != nil {
+		return 0, 0, false
+	}
+	return x, y, true
 }
 
 func applyOmenStackDelta(current, delta int) (next int, overflow int) {

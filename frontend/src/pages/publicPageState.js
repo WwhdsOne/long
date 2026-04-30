@@ -139,18 +139,19 @@ const liveConnected = ref(false)
 function defaultTalentVisualState() {
   return {
     omenStacks: 0,
+    omenCap: 150,
     silverStormActive: false,
     silverStormRemaining: 0,
     silverStormEndsAt: 0,
     silverStormDuration: 0,
-    deathEcstasyActive: false,
     skinnerDurationByPart: {},
+    skinnerCooldownEndsAt: 0,
+    skinnerCooldownDuration: 0,
     collapsePartKeys: [],
     collapseEndsAt: 0,
     collapseDuration: 8,
     doomMarks: [],
     doomMarkCumDamage: {},
-    finalCutCooldown: 0,
   }
 }
 
@@ -313,6 +314,7 @@ const partStatusList = computed(() => {
   const cs = talentCombatState.value
   if (!Array.isArray(parts) || parts.length === 0) return []
   const skinnerMap = cs?.skinnerParts || {}
+  const bleedMap = cs?.bleeds && typeof cs.bleeds === 'object' ? cs.bleeds : {}
   const nowSec = Date.now() / 1000
   const nowMs = Date.now()
   const result = []
@@ -323,6 +325,9 @@ const partStatusList = computed(() => {
   const collapseRemainingSec = collapseEndsAt > nowSec ? Math.max(0, Math.ceil(collapseEndsAt - nowSec)) : 0
   const collapseRemainingMs = collapseEndsAt > nowSec ? Math.max(0, collapseEndsAt * 1000 - nowMs) : 0
   const collapseDurationSec = Math.max(0, Number(talentVisualState.value?.collapseDuration) || 0)
+  const doomMarkKeys = Array.isArray(talentVisualState.value?.doomMarks)
+    ? talentVisualState.value.doomMarks
+    : []
   for (const part of parts) {
     if (!part.alive) continue
     const key = `${part.x}-${part.y}`
@@ -337,6 +342,24 @@ const partStatusList = computed(() => {
         remainingSec: collapseRemainingSec,
         progress: collapseDurationSec > 0
           ? Math.min(100, Math.max(0, (collapseRemainingMs / (collapseDurationSec * 1000)) * 100))
+          : 0,
+      })
+    }
+    const bleedState = bleedMap[key]
+    const bleedEndsAt = Number(bleedState?.endsAt) || 0
+    if (bleedEndsAt > nowSec) {
+      const bleedDurationSec = Math.max(0, Number(bleedState?.duration) || 0)
+      const bleedRemainingMs = Math.max(0, bleedEndsAt * 1000 - nowMs)
+      result.push({
+        key: `${key}:bleed`,
+        partKey: key,
+        name: part.displayName || partTypeLabel(part.type),
+        type: part.type,
+        statusKey: 'bleed',
+        statusLabel: '致命出血',
+        remainingSec: Math.max(0, Math.ceil(bleedEndsAt - nowSec)),
+        progress: bleedDurationSec > 0
+          ? Math.min(100, Math.max(0, (bleedRemainingMs / (bleedDurationSec * 1000)) * 100))
           : 0,
       })
     }
@@ -355,6 +378,24 @@ const partStatusList = computed(() => {
       progress: durationSec > 0
         ? Math.min(100, Math.max(0, (remainingMs / (durationSec * 1000)) * 100))
         : 0,
+    })
+  }
+  for (const part of parts) {
+    if (!part.alive) continue
+    const key = `${part.x}-${part.y}`
+    if (!doomMarkKeys.includes(key)) continue
+    result.push({
+      key: `${key}:doom-mark`,
+      partKey: key,
+      name: part.displayName || partTypeLabel(part.type),
+      type: part.type,
+      statusKey: 'doom-mark',
+      statusLabel: '末日审判',
+      statusMeta: '击碎后结算死兆',
+      showCountdown: false,
+      showProgress: false,
+      remainingSec: 0,
+      progress: 0,
     })
   }
   return result
@@ -441,38 +482,57 @@ const globalStatusList = computed(() => {
   })
 
   const omenStacks = Math.max(0, Number(talentVisualState.value?.omenStacks) || 0)
+  const omenCap = Math.max(1, Number(talentVisualState.value?.omenCap) || 150)
+  const skinnerCooldownEndsAt = Math.max(0, Number(talentVisualState.value?.skinnerCooldownEndsAt) || 0)
+  const skinnerCooldownRemaining = skinnerCooldownEndsAt > 0
+    ? Math.max(0, Math.ceil(skinnerCooldownEndsAt - Date.now() / 1000))
+    : 0
+  const skinnerCooldownRemainingMs = skinnerCooldownEndsAt > 0
+    ? Math.max(0, skinnerCooldownEndsAt * 1000 - Date.now())
+    : 0
+  const skinnerCooldownDuration = Math.max(0, Number(talentVisualState.value?.skinnerCooldownDuration) || 0)
+  const skinnerActiveCount = partStatusList.value.filter((status) => status.statusKey === 'skinner').length
+  if (skinnerCooldownRemaining > 0 || skinnerActiveCount > 0) {
+    result.push({
+      key: 'skinner',
+      kind: 'skinner',
+      title: '剥皮',
+      primary: skinnerCooldownRemaining > 0 ? `${skinnerCooldownRemaining}s` : '待命',
+      secondary: skinnerActiveCount > 0 ? `临时弱点 ${skinnerActiveCount} 处` : '暴击触发',
+      hint: skinnerCooldownRemaining > 0 ? '冷却中' : '命中后制造弱点',
+      progress: skinnerCooldownDuration > 0
+        ? Math.min(100, Math.max(0, (skinnerCooldownRemainingMs / (skinnerCooldownDuration * 1000)) * 100))
+        : 0,
+    })
+  }
   if (omenStacks > 0) {
     result.push({
       key: 'omen',
       kind: 'omen',
       title: '死兆',
-      primary: `${omenStacks} / 100`,
+      primary: `${omenStacks} / ${omenCap}`,
       secondary: '',
-      hint: '满层触发死亡狂喜',
-      progress: Math.min(100, Math.max(0, (omenStacks / 100) * 100)),
+      hint: `${omenCap} 层自动触发终末血斩`,
+      progress: Math.min(100, Math.max(0, (omenStacks / omenCap) * 100)),
     })
   }
 
-  const finalCutTriggerCount = Math.max(1, Number(talentCombatState.value?.finalCutTriggerCount) || 80)
-  const finalCutCritCount = Math.max(0, Number(talentCombatState.value?.critCount) || 0)
   const finalCutLastTriggerAt = Math.max(0, Number(talentCombatState.value?.lastFinalCutAt) || 0)
-  const finalCutCooldownRemaining = finalCutLastTriggerAt > 0
-    ? Math.max(0, Math.ceil(finalCutLastTriggerAt + 30 - Date.now() / 1000))
+  const finalCutRecentWindowSec = 3
+  const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0
+    ? Math.max(0, Math.ceil(finalCutLastTriggerAt + finalCutRecentWindowSec - Date.now() / 1000))
     : 0
-  const finalCutCooldownRemainingMs = finalCutLastTriggerAt > 0
-    ? Math.max(0, (finalCutLastTriggerAt + 30) * 1000 - Date.now())
-    : 0
-  if (finalCutCooldownRemaining > 0 || finalCutCritCount > 0) {
+  if (omenStacks > 0 || finalCutRecentlyTriggered > 0) {
     result.push({
       key: 'final-cut',
       kind: 'final_cut',
       title: '终末血斩',
-      primary: finalCutCooldownRemaining > 0 ? `${finalCutCooldownRemaining}s` : `${finalCutCritCount}`,
-      secondary: finalCutCooldownRemaining > 0 ? '冷却中' : `/ ${finalCutTriggerCount} 暴击`,
-      hint: '',
-      progress: finalCutCooldownRemaining > 0
-        ? Math.min(100, Math.max(0, ((30000 - finalCutCooldownRemainingMs) / 30000) * 100))
-        : Math.min(100, (finalCutCritCount / finalCutTriggerCount) * 100),
+      primary: finalCutRecentlyTriggered > 0 ? `${finalCutRecentlyTriggered}s` : `${Math.max(0, omenCap - omenStacks)}`,
+      secondary: finalCutRecentlyTriggered > 0 ? '刚触发' : '距自动触发剩余层数',
+      hint: finalCutRecentlyTriggered > 0 ? '' : `${omenCap} 层自动引爆`,
+      progress: finalCutRecentlyTriggered > 0
+        ? Math.min(100, Math.max(0, (finalCutRecentlyTriggered / finalCutRecentWindowSec) * 100))
+        : Math.min(100, Math.max(0, (omenStacks / omenCap) * 100)),
     })
   }
 
@@ -1438,6 +1498,7 @@ function applyTalentCombatState(state) {
   talentCombatState.value = state
   const vs = talentVisualState.value
   vs.omenStacks = Number(state.omenStacks) || 0
+  vs.omenCap = 150
 
   const prevSilverStormEndsAt = Number(vs.silverStormEndsAt) || 0
   const prevSilverStormActive = Boolean(vs.silverStormActive)
@@ -1453,21 +1514,21 @@ function applyTalentCombatState(state) {
         : Math.max(Number(vs.silverStormDuration) || 0, Number(state.silverStormRemaining) || 0, vs.silverStormRemaining))
     : 0
 
-  vs.deathEcstasyActive = Boolean(state.deathEcstasyActive)
+  vs.skinnerCooldownEndsAt = Number(state.skinnerCooldownEndsAt) || 0
+  vs.skinnerCooldownDuration = Number(state.skinnerCooldownDuration) || 0
   const skinnerParts = state.skinnerParts && typeof state.skinnerParts === 'object' ? state.skinnerParts : {}
+  const skinnerDurationByPart = state.skinnerDurationByPart && typeof state.skinnerDurationByPart === 'object'
+    ? state.skinnerDurationByPart
+    : {}
   const nextSkinnerDurationByPart = {}
   const nowSec = Date.now() / 1000
   for (const [partKey, endsAtRaw] of Object.entries(skinnerParts)) {
     const endsAt = Number(endsAtRaw) || 0
     if (endsAt <= nowSec) continue
-    const remainingSec = Math.max(0, Math.ceil(endsAt - nowSec))
-    nextSkinnerDurationByPart[partKey] = Math.max(
-      Number(vs.skinnerDurationByPart?.[partKey]) || 0,
-      remainingSec,
-    )
+    nextSkinnerDurationByPart[partKey] = Math.max(0, Number(skinnerDurationByPart[partKey]) || 0)
   }
   vs.skinnerDurationByPart = nextSkinnerDurationByPart
-	  vs.doomMarkCumDamage = state.doomMarkCumDamage || {}
+  vs.doomMarkCumDamage = state.doomMarkCumDamage || {}
 
   // doomMarks: indices → "x-y" keys
   vs.doomMarks = Array.isArray(state.doomMarks)
@@ -1489,14 +1550,8 @@ function applyTalentVisualState(events) {
             case 'storm_combo':
                 onStormComboTrigger()
                 break
-            case 'storm_combo':
-                onStormComboTrigger()
-                break
             case 'silver_storm':
                 onStormComboTrigger()
-                break
-            case 'death_ecstasy_ult':
-                vs.deathEcstasyActive = true
                 break
             case 'collapse_trigger':
                 onArmorTrigger()
@@ -1507,7 +1562,7 @@ function applyTalentVisualState(events) {
                     }
                 }
                 break
-            case 'doom_judgment':
+            case 'doom_mark':
                 break
             case 'auto_strike':
             case 'bleed':

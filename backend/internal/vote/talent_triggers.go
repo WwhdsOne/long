@@ -22,6 +22,7 @@ type talentTriggerContext struct {
 	totalExtra         int64
 	events             []TalentTriggerEvent
 	damageTypeOverride string
+	roll               func(int) int
 }
 
 func (c *CompiledTalentSet) buildTriggerHandlers() ([]compiledTalentTrigger, []string) {
@@ -45,7 +46,6 @@ func (c *CompiledTalentSet) buildTriggerHandlers() ([]compiledTalentTrigger, []s
 	appendTrigger(c.Has("armor_ultimate"), "armor_ultimate", applyArmorUltimateTrigger)
 	appendTrigger(c.Has("crit_bleed"), "crit_bleed", applyCritBleedTrigger)
 	appendTrigger(c.Has("crit_final_cut"), "crit_final_cut", applyCritFinalCutTrigger)
-	appendTrigger(c.Has("crit_death_ecstasy"), "crit_death_ecstasy", applyCritDeathEcstasyTrigger)
 	appendTrigger(c.Has("crit_doom_judgment"), "crit_doom_judgment", applyCritDoomJudgmentTrigger)
 
 	return handlers, names
@@ -196,66 +196,52 @@ func applyCritBleedTrigger(tc *talentTriggerContext) {
 	if !tc.isCritical {
 		return
 	}
+	if !tc.part.Alive || tc.compiledTalents.Crit.BleedDuration <= 0 {
+		return
+	}
 	if bd := int64(float64(tc.baseDamage) * tc.compiledTalents.Crit.BleedRatio); bd > 0 {
-		tc.totalExtra += bd
+		partKey := TalentPartKey(tc.part.X, tc.part.Y)
+		tc.combatState.Bleeds[partKey] = TalentBleedState{
+			StartedAt:   tc.now,
+			EndsAt:      tc.now + tc.compiledTalents.Crit.BleedDuration,
+			Duration:    tc.compiledTalents.Crit.BleedDuration,
+			TotalDamage: bd,
+		}
 		tc.events = append(tc.events, TalentTriggerEvent{
 			TalentID: "crit_bleed", Name: "致命出血", EffectType: "bleed",
-			ExtraDamage: bd, Message: "致命出血",
-			PartX: tc.part.X, PartY: tc.part.Y,
+			Message: "致命出血（持续3秒）",
+			PartX:   tc.part.X, PartY: tc.part.Y,
 		})
 	}
 }
 
 func applyCritFinalCutTrigger(tc *talentTriggerContext) {
-	if !tc.isCritical {
+	if tc.compiledTalents.Crit.FinalCutOmenTrigger <= 0 || tc.compiledTalents.Crit.FinalCutDamageRatio <= 0 {
 		return
 	}
-
-	if tc.now-tc.combatState.LastFinalCutAt < 30 {
+	if tc.combatState.OmenStacks < tc.compiledTalents.Crit.FinalCutOmenTrigger || !tc.part.Alive {
 		return
 	}
-
-	tc.combatState.CritCount++
-	triggerCount := tc.compiledTalents.Crit.FinalCutTrigger
-	hpCut := tc.compiledTalents.Crit.FinalCutHpCut
-	if tc.combatState.CritCount < triggerCount {
-		return
-	}
-
-	tc.combatState.CritCount = 0
+	tc.combatState.OmenStacks = 0
 	tc.combatState.LastFinalCutAt = tc.now
-	cd := min(int64(float64(tc.boss.MaxHP)*hpCut), tc.part.CurrentHP)
-	_, cd, _ = applyBossPartDamageDelta(tc.boss, tc.part, cd)
-	tc.totalExtra += cd
+	cd := min(int64(float64(maxInt64(1, tc.baseDamage))*tc.compiledTalents.Crit.FinalCutDamageRatio), tc.part.CurrentHP)
+	_, actualDamage, _ := applyBossPartDamageDelta(tc.boss, tc.part, cd)
+	tc.totalExtra += actualDamage
 	tc.events = append(tc.events, TalentTriggerEvent{
 		TalentID: "crit_final_cut", Name: "终末血斩！", EffectType: "final_cut",
-		ExtraDamage: cd, Message: "终末血斩！",
-		PartX: tc.part.X, PartY: tc.part.Y,
-	})
-	tc.damageTypeOverride = "doomsday"
-}
-
-func applyCritDeathEcstasyTrigger(tc *talentTriggerContext) {
-	if tc.combatState.OmenStacks < 100 || tc.compiledTalents.Crit.DeathEcstasyMult <= 0 {
-		return
-	}
-
-	consumed := min(tc.combatState.OmenStacks, 100)
-	tc.combatState.OmenStacks -= consumed
-
-	effStacks := min(consumed, 100)
-	ed := min(int64(float64(tc.baseDamage)*float64(effStacks)*tc.compiledTalents.Crit.DeathEcstasyMult), tc.part.CurrentHP)
-	_, ed, _ = applyBossPartDamageDelta(tc.boss, tc.part, ed)
-	tc.totalExtra += ed
-	tc.events = append(tc.events, TalentTriggerEvent{
-		TalentID: "crit_death_ecstasy", Name: "死亡狂喜", EffectType: "death_ecstasy_ult",
-		ExtraDamage: ed, Message: "死亡狂喜！",
+		ExtraDamage: actualDamage, Message: "终末血斩！",
 		PartX: tc.part.X, PartY: tc.part.Y,
 	})
 	tc.damageTypeOverride = "doomsday"
 }
 
 func applyCritDoomJudgmentTrigger(tc *talentTriggerContext) {
+	if !tc.combatState.HasTriggeredDoom && tc.compiledTalents.Crit.DoomMarkCount > 0 {
+		if tc.boss.CurrentHP <= int64(float64(maxInt64(1, tc.boss.MaxHP))*tc.compiledTalents.Crit.DoomMarkThreshold) {
+			tc.combatState.DoomMarks = randomMarkIndices(len(tc.boss.Parts), min(tc.compiledTalents.Crit.DoomMarkCount, len(tc.boss.Parts)), tc.roll)
+			tc.combatState.HasTriggeredDoom = true
+		}
+	}
 	if tc.part.Alive || len(tc.combatState.DoomMarks) == 0 {
 		return
 	}
@@ -270,6 +256,9 @@ func applyCritDoomJudgmentTrigger(tc *talentTriggerContext) {
 			TalentID: "crit_doom_judgment", Name: "末日审判", EffectType: "doom_mark",
 			Message: fmt.Sprintf("标记触发！+%d 死兆", omenReward),
 			PartX:   tc.part.X, PartY: tc.part.Y,
+		})
+		tc.combatState.DoomMarks = slices.DeleteFunc(tc.combatState.DoomMarks, func(marked int) bool {
+			return marked == tc.partIndex
 		})
 		tc.damageTypeOverride = "doomsday"
 		return

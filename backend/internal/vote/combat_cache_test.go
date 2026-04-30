@@ -192,11 +192,11 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 	if compiled.Crit.SkinnerChance != critSkinnerChanceForLevel(4) {
 		t.Fatalf("expected skinner chance %.2f, got %.2f", critSkinnerChanceForLevel(4), compiled.Crit.SkinnerChance)
 	}
-	if compiled.Crit.FinalCutTrigger != int64(critFinalCutCountForLevel(1)) {
-		t.Fatalf("expected final cut trigger %d, got %d", critFinalCutCountForLevel(1), compiled.Crit.FinalCutTrigger)
+	if compiled.Crit.FinalCutOmenTrigger != critFinalCutOmenTriggerForLevel(1) {
+		t.Fatalf("expected final cut omen trigger %d, got %d", critFinalCutOmenTriggerForLevel(1), compiled.Crit.FinalCutOmenTrigger)
 	}
-	if compiled.Crit.DeathEcstasyMult != critDeathEcstasyMultForLevel(5)+2 {
-		t.Fatalf("expected death ecstasy mult %.2f, got %.2f", critDeathEcstasyMultForLevel(5)+2, compiled.Crit.DeathEcstasyMult)
+	if compiled.Crit.WeakspotInsightMult != critWeakspotInsightMultiplierForLevel(5) {
+		t.Fatalf("expected weakspot insight mult %.2f, got %.2f", critWeakspotInsightMultiplierForLevel(5), compiled.Crit.WeakspotInsightMult)
 	}
 	if compiled.Crit.DoomMarkCount != critDoomMarkCountForLevel(2) {
 		t.Fatalf("expected doom mark count %d, got %d", critDoomMarkCountForLevel(2), compiled.Crit.DoomMarkCount)

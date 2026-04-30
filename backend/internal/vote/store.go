@@ -1477,40 +1477,29 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if critical && compiledTalents.Has("crit_core") && combatState.OmenStacks > 0 {
 		partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*compiledTalents.Crit.OmenResonatePerOmen))
 	}
+	if critical && effectivePartType == PartTypeWeak && compiledTalents.Crit.WeakspotInsightMult > 1 {
+		partDamage = int64(float64(partDamage) * compiledTalents.Crit.WeakspotInsightMult)
+	}
 
 	// 死兆收割被动：根据死兆层数档位提供增伤（不消耗层数）
-	if compiledTalents.Has("crit_omen_reap") && combatState.OmenStacks >= 30 {
-		def, ok := talentDefs["crit_omen_reap"]
-		if ok {
-			val, _ := def.EffectValue.(map[string]any)
-			thresholds, _ := val["thresholds"].([]float64)
-			damageMults, _ := val["damageMult"].([]float64)
-			if thresholds != nil && damageMults != nil && len(thresholds) == len(damageMults) {
-				var reapMult float64 = 1.0
-				for i := len(thresholds) - 1; i >= 0; i-- {
-					if float64(combatState.OmenStacks) >= thresholds[i] {
-						reapMult = damageMults[i]
-						break
-					}
-				}
-				if reapMult > 1.0 {
-					partDamage = int64(float64(partDamage) * reapMult)
-				}
+	if compiledTalents.Has("crit_omen_reap") && len(compiledTalents.Crit.OmenReapThresholds) > 0 {
+		reapMult := 1.0
+		for i := len(compiledTalents.Crit.OmenReapThresholds) - 1; i >= 0; i-- {
+			if combatState.OmenStacks >= compiledTalents.Crit.OmenReapThresholds[i] {
+				reapMult = compiledTalents.Crit.OmenReapDamageMults[i]
+				break
 			}
+		}
+		if reapMult > 1.0 {
+			partDamage = int64(float64(partDamage) * reapMult)
 		}
 	}
 
 	partWasAlive := part.CurrentHP > 0
 	omenGain := 0
 	if compiledTalents.Has("crit_core") {
-		if critical {
-			omenGain = 1
-			if effectivePartType == PartTypeWeak && partWasAlive {
-				omenGain = 2
-			}
-		}
-		if partDamage >= part.CurrentHP {
-			omenGain += 5
+		if critical && effectivePartType == PartTypeWeak && partWasAlive {
+			omenGain = compiledTalents.Crit.OmenPerWeakCrit
 		}
 	}
 	beforeHP, actualDamage, _ := applyBossPartDamageDelta(boss, part, partDamage)
@@ -1520,9 +1509,28 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		combatState.OmenStacks, _ = applyOmenStackDelta(combatState.OmenStacks, omenGain)
 	}
 
-	if critical && part.Type != PartTypeWeak && effectivePartType != PartTypeWeak && compiledTalents.Has("crit_skinner") {
-		if s.roll != nil && s.roll(100) < int(math.Round(compiledTalents.Crit.SkinnerChance*100)) {
-			combatState.SkinnerParts[partKey] = now + compiledTalents.Crit.SkinnerDuration
+	if critical && compiledTalents.Has("crit_skinner") && now >= combatState.SkinnerCooldownEndsAt {
+		var candidates []BossPart
+		for _, candidate := range boss.Parts {
+			if !candidate.Alive || candidate.Type == PartTypeWeak {
+				continue
+			}
+			candidateKey := TalentPartKey(candidate.X, candidate.Y)
+			if endsAt, ok := combatState.SkinnerParts[candidateKey]; ok && endsAt > now {
+				continue
+			}
+			candidates = append(candidates, candidate)
+		}
+		if len(candidates) > 0 && (s.roll == nil || s.roll(100) < int(math.Round(compiledTalents.Crit.SkinnerChance*100))) {
+			target := candidates[0]
+			if s.roll != nil && len(candidates) > 1 {
+				target = candidates[s.roll(len(candidates))]
+			}
+			targetKey := TalentPartKey(target.X, target.Y)
+			combatState.SkinnerParts[targetKey] = now + compiledTalents.Crit.SkinnerDuration
+			combatState.SkinnerDurationByPart[targetKey] = compiledTalents.Crit.SkinnerDuration
+			combatState.SkinnerCooldownEndsAt = now + compiledTalents.Crit.SkinnerCooldown
+			combatState.SkinnerCooldownDuration = compiledTalents.Crit.SkinnerCooldown
 		}
 	}
 
@@ -1535,6 +1543,13 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		AfterHP:  part.CurrentHP,
 		PartType: string(part.Type),
 	})
+
+	bleedDamage, bleedEvents, bleedDeltas := applyTalentBleedDamage(boss, combatState, now)
+	if bleedDamage > 0 {
+		totalDamage += bleedDamage
+		result.PartStateDeltas = append(result.PartStateDeltas, bleedDeltas...)
+		result.TalentEvents = append(result.TalentEvents, bleedEvents...)
+	}
 
 	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, compiledTalents, combatState, now)
 	if extraDamage > 0 {
@@ -1592,10 +1607,6 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		})
 	}
 
-	if compiledTalents.Has("crit_doom_judgment") && len(combatState.DoomMarks) == 0 && len(boss.Parts) >= 2 {
-		combatState.DoomMarks = randomMarkIndices(len(boss.Parts), min(compiledTalents.Crit.DoomMarkCount, len(boss.Parts)), s.roll)
-	}
-
 	result.BossDamage = totalDamage
 	result.Critical = critical
 	isCollapsed := slices.Contains(combatState.CollapseParts, targetIdx)
@@ -1614,9 +1625,6 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	// 计算动态触发阈值（受天赋影响）
 	if compiledTalents.Has("normal_core") {
 		combatState.NormalTriggerCount = compiledTalents.Normal.TriggerCount
-	}
-	if compiledTalents.Has("crit_final_cut") {
-		combatState.FinalCutTriggerCount = compiledTalents.Crit.FinalCutTrigger
 	}
 	if compiledTalents.Has("armor_core") {
 		combatState.ArmorTriggerCount = compiledTalents.Armor.CollapseTrigger
@@ -1695,6 +1703,85 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	return result, nil
 }
 
+func applyTalentBleedDamage(boss *Boss, combatState *TalentCombatState, now int64) (int64, []TalentTriggerEvent, []BossPartStateDelta) {
+	if boss == nil || combatState == nil || len(combatState.Bleeds) == 0 {
+		return 0, nil, nil
+	}
+
+	totalDamage := int64(0)
+	var events []TalentTriggerEvent
+	var deltas []BossPartStateDelta
+	for partKey, bleed := range combatState.Bleeds {
+		if bleed.Duration <= 0 || bleed.TotalDamage <= 0 || bleed.EndsAt <= bleed.StartedAt {
+			delete(combatState.Bleeds, partKey)
+			continue
+		}
+
+		partX, partY, ok := ParseTalentPartKey(partKey)
+		if !ok {
+			delete(combatState.Bleeds, partKey)
+			continue
+		}
+
+		var part *BossPart
+		for i := range boss.Parts {
+			if boss.Parts[i].X == partX && boss.Parts[i].Y == partY {
+				part = &boss.Parts[i]
+				break
+			}
+		}
+		if part == nil || !part.Alive || part.CurrentHP <= 0 {
+			delete(combatState.Bleeds, partKey)
+			continue
+		}
+
+		elapsed := min(now, bleed.EndsAt) - bleed.StartedAt
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		dueDamage := int64(float64(bleed.TotalDamage) * (float64(elapsed) / float64(maxInt64(1, bleed.Duration))))
+		if now >= bleed.EndsAt {
+			dueDamage = bleed.TotalDamage
+		}
+		if dueDamage < bleed.AppliedDamage {
+			dueDamage = bleed.AppliedDamage
+		}
+
+		pendingDamage := dueDamage - bleed.AppliedDamage
+		if pendingDamage > 0 {
+			beforeHP, actualDamage, _ := applyBossPartDamageDelta(boss, part, pendingDamage)
+			if actualDamage > 0 {
+				totalDamage += actualDamage
+				deltas = append(deltas, BossPartStateDelta{
+					X:        part.X,
+					Y:        part.Y,
+					Damage:   actualDamage,
+					BeforeHP: beforeHP,
+					AfterHP:  part.CurrentHP,
+					PartType: string(part.Type),
+				})
+				events = append(events, TalentTriggerEvent{
+					TalentID:    "crit_bleed",
+					Name:        "致命出血",
+					EffectType:  "bleed",
+					ExtraDamage: actualDamage,
+					Message:     "出血结算",
+					PartX:       part.X,
+					PartY:       part.Y,
+				})
+			}
+		}
+
+		bleed.AppliedDamage = dueDamage
+		if now >= bleed.EndsAt || !part.Alive || bleed.AppliedDamage >= bleed.TotalDamage {
+			delete(combatState.Bleeds, partKey)
+			continue
+		}
+		combatState.Bleeds[partKey] = bleed
+	}
+	return totalDamage, events, deltas
+}
+
 func applyComboDamageAmplify(baseDamage int64, comboCount int64) int64 {
 	if baseDamage <= 0 {
 		return baseDamage
@@ -1748,6 +1835,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		compiledTalents: compiledTalents,
 		combatState:     combatState,
 		now:             now,
+		roll:            s.roll,
 	}
 	for _, trigger := range compiledTalents.triggers {
 		trigger(triggerCtx)

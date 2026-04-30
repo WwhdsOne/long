@@ -1600,7 +1600,7 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 	}
 }
 
-func TestCritFinalCutRequiresRestackingAfterCooldown(t *testing.T) {
+func TestCritFinalCutTriggersAtOmenCap(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -1628,54 +1628,41 @@ func TestCritFinalCutRequiresRestackingAfterCooldown(t *testing.T) {
 		Name:  "终末血斩测试Boss",
 		MaxHP: 100000,
 		Parts: []BossPart{
-			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100000, CurrentHP: 100000, Alive: true},
+			{X: 0, Y: 0, Type: PartTypeWeak, MaxHP: 100000, CurrentHP: 100000, Alive: true},
 		},
 	}); err != nil {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	triggerCount := critFinalCutCountForLevel(1)
+	combatState := NewTalentCombatState()
+	combatState.OmenStacks = critFinalCutOmenTriggerForLevel(1)
+	if err := store.SaveTalentCombatState(ctx, nickname, "final-cut-restack-test", combatState); err != nil {
+		t.Fatalf("seed combat state: %v", err)
+	}
 	var firstFinalCut *TalentTriggerEvent
-	for i := 1; i <= triggerCount; i++ {
-		result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
-		if err != nil {
-			t.Fatalf("click %d: %v", i, err)
-		}
-		for _, ev := range result.TalentEvents {
-			if ev.TalentID == "crit_final_cut" {
-				firstFinalCut = &ev
-				break
-			}
-		}
-	}
-	if firstFinalCut == nil {
-		t.Fatalf("expected first final cut to trigger after %d crits", triggerCount)
-	}
-
-	currentTime = currentTime.Add(31 * time.Second)
 	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
 	if err != nil {
-		t.Fatalf("click after cooldown: %v", err)
+		t.Fatalf("click: %v", err)
 	}
 	for _, ev := range result.TalentEvents {
 		if ev.TalentID == "crit_final_cut" {
-			t.Fatalf("expected final cut to require restacking after cooldown, got %+v", ev)
+			firstFinalCut = &ev
+			break
 		}
 	}
-
-	combatState, err := store.GetTalentCombatState(ctx, nickname, "final-cut-restack-test")
+	if firstFinalCut == nil {
+		t.Fatalf("expected final cut to trigger at omen cap")
+	}
+	combatState, err = store.GetTalentCombatState(ctx, nickname, "final-cut-restack-test")
 	if err != nil {
 		t.Fatalf("get combat state: %v", err)
 	}
-	if combatState.FinalCutTriggerCount != int64(critFinalCutCountForLevel(1)) {
-		t.Fatalf("expected final cut trigger count %d, got %d", critFinalCutCountForLevel(1), combatState.FinalCutTriggerCount)
-	}
-	if combatState.CritCount != 1 {
-		t.Fatalf("expected crit count to restart from 1 after trigger, got %d", combatState.CritCount)
+	if combatState.OmenStacks != 0 {
+		t.Fatalf("expected omen stacks reset to 0 after final cut, got %d", combatState.OmenStacks)
 	}
 }
 
-func TestCritFinalCutDoesNotAccumulateDuringCooldown(t *testing.T) {
+func TestCritFinalCutDoesNotTriggerBelowOmenCap(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
 
@@ -1703,30 +1690,127 @@ func TestCritFinalCutDoesNotAccumulateDuringCooldown(t *testing.T) {
 		Name:  "终末血斩冷却Boss",
 		MaxHP: 100000,
 		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeWeak, MaxHP: 100000, CurrentHP: 100000, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	combatState := NewTalentCombatState()
+	combatState.OmenStacks = critFinalCutOmenTriggerForLevel(1) - 2
+	if err := store.SaveTalentCombatState(ctx, nickname, "final-cut-cooldown-test", combatState); err != nil {
+		t.Fatalf("seed combat state: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("click below omen cap: %v", err)
+	}
+	for _, ev := range result.TalentEvents {
+		if ev.TalentID == "crit_final_cut" {
+			t.Fatalf("expected final cut not to trigger below omen cap, got %+v", ev)
+		}
+	}
+
+	combatState, err = store.GetTalentCombatState(ctx, nickname, "final-cut-cooldown-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if combatState.OmenStacks != critFinalCutOmenTriggerForLevel(1)-2 {
+		t.Fatalf("expected omen stacks stay at %d below trigger, got %d", critFinalCutOmenTriggerForLevel(1)-2, combatState.OmenStacks)
+	}
+}
+
+func TestCritBleedSettlesOverDurationAndExpires(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	currentTime := time.Unix(1_700_420_000, 0)
+	store.now = func() time.Time { return currentTime }
+	store.critical.CriticalChancePercent = 100
+	store.critical.CriticalCount = 5
+	store.roll = func(limit int) int { return 0 }
+
+	ctx := context.Background()
+	nickname := "致命出血测试"
+
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"crit_bleed": 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed crit_bleed state: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "crit-bleed-test",
+		Name:  "致命出血Boss",
+		MaxHP: 100000,
+		Parts: []BossPart{
 			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100000, CurrentHP: 100000, Alive: true},
 		},
 	}); err != nil {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	triggerCount := critFinalCutCountForLevel(1)
-	for i := 1; i <= triggerCount; i++ {
-		if _, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname); err != nil {
-			t.Fatalf("click %d: %v", i, err)
+	first, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("first click: %v", err)
+	}
+	if !first.Critical {
+		t.Fatalf("expected first click to crit and挂出血, got %+v", first)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "crit-bleed-test")
+	if err != nil {
+		t.Fatalf("get combat state after first click: %v", err)
+	}
+	bleedState, ok := combatState.Bleeds[TalentPartKey(0, 0)]
+	if !ok {
+		t.Fatalf("expected bleed state after first click, got %+v", combatState)
+	}
+	if bleedState.Duration != critBleedDurationForLevel(5) {
+		t.Fatalf("expected bleed duration %d, got %+v", critBleedDurationForLevel(5), bleedState)
+	}
+	if bleedState.TotalDamage <= 0 {
+		t.Fatalf("expected bleed total damage > 0, got %+v", bleedState)
+	}
+
+	store.critical.CriticalChancePercent = 0
+	store.critical.CriticalCount = 0
+	store.roll = func(limit int) int { return maxInt(0, limit-1) }
+	store.invalidateCombatStatsCache(nickname)
+
+	currentTime = currentTime.Add(2 * time.Second)
+	second, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("second click: %v", err)
+	}
+
+	currentTime = currentTime.Add(2 * time.Second)
+	third, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("third click: %v", err)
+	}
+
+	bleedDamage := int64(0)
+	for _, ev := range append(second.TalentEvents, third.TalentEvents...) {
+		if ev.TalentID == "crit_bleed" && ev.ExtraDamage > 0 {
+			bleedDamage += ev.ExtraDamage
 		}
 	}
-
-	currentTime = currentTime.Add(10 * time.Second)
-	if _, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname); err != nil {
-		t.Fatalf("click during cooldown: %v", err)
+	if bleedDamage != bleedState.TotalDamage {
+		t.Fatalf("expected bleed settlement %d, got %d", bleedState.TotalDamage, bleedDamage)
 	}
 
-	combatState, err := store.GetTalentCombatState(ctx, nickname, "final-cut-cooldown-test")
+	combatState, err = store.GetTalentCombatState(ctx, nickname, "crit-bleed-test")
 	if err != nil {
-		t.Fatalf("get combat state: %v", err)
+		t.Fatalf("get combat state after bleed expire: %v", err)
 	}
-	if combatState.CritCount != 0 {
-		t.Fatalf("expected crit count stay at 0 during cooldown, got %d", combatState.CritCount)
+	if _, ok := combatState.Bleeds[TalentPartKey(0, 0)]; ok {
+		t.Fatalf("expected bleed state to expire, got %+v", combatState.Bleeds)
 	}
 }
 

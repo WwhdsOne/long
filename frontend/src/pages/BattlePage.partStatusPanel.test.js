@@ -11,19 +11,24 @@ const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8
 const docsPath = path.resolve(currentDir, '../../../docs/developer-reference/2026-04-29-BattlePage部位状态面板复用说明.md')
 
 describe('BattlePage 部位状态面板', () => {
-  it('左侧新增可复用的部位状态面板，并接入剥皮与护甲崩塌状态', () => {
+  it('左侧新增可复用的部位状态面板，并接入剥皮、出血、护甲崩塌与末日标记状态', () => {
     expect(stateSource).toContain('const partStatusList = computed(() => {')
     expect(stateSource).toContain('const skinnerMap = cs?.skinnerParts || {}')
+    expect(stateSource).toContain("statusLabel: '致命出血'")
+    expect(stateSource).toContain('const doomMarkKeys = Array.isArray(talentVisualState.value?.doomMarks)')
     expect(stateSource).toContain("statusKey: 'collapse'")
     expect(stateSource).toContain("statusLabel: '护甲崩塌'")
     expect(stateSource).toContain("statusLabel: '剥皮'")
+    expect(stateSource).toContain("statusLabel: '末日审判'")
+    expect(stateSource).toContain("statusMeta: '击碎后结算死兆'")
     expect(stateSource).toContain('remainingSec:')
     expect(stateSource).toContain('progress:')
     expect(battleSource).toContain('partStatusList')
     expect(battleSource).toContain('class="part-status-panel"')
     expect(battleSource).toContain('class="part-status-panel__title">部位状态</div>')
     expect(battleSource).toContain('{{ s.statusLabel }}')
-    expect(battleSource).toContain('{{ s.remainingSec }}s')
+    expect(battleSource).toContain("v-if=\"s.showCountdown !== false\"")
+    expect(battleSource).toContain('statusMeta')
     expect(battleSource).toContain('class="part-status-panel__bar"')
     expect(battleSource).toContain('class="part-status-panel__bar-fill"')
     expect(battleSource).not.toContain('class="collapse-panel"')
@@ -43,6 +48,7 @@ describe('BattlePage 全局状态面板', () => {
   it('左侧全局状态统一走可复用的 status-panel 列表，而不是保留专属卡片模板', () => {
     expect(stateSource).toContain('const globalStatusList = computed(() => {')
     expect(stateSource).toContain("kind: 'combo'")
+    expect(stateSource).toContain("kind: 'skinner'")
     expect(stateSource).toContain("kind: 'omen'")
     expect(stateSource).toContain("kind: 'final_cut'")
     expect(battleSource).toContain('globalStatusList')

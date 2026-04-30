@@ -42,15 +42,14 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain("effectOverlayStyle('auto_strike', { scale: 2.05, fallback:")
     expect(battleSource).toContain("anchor: triggerAnchor('bleed', TALENT_EFFECT_WINDOW_MS, entry)")
     expect(battleSource).toContain("fallback: effectFallback(3.75, { top: '50%', left: '50%' })")
-    expect(battleSource).toContain("effectOverlayStyle('death_ecstasy_ult', { anchor: 'grid', fallback:")
+    expect(battleSource).toContain("effectOverlayStyle('final_cut', { anchor: 'grid', fallback:")
     expect(battleSource).toContain("effectOverlayStyle('collapse_trigger', { scale: 1, fallback:")
   })
 
-  it('终末血斩不再挂覆盖层特效，死亡狂喜改为触发贯穿整个 5x5 战斗区的终末斩击', () => {
-    expect(battleSource).not.toContain("hasRecentTrigger('final_cut')")
+  it('终末血斩改为直接驱动 5x5 战斗区的贯穿终结斩特效', () => {
     expect(battleSource).toContain('const ULTIMATE_EFFECT_WINDOW_MS = 3200')
-    expect(battleSource).toContain("hasRecentTrigger('death_ecstasy_ult', ULTIMATE_EFFECT_WINDOW_MS)")
-    expect(battleSource).toContain("effectOverlayStyle('death_ecstasy_ult', { anchor: 'grid', fallback:")
+    expect(battleSource).toContain("hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)")
+    expect(battleSource).toContain("effectOverlayStyle('final_cut', { anchor: 'grid', fallback:")
     expect(battleSource).toContain("<PixelEffectCanvas effect=\"final_cut\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\" />")
   })
 
@@ -69,7 +68,7 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain("<PixelEffectCanvas effect=\"judgment_day\" :size=\"bossGridEffectSize()\" :loop=\"false\" />")
   })
 
-  it('流血以格子中心为喷发源，死亡狂喜的终结斩回退到更细一版的 5x5 对角重斩', () => {
+  it('流血以格子中心为喷发源，终末血斩的终结斩回退到更细一版的 5x5 对角重斩', () => {
     expect(canvasSource).toContain('const cx = size / 2, cy = size / 2')
     expect(canvasSource).toContain('const startX = -size * 0.32')
     expect(canvasSource).toContain('const endX = size * 1.32')

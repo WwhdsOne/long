@@ -9,15 +9,14 @@ const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 
 const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 
 describe('碎甲重击 HUD', () => {
-  it('终末血斩 HUD 直接读取后端 talentCombatState 的真实计数与冷却时间', () => {
+  it('终末血斩 HUD 改为读取死兆资源态与最近触发状态', () => {
     expect(stateSource).toContain('const globalStatusList = computed(() => {')
     expect(stateSource).toContain("kind: 'final_cut'")
-    expect(stateSource).toContain('const finalCutTriggerCount = Math.max(1, Number(talentCombatState.value?.finalCutTriggerCount) || 80)')
-    expect(stateSource).toContain('const finalCutCritCount = Math.max(0, Number(talentCombatState.value?.critCount) || 0)')
     expect(stateSource).toContain('const finalCutLastTriggerAt = Math.max(0, Number(talentCombatState.value?.lastFinalCutAt) || 0)')
-    expect(stateSource).toContain('const finalCutCooldownRemaining = finalCutLastTriggerAt > 0')
-    expect(stateSource).toContain('const finalCutCooldownRemainingMs = finalCutLastTriggerAt > 0')
-    expect(stateSource).toContain('((30000 - finalCutCooldownRemainingMs) / 30000) * 100')
+    expect(stateSource).toContain('const finalCutRecentWindowSec = 3')
+    expect(stateSource).toContain('const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0')
+    expect(stateSource).toContain("secondary: finalCutRecentlyTriggered > 0 ? '刚触发' : '距自动触发剩余层数'")
+    expect(stateSource).toContain("hint: finalCutRecentlyTriggered > 0 ? '' : `${omenCap} 层自动引爆`")
     expect(battleSource).toContain('globalStatusList')
     expect(battleSource).toContain('class="status-panel"')
     expect(battleSource).toContain('status-panel--${status.kind}')

@@ -11,11 +11,13 @@ const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8
 const docsPath = path.resolve(currentDir, '../../../docs/2026-04-29-伤害动画解析优先级.md')
 
 describe('BattlePage 光标与伤害说明', () => {
-  it('死兆改到左侧统一全局状态面板，并按 100 层显示进度', () => {
+  it('死兆改到左侧统一全局状态面板，并按 150 层显示进度', () => {
     expect(stateSource).toContain("kind: 'omen'")
     expect(stateSource).toContain('const omenStacks = Math.max(0, Number(talentVisualState.value?.omenStacks) || 0)')
+    expect(stateSource).toContain('const omenCap = Math.max(1, Number(talentVisualState.value?.omenCap) || 150)')
     expect(stateSource).toContain("title: '死兆'")
-    expect(stateSource).toContain("primary: `${omenStacks} / 100`")
+    expect(stateSource).toContain("primary: `${omenStacks} / ${omenCap}`")
+    expect(stateSource).toContain("hint: `${omenCap} 层自动触发终末血斩`")
     expect(battleSource).toContain('class="status-panel"')
     expect(battleSource).not.toContain('class="talent-omen-ring__svg"')
     expect(styleSource).toContain('background: linear-gradient(180deg, rgba(69, 10, 10, 0.94), rgba(127, 29, 29, 0.82));')
