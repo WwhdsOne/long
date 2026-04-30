@@ -2646,31 +2646,56 @@ func (s *Store) itemInstancesByIDForNickname(ctx context.Context, nickname strin
 		return map[string]ItemInstance{}, nil
 	}
 
-	instances := make(map[string]ItemInstance, len(instanceIDs))
+	filteredIDs := make([]string, 0, len(instanceIDs))
+	pipe := s.client.Pipeline()
+	instanceCmds := make(map[string]*redis.SliceCmd, len(instanceIDs))
 	for _, instanceID := range instanceIDs {
 		instanceID = strings.TrimSpace(instanceID)
 		if instanceID == "" {
 			continue
 		}
-		values, err := s.client.HGetAll(ctx, s.equipmentInstanceKey(instanceID)).Result()
-		if err != nil {
-			return nil, err
-		}
-		if len(values) == 0 {
+		filteredIDs = append(filteredIDs, instanceID)
+		instanceCmds[instanceID] = pipe.HMGet(ctx, s.equipmentInstanceKey(instanceID),
+			"item_id",
+			"enhance_level",
+			"spent_stones",
+			"bound",
+			"locked",
+			"created_at",
+		)
+	}
+	if len(filteredIDs) == 0 {
+		return map[string]ItemInstance{}, nil
+	}
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+		return nil, err
+	}
+
+	instances := make(map[string]ItemInstance, len(instanceIDs))
+	for _, instanceID := range filteredIDs {
+		cmd := instanceCmds[instanceID]
+		if cmd == nil {
 			continue
 		}
-		itemID := strings.TrimSpace(values["item_id"])
+		if cmdErr := cmd.Err(); cmdErr != nil {
+			if errors.Is(cmdErr, redis.Nil) {
+				continue
+			}
+			return nil, cmdErr
+		}
+		values := cmd.Val()
+		itemID := strings.TrimSpace(stringValue(values, 0))
 		if itemID == "" {
 			continue
 		}
 		instance := ItemInstance{
 			InstanceID:   instanceID,
 			ItemID:       itemID,
-			EnhanceLevel: int(int64FromString(values["enhance_level"])),
-			SpentStones:  int64FromString(values["spent_stones"]),
-			Bound:        int64FromString(values["bound"]) > 0,
-			Locked:       int64FromString(values["locked"]) > 0,
-			CreatedAt:    int64FromString(values["created_at"]),
+			EnhanceLevel: int(int64Value(values, 1)),
+			SpentStones:  int64Value(values, 2),
+			Bound:        int64Value(values, 3) > 0,
+			Locked:       int64Value(values, 4) > 0,
+			CreatedAt:    int64Value(values, 5),
 		}
 		instances[instanceID] = instance
 	}

@@ -1730,6 +1730,54 @@ func TestGetTalentStateSupportsLegacyArrayEncoding(t *testing.T) {
 	}
 }
 
+func TestItemInstancesByIDForNicknameReturnsMultipleInstances(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "实例批量读取"
+	firstID := seedOwnedInstance(t, store, ctx, nickname, "sword-a")
+	secondID := seedOwnedInstance(t, store, ctx, nickname, "sword-b")
+
+	instances, err := store.itemInstancesByIDForNickname(ctx, nickname)
+	if err != nil {
+		t.Fatalf("itemInstancesByIDForNickname: %v", err)
+	}
+	if len(instances) != 2 {
+		t.Fatalf("expected 2 instances, got %+v", instances)
+	}
+	if instances[firstID].ItemID != "sword-a" || instances[secondID].ItemID != "sword-b" {
+		t.Fatalf("expected both instances to remain readable, got %+v", instances)
+	}
+}
+
+func TestItemInstancesByIDForNicknameSkipsMissingInstanceHash(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "实例缺失跳过"
+	validID := seedOwnedInstance(t, store, ctx, nickname, "valid-sword")
+	missingID := "inst-missing-hash"
+	if err := store.client.SAdd(ctx, store.playerInstancesKey(nickname), missingID).Err(); err != nil {
+		t.Fatalf("seed missing instance ref: %v", err)
+	}
+
+	instances, err := store.itemInstancesByIDForNickname(ctx, nickname)
+	if err != nil {
+		t.Fatalf("itemInstancesByIDForNickname: %v", err)
+	}
+	if len(instances) != 1 {
+		t.Fatalf("expected only valid instance to remain, got %+v", instances)
+	}
+	if instances[validID].ItemID != "valid-sword" {
+		t.Fatalf("expected valid instance to remain readable, got %+v", instances)
+	}
+	if _, ok := instances[missingID]; ok {
+		t.Fatalf("expected missing instance hash to be skipped, got %+v", instances)
+	}
+}
+
 func TestBossAutoClickKillReturnsRecentRewards(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
