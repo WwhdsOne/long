@@ -1060,32 +1060,28 @@ func (s *Store) talentKey(nickname string) string {
 
 // GetTalentState 获取玩家天赋状态。
 func (s *Store) GetTalentState(ctx context.Context, nickname string) (*TalentState, error) {
-	values, err := s.client.HGetAll(ctx, s.talentKey(nickname)).Result()
+	values, err := s.client.HMGet(ctx, s.talentKey(nickname), "talents").Result()
 	if err != nil {
 		return nil, err
 	}
-	if len(values) == 0 {
+	talentsRaw := stringValue(values, 0)
+	if talentsRaw == "" {
 		return &TalentState{Talents: make(map[string]int)}, nil
 	}
 
 	state := &TalentState{}
-	talentsRaw := values["talents"]
-	if talentsRaw != "" {
-		talents := make(map[string]int)
-		if err := sonic.Unmarshal([]byte(talentsRaw), &talents); err != nil {
-			// 兼容旧格式 []string → 迁移为 map[string]int (均为 Lv1)
-			var oldTalents []string
-			if err2 := sonic.Unmarshal([]byte(talentsRaw), &oldTalents); err2 != nil {
-				return nil, err
-			}
-			for _, id := range oldTalents {
-				talents[id] = 1
-			}
+	talents := make(map[string]int)
+	if err := sonic.Unmarshal([]byte(talentsRaw), &talents); err != nil {
+		// 兼容旧格式 []string → 迁移为 map[string]int (均为 Lv1)
+		var oldTalents []string
+		if err2 := sonic.Unmarshal([]byte(talentsRaw), &oldTalents); err2 != nil {
+			return nil, err
 		}
-		state.Talents = talents
-	} else {
-		state.Talents = make(map[string]int)
+		for _, id := range oldTalents {
+			talents[id] = 1
+		}
 	}
+	state.Talents = talents
 
 	return state, nil
 }

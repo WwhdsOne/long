@@ -1674,6 +1674,62 @@ func TestRecentRewardsForNicknameSupportsLegacyFields(t *testing.T) {
 	}
 }
 
+func TestGetOwnedInstanceReadsStableFields(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	instanceID := "inst-hmget-owned"
+	if err := store.client.SAdd(ctx, store.playerInstancesKey(nickname), instanceID).Err(); err != nil {
+		t.Fatalf("seed owned instance index: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.equipmentInstanceKey(instanceID), map[string]any{
+		"item_id":       "owned-sword",
+		"enhance_level": "3",
+		"spent_stones":  "21",
+		"bound":         "1",
+		"locked":        "0",
+		"created_at":    "1713744000",
+	}).Err(); err != nil {
+		t.Fatalf("seed owned instance: %v", err)
+	}
+
+	instance, err := store.getOwnedInstance(ctx, nickname, instanceID)
+	if err != nil {
+		t.Fatalf("getOwnedInstance: %v", err)
+	}
+	if instance == nil || instance.ItemID != "owned-sword" || instance.EnhanceLevel != 3 {
+		t.Fatalf("expected stable owned instance fields, got %+v", instance)
+	}
+	if !instance.Bound || instance.Locked || instance.SpentStones != 21 {
+		t.Fatalf("expected flags and counters to stay available, got %+v", instance)
+	}
+}
+
+func TestGetTalentStateSupportsLegacyArrayEncoding(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	raw, err := sonic.Marshal([]string{"normal_core", "crit_skinner"})
+	if err != nil {
+		t.Fatalf("marshal legacy talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(raw)).Err(); err != nil {
+		t.Fatalf("seed legacy talents: %v", err)
+	}
+
+	state, err := store.GetTalentState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("GetTalentState: %v", err)
+	}
+	if state.Talents["normal_core"] != 1 || state.Talents["crit_skinner"] != 1 {
+		t.Fatalf("expected legacy array talents to be migrated to lv1 map, got %+v", state.Talents)
+	}
+}
+
 func TestBossAutoClickKillReturnsRecentRewards(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

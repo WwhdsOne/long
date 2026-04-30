@@ -2695,14 +2695,21 @@ func (s *Store) getOwnedInstance(ctx context.Context, nickname string, ref strin
 		return nil, ErrEquipmentNotOwned
 	}
 
-	values, err := s.client.HGetAll(ctx, s.equipmentInstanceKey(ref)).Result()
+	values, err := s.client.HMGet(ctx, s.equipmentInstanceKey(ref),
+		"item_id",
+		"enhance_level",
+		"spent_stones",
+		"bound",
+		"locked",
+		"created_at",
+	).Result()
 	if err != nil {
 		return nil, err
 	}
-	if len(values) == 0 {
+	if stringValue(values, 0) == "" {
 		return nil, ErrEquipmentNotOwned
 	}
-	itemID := strings.TrimSpace(values["item_id"])
+	itemID := strings.TrimSpace(stringValue(values, 0))
 	if itemID == "" {
 		return nil, ErrEquipmentNotOwned
 	}
@@ -2710,11 +2717,11 @@ func (s *Store) getOwnedInstance(ctx context.Context, nickname string, ref strin
 	instance := &ItemInstance{
 		InstanceID:   ref,
 		ItemID:       itemID,
-		EnhanceLevel: int(int64FromString(values["enhance_level"])),
-		SpentStones:  int64FromString(values["spent_stones"]),
-		Bound:        int64FromString(values["bound"]) > 0,
-		Locked:       int64FromString(values["locked"]) > 0,
-		CreatedAt:    int64FromString(values["created_at"]),
+		EnhanceLevel: int(int64Value(values, 1)),
+		SpentStones:  int64Value(values, 2),
+		Bound:        int64Value(values, 3) > 0,
+		Locked:       int64Value(values, 4) > 0,
+		CreatedAt:    int64Value(values, 5),
 	}
 	return instance, nil
 }
