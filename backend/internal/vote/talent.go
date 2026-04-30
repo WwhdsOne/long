@@ -1231,11 +1231,15 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 }
 
 type TalentBleedState struct {
-	StartedAt     int64 `json:"startedAt"`
-	EndsAt        int64 `json:"endsAt"`
-	Duration      int64 `json:"duration"`
-	TotalDamage   int64 `json:"totalDamage"`
-	AppliedDamage int64 `json:"appliedDamage"`
+	StartedAtMs    int64 `json:"startedAtMs"`
+	NextTickAtMs   int64 `json:"nextTickAtMs"`
+	EndsAtMs       int64 `json:"endsAtMs"`
+	DurationMs     int64 `json:"durationMs"`
+	TickIntervalMs int64 `json:"tickIntervalMs"`
+	TotalTicks     int64 `json:"totalTicks"`
+	AppliedTicks   int64 `json:"appliedTicks"`
+	TotalDamage    int64 `json:"totalDamage"`
+	AppliedDamage  int64 `json:"appliedDamage"`
 }
 
 // TalentCombatState 玩家在单场 Boss 战中的天赋战斗状态。
@@ -1288,6 +1292,10 @@ func (s *Store) talentCombatStateKey(nickname, bossID string) string {
 	return s.namespace + "player:talent_state:" + nickname + ":" + bossID
 }
 
+func (s *Store) talentEventQueueKey(nickname, bossID string) string {
+	return s.namespace + "player:talent_events:" + nickname + ":" + bossID
+}
+
 // GetTalentCombatState 获取天赋战斗状态。
 func (s *Store) GetTalentCombatState(ctx context.Context, nickname, bossID string) (*TalentCombatState, error) {
 	raw, err := s.client.HGet(ctx, s.talentCombatStateKey(nickname, bossID), "state").Result()
@@ -1337,9 +1345,47 @@ func (s *Store) SaveTalentCombatState(ctx context.Context, nickname, bossID stri
 	return s.client.HSet(ctx, s.talentCombatStateKey(nickname, bossID), "state", string(raw)).Err()
 }
 
+func (s *Store) appendPendingTalentEvents(ctx context.Context, nickname, bossID string, events []TalentTriggerEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
+	pipe := s.client.TxPipeline()
+	queueKey := s.talentEventQueueKey(nickname, bossID)
+	for _, event := range events {
+		raw, err := sonic.Marshal(event)
+		if err != nil {
+			return err
+		}
+		pipe.RPush(ctx, queueKey, string(raw))
+	}
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (s *Store) consumePendingTalentEvents(ctx context.Context, nickname, bossID string) ([]TalentTriggerEvent, error) {
+	queueKey := s.talentEventQueueKey(nickname, bossID)
+	values, err := s.client.LRange(ctx, queueKey, 0, -1).Result()
+	if err != nil || len(values) == 0 {
+		return nil, err
+	}
+	if err := s.client.Del(ctx, queueKey).Err(); err != nil {
+		return nil, err
+	}
+
+	events := make([]TalentTriggerEvent, 0, len(values))
+	for _, value := range values {
+		var event TalentTriggerEvent
+		if err := sonic.UnmarshalString(value, &event); err != nil {
+			continue
+		}
+		events = append(events, event)
+	}
+	return events, nil
+}
+
 // DeleteTalentCombatState Boss 战后清理天赋战斗状态。
 func (s *Store) DeleteTalentCombatState(ctx context.Context, nickname, bossID string) error {
-	return s.client.Del(ctx, s.talentCombatStateKey(nickname, bossID)).Err()
+	return s.client.Del(ctx, s.talentCombatStateKey(nickname, bossID), s.talentEventQueueKey(nickname, bossID)).Err()
 }
 
 // AddOmenStacks 增加死兆层数并返回新值。

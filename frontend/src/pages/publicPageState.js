@@ -87,6 +87,15 @@ const DAMAGE_VARIANTS = {
         colors: ['#fde047', '#facc15', '#fbbf24', '#fef08a', '#eab308', '#f59e0b'],
         label: 'K.O.',
     },
+    bleed: {
+        scale: 0.78,
+        ttl: 1100,
+        shake: 0,
+        stageFx: [],
+        particles: 4,
+        colors: ['#ef4444', '#dc2626', '#b91c1c'],
+        label: '',
+    },
 }
 
 const profilePageMap = {
@@ -346,10 +355,10 @@ const partStatusList = computed(() => {
       })
     }
     const bleedState = bleedMap[key]
-    const bleedEndsAt = Number(bleedState?.endsAt) || 0
-    if (bleedEndsAt > nowSec) {
-      const bleedDurationSec = Math.max(0, Number(bleedState?.duration) || 0)
-      const bleedRemainingMs = Math.max(0, bleedEndsAt * 1000 - nowMs)
+    const bleedEndsAtMs = Number(bleedState?.endsAtMs) || 0
+    if (bleedEndsAtMs > nowMs) {
+      const bleedDurationMs = Math.max(0, Number(bleedState?.durationMs) || 0)
+      const bleedRemainingMs = Math.max(0, bleedEndsAtMs - nowMs)
       result.push({
         key: `${key}:bleed`,
         partKey: key,
@@ -357,9 +366,9 @@ const partStatusList = computed(() => {
         type: part.type,
         statusKey: 'bleed',
         statusLabel: '致命出血',
-        remainingSec: Math.max(0, Math.ceil(bleedEndsAt - nowSec)),
-        progress: bleedDurationSec > 0
-          ? Math.min(100, Math.max(0, (bleedRemainingMs / (bleedDurationSec * 1000)) * 100))
+        remainingSec: Math.max(0, Math.ceil(bleedRemainingMs / 1000)),
+        progress: bleedDurationMs > 0
+          ? Math.min(100, Math.max(0, (bleedRemainingMs / bleedDurationMs) * 100))
           : 0,
       })
     }
@@ -1394,6 +1403,10 @@ function applyBattleUserState(payload) {
     if ('recentRewards' in payload) {
         recentRewards.value = Array.isArray(payload.recentRewards) ? payload.recentRewards : []
     }
+    if (Array.isArray(payload.talentEvents) && payload.talentEvents.length > 0) {
+        triggerTalentEventDamageBursts(payload.talentEvents)
+        appendTalentTriggerEvents(payload.talentEvents)
+    }
     if ('talentCombatState' in payload && payload.talentCombatState) {
         applyTalentCombatState(payload.talentCombatState)
     }
@@ -1592,6 +1605,25 @@ function appendTalentTriggerEvents(events) {
         ...talentTriggerFeed.value,
     ].slice(0, 6)
     applyTalentVisualState(events)
+}
+
+function triggerTalentEventDamageBursts(events) {
+    if (!Array.isArray(events) || events.length === 0) {
+        return
+    }
+    for (const event of events) {
+        if (event.effectType !== 'bleed' || Number(event.extraDamage || 0) <= 0) {
+            continue
+        }
+        if (event.partX === undefined || event.partY === undefined) {
+            continue
+        }
+        triggerDamageBurst(`boss-part:${event.partX}-${event.partY}`, {
+            bossDamage: Number(event.extraDamage || 0),
+            damageType: 'bleed',
+            effectType: 'bleed',
+        })
+    }
 }
 
 function clearTalentVisualState() {
@@ -1826,6 +1858,7 @@ function normalizeDamageVariant(rawType) {
         judgement: 'judgement',
         judgment: 'judgement',
         ultimate_critical: 'judgement',
+        bleed: 'bleed',
         weak_critical: 'weakCritical',
         weakcritical: 'weakCritical',
         critical: 'critical',

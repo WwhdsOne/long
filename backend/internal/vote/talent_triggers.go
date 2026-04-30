@@ -19,6 +19,7 @@ type talentTriggerContext struct {
 	compiledTalents    *CompiledTalentSet
 	combatState        *TalentCombatState
 	now                int64
+	nowMs              int64
 	totalExtra         int64
 	events             []TalentTriggerEvent
 	damageTypeOverride string
@@ -200,12 +201,21 @@ func applyCritBleedTrigger(tc *talentTriggerContext) {
 		return
 	}
 	if bd := int64(float64(tc.baseDamage) * tc.compiledTalents.Crit.BleedRatio); bd > 0 {
+		durationMs := tc.compiledTalents.Crit.BleedDuration * 1000
+		tickIntervalMs := int64(200)
+		totalTicks := durationMs / tickIntervalMs
+		if totalTicks <= 0 {
+			totalTicks = 1
+		}
 		partKey := TalentPartKey(tc.part.X, tc.part.Y)
 		tc.combatState.Bleeds[partKey] = TalentBleedState{
-			StartedAt:   tc.now,
-			EndsAt:      tc.now + tc.compiledTalents.Crit.BleedDuration,
-			Duration:    tc.compiledTalents.Crit.BleedDuration,
-			TotalDamage: bd,
+			StartedAtMs:    tc.nowMs,
+			NextTickAtMs:   tc.nowMs + tickIntervalMs,
+			EndsAtMs:       tc.nowMs + durationMs,
+			DurationMs:     durationMs,
+			TickIntervalMs: tickIntervalMs,
+			TotalTicks:     totalTicks,
+			TotalDamage:    bd,
 		}
 		tc.events = append(tc.events, TalentTriggerEvent{
 			TalentID: "crit_bleed", Name: "致命出血", EffectType: "bleed",

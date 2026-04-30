@@ -1728,7 +1728,7 @@ func TestCritBleedSettlesOverDurationAndExpires(t *testing.T) {
 	currentTime := time.Unix(1_700_420_000, 0)
 	store.now = func() time.Time { return currentTime }
 	store.critical.CriticalChancePercent = 100
-	store.critical.CriticalCount = 5
+	store.critical.CriticalCount = 30
 	store.roll = func(limit int) int { return 0 }
 
 	ctx := context.Background()
@@ -1771,8 +1771,8 @@ func TestCritBleedSettlesOverDurationAndExpires(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected bleed state after first click, got %+v", combatState)
 	}
-	if bleedState.Duration != critBleedDurationForLevel(5) {
-		t.Fatalf("expected bleed duration %d, got %+v", critBleedDurationForLevel(5), bleedState)
+	if bleedState.DurationMs != critBleedDurationForLevel(5)*1000 {
+		t.Fatalf("expected bleed duration %dms, got %+v", critBleedDurationForLevel(5)*1000, bleedState)
 	}
 	if bleedState.TotalDamage <= 0 {
 		t.Fatalf("expected bleed total damage > 0, got %+v", bleedState)
@@ -1783,20 +1783,21 @@ func TestCritBleedSettlesOverDurationAndExpires(t *testing.T) {
 	store.roll = func(limit int) int { return maxInt(0, limit-1) }
 	store.invalidateCombatStatsCache(nickname)
 
-	currentTime = currentTime.Add(2 * time.Second)
-	second, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	currentTime = currentTime.Add(3 * time.Second)
+	changes, err := store.ProcessTalentBleedTicks(ctx)
 	if err != nil {
-		t.Fatalf("second click: %v", err)
+		t.Fatalf("process bleed ticks: %v", err)
+	}
+	if len(changes) == 0 {
+		t.Fatalf("expected bleed tick changes after 3 seconds")
 	}
 
-	currentTime = currentTime.Add(2 * time.Second)
-	third, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	userState, err := store.GetUserState(ctx, nickname)
 	if err != nil {
-		t.Fatalf("third click: %v", err)
+		t.Fatalf("get user state after bleed ticks: %v", err)
 	}
-
 	bleedDamage := int64(0)
-	for _, ev := range append(second.TalentEvents, third.TalentEvents...) {
+	for _, ev := range userState.TalentEvents {
 		if ev.TalentID == "crit_bleed" && ev.ExtraDamage > 0 {
 			bleedDamage += ev.ExtraDamage
 		}
@@ -1811,6 +1812,163 @@ func TestCritBleedSettlesOverDurationAndExpires(t *testing.T) {
 	}
 	if _, ok := combatState.Bleeds[TalentPartKey(0, 0)]; ok {
 		t.Fatalf("expected bleed state to expire, got %+v", combatState.Bleeds)
+	}
+}
+
+func TestProcessTalentBleedTicksSettlesEveryTwoHundredMs(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	currentTime := time.Unix(1_700_430_000, 0)
+	store.now = func() time.Time { return currentTime }
+	store.critical.CriticalChancePercent = 100
+	store.critical.CriticalCount = 30
+	store.roll = func(limit int) int { return 0 }
+
+	ctx := context.Background()
+	nickname := "出血分段结算测试"
+
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"crit_bleed": 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed crit_bleed state: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "crit-bleed-tick-test",
+		Name:  "出血分段Boss",
+		MaxHP: 100000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100000, CurrentHP: 100000, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	first, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("first click: %v", err)
+	}
+	if !first.Critical {
+		t.Fatalf("expected first click critical, got %+v", first)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "crit-bleed-tick-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	bleedState, ok := combatState.Bleeds[TalentPartKey(0, 0)]
+	if !ok {
+		t.Fatalf("expected bleed state after first click, got %+v", combatState)
+	}
+	bleedState.TotalDamage = 30
+	combatState.Bleeds[TalentPartKey(0, 0)] = bleedState
+	if err := store.SaveTalentCombatState(ctx, nickname, "crit-bleed-tick-test", combatState); err != nil {
+		t.Fatalf("save amplified bleed state: %v", err)
+	}
+
+	currentTime = currentTime.Add(199 * time.Millisecond)
+	changes, err := store.ProcessTalentBleedTicks(ctx)
+	if err != nil {
+		t.Fatalf("process bleed ticks before due: %v", err)
+	}
+	if len(changes) != 0 {
+		t.Fatalf("expected no bleed tick before 0.2s, got %+v", changes)
+	}
+
+	totalBleedDamage := int64(0)
+	totalBleedEvents := 0
+	for i := 0; i < 15; i++ {
+		currentTime = currentTime.Add(200 * time.Millisecond)
+		changes, err = store.ProcessTalentBleedTicks(ctx)
+		if err != nil {
+			t.Fatalf("process bleed ticks: %v", err)
+		}
+		if len(changes) == 0 {
+			t.Fatalf("expected bleed tick change on each 0.2s step")
+		}
+		tickEvents, err := store.consumePendingTalentEvents(ctx, nickname, "crit-bleed-tick-test")
+		if err != nil {
+			t.Fatalf("consume pending bleed events after tick: %v", err)
+		}
+		if len(tickEvents) == 0 {
+			t.Fatalf("expected pending bleed talent event after tick")
+		}
+		for _, ev := range tickEvents {
+			if ev.TalentID == "crit_bleed" && ev.ExtraDamage > 0 {
+				totalBleedDamage += ev.ExtraDamage
+				totalBleedEvents++
+			}
+		}
+	}
+
+	if totalBleedEvents != 15 {
+		t.Fatalf("expected 15 bleed tick events, got %d", totalBleedEvents)
+	}
+	if totalBleedDamage != bleedState.TotalDamage {
+		t.Fatalf("expected total bleed damage %d, got %d", bleedState.TotalDamage, totalBleedDamage)
+	}
+
+	combatState, err = store.GetTalentCombatState(ctx, nickname, "crit-bleed-tick-test")
+	if err != nil {
+		t.Fatalf("get combat state after final tick: %v", err)
+	}
+	if _, ok := combatState.Bleeds[TalentPartKey(0, 0)]; ok {
+		t.Fatalf("expected bleed state removed after 15 ticks, got %+v", combatState.Bleeds)
+	}
+}
+
+func TestGetUserStateConsumesPendingTalentEvents(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "用户态出血事件测试"
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "user-state-talent-event-test",
+		Name:  "用户态事件Boss",
+		MaxHP: 1000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1000, CurrentHP: 1000, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	events := []TalentTriggerEvent{
+		{
+			TalentID:    "crit_bleed",
+			Name:        "致命出血",
+			EffectType:  "bleed",
+			ExtraDamage: 3,
+			Message:     "出血结算",
+			PartX:       0,
+			PartY:       0,
+		},
+	}
+	if err := store.appendPendingTalentEvents(ctx, nickname, "user-state-talent-event-test", events); err != nil {
+		t.Fatalf("append pending events: %v", err)
+	}
+
+	userState, err := store.GetUserState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+	if len(userState.TalentEvents) != 1 {
+		t.Fatalf("expected one pending talent event, got %+v", userState.TalentEvents)
+	}
+
+	userState, err = store.GetUserState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get user state second time: %v", err)
+	}
+	if len(userState.TalentEvents) != 0 {
+		t.Fatalf("expected pending talent events consumed after first read, got %+v", userState.TalentEvents)
 	}
 }
 

@@ -301,16 +301,17 @@ type Snapshot struct {
 
 // UserState 个人实时状态，只推送给对应昵称的连接
 type UserState struct {
-	UserStats         *UserStats         `json:"userStats,omitempty"`
-	MyBossStats       *BossUserStats     `json:"myBossStats,omitempty"`
-	Inventory         []InventoryItem    `json:"inventory"`
-	Loadout           Loadout            `json:"loadout"`
-	CombatStats       CombatStats        `json:"combatStats"`
-	Gold              int64              `json:"gold"`
-	Stones            int64              `json:"stones"`
-	TalentPoints      int64              `json:"talentPoints"`
-	RecentRewards     []Reward           `json:"recentRewards,omitempty"`
-	TalentCombatState *TalentCombatState `json:"talentCombatState,omitempty"`
+	UserStats         *UserStats           `json:"userStats,omitempty"`
+	MyBossStats       *BossUserStats       `json:"myBossStats,omitempty"`
+	Inventory         []InventoryItem      `json:"inventory"`
+	Loadout           Loadout              `json:"loadout"`
+	CombatStats       CombatStats          `json:"combatStats"`
+	Gold              int64                `json:"gold"`
+	Stones            int64                `json:"stones"`
+	TalentPoints      int64                `json:"talentPoints"`
+	RecentRewards     []Reward             `json:"recentRewards,omitempty"`
+	TalentEvents      []TalentTriggerEvent `json:"talentEvents,omitempty"`
+	TalentCombatState *TalentCombatState   `json:"talentCombatState,omitempty"`
 }
 
 // State 完整状态，包含个人统计与玩法状态
@@ -713,6 +714,11 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 
 		combatState, _ := s.GetTalentCombatState(ctx, normalizedNickname, boss.ID)
 		userState.TalentCombatState = combatState
+		pendingTalentEvents, err := s.consumePendingTalentEvents(ctx, normalizedNickname, boss.ID)
+		if err != nil {
+			return UserState{}, err
+		}
+		userState.TalentEvents = pendingTalentEvents
 	}
 
 	return userState, nil
@@ -1414,7 +1420,9 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		return result, ErrBossPartAlreadyDead
 	}
 
-	now := s.now().Unix()
+	nowTime := s.now()
+	now := nowTime.Unix()
+	nowMs := nowTime.UnixMilli()
 
 	aliveCount := 0
 	for _, p := range boss.Parts {
@@ -1544,14 +1552,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		PartType: string(part.Type),
 	})
 
-	bleedDamage, bleedEvents, bleedDeltas := applyTalentBleedDamage(boss, combatState, now)
-	if bleedDamage > 0 {
-		totalDamage += bleedDamage
-		result.PartStateDeltas = append(result.PartStateDeltas, bleedDeltas...)
-		result.TalentEvents = append(result.TalentEvents, bleedEvents...)
-	}
-
-	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, compiledTalents, combatState, now)
+	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, compiledTalents, combatState, now, nowMs)
 	if extraDamage > 0 {
 		totalDamage += extraDamage
 		result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
@@ -1703,23 +1704,26 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	return result, nil
 }
 
-func applyTalentBleedDamage(boss *Boss, combatState *TalentCombatState, now int64) (int64, []TalentTriggerEvent, []BossPartStateDelta) {
+func applyTalentBleedTicks(boss *Boss, combatState *TalentCombatState, nowMs int64) (int64, []TalentTriggerEvent, []BossPartStateDelta, bool) {
 	if boss == nil || combatState == nil || len(combatState.Bleeds) == 0 {
-		return 0, nil, nil
+		return 0, nil, nil, false
 	}
 
 	totalDamage := int64(0)
 	var events []TalentTriggerEvent
 	var deltas []BossPartStateDelta
+	changed := false
 	for partKey, bleed := range combatState.Bleeds {
-		if bleed.Duration <= 0 || bleed.TotalDamage <= 0 || bleed.EndsAt <= bleed.StartedAt {
+		if bleed.TickIntervalMs <= 0 || bleed.TotalTicks <= 0 || bleed.TotalDamage <= 0 || bleed.EndsAtMs <= bleed.StartedAtMs {
 			delete(combatState.Bleeds, partKey)
+			changed = true
 			continue
 		}
 
 		partX, partY, ok := ParseTalentPartKey(partKey)
 		if !ok {
 			delete(combatState.Bleeds, partKey)
+			changed = true
 			continue
 		}
 
@@ -1732,22 +1736,29 @@ func applyTalentBleedDamage(boss *Boss, combatState *TalentCombatState, now int6
 		}
 		if part == nil || !part.Alive || part.CurrentHP <= 0 {
 			delete(combatState.Bleeds, partKey)
+			changed = true
 			continue
 		}
 
-		elapsed := min(now, bleed.EndsAt) - bleed.StartedAt
-		if elapsed < 0 {
-			elapsed = 0
-		}
-		dueDamage := int64(float64(bleed.TotalDamage) * (float64(elapsed) / float64(maxInt64(1, bleed.Duration))))
-		if now >= bleed.EndsAt {
-			dueDamage = bleed.TotalDamage
-		}
-		if dueDamage < bleed.AppliedDamage {
-			dueDamage = bleed.AppliedDamage
+		if nowMs < bleed.NextTickAtMs {
+			continue
 		}
 
-		pendingDamage := dueDamage - bleed.AppliedDamage
+		dueTicks := ((nowMs - bleed.NextTickAtMs) / bleed.TickIntervalMs) + 1
+		remainingTicks := bleed.TotalTicks - bleed.AppliedTicks
+		if dueTicks > remainingTicks {
+			dueTicks = remainingTicks
+		}
+		if dueTicks <= 0 {
+			continue
+		}
+
+		prevTicks := bleed.AppliedTicks
+		nextTicks := prevTicks + dueTicks
+		prevDamage := (bleed.TotalDamage * prevTicks) / bleed.TotalTicks
+		nextDamage := (bleed.TotalDamage * nextTicks) / bleed.TotalTicks
+		pendingDamage := nextDamage - prevDamage
+		changed = true
 		if pendingDamage > 0 {
 			beforeHP, actualDamage, _ := applyBossPartDamageDelta(boss, part, pendingDamage)
 			if actualDamage > 0 {
@@ -1772,14 +1783,153 @@ func applyTalentBleedDamage(boss *Boss, combatState *TalentCombatState, now int6
 			}
 		}
 
-		bleed.AppliedDamage = dueDamage
-		if now >= bleed.EndsAt || !part.Alive || bleed.AppliedDamage >= bleed.TotalDamage {
+		bleed.AppliedTicks = nextTicks
+		bleed.AppliedDamage = nextDamage
+		bleed.NextTickAtMs += dueTicks * bleed.TickIntervalMs
+		if bleed.AppliedTicks >= bleed.TotalTicks || nowMs >= bleed.EndsAtMs || !part.Alive || bleed.AppliedDamage >= bleed.TotalDamage {
 			delete(combatState.Bleeds, partKey)
 			continue
 		}
 		combatState.Bleeds[partKey] = bleed
 	}
-	return totalDamage, events, deltas
+	return totalDamage, events, deltas, changed
+}
+
+func (s *Store) ProcessTalentBleedTicks(ctx context.Context) ([]StateChange, error) {
+	boss, err := s.currentBoss(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if boss == nil || boss.Status != bossStatusActive {
+		return nil, nil
+	}
+
+	nicknames, err := s.listTalentCombatStateNicknames(ctx, boss.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(nicknames) == 0 {
+		return nil, nil
+	}
+
+	nowTime := s.now()
+	nowMs := nowTime.UnixMilli()
+	now := nowTime.Unix()
+	changes := make([]StateChange, 0, len(nicknames))
+	for _, nickname := range nicknames {
+		combatState, err := s.GetTalentCombatState(ctx, nickname, boss.ID)
+		if err != nil || combatState == nil || len(combatState.Bleeds) == 0 {
+			continue
+		}
+
+		damage, events, _, changed := applyTalentBleedTicks(boss, combatState, nowMs)
+		if !changed {
+			continue
+		}
+		if err := s.persistTalentTickState(ctx, boss, nickname, combatState, damage); err != nil {
+			return nil, err
+		}
+		if err := s.appendPendingTalentEvents(ctx, nickname, boss.ID, events); err != nil {
+			return nil, err
+		}
+
+		change := StateChange{
+			Type:      StateChangeBossChanged,
+			Nickname:  nickname,
+			Timestamp: now,
+		}
+		if boss.Status == bossStatusActive {
+			changes = append(changes, change)
+			continue
+		}
+
+		change.BroadcastUserAll = true
+		if _, _, err := s.finalizeBossKill(ctx, boss, false, ""); err != nil {
+			return nil, err
+		}
+		changes = append(changes, change)
+		break
+	}
+	return changes, nil
+}
+
+func (s *Store) listTalentCombatStateNicknames(ctx context.Context, bossID string) ([]string, error) {
+	prefix := s.namespace + "player:talent_state:"
+	suffix := ":" + bossID
+	pattern := prefix + "*" + suffix
+	seen := make(map[string]struct{})
+	var nicknames []string
+	var cursor uint64
+	for {
+		keys, nextCursor, err := s.client.Scan(ctx, cursor, pattern, 200).Result()
+		if err != nil {
+			return nil, err
+		}
+		for _, key := range keys {
+			if !strings.HasPrefix(key, prefix) || !strings.HasSuffix(key, suffix) {
+				continue
+			}
+			nickname := strings.TrimSuffix(strings.TrimPrefix(key, prefix), suffix)
+			if nickname == "" {
+				continue
+			}
+			if _, ok := seen[nickname]; ok {
+				continue
+			}
+			seen[nickname] = struct{}{}
+			nicknames = append(nicknames, nickname)
+		}
+		if nextCursor == 0 {
+			break
+		}
+		cursor = nextCursor
+	}
+	return nicknames, nil
+}
+
+func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname string, combatState *TalentCombatState, totalDamage int64) error {
+	if boss == nil || combatState == nil {
+		return nil
+	}
+
+	allDead := true
+	for _, part := range boss.Parts {
+		if part.Alive {
+			allDead = false
+			break
+		}
+	}
+	if allDead {
+		boss.Status = bossStatusDefeated
+		boss.DefeatedAt = s.now().Unix()
+	}
+
+	partsRaw, err := sonic.Marshal(boss.Parts)
+	if err != nil {
+		return err
+	}
+	combatStateRaw, err := sonic.Marshal(combatState)
+	if err != nil {
+		return err
+	}
+
+	bossValues := map[string]any{
+		"parts":      string(partsRaw),
+		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
+		"status":     boss.Status,
+	}
+	if boss.DefeatedAt != 0 {
+		bossValues["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
+	if totalDamage > 0 {
+		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
+	}
+	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 func applyComboDamageAmplify(baseDamage int64, comboCount int64) int64 {
@@ -1816,7 +1966,7 @@ func applyBossPartDamageDelta(boss *Boss, part *BossPart, damage int64) (beforeH
 	return beforeHP, actualDamage, partWasAlive && !part.Alive
 }
 
-func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now int64) (int64, []TalentTriggerEvent, string) {
+func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now, nowMs int64) (int64, []TalentTriggerEvent, string) {
 	if boss == nil || part == nil || strings.TrimSpace(nickname) == "" || clickCount <= 0 {
 		return 0, nil, ""
 	}
@@ -1835,6 +1985,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		compiledTalents: compiledTalents,
 		combatState:     combatState,
 		now:             now,
+		nowMs:           nowMs,
 		roll:            s.roll,
 	}
 	for _, trigger := range compiledTalents.triggers {

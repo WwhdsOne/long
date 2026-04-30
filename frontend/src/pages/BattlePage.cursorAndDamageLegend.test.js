@@ -64,6 +64,14 @@ describe('BattlePage 光标与伤害说明', () => {
     expect(stateSource).toContain('scale: 2.75,')
   })
 
+  it('出血结算通过用户态事件触发独立小字，而不是依赖点击回包', () => {
+    expect(stateSource).toContain('function triggerTalentEventDamageBursts(events) {')
+    expect(stateSource).toContain("if (event.effectType !== 'bleed' || Number(event.extraDamage || 0) <= 0)")
+    expect(stateSource).toContain("triggerDamageBurst(`boss-part:${event.partX}-${event.partY}`, {")
+    expect(stateSource).toContain("damageType: 'bleed'")
+    expect(stateSource).toContain('triggerTalentEventDamageBursts(payload.talentEvents)')
+  })
+
   it('重甲格子有金属质感和低频扫光，只作用在 5x5 战斗格子', () => {
     expect(styleSource).toContain('.boss-part-cell--heavy::after')
     expect(styleSource).toContain('animation: boss-heavy-sheen 3.6s ease-in-out infinite;')

@@ -155,6 +155,15 @@ func run() error {
 		}
 	}()
 
+	go func() {
+		if err := processTalentBleedLoop(pollCtx, store, changeBus); err != nil && !errors.Is(err, context.Canceled) {
+			select {
+			case errCh <- fmt.Errorf("process talent bleed loop: %w", err):
+			default:
+			}
+		}
+	}()
+
 	if _, err := stateCache.RefreshSnapshot(startupCtx); err != nil {
 		return fmt.Errorf("warm snapshot cache: %w", err)
 	}
@@ -200,6 +209,29 @@ func broadcastLeaderboardOnMinute(ctx context.Context, dispatcher *events.Dispat
 
 		if err := dispatcher.BroadcastLeaderboard(context.Background()); err != nil {
 			return err
+		}
+	}
+}
+
+func processTalentBleedLoop(ctx context.Context, store *vote.Store, changeBus *events.RedisChangeBus) error {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+
+		changes, err := store.ProcessTalentBleedTicks(context.Background())
+		if err != nil {
+			return err
+		}
+		for _, change := range changes {
+			if err := changeBus.PublishChange(context.Background(), change); err != nil {
+				return err
+			}
 		}
 	}
 }
