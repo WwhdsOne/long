@@ -168,9 +168,9 @@ function effectOverlayStyle(type, options = {}) {
 
 // 剑挥火花（按部位类型变色，参照 DAMAGE_VARIANTS）
 const sparkPresets = {
-  weak:     { colors: ['#facc15','#ef4444','#f87171','#fbbf24','#f59e0b','#dc2626'], count: 12, gravity: 0.04 },
-  heavy:    { colors: ['#9ca3af','#787888','#64748b','#94a3b8'], count: 5, gravity: 0.18 },
-  soft:     { colors: ['#f8fafc','#e2e8f0','#cbd5e1','#fafaff'], count: 6, gravity: 0.08 },
+  weak: {colors: ['#facc15', '#ef4444', '#f87171', '#fbbf24', '#f59e0b', '#dc2626'], count: 12, gravity: 0.04},
+  heavy: {colors: ['#9ca3af', '#787888', '#64748b', '#94a3b8'], count: 5, gravity: 0.18},
+  soft: {colors: ['#f8fafc', '#e2e8f0', '#cbd5e1', '#fafaff'], count: 6, gravity: 0.08},
 }
 
 function detectCellType(el) {
@@ -195,21 +195,47 @@ function spawnSparks(cx, cy, cellType) {
     const sz = 4 + Math.floor(Math.random() * 8)
     el.style.width = el.style.height = sz + 'px'
     el.style.background = preset.colors[Math.floor(Math.random() * preset.colors.length)]
-    el.style.left = cx + 'px'; el.style.top = cy + 'px'
+    el.style.left = cx + 'px';
+    el.style.top = cy + 'px'
     document.body.appendChild(el)
-    sparks.push({ el, x: cx, y: cy, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, gravity: preset.gravity, decay: 0.03 + Math.random() * 0.04 })
+    sparks.push({
+      el,
+      x: cx,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      gravity: preset.gravity,
+      decay: 0.03 + Math.random() * 0.04
+    })
   }
-  if (!sparksRunning) { sparksRunning = true; particleRaf = requestAnimationFrame(updateSparks) }
+  if (!sparksRunning) {
+    sparksRunning = true;
+    particleRaf = requestAnimationFrame(updateSparks)
+  }
 }
 
 function updateSparks() {
   for (let i = sparks.length - 1; i >= 0; i--) {
-    const s = sparks[i]; s.x += s.vx; s.y += s.vy; s.vy += s.gravity; s.life -= s.decay
-    s.el.style.left = s.x + 'px'; s.el.style.top = s.y + 'px'; s.el.style.opacity = s.life
-    if (s.life <= 0) { s.el.remove(); sparks.splice(i, 1) }
+    const s = sparks[i];
+    s.x += s.vx;
+    s.y += s.vy;
+    s.vy += s.gravity;
+    s.life -= s.decay
+    s.el.style.left = s.x + 'px';
+    s.el.style.top = s.y + 'px';
+    s.el.style.opacity = s.life
+    if (s.life <= 0) {
+      s.el.remove();
+      sparks.splice(i, 1)
+    }
   }
-  if (sparks.length > 0) { particleRaf = requestAnimationFrame(updateSparks) }
-  else { sparksRunning = false; particleRaf = 0 }
+  if (sparks.length > 0) {
+    particleRaf = requestAnimationFrame(updateSparks)
+  } else {
+    sparksRunning = false;
+    particleRaf = 0
+  }
 }
 
 function doCursorAttack(e) {
@@ -382,6 +408,7 @@ const talentEdgeGlowClass = computed(() => {
 
 const showSilverFlash = computed(() => silverStormActive.value && silverStormCountdown.value >= 14)
 const TALENT_EFFECT_WINDOW_MS = 1350
+const BLEED_EFFECT_WINDOW_MS = 720
 const ULTIMATE_EFFECT_WINDOW_MS = 3200
 const JUDGMENT_DAY_EFFECT_WINDOW_MS = 5000
 
@@ -408,7 +435,11 @@ function effectWindowMs(type) {
 }
 
 function recentTriggers(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
-  return talentTriggerFeed.value.filter((entry) => entry.effectType === type && isTriggerFresh(entry, windowMs))
+  const filtered = talentTriggerFeed.value.filter((entry) => entry.effectType === type && isTriggerFresh(entry, windowMs))
+  if (type === 'bleed') {
+    return filtered.slice(0, 2)
+  }
+  return filtered
 }
 
 function isTriggerFresh(entry, windowMs = TALENT_EFFECT_WINDOW_MS) {
@@ -598,34 +629,47 @@ const silverStormActive = computed(() => {
         <div v-else class="boss-part-grid-container">
           <!-- 左侧面板列 -->
           <div class="boss-left-panels">
-            <div v-for="status in globalStatusList" :key="status.key" class="status-panel" :class="[`status-panel--${status.kind}`, { 'status-panel--gold': status.isGold }]" :style="status.panelStyle || null">
+            <div v-for="status in globalStatusList" :key="status.key" class="status-panel"
+                 :class="[`status-panel--${status.kind}`, { 'status-panel--gold': status.isGold }]"
+                 :style="status.panelStyle || null">
               <template v-if="status.kind === 'combo'">
                 <div class="status-panel__row status-panel__row--combo">
                   <span class="status-panel__title">{{ status.title }}</span>
                   <span class="status-panel__count-wrap">
-                    <strong class="status-panel__primary" :style="status.primaryStyle || null">{{ status.primary }}</strong>
+                    <strong class="status-panel__primary" :style="status.primaryStyle || null">{{
+                        status.primary
+                      }}</strong>
                     <span class="status-panel__milestone-anchor">
-                      <span v-if="comboMilestoneText" :key="comboMilestoneTick" class="status-panel__milestone status-panel__milestone--floating">
+                      <span v-if="comboMilestoneText" :key="comboMilestoneTick"
+                            class="status-panel__milestone status-panel__milestone--floating">
                         {{ comboMilestoneText }}
                       </span>
                     </span>
                   </span>
                   <span class="status-panel__meta status-panel__meta--combo">
-                    <span v-if="status.secondary" class="status-panel__secondary" :style="status.secondaryStyle || null">{{ status.secondary }}</span>
-                    <span v-if="status.hint" class="status-panel__hint status-panel__hint--inline" :style="status.hintStyle || null">{{ status.hint }}</span>
+                    <span v-if="status.secondary" class="status-panel__secondary"
+                          :style="status.secondaryStyle || null">{{ status.secondary }}</span>
+                    <span v-if="status.hint" class="status-panel__hint status-panel__hint--inline"
+                          :style="status.hintStyle || null">{{ status.hint }}</span>
                   </span>
                 </div>
               </template>
               <template v-else>
                 <div class="status-panel__title">{{ status.title }}</div>
                 <div class="status-panel__row">
-                  <strong class="status-panel__primary" :style="status.primaryStyle || null">{{ status.primary }}</strong>
+                  <strong class="status-panel__primary" :style="status.primaryStyle || null">{{
+                      status.primary
+                    }}</strong>
                   <span v-if="status.secondary" class="status-panel__secondary">{{ status.secondary }}</span>
                 </div>
-                <div v-if="status.hint" class="status-panel__hint" :style="status.hintStyle || null">{{ status.hint }}</div>
+                <div v-if="status.hint" class="status-panel__hint" :style="status.hintStyle || null">{{
+                    status.hint
+                  }}
+                </div>
               </template>
-              <span class="status-panel__bar">
-                <span class="status-panel__bar-fill" :class="`status-panel__bar-fill--${status.kind}`" :style="{ width: `${status.progress}%`, ...(status.barStyle || {}) }"></span>
+              <span v-if="status.showProgress !== false" class="status-panel__bar">
+                <span class="status-panel__bar-fill" :class="`status-panel__bar-fill--${status.kind}`"
+                      :style="{ width: `${status.progress}%`, ...(status.barStyle || {}) }"></span>
               </span>
             </div>
 
@@ -648,42 +692,49 @@ const silverStormActive = computed(() => {
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor"
                       :style="{ width: p.armorProgress + '%' }"></span></span>
                 </span>
-                <span v-if="p.type === 'heavy' && p.judgmentDay > 0" class="part-progress-panel__track part-progress-panel__track--judgment-day">
+                <span v-if="p.type === 'heavy' && p.judgmentDay > 0"
+                      class="part-progress-panel__track part-progress-panel__track--judgment-day">
                   审判日 {{ p.judgmentDay }}/{{ judgmentDayTrigger }}
                   <span class="part-progress-panel__bar"><span
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--judgment-day"
                       :style="{ width: p.judgmentDayProgress + '%' }"></span></span>
                 </span>
-                <span v-if="p.type === 'heavy' && p.autoStrike > 0" class="part-progress-panel__track part-progress-panel__track--auto-strike">
-                  碎甲重击 {{ p.autoStrike }}/{{ autoStrikeTrigger }}
-                  <span class="part-progress-panel__bar"><span
-                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--auto-strike"
-                      :style="{ width: p.autoStrikeProgress + '%' }"></span></span>
-                  <span class="part-progress-panel__countdown">{{ Number.isFinite(p.autoStrikeCountdown) ? Math.ceil(p.autoStrikeCountdown) : 0 }}s</span>
-                  <span class="part-progress-panel__bar part-progress-panel__bar--timer"><span
-                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--timer"
-                      :style="{ width: p.autoStrikeTimeoutPercent + '%' }"></span></span>
-                </span>
+                <span v-if="p.type === 'heavy' && p.autoStrike > 0"
+                      class="part-progress-panel__track part-progress-panel__track--auto-strike"
+                      :style="{ position: 'relative', zIndex: 999 }">
+                    碎甲重击 {{ p.autoStrike }}/{{ autoStrikeTrigger }}
+                    <span class="part-progress-panel__bar"><span
+                        class="part-progress-panel__bar-fill part-progress-panel__bar-fill--auto-strike"
+                        :style="{ width: p.autoStrikeProgress + '%' }"></span></span>
+                    <span class="part-progress-panel__countdown">{{
+                        Number.isFinite(p.autoStrikeCountdown) ? Math.ceil(p.autoStrikeCountdown) : 0
+                      }}s</span>
+                    <span class="part-progress-panel__bar part-progress-panel__bar--timer"><span
+                        class="part-progress-panel__bar-fill part-progress-panel__bar-fill--timer"
+                        :style="{ width: p.autoStrikeTimeoutPercent + '%' }"></span></span>
+                  </span>
               </div>
             </div>
 
-              <div v-if="partStatusList.length > 0" class="part-status-panel">
+            <div v-if="partStatusList.length > 0" class="part-status-panel">
               <div class="part-status-panel__title">部位状态</div>
               <div v-for="s in partStatusList" :key="s.key" class="part-status-panel__item">
                 <span class="part-status-panel__name" :class="`part-status-panel__name--${s.type}`">{{ s.name }}</span>
                 <div class="part-status-panel__row">
                   <span class="part-status-panel__label">{{ s.statusLabel }}</span>
-                  <span v-if="s.showCountdown !== false" class="part-status-panel__countdown">{{ s.remainingSec }}s</span>
+                  <span v-if="s.showCountdown !== false" class="part-status-panel__countdown">{{
+                      s.remainingSec
+                    }}s</span>
                 </div>
                 <div v-if="s.statusMeta" class="status-panel__hint">{{ s.statusMeta }}</div>
                 <span v-if="s.showProgress !== false" class="part-status-panel__bar">
-                  <span class="part-status-panel__bar-fill" :class="`part-status-panel__bar-fill--${s.statusKey}`" :style="{ width: `${s.progress}%` }"></span>
+                  <span class="part-status-panel__bar-fill" :class="`part-status-panel__bar-fill--${s.statusKey}`"
+                        :style="{ width: `${s.progress}%` }"></span>
                 </span>
               </div>
             </div>
 
           </div>
-
 
 
           <!-- 右侧：5×5 Boss 网格 + 连击计数 -->
@@ -746,7 +797,9 @@ const silverStormActive = computed(() => {
                   '--damage-ttl': `${burst.ttl}ms`,
                 }"
               >
-                <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{ burst.value }}
+                <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{
+                  burst.value
+                }}
               </span>
                         <span
                             v-for="p in (burst.particles || [])"
@@ -829,6 +882,7 @@ const silverStormActive = computed(() => {
               <span class="boss-right-legend__item boss-right-legend__item--normal">普通</span>
               <span class="boss-right-legend__item boss-right-legend__item--critical">暴击 CRIT!</span>
               <span class="boss-right-legend__item boss-right-legend__item--weak">弱点暴击 WEAK!</span>
+              <span class="boss-right-legend__item boss-right-legend__item--bleed">出血</span>
               <span class="boss-right-legend__item boss-right-legend__item--pursuit">追击</span>
               <span class="boss-right-legend__item boss-right-legend__item--true"><span class="boss-right-legend__icon">⚡</span>真实伤害</span>
               <span class="boss-right-legend__item boss-right-legend__item--doomsday">💀 削血</span>
@@ -856,54 +910,54 @@ const silverStormActive = computed(() => {
                :key="triggerKey('storm_combo')"
                class="talent-canvas-fx"
                :style="effectOverlayStyle('storm_combo', { scale: 1.65, fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="storm_combo" :size="effectCanvasSize(1.65)" :loop="false" />
+            <PixelEffectCanvas effect="storm_combo" :size="effectCanvasSize(1.65)" :loop="false"/>
           </div>
           <div v-if="hasRecentTrigger('auto_strike')"
                :key="triggerKey('auto_strike')"
                class="talent-canvas-fx"
                :style="effectOverlayStyle('auto_strike', { scale: 2.05, fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="auto_strike" :size="effectCanvasSize(2.05)" :loop="false" />
+            <PixelEffectCanvas effect="auto_strike" :size="effectCanvasSize(2.05)" :loop="false"/>
           </div>
-          <div v-for="entry in recentTriggers('bleed')"
+          <div v-for="entry in recentTriggers('bleed', BLEED_EFFECT_WINDOW_MS)"
                :key="entry.id"
                class="talent-canvas-fx"
                :style="triggerOverlayStyle('bleed', {
-                 width: effectCanvasSize(3.75),
-                 height: effectCanvasSize(3.75),
-                 anchor: triggerAnchor('bleed', TALENT_EFFECT_WINDOW_MS, entry),
-                 fallback: effectFallback(3.75, { top: '50%', left: '50%' }),
+                 width: effectCanvasSize(2.6),
+                 height: effectCanvasSize(2.6),
+                 anchor: triggerAnchor('bleed', BLEED_EFFECT_WINDOW_MS, entry),
+                 fallback: effectFallback(2.6, { top: '50%', left: '50%' }),
                })">
-            <PixelEffectCanvas effect="bleed" :size="effectCanvasSize(3.75)" :loop="false" />
+            <PixelEffectCanvas effect="bleed" :size="effectCanvasSize(2.6)" :loop="false"/>
           </div>
           <div v-if="hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)"
                :key="triggerKey('final_cut', ULTIMATE_EFFECT_WINDOW_MS)"
                class="talent-canvas-fx"
                :style="effectOverlayStyle('final_cut', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="final_cut" :size="ultimateEffectCanvasSize()" :loop="false" />
+            <PixelEffectCanvas effect="final_cut" :size="ultimateEffectCanvasSize()" :loop="false"/>
           </div>
           <div v-if="hasRecentTrigger('collapse_trigger')"
                :key="triggerKey('collapse_trigger')"
                class="talent-canvas-fx"
                :style="effectOverlayStyle('collapse_trigger', { scale: 1, fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="collapse_trigger" :size="effectCanvasSize(1)" :loop="false" />
+            <PixelEffectCanvas effect="collapse_trigger" :size="effectCanvasSize(2.5)" :loop="false"/>
           </div>
           <div v-if="hasRecentTrigger('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"
                :key="triggerKey('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"
                class="talent-canvas-fx"
                :style="effectOverlayStyle('judgment_day', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="judgment_day" :size="bossGridEffectSize()" :loop="false" />
+            <PixelEffectCanvas effect="judgment_day" :size="bossGridEffectSize()" :loop="false"/>
           </div>
           <div v-if="hasRecentTrigger('doom_mark')"
                :key="triggerKey('doom_mark')"
                class="talent-canvas-fx"
                :style="effectOverlayStyle('doom_mark', { scale: 1.25, fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="doom_mark" :size="effectCanvasSize(1.25)" :loop="false" />
+            <PixelEffectCanvas effect="doom_mark" :size="effectCanvasSize(1.25)" :loop="false"/>
           </div>
           <div v-if="hasRecentTrigger('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)"
                :key="triggerKey('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)"
                class="talent-canvas-fx"
                :style="effectOverlayStyle('silver_storm', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="silver_storm" :size="ultimateEffectCanvasSize()" :loop="false" />
+            <PixelEffectCanvas effect="silver_storm" :size="ultimateEffectCanvasSize()" :loop="false"/>
           </div>
         </div>
         <div class="vote-stage__boss-note vote-stage__boss-note--rules">

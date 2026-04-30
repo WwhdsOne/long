@@ -25,12 +25,12 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain('function effectCanvasSize(scale) {')
     expect(battleSource).toContain('function ultimateEffectCanvasSize() {')
     expect(battleSource).toContain('Math.round(bossCellSizePx.value * scale)')
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"storm_combo\" :size=\"effectCanvasSize(1.65)\" :loop=\"false\" />")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"auto_strike\" :size=\"effectCanvasSize(2.05)\" :loop=\"false\" />")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"bleed\" :size=\"effectCanvasSize(3.75)\" :loop=\"false\" />")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"final_cut\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\" />")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(1)\" :loop=\"false\" />")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"judgment_day\" :size=\"bossGridEffectSize()\" :loop=\"false\" />")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"storm_combo\" :size=\"effectCanvasSize(1.65)\" :loop=\"false\"/>")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"auto_strike\" :size=\"effectCanvasSize(2.05)\" :loop=\"false\"/>")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"bleed\" :size=\"effectCanvasSize(2.6)\" :loop=\"false\"/>")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"final_cut\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\"/>")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(2.5)\" :loop=\"false\"/>")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"judgment_day\" :size=\"bossGridEffectSize()\" :loop=\"false\"/>")
     expect(styleSource).toContain('image-rendering: pixelated;')
   })
 
@@ -40,8 +40,8 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain("height: height > 0 ? `${Math.round(height)}px` : undefined")
     expect(battleSource).toContain("effectOverlayStyle('storm_combo', { scale: 1.65, fallback:")
     expect(battleSource).toContain("effectOverlayStyle('auto_strike', { scale: 2.05, fallback:")
-    expect(battleSource).toContain("anchor: triggerAnchor('bleed', TALENT_EFFECT_WINDOW_MS, entry)")
-    expect(battleSource).toContain("fallback: effectFallback(3.75, { top: '50%', left: '50%' })")
+    expect(battleSource).toContain("anchor: triggerAnchor('bleed', BLEED_EFFECT_WINDOW_MS, entry)")
+    expect(battleSource).toContain("fallback: effectFallback(2.6, { top: '50%', left: '50%' })")
     expect(battleSource).toContain("effectOverlayStyle('final_cut', { anchor: 'grid', fallback:")
     expect(battleSource).toContain("effectOverlayStyle('collapse_trigger', { scale: 1, fallback:")
   })
@@ -50,14 +50,16 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain('const ULTIMATE_EFFECT_WINDOW_MS = 3200')
     expect(battleSource).toContain("hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)")
     expect(battleSource).toContain("effectOverlayStyle('final_cut', { anchor: 'grid', fallback:")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"final_cut\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\" />")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"final_cut\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\"/>")
   })
 
   it('流血改为按事件列表并发叠加渲染，而不是只取最新一层覆盖旧层', () => {
-    expect(battleSource).toContain("v-for=\"entry in recentTriggers('bleed')\"")
+    expect(battleSource).toContain("v-for=\"entry in recentTriggers('bleed', BLEED_EFFECT_WINDOW_MS)\"")
     expect(battleSource).not.toContain("hasRecentTrigger('bleed')")
     expect(battleSource).toContain(":key=\"entry.id\"")
     expect(battleSource).toContain('function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS, entryOverride = null) {')
+    expect(battleSource).toContain("const BLEED_EFFECT_WINDOW_MS = 720")
+    expect(battleSource).toContain("return filtered.slice(0, 2)")
   })
 
   it('审判日在战斗页使用独立更长的挂载窗口，避免比 demo 提前卸载', () => {
@@ -65,11 +67,14 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain("hasRecentTrigger('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)")
     expect(battleSource).toContain("triggerKey('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)")
     expect(battleSource).toContain("effectOverlayStyle('judgment_day', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"judgment_day\" :size=\"bossGridEffectSize()\" :loop=\"false\" />")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"judgment_day\" :size=\"bossGridEffectSize()\" :loop=\"false\"/>")
   })
 
   it('流血以格子中心为喷发源，终末血斩的终结斩回退到更细一版的 5x5 对角重斩', () => {
     expect(canvasSource).toContain('const cx = size / 2, cy = size / 2')
+    expect(canvasSource).toContain('for (let i = 0; i < 24; i++)')
+    expect(canvasSource).toContain('const ang = Math.random() * Math.PI * 2, dist = Math.random() * 20')
+    expect(canvasSource).toContain('if (s.timer > 2200) return this.init(size)')
     expect(canvasSource).toContain('const startX = -size * 0.32')
     expect(canvasSource).toContain('const endX = size * 1.32')
     expect(canvasSource).toContain('for (let w = -7; w <= 7; w++)')
@@ -82,13 +87,13 @@ describe('BattlePage 战斗特效覆盖层', () => {
   })
 
   it('崩塌只保留覆盖层瞬发特效，不再在格子内部重复渲染 PixelShatter', () => {
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(1)\" :loop=\"false\" />")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(2.5)\" :loop=\"false\"/>")
     expect(battleSource).not.toContain('<PixelShatter')
   })
 
   it('崩塌特效缩小25%并让渲染节奏提速25%', () => {
     expect(battleSource).toContain("effectOverlayStyle('collapse_trigger', { scale: 1, fallback:")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(1)\" :loop=\"false\" />")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(2.5)\" :loop=\"false\"/>")
     expect(canvasSource).toContain('const impactX = size / 2')
     expect(canvasSource).toContain('const impactY = size / 2')
     expect(canvasSource).toContain('const pivotX = impactX - handleLen')

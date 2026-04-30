@@ -44,8 +44,8 @@ describe('BattlePage 连击金色态', () => {
     expect(stateSource).not.toContain('comboTimeoutPercent.value = Math.round(Math.max(0, 100 - (elapsed / COMBO_TIMEOUT_MS) * 100))')
     expect(stateSource).toContain("kind: 'combo'")
     expect(battleSource).toContain('class="status-panel__meta status-panel__meta--combo"')
-    expect(battleSource).toContain('class="status-panel__secondary" :style="status.secondaryStyle || null"')
-    expect(battleSource).toContain('class="status-panel__hint status-panel__hint--inline" :style="status.hintStyle || null"')
+    expect(battleSource).toContain("class=\"status-panel__secondary\"\n                          :style=\"status.secondaryStyle || null\"")
+    expect(battleSource).toContain("class=\"status-panel__hint status-panel__hint--inline\"\n                          :style=\"status.hintStyle || null\"")
   })
 
   it('200连击以上恢复金黄色主题，数字、倒计时、加伤与进度条都切到金色渐变', () => {

@@ -1636,6 +1636,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 	if compiledTalents.Has("armor_ultimate") {
 		combatState.JudgmentDayTriggerCount = compiledTalents.Armor.UltimateTrigger
+		combatState.JudgmentDayCooldownSec = compiledTalents.Armor.UltimateCooldown
 	}
 
 	result.TalentCombatState = combatState

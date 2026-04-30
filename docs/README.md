@@ -15,7 +15,7 @@
   - [developer-reference/2026-04-26-天赋系统开发参考](./developer-reference/2026-04-26-天赋系统开发参考.md)
   - [developer-reference/2026-04-27-均衡攻势工作原理](./developer-reference/2026-04-27-均衡攻势工作原理.md)
   - [developer-reference/2026-04-27-碎盾攻坚工作原理](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
-  - [developer-reference/2026-04-27-致命洞察工作原理](./developer-reference/2026-04-27-致命洞察工作原理.md)
+  - [developer-reference/2026-04-27-致命洞察工作原理（已失效，仅作快照）](./developer-reference/2026-04-27-致命洞察工作原理.md)
   - [developer-reference/2026-04-30-V2伤害计算链路总览](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
 - 相关设计与实施：
   - [designs/2026-04-25-Boss分区基础视觉与点击口径设计](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
@@ -71,7 +71,7 @@
   - [developer-reference/2026-04-26-天赋系统开发参考](./developer-reference/2026-04-26-天赋系统开发参考.md)
   - [developer-reference/2026-04-27-均衡攻势工作原理](./developer-reference/2026-04-27-均衡攻势工作原理.md)
   - [developer-reference/2026-04-27-碎盾攻坚工作原理](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
-  - [developer-reference/2026-04-27-致命洞察工作原理](./developer-reference/2026-04-27-致命洞察工作原理.md)
+  - [developer-reference/2026-04-27-致命洞察工作原理（已失效，仅作快照）](./developer-reference/2026-04-27-致命洞察工作原理.md)
   - [developer-reference/2026-04-30-V2伤害计算链路总览](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
 - 历史草案：
   - [designs/2026-04-23-玩家技能树系统策划案](./designs/2026-04-23-玩家技能树系统策划案.md)

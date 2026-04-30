@@ -559,7 +559,7 @@ func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected first line object, got %+v", normalCore[0])
 	}
-	if firstLine["label"] != "触发次数" || firstLine["text"] != "45 → 40" {
+	if firstLine["label"] != "触发次数" || firstLine["text"] != "55 → 50" {
 		t.Fatalf("expected trigger count preview from backend, got %+v", firstLine)
 	}
 
@@ -567,7 +567,7 @@ func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected effectDescriptions map in payload, got %+v", payload["effectDescriptions"])
 	}
-	if effectDescriptions["normal_core"] != "每 45 次点击触发追击爆发，造成 基础伤害 x 50% x 24 段总伤。可无限触发。" {
+	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 22% x 18 段总伤。可无限触发。" {
 		t.Fatalf("expected dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
 	}
 }
@@ -617,14 +617,14 @@ func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected second line object, got %+v", normalCore[1])
 	}
-	if secondLine["label"] != "追击段数" || secondLine["text"] != "24 → 28" {
+	if secondLine["label"] != "追击段数" || secondLine["text"] != "18 → 22" {
 		t.Fatalf("expected updated preview from backend, got %+v", secondLine)
 	}
 	firstLine, ok := normalCore[0].(map[string]any)
 	if !ok {
 		t.Fatalf("expected first line object, got %+v", normalCore[0])
 	}
-	if firstLine["label"] != "触发次数" || firstLine["text"] != "45 → 40" {
+	if firstLine["label"] != "触发次数" || firstLine["text"] != "55 → 50" {
 		t.Fatalf("expected updated trigger count preview from backend, got %+v", firstLine)
 	}
 
@@ -632,7 +632,7 @@ func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected effectDescriptions map in payload, got %+v", payload["effectDescriptions"])
 	}
-	if effectDescriptions["normal_core"] != "每 45 次点击触发追击爆发，造成 基础伤害 x 50% x 24 段总伤。可无限触发。" {
+	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 22% x 18 段总伤。可无限触发。" {
 		t.Fatalf("expected upgraded dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
 	}
 }

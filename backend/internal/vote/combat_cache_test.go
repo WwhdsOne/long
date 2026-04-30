@@ -129,7 +129,7 @@ func TestCompileTalentSetBuildsNormalThresholdsAndTierFlags(t *testing.T) {
 	if compiled.Normal.ExtraHits != expectedHits {
 		t.Fatalf("expected compiled normal extra hits %d, got %d", expectedHits, compiled.Normal.ExtraHits)
 	}
-	expectedRatio := normalChaseUpgradeRatioForLevel(3) + 0.15
+	expectedRatio := normalChaseUpgradeRatioForLevel(3) + normalFillerT2aChaseForLevel(1)
 	if compiled.Normal.ChaseRatio != expectedRatio {
 		t.Fatalf("expected compiled normal chase ratio %.2f, got %.2f", expectedRatio, compiled.Normal.ChaseRatio)
 	}
@@ -162,7 +162,7 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 			"crit_skinner":       4,
 			"crit_doom_judgment": 2,
 			"crit_final_cut":     1,
-			"crit_death_ecstasy": 5,
+			"crit_weakspot_insight": 5,
 		},
 	})
 
@@ -208,11 +208,11 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 
 func TestArmorCoreCollapseTriggerCurveAndTierBonus(t *testing.T) {
 	expected := map[int]int{
-		1: 100,
-		2: 95,
-		3: 90,
-		4: 85,
-		5: 80,
+		1: 120,
+		2: 115,
+		3: 110,
+		4: 105,
+		5: 100,
 	}
 	for level, want := range expected {
 		if got := armorCoreCollapseTriggerForLevel(level); got != want {
@@ -236,8 +236,8 @@ func TestArmorCoreCollapseTriggerCurveAndTierBonus(t *testing.T) {
 	if !compiled.IsTierFull(TalentTreeArmor, 1) {
 		t.Fatalf("expected armor tier 1 to be full, got %+v", compiled.tierFull)
 	}
-	if compiled.Armor.CollapseTrigger != 80 {
-		t.Fatalf("expected tier-full armor collapse trigger remain 80, got %d", compiled.Armor.CollapseTrigger)
+	if compiled.Armor.CollapseTrigger != 100 {
+		t.Fatalf("expected tier-full armor collapse trigger remain 100, got %d", compiled.Armor.CollapseTrigger)
 	}
 }
 
@@ -266,16 +266,16 @@ func TestCritOmenResonateRemovedAndDescriptionsUpdated(t *testing.T) {
 		t.Fatalf("expected crit_core description to avoid removed wording, got %q", coreDesc)
 	}
 
-	deathEcstasy, ok := GetTalentDef("crit_death_ecstasy")
+	weakspotInsight, ok := GetTalentDef("crit_weakspot_insight")
 	if !ok {
-		t.Fatal("expected crit_death_ecstasy def")
+		t.Fatal("expected crit_weakspot_insight def")
 	}
-	deathDesc := TalentEffectDescriptionForLevel(deathEcstasy, 5)
-	if containsAny(deathDesc, []string{"上限100", "最高到100", "无上限"}) {
-		t.Fatalf("expected death ecstasy description to avoid removed wording, got %q", deathDesc)
+	wsDesc := TalentEffectDescriptionForLevel(weakspotInsight, 5)
+	if containsAny(wsDesc, []string{"上限100", "最高到100", "无上限"}) {
+		t.Fatalf("expected weakspot insight description to avoid removed wording, got %q", wsDesc)
 	}
-	if containsAny(deathDesc, []string{"× ×", "x x", "× ×1.0", "x x1.0"}) {
-		t.Fatalf("expected death ecstasy description to avoid duplicated multiplier marker, got %q", deathDesc)
+	if containsAny(wsDesc, []string{"× ×", "x x", "× ×1.0", "x x1.0"}) {
+		t.Fatalf("expected weakspot insight description to avoid duplicated multiplier marker, got %q", wsDesc)
 	}
 }
 

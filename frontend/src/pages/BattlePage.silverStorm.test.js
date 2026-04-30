@@ -44,7 +44,7 @@ describe('白银风暴秒级状态', () => {
     expect(battleSource).toContain("hasRecentTrigger('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)")
     expect(battleSource).toContain("effectOverlayStyle('silver_storm', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })")
     expect(battleSource).toContain('function ultimateEffectCanvasSize() {')
-    expect(battleSource).toContain('<PixelEffectCanvas effect="silver_storm" :size="ultimateEffectCanvasSize()" :loop="false" />')
+    expect(battleSource).toContain('<PixelEffectCanvas effect="silver_storm" :size="ultimateEffectCanvasSize()" :loop="false"/>')
   })
 
   it('战斗页不再保留旧的暴伤x3和死亡狂喜持续 Buff 占位', () => {

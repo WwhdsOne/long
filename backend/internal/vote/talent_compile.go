@@ -17,8 +17,9 @@ type compiledArmorTalents struct {
 	AutoStrikeTrigger int64
 	AutoStrikeRatio   float64
 	CollapseAmp       float64
-	UltimateTrigger   int64
-	UltimateHpCut     float64
+	UltimateTrigger      int64
+	UltimateDamageRatio  float64
+	UltimateCooldown     int64
 }
 
 type compiledCritTalents struct {
@@ -141,81 +142,115 @@ func buildTalentModifiersFromCompiled(compiled *CompiledTalentSet) *TalentModifi
 		}
 
 		val, _ := def.EffectValue.(map[string]any)
-		levelFactor := float64(level)
 
 		switch def.EffectType {
 		case "attack_power_percent":
-			if p, ok := val["percent"].(float64); ok {
-				mods.AttackPowerPercent += p * levelFactor
+			if _, ok := val["percent"].(float64); ok {
+				switch id {
+				case "normal_atk_up":
+					mods.AttackPowerPercent += normalAtkUpPercentForLevel(level)
+				case "normal_filler_t1a":
+					mods.AttackPowerPercent += normalFillerT1aAtkPercentForLevel(level)
+				case "normal_filler_t3b":
+					mods.AttackPowerPercent += normalFillerT3bAtkPercentForLevel(level)
+				case "armor_filler_t1a":
+					mods.AttackPowerPercent += armorFillerT1aAtkPercentForLevel(level)
+				case "crit_filler_t1a":
+					mods.AttackPowerPercent += critFillerT1aAtkPercentForLevel(level)
+				}
 			}
 		case "all_damage_amplify":
-			if p, ok := val["percent"].(float64); ok {
-				mods.AllDamageAmplify += p * levelFactor
+			if _, ok := val["percent"].(float64); ok {
+				switch id {
+				case "normal_dmg_amp":
+					mods.AllDamageAmplify += normalDmgAmpPercentForLevel(level)
+				case "normal_filler_t1b":
+					mods.AllDamageAmplify += normalFillerT1bDmgAmpForLevel(level)
+				case "normal_filler_t2b":
+					mods.AllDamageAmplify += normalFillerT2bDmgAmpForLevel(level)
+				case "normal_filler_t3a":
+					mods.AllDamageAmplify += normalFillerT3aDmgAmpForLevel(level)
+				case "armor_boss_hunter":
+					mods.AllDamageAmplify += armorBossHunterPercentForLevel(level)
+				case "armor_filler_t2a":
+					mods.AllDamageAmplify += armorFillerT2aDmgAmpForLevel(level)
+				case "armor_filler_t3a":
+					mods.AllDamageAmplify += armorFillerT3aDmgAmpForLevel(level)
+				case "armor_filler_t3b":
+					mods.AllDamageAmplify += armorFillerT3bDmgAmpForLevel(level)
+				case "crit_filler_t2a":
+					mods.AllDamageAmplify += critFillerT2aDmgAmpForLevel(level)
+				case "crit_filler_t3a":
+					mods.AllDamageAmplify += critFillerT3aDmgAmpForLevel(level)
+				}
 			}
 		case "part_type_damage":
 			partTypeStr, _ := val["partType"].(string)
-			percent, _ := val["percent"].(float64)
-			if id == "normal_soft_atk" {
-				percent = normalCoreScaledPartDamage(level, 0.80, 3.00)
-			}
-			if id == "armor_heavy_atk" {
-				percent = normalCoreScaledPartDamage(level, 1.00, 3.00)
-			}
 			if partTypeStr != "" {
-				mods.PartTypeBonus[PartType(partTypeStr)] += percent
+				switch id {
+				case "normal_soft_atk":
+					mods.PartTypeBonus[PartType(partTypeStr)] += normalSoftAtkPercentForLevel(level)
+				case "armor_heavy_atk":
+					mods.PartTypeBonus[PartType(partTypeStr)] += armorHeavyAtkPercentForLevel(level)
+				}
 			}
 		case "armor_pen_extra":
-			if p, ok := val["extraPen"].(float64); ok {
-				if id == "armor_pen_up" {
+			if _, ok := val["extraPen"].(float64); ok {
+				switch id {
+				case "armor_pen_up":
 					mods.ArmorPenExtra += armorPenUpExtraForLevel(level)
-				} else {
-					mods.ArmorPenExtra += p * levelFactor
+				case "armor_filler_t1b":
+					mods.ArmorPenExtra += armorFillerT1bPenForLevel(level)
 				}
 			}
 		case "crit_damage_bonus":
-			if p, ok := val["percent"].(float64); ok {
-				if id == "crit_cruel" {
+			if _, ok := val["percent"].(float64); ok {
+				switch id {
+				case "crit_cruel":
 					mods.CritDamagePercentBonus += critCruelBonusForLevel(level)
-				} else {
-					mods.CritDamagePercentBonus += p * levelFactor
+				case "crit_filler_t1b":
+					mods.CritDamagePercentBonus += critFillerT1bCritDmgForLevel(level)
+				case "crit_filler_t3b":
+					mods.CritDamagePercentBonus += critFillerT3bCritDmgForLevel(level)
 				}
 			}
 		case "per_part_damage":
-			if p, ok := val["percentPerPart"].(float64); ok {
-				mods.PerPartDamagePercent += p * levelFactor
+			if _, ok := val["percentPerPart"].(float64); ok {
+				if id == "normal_encircle" {
+					mods.PerPartDamagePercent += normalEncirclePercentForLevel(level)
+				}
 			}
 		case "low_hp_bonus":
-			if m, ok := val["multiplier"].(float64); ok {
+			if _, ok := val["multiplier"].(float64); ok {
 				if id == "normal_low_hp" {
 					mods.LowHpMultiplier = normalLowHPMultiplierForLevel(level)
-				} else {
-					mods.LowHpMultiplier += m * levelFactor
 				}
 			}
-			if threshold, ok := val["hpThreshold"].(float64); ok {
-				t := threshold * levelFactor
+			if _, ok := val["hpThreshold"].(float64); ok {
 				if id == "normal_low_hp" {
-					t = normalLowHPThresholdForLevel(level)
-				}
-				if t > mods.LowHpThreshold {
-					mods.LowHpThreshold = t
+					t := normalLowHPThresholdForLevel(level)
+					if t > mods.LowHpThreshold {
+						mods.LowHpThreshold = t
+					}
 				}
 			}
 		case "pen_to_amplify":
-			if r, ok := val["convertRatio"].(float64); ok {
+			if _, ok := val["convertRatio"].(float64); ok {
 				if id == "armor_pen_convert" {
 					mods.PenToAmplifyRatio = armorPenConvertRatioForLevel(level)
-				} else {
-					mods.PenToAmplifyRatio = r * levelFactor
 				}
 			}
 		case "chase_ratio_bonus":
-			if p, ok := val["percent"].(float64); ok {
-				mods.ChaseRatioBonus += p * levelFactor
+			if _, ok := val["percent"].(float64); ok {
+				if id == "normal_filler_t2a" {
+					mods.ChaseRatioBonus += normalFillerT2aChaseForLevel(level)
+				}
 			}
 		case "omen_crit_damage":
-			if p, ok := val["critDmgPerOmen"].(float64); ok {
-				mods.OmenCritDmgExtra += p * levelFactor
+			if _, ok := val["critDmgPerOmen"].(float64); ok {
+				if id == "crit_filler_t2b" {
+					mods.OmenCritDmgExtra += critFillerT2bOmenCritDmgForLevel(level)
+				}
 			}
 		case "overkill":
 			if _, ok := val["baseCritBonus"].(float64); ok {
@@ -304,9 +339,10 @@ func compileArmorTalents(compiled *CompiledTalentSet) compiledArmorTalents {
 	if compiled.Has("armor_ultimate") {
 		level := compiled.Level("armor_ultimate")
 		armor.UltimateTrigger = int64(armorUltimateTriggerCountForLevel(level))
-		armor.UltimateHpCut = armorUltimateHpCutForLevel(level)
+		armor.UltimateDamageRatio = armorUltimateDamageRatioForLevel(level)
+		armor.UltimateCooldown = armorUltimateCooldownForLevel(level)
 		if compiled.IsTierFull(TalentTreeArmor, 4) {
-			armor.UltimateHpCut += 0.10
+			armor.UltimateDamageRatio += 1.0
 		}
 	}
 
@@ -345,8 +381,8 @@ func compileCritTalents(compiled *CompiledTalentSet) compiledCritTalents {
 		crit.FinalCutOmenTrigger = critFinalCutOmenTriggerForLevel(level)
 		crit.FinalCutDamageRatio = critFinalCutDamageRatioForLevel(level)
 	}
-	if compiled.Has("crit_death_ecstasy") {
-		crit.WeakspotInsightMult = critWeakspotInsightMultiplierForLevel(compiled.Level("crit_death_ecstasy"))
+	if compiled.Has("crit_weakspot_insight") {
+		crit.WeakspotInsightMult = critWeakspotInsightMultiplierForLevel(compiled.Level("crit_weakspot_insight"))
 	}
 	if compiled.Has("crit_doom_judgment") {
 		level := compiled.Level("crit_doom_judgment")
@@ -359,16 +395,11 @@ func compileCritTalents(compiled *CompiledTalentSet) compiledCritTalents {
 }
 
 func chaseRatioBonusForLevel(level int, talentID string) float64 {
-	def, ok := talentDefs[talentID]
-	if !ok {
-		return 0
+	switch talentID {
+	case "normal_filler_t2a":
+		return normalFillerT2aChaseForLevel(level)
 	}
-	val, _ := def.EffectValue.(map[string]any)
-	percent, _ := val["percent"].(float64)
-	if percent <= 0 {
-		return 0
-	}
-	return percent * float64(max(level, 1))
+	return 0
 }
 
 func cloneTalentModifiers(mods *TalentModifiers) *TalentModifiers {

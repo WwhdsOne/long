@@ -295,13 +295,13 @@ func TestBuildTalentEffectLinesReturnsUpgradePreviewForNormalCore(t *testing.T) 
 		t.Fatalf("expected 3 effect lines, got %+v", lines)
 	}
 
-	if lines[0].Label != "触发次数" || lines[0].Text != "45 → 40" {
+	if lines[0].Label != "触发次数" || lines[0].Text != "55 → 50" {
 		t.Fatalf("expected trigger count preview, got %+v", lines[0])
 	}
-	if lines[1].Label != "追击段数" || lines[1].Text != "24 → 28" {
+	if lines[1].Label != "追击段数" || lines[1].Text != "18 → 22" {
 		t.Fatalf("expected extra hits preview, got %+v", lines[1])
 	}
-	if lines[2].Label != "追击倍率" || lines[2].Text != "100% → 150%" {
+	if lines[2].Label != "追击倍率" || lines[2].Text != "22% → 25%" {
 		t.Fatalf("expected chase ratio preview, got %+v", lines[2])
 	}
 }
@@ -332,21 +332,21 @@ func TestNormalCoreLevelFiveTriggersAtThirtyHits(t *testing.T) {
 		t.Fatalf("activate boss: %v", err)
 	}
 
-	for i := 1; i <= 29; i++ {
+	for i := 1; i <= 39; i++ {
 		result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
 		if err != nil {
 			t.Fatalf("click %d: %v", i, err)
 		}
 		for _, ev := range result.TalentEvents {
 			if ev.TalentID == "normal_core" {
-				t.Fatalf("expected no normal_core trigger before 30 hits, got event at click %d: %+v", i, ev)
+				t.Fatalf("expected no normal_core trigger before 40 hits, got event at click %d: %+v", i, ev)
 			}
 		}
 	}
 
 	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
 	if err != nil {
-		t.Fatalf("click 30: %v", err)
+		t.Fatalf("click 40: %v", err)
 	}
 	found := false
 	for _, ev := range result.TalentEvents {
@@ -411,11 +411,11 @@ func TestSilverStormUsesTimeWindowInsteadOfAttackCountdown(t *testing.T) {
 	if !combatState.SilverStormActive {
 		t.Fatal("expected silver storm active after part break")
 	}
-	if combatState.SilverStormEndsAt != baseNow.Unix()+20 {
-		t.Fatalf("expected silver storm ends at %d, got %d", baseNow.Unix()+20, combatState.SilverStormEndsAt)
+	if combatState.SilverStormEndsAt != baseNow.Unix()+16 {
+		t.Fatalf("expected silver storm ends at %d, got %d", baseNow.Unix()+16, combatState.SilverStormEndsAt)
 	}
-	if combatState.SilverStormRemaining != 20 {
-		t.Fatalf("expected silver storm remaining 20, got %d", combatState.SilverStormRemaining)
+	if combatState.SilverStormRemaining != 16 {
+		t.Fatalf("expected silver storm remaining 16, got %d", combatState.SilverStormRemaining)
 	}
 
 	second, err := store.ClickBossPart(ctx, "boss-part:1-0", nickname)
@@ -429,7 +429,7 @@ func TestSilverStormUsesTimeWindowInsteadOfAttackCountdown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get combat state during silver storm: %v", err)
 	}
-	if combatState.SilverStormRemaining != 20 {
+	if combatState.SilverStormRemaining != 16 {
 		t.Fatalf("expected silver storm remaining unchanged within same second, got %d", combatState.SilverStormRemaining)
 	}
 
@@ -482,7 +482,7 @@ func TestSilverStormTriggersWhenExtraTalentDamageBreaksPart(t *testing.T) {
 	}
 
 	state := NewTalentCombatState()
-	state.PartHeavyClickCount[TalentPartKey(0, 0)] = 29
+	state.PartJudgmentDayCount[TalentPartKey(0, 0)] = 59
 	if err := store.SaveTalentCombatState(ctx, nickname, "silverstorm-extra-damage-test", state); err != nil {
 		t.Fatalf("seed combat state: %v", err)
 	}

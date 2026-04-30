@@ -93,6 +93,7 @@ func applyArmorCoreTrigger(tc *talentTriggerContext) {
 	}
 
 	partKey := TalentPartKey(tc.part.X, tc.part.Y)
+
 	tc.combatState.PartHeavyClickCount[partKey]++
 	if tc.combatState.CollapseEndsAt > tc.now && slices.Contains(tc.combatState.CollapseParts, tc.partIndex) {
 		return
@@ -177,18 +178,35 @@ func applyArmorUltimateTrigger(tc *talentTriggerContext) {
 
 	pk := TalentPartKey(tc.part.X, tc.part.Y)
 	jdTrigger := tc.compiledTalents.Armor.UltimateTrigger
-	hpCut := tc.compiledTalents.Armor.UltimateHpCut
-	if tc.combatState.JudgmentDayUsed[pk] || tc.combatState.PartHeavyClickCount[pk] < jdTrigger {
+	now := tc.now
+
+	// 冷却中不累计，冷却结束则重置
+	cooldown := tc.compiledTalents.Armor.UltimateCooldown
+	if lastTrigger, ok := tc.combatState.JudgmentDayUsed[pk]; ok && lastTrigger > 0 {
+		if now-lastTrigger < cooldown {
+			return
+		}
+		delete(tc.combatState.JudgmentDayUsed, pk)
+		tc.combatState.PartJudgmentDayCount[pk] = 0
+	}
+
+	tc.combatState.PartJudgmentDayCount[pk]++
+	if tc.combatState.PartJudgmentDayCount[pk] < jdTrigger {
 		return
 	}
 
-	tc.combatState.JudgmentDayUsed[pk] = true
-	cd := min(int64(float64(tc.boss.MaxHP)*hpCut), tc.part.CurrentHP)
-	_, cd, _ = applyBossPartDamageDelta(tc.boss, tc.part, cd)
-	tc.totalExtra += cd
+	ratio := tc.compiledTalents.Armor.UltimateDamageRatio
+	dmg := int64(float64(maxInt64(1, tc.baseDamage)) * ratio)
+	if dmg > tc.part.CurrentHP {
+		dmg = tc.part.CurrentHP
+	}
+	_, dmg, _ = applyBossPartDamageDelta(tc.boss, tc.part, dmg)
+	tc.totalExtra += dmg
+	tc.combatState.JudgmentDayUsed[pk] = now
+	tc.combatState.PartJudgmentDayCount[pk] = 0
 	tc.events = append(tc.events, TalentTriggerEvent{
-		TalentID: "armor_ultimate", Name: "审判日触发！削除 50% 最大生命", EffectType: "judgment_day",
-		ExtraDamage: cd, Message: "审判日触发！削除 50% 最大生命",
+		TalentID: "armor_ultimate", Name: "审判日", EffectType: "judgment_day",
+		ExtraDamage: dmg, Message: fmt.Sprintf("审判日！×%.1f 攻击力", ratio),
 	})
 	tc.damageTypeOverride = "judgement"
 }

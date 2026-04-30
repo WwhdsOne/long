@@ -25,14 +25,16 @@ type onlineCountPayload struct {
 }
 
 type realtimeUserStatePayload struct {
-	UserStats     *vote.UserStats     `json:"userStats,omitempty"`
-	MyBossStats   *vote.BossUserStats `json:"myBossStats,omitempty"`
-	Loadout       vote.Loadout        `json:"loadout"`
-	CombatStats   vote.CombatStats    `json:"combatStats"`
-	Gold          int64               `json:"gold"`
-	Stones        int64               `json:"stones"`
-	TalentPoints  int64               `json:"talentPoints"`
-	RecentRewards []vote.Reward       `json:"recentRewards,omitempty"`
+	UserStats          *vote.UserStats          `json:"userStats,omitempty"`
+	MyBossStats        *vote.BossUserStats      `json:"myBossStats,omitempty"`
+	Loadout            vote.Loadout             `json:"loadout"`
+	CombatStats        vote.CombatStats         `json:"combatStats"`
+	Gold               int64                    `json:"gold"`
+	Stones             int64                    `json:"stones"`
+	TalentPoints       int64                    `json:"talentPoints"`
+	RecentRewards      []vote.Reward            `json:"recentRewards,omitempty"`
+	TalentEvents       []vote.TalentTriggerEvent `json:"talentEvents,omitempty"`
+	TalentCombatState  *vote.TalentCombatState  `json:"talentCombatState,omitempty"`
 }
 
 type publicStatePayload struct {
@@ -155,14 +157,16 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 
 func buildRealtimeUserStatePayload(state vote.UserState) realtimeUserStatePayload {
 	return realtimeUserStatePayload{
-		UserStats:     state.UserStats,
-		MyBossStats:   state.MyBossStats,
-		Loadout:       state.Loadout,
-		CombatStats:   state.CombatStats,
-		Gold:          state.Gold,
-		Stones:        state.Stones,
-		TalentPoints:  state.TalentPoints,
-		RecentRewards: state.RecentRewards,
+		UserStats:         state.UserStats,
+		MyBossStats:       state.MyBossStats,
+		Loadout:           state.Loadout,
+		CombatStats:       state.CombatStats,
+		Gold:              state.Gold,
+		Stones:            state.Stones,
+		TalentPoints:      state.TalentPoints,
+		RecentRewards:     state.RecentRewards,
+		TalentEvents:      state.TalentEvents,
+		TalentCombatState: state.TalentCombatState,
 	}
 }
 

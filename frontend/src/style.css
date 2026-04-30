@@ -904,6 +904,7 @@ select {
 .boss-right-legend__item--normal    { color: #e2e8f0; border-color: rgba(226,232,240,0.3); }
 .boss-right-legend__item--critical  { color: #fbbf24; border-color: rgba(251,191,36,0.35); }
 .boss-right-legend__item--weak      { color: #facc15; border-color: rgba(239,68,68,0.35); text-shadow: 0 0 4px rgba(239,68,68,0.3); }
+.boss-right-legend__item--bleed     { color: #ef4444; border-color: rgba(239,68,68,0.35); text-shadow: 0 0 4px rgba(239,68,68,0.25); }
 .boss-right-legend__item--pursuit   { color: #60a5fa; border-color: rgba(96,165,250,0.3); }
 .boss-right-legend__item--true      { color: #c084fc; border-color: rgba(192,132,252,0.3); }
 .boss-right-legend__item--doomsday  { color: #c084fc; border-color: rgba(192,132,252,0.3); }
@@ -3134,7 +3135,6 @@ select {
 
 .boss-zone-button__damage-burst--weakCritical {
   color: #facc15;
-  -webkit-text-stroke: 0.6px #dc2626;
   text-shadow: 0 0 12px rgba(250, 204, 21, 0.55), 0 0 22px rgba(239, 68, 68, 0.3), 0 2px 8px rgba(15, 23, 42, 0.65);
   animation:
     boss-damage-float var(--damage-ttl) cubic-bezier(0.22, 1, 0.36, 1) forwards,
@@ -4573,6 +4573,11 @@ select {
   transition: width 0.25s linear;
 }
 
+.part-status-panel__bar-fill--bleed {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.35);
+}
+
 .part-status-panel__bar-fill--collapse {
   background: linear-gradient(90deg, #f59e0b, #fcd34d);
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
@@ -4581,6 +4586,11 @@ select {
 .part-status-panel__bar-fill--skinner {
   background: linear-gradient(90deg, #ef4444, #f87171);
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+}
+
+.part-status-panel__bar-fill--judgment-day {
+  background: linear-gradient(90deg, #b45309, #f59e0b);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
 }
 
 /* 崩塌面板 */
@@ -4631,38 +4641,6 @@ select {
   font-weight: 900;
   color: #f59e0b;
   text-align: right;
-}
-
-/* 死亡狂喜倒计时 */
-.death-ecstasy-timer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  backdrop-filter: blur(6px);
-}
-
-.death-ecstasy-timer__icon {
-  font-size: 0.9rem;
-}
-
-.death-ecstasy-timer__label {
-  font-size: 0.65rem;
-  font-weight: 800;
-  color: #fca5a5;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.death-ecstasy-timer__count {
-  font-size: 0.9rem;
-  font-weight: 900;
-  color: #fecaca;
-  margin-left: auto;
-  text-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
 /* 部位累计进度 / 部位状态面板 */

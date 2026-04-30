@@ -92,9 +92,9 @@ const DAMAGE_VARIANTS = {
         ttl: 1100,
         shake: 0,
         stageFx: [],
-        particles: 4,
+        particles: 1,
         colors: ['#ef4444', '#dc2626', '#b91c1c'],
-        label: '',
+        label: '出血',
     },
 }
 
@@ -274,21 +274,23 @@ const partProgressList = computed(() => {
   if (!Array.isArray(parts) || parts.length === 0) return []
   const stormMap = cs?.partStormComboCount || {}
   const heavyMap = cs?.partHeavyClickCount || {}
-  const jdUsedMap = cs?.judgmentDayUsed || {}
-  const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
-  const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
-  const jdTrigger = judgmentDayTrigger.value
-  const result = []
-  for (const part of parts) {
-    const key = `${part.x}-${part.y}`
-    const storm = Number(stormMap[key]) || 0
-    const armor = Number(heavyMap[key]) || 0
-    const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
-    const rawHeavy = Number(heavyMap[key]) || 0
-    const jdUsed = part.type === 'heavy' && rawHeavy > 0 && jdUsedMap[key] === true
-    // 已触发后不再展示审判日进度（避免"永远满条+已触发"误导）
-    const jdCount = (part.type === 'heavy' && !jdUsed) ? rawHeavy : 0
-    const jdProgress = jdTrigger > 0 ? Math.min(100, Math.round((jdCount / jdTrigger) * 100)) : 0
+	  const jdUsedMap = cs?.judgmentDayUsed || {}
+	  const jdCooldown = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
+	  const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
+	  const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
+	  const jdTrigger = judgmentDayTrigger.value
+	  const nowSec = Date.now() / 1000
+	  const result = []
+	  for (const part of parts) {
+	    const key = `${part.x}-${part.y}`
+	    const storm = Number(stormMap[key]) || 0
+	    const armor = Number(heavyMap[key]) || 0
+	    const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
+	    const rawHeavy = Number(heavyMap[key]) || 0
+	    const lastJdTrigger = Number(jdUsedMap[key]) || 0
+	    const jdOnCooldown = part.type === 'heavy' && lastJdTrigger > 0 && jdCooldown > 0 && (nowSec - lastJdTrigger) < jdCooldown
+	    const jdCount = (part.type === 'heavy' && !jdOnCooldown) ? rawHeavy : 0
+	    const jdProgress = jdTrigger > 0 ? Math.min(100, Math.round((jdCount / jdTrigger) * 100)) : 0
     if (storm <= 0 && armor <= 0 && autoStrike <= 0 && jdCount <= 0) continue
     if (!part.alive) continue
     result.push({
@@ -309,8 +311,8 @@ const partProgressList = computed(() => {
       autoStrikeTimeoutPercent: autoStrike > 0 ? safeAutoStrikeTimeoutPercent.value : 0,
       judgmentDay: jdCount,
       judgmentDayTrigger: jdTrigger,
-      judgmentDayUsed: jdUsed,
-      judgmentDayProgress: jdUsed ? 100 : jdProgress,
+      judgmentDayOnCooldown: jdOnCooldown,
+      judgmentDayProgress: jdOnCooldown ? 100 : jdProgress,
       alive: part.alive,
     })
   }
@@ -375,17 +377,18 @@ const partStatusList = computed(() => {
     const endsAt = Number(skinnerMap[key]) || 0
     if (endsAt <= nowSec) continue
     const remainingMs = Math.max(0, endsAt * 1000 - nowMs)
-    const durationSec = Math.max(0, Number(talentVisualState.value?.skinnerDurationByPart?.[key]) || 0)
+    const skinnerDurationSec = Math.max(0, Number(cs?.skinnerDurationByPart?.[key]) || Number(talentVisualState.value?.skinnerDurationByPart?.[key]) || 0)
     result.push({
       key: `${key}:skinner`,
       partKey: key,
       name: part.displayName || partTypeLabel(part.type),
       type: part.type,
       statusKey: 'skinner',
-      statusLabel: '剥皮',
+      statusLabel: '变为弱点',
       remainingSec: Math.max(0, Math.ceil(endsAt - nowSec)),
-      progress: durationSec > 0
-        ? Math.min(100, Math.max(0, (remainingMs / (durationSec * 1000)) * 100))
+      showProgress: false,
+      progress: skinnerDurationSec > 0
+        ? Math.min(100, Math.max(0, (remainingMs / (skinnerDurationSec * 1000)) * 100))
         : 0,
     })
   }
@@ -407,6 +410,33 @@ const partStatusList = computed(() => {
       progress: 0,
     })
   }
+	  // 审判日冷却状态
+	  const jdCooldownCheckMap = cs?.judgmentDayUsed || {}
+	  const jdCooldownCheckSec = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
+	  if (jdCooldownCheckSec > 0) {
+	    for (const part of parts) {
+	      if (!part.alive) continue
+	      if (part.type !== 'heavy') continue
+	      const key = `${part.x}-${part.y}`
+	      const lastTrigger = Number(jdCooldownCheckMap[key]) || 0
+	      if (lastTrigger <= 0) continue
+	      const remaining = Math.max(0, lastTrigger + jdCooldownCheckSec - nowSec)
+	      if (remaining <= 0) continue
+	      result.push({
+	        key: `${key}:jd-cooldown`,
+	        partKey: key,
+	        name: part.displayName || partTypeLabel(part.type),
+	        type: part.type,
+	        statusKey: 'judgment-day',
+	        statusLabel: '审判日',
+	        statusMeta: '冷却中',
+	        remainingSec: Math.ceil(remaining),
+	        progress: Math.min(100, Math.max(0, ((jdCooldownCheckSec - remaining) / jdCooldownCheckSec) * 100)),
+	        showCountdown: true,
+	        showProgress: true,
+	      })
+	    }
+	  }
   return result
 })
 
@@ -509,6 +539,7 @@ const globalStatusList = computed(() => {
       primary: skinnerCooldownRemaining > 0 ? `${skinnerCooldownRemaining}s` : '待命',
       secondary: skinnerActiveCount > 0 ? `临时弱点 ${skinnerActiveCount} 处` : '暴击触发',
       hint: skinnerCooldownRemaining > 0 ? '冷却中' : '命中后制造弱点',
+      showProgress: false,
       progress: skinnerCooldownDuration > 0
         ? Math.min(100, Math.max(0, (skinnerCooldownRemainingMs / (skinnerCooldownDuration * 1000)) * 100))
         : 0,
@@ -531,19 +562,6 @@ const globalStatusList = computed(() => {
   const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0
     ? Math.max(0, Math.ceil(finalCutLastTriggerAt + finalCutRecentWindowSec - Date.now() / 1000))
     : 0
-  if (omenStacks > 0 || finalCutRecentlyTriggered > 0) {
-    result.push({
-      key: 'final-cut',
-      kind: 'final_cut',
-      title: '终末血斩',
-      primary: finalCutRecentlyTriggered > 0 ? `${finalCutRecentlyTriggered}s` : `${Math.max(0, omenCap - omenStacks)}`,
-      secondary: finalCutRecentlyTriggered > 0 ? '刚触发' : '距自动触发剩余层数',
-      hint: finalCutRecentlyTriggered > 0 ? '' : `${omenCap} 层自动引爆`,
-      progress: finalCutRecentlyTriggered > 0
-        ? Math.min(100, Math.max(0, (finalCutRecentlyTriggered / finalCutRecentWindowSec) * 100))
-        : Math.min(100, Math.max(0, (omenStacks / omenCap) * 100)),
-    })
-  }
 
   const silverStormEndsAt = Number(talentVisualState.value?.silverStormEndsAt) || 0
   const silverStormRemaining = silverStormEndsAt
@@ -1492,6 +1510,7 @@ function applyClickResult(payload) {
     myBossStats.value = nextClickState.myBossStats
     myBossDamageValue.value = nextClickState.myBossDamage
     recentRewards.value = nextClickState.recentRewards
+    triggerTalentEventDamageBursts(payload.talentEvents)
     appendTalentTriggerEvents(payload.talentEvents)
     if (payload.talentCombatState) {
       applyTalentCombatState(payload.talentCombatState)
@@ -1538,7 +1557,10 @@ function applyTalentCombatState(state) {
   for (const [partKey, endsAtRaw] of Object.entries(skinnerParts)) {
     const endsAt = Number(endsAtRaw) || 0
     if (endsAt <= nowSec) continue
-    nextSkinnerDurationByPart[partKey] = Math.max(0, Number(skinnerDurationByPart[partKey]) || 0)
+    const incomingDurationSec = Math.max(0, Number(skinnerDurationByPart[partKey]) || 0)
+    const cachedDurationSec = Math.max(0, Number(vs.skinnerDurationByPart?.[partKey]) || 0)
+    const observedRemainingSec = Math.max(0, Math.ceil(endsAt - nowSec))
+    nextSkinnerDurationByPart[partKey] = incomingDurationSec || cachedDurationSec || observedRemainingSec
   }
   vs.skinnerDurationByPart = nextSkinnerDurationByPart
   vs.doomMarkCumDamage = state.doomMarkCumDamage || {}

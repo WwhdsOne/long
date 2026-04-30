@@ -124,83 +124,190 @@ const stormComboRenderer = {
 // ---- 2. auto_strike: T形锤，锤柄底端在格子左侧边缘为圆心，绕90度砸向中心 ----
 const autoStrikeRenderer = {
   init(size) {
-    return { phase: 'idle', timer: 0, swingAngle: -Math.PI / 2, fragments: [], dent: [], flash: [] }
+    return {
+      phase: 'idle',
+      timer: 0,
+      swingAngle: -Math.PI / 2,
+      fragments: [],
+      dent: [],
+      flash: [],
+    }
   },
+
   update(s, size) {
     s.timer += 16
-    // 锤击落点固定在格子中心
+
     const handleLen = size * 0.5
     const impactX = size / 2
     const impactY = size / 2
     const pivotX = impactX - handleLen
     const pivotY = impactY
-    if (s.phase === 'idle' && s.timer > 500) { s.phase = 'swing'; s.timer = 0 }
+
+    if (s.phase === 'idle' && s.timer > 500) {
+      s.phase = 'swing'
+      s.timer = 0
+    }
+
     if (s.phase === 'swing') {
       const progress = Math.min(1, s.timer / 450)
-      const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2
+      const eased = progress < 0.5
+          ? 2 * progress * progress
+          : 1 - Math.pow(-2 * progress + 2, 2) / 2
+
       s.swingAngle = -Math.PI / 2 + eased * (Math.PI / 2)
+
       if (progress >= 1) {
-        s.phase = 'impact'; s.timer = 0
+        s.phase = 'impact'
+        s.timer = 0
+
         const hitX = pivotX + Math.cos(s.swingAngle) * handleLen
         const hitY = pivotY + Math.sin(s.swingAngle) * handleLen
+
         for (let i = 0; i < 24; i++) {
-          const ang = Math.random() * Math.PI * 2, spd = 1.5 + Math.random() * 3.5
-          s.fragments.push(makeParticle(hitX, hitY, Math.cos(ang) * spd, Math.sin(ang) * spd, 1, 3 + Math.floor(Math.random() * 3), ['#9ca3af','#6b7280','#d1d5db','#4b5563'][Math.floor(Math.random() * 4)]))
+          const ang = Math.random() * Math.PI * 2
+          const spd = 1.5 + Math.random() * 3.5
+          s.fragments.push(
+              makeParticle(
+                  hitX,
+                  hitY,
+                  Math.cos(ang) * spd,
+                  Math.sin(ang) * spd,
+                  1,
+                  3 + Math.floor(Math.random() * 3),
+                  ['#9ca3af', '#6b7280', '#d1d5db', '#4b5563'][Math.floor(Math.random() * 4)],
+              ),
+          )
         }
-        for (let i = 0; i < 10; i++) s.flash.push(makeParticle(hitX + rnd(6), hitY + rnd(6), rnd(1), rnd(1), 0.4, 2, '#fef3c7'))
-        for (let i = 0; i < 10; i++) s.dent.push(makeParticle(hitX + rnd(18), hitY + rnd(14), 0, 0, 2.5, 3, '#374151'))
+
+        for (let i = 0; i < 10; i++) {
+          s.flash.push(makeParticle(hitX + rnd(6), hitY + rnd(6), rnd(1), rnd(1), 0.4, 2, '#fef3c7'))
+        }
+
+        for (let i = 0; i < 10; i++) {
+          s.dent.push(makeParticle(hitX + rnd(18), hitY + rnd(14), 0, 0, 2.5, 3, '#374151'))
+        }
       }
     }
+
     if (s.phase === 'impact') {
-      for (const f of s.fragments) { f.x += f.vx; f.y += f.vy; f.vx *= 0.93; f.vy *= 0.93; f.life -= 0.022 }
-      for (const fl of s.flash) { fl.life -= 0.04 }
-      for (const d of s.dent) d.life -= 0.01
-      if (s.fragments.every(f => f.life <= 0) && s.flash.every(fl => fl.life <= 0) && s.timer > 1400) { s.phase = 'done'; s.timer = 0 }
+      for (const f of s.fragments) {
+        f.x += f.vx
+        f.y += f.vy
+        f.vx *= 0.93
+        f.vy *= 0.93
+        f.life -= 0.022
+      }
+
+      for (const fl of s.flash) {
+        fl.life -= 0.04
+      }
+
+      for (const d of s.dent) {
+        d.life -= 0.01
+      }
+
+      if (
+          s.fragments.every(f => f.life <= 0)
+          && s.flash.every(fl => fl.life <= 0)
+          && s.timer > 1400
+      ) {
+        s.phase = 'done'
+        s.timer = 0
+      }
     }
-    if (s.phase === 'done' && s.timer > 800) return this.init(size)
+
+    if (s.phase === 'done' && s.timer > 800) {
+      return this.init(size)
+    }
+
     return s
   },
+
   draw(ctx, s, size) {
     const handleLen = size * 0.5
     const impactX = size / 2
     const impactY = size / 2
     const pivotX = impactX - handleLen
     const pivotY = impactY
+
     if (s.phase === 'idle' || s.phase === 'swing') {
       const ang = s.swingAngle
-      // T 形锤：柄从 pivot 向 ang 延伸，锤头在柄顶端呈 T 形横梁
+
       const headX = pivotX + Math.cos(ang) * handleLen
       const headY = pivotY + Math.sin(ang) * handleLen
-      // 锤柄（从 pivot 到 head 下方）
+
+      // 加粗锤柄
       const handleBase = handleLen * 0.15
-      const steps = Math.ceil((handleLen - handleBase) / 3)
+      const steps = Math.ceil((handleLen - handleBase) / 4)
+
       for (let i = 0; i <= steps; i++) {
         const t = i / steps
         const px = Math.round(pivotX + (headX - pivotX) * t)
         const py = Math.round(pivotY + (headY - pivotY) * t)
-        ctx.fillStyle = '#6b7280'; ctx.fillRect(px - 1, py, 4, 3)
-        ctx.fillStyle = '#374151'; ctx.fillRect(px + 3, py, 2, 3)
+
+        ctx.fillStyle = '#6b7280'
+        ctx.fillRect(px - 2, py - 2, 7, 6)
+
+        ctx.fillStyle = '#374151'
+        ctx.fillRect(px + 4, py - 2, 3, 6)
       }
-      // T 形锤头横梁（垂直于柄）
-      const perpX = -Math.sin(ang), perpY = Math.cos(ang)
-      // 横梁跨柄顶端
-      for (let s = -5; s <= 5; s++) {
-        for (let t = -2; t <= 3; t++) {
-          const px = Math.round(headX + perpX * s * 3 + Math.cos(ang) * t * 3)
-          const py = Math.round(headY + perpY * s * 3 + Math.sin(ang) * t * 3)
-          if (Math.abs(s) <= 1 && t < 1) continue // 空出柄连接处
-          const dark = Math.abs(s) >= 4 || Math.abs(t) >= 2
-          ctx.fillStyle = dark ? '#4b5563' : Math.abs(s) <= 2 ? '#d1d5db' : '#9ca3af'
-          ctx.fillRect(px, py, 4, 4)
+
+      // 放大 T 形锤头
+      const perpX = -Math.sin(ang)
+      const perpY = Math.cos(ang)
+
+      for (let s = -7; s <= 7; s++) {
+        for (let t = -3; t <= 4; t++) {
+          const px = Math.round(
+              headX + perpX * s * 4 + Math.cos(ang) * t * 4,
+          )
+          const py = Math.round(
+              headY + perpY * s * 4 + Math.sin(ang) * t * 4,
+          )
+
+          // 中心连接处少挖一点，避免锤头显小
+          if (Math.abs(s) <= 1 && t < 0) continue
+
+          const dark = Math.abs(s) >= 6 || Math.abs(t) >= 3
+
+          ctx.fillStyle = dark
+              ? '#4b5563'
+              : Math.abs(s) <= 2
+                  ? '#d1d5db'
+                  : '#9ca3af'
+
+          ctx.fillRect(px - 1, py - 1, 6, 6)
         }
       }
     }
-    for (const f of s.fragments) { if (f.life <= 0) continue; ctx.globalAlpha = f.life; ctx.fillStyle = f.color; ctx.fillRect(Math.round(f.x), Math.round(f.y), f.size, f.size) }
-    for (const fl of s.flash) { if (fl.life <= 0) continue; ctx.globalAlpha = fl.life; ctx.fillStyle = fl.color; ctx.fillRect(Math.round(fl.x), Math.round(fl.y), fl.size, fl.size) }
-    for (const d of s.dent) { if (d.life <= 0) continue; ctx.globalAlpha = Math.min(1, d.life); ctx.fillStyle = d.color; ctx.fillRect(Math.round(d.x), Math.round(d.y), d.size, d.size) }
+
+    for (const f of s.fragments) {
+      if (f.life <= 0) continue
+      ctx.globalAlpha = f.life
+      ctx.fillStyle = f.color
+      ctx.fillRect(Math.round(f.x), Math.round(f.y), f.size, f.size)
+    }
+
+    for (const fl of s.flash) {
+      if (fl.life <= 0) continue
+      ctx.globalAlpha = fl.life
+      ctx.fillStyle = fl.color
+      ctx.fillRect(Math.round(fl.x), Math.round(fl.y), fl.size, fl.size)
+    }
+
+    for (const d of s.dent) {
+      if (d.life <= 0) continue
+      ctx.globalAlpha = Math.min(1, d.life)
+      ctx.fillStyle = d.color
+      ctx.fillRect(Math.round(d.x), Math.round(d.y), d.size, d.size)
+    }
+
     ctx.globalAlpha = 1
   },
-  isDone(s) { return false },
+
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 3. bleed: 血迹扩散 ----
@@ -208,16 +315,16 @@ const bleedRenderer = {
   init(size) {
     const cx = size / 2, cy = size / 2
     const parts = []
-    for (let i = 0; i < 70; i++) {
-      const ang = Math.random() * Math.PI * 2, dist = Math.random() * 36
-      parts.push(makeParticle(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, Math.cos(ang) * 0.45 + rnd(0.45), Math.sin(ang) * 0.45 + rnd(0.45), 0.6 + Math.random() * 0.4, 3 + Math.floor(Math.random() * 4), ['#7f1d1d','#991b1b','#450a0a','#b91c1c'][Math.floor(Math.random() * 4)]))
+    for (let i = 0; i < 24; i++) {
+      const ang = Math.random() * Math.PI * 2, dist = Math.random() * 20
+      parts.push(makeParticle(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, Math.cos(ang) * 0.24 + rnd(0.2), Math.sin(ang) * 0.24 + rnd(0.2), 0.5 + Math.random() * 0.25, 2 + Math.floor(Math.random() * 3), ['#7f1d1d','#991b1b','#450a0a','#b91c1c'][Math.floor(Math.random() * 4)]))
     }
     return { phase: 'spread', timer: 0, parts }
   },
   update(s, size) {
     s.timer += 16
-    for (const p of s.parts) { p.x += p.vx; p.y += p.vy; p.vx *= 0.96; p.vy *= 0.96; p.life -= 0.003 }
-    if (s.timer > 4000) return this.init(size)
+    for (const p of s.parts) { p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy *= 0.94; p.life -= 0.006 }
+    if (s.timer > 2200) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
