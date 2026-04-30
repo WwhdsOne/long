@@ -1581,6 +1581,99 @@ func TestBossAutoClickDoesNotIncreaseUserClicks(t *testing.T) {
 	}
 }
 
+func TestGetCurrentBossReadsStableFields(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "hmget-boss",
+		Name:  "字段读取 Boss",
+		MaxHP: 300,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, DisplayName: "躯干", MaxHP: 300, CurrentHP: 300, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	boss, err := store.GetCurrentBoss(ctx)
+	if err != nil {
+		t.Fatalf("get current boss: %v", err)
+	}
+	if boss == nil || boss.ID != "hmget-boss" || boss.Name != "字段读取 Boss" {
+		t.Fatalf("expected stable boss fields, got %+v", boss)
+	}
+	if len(boss.Parts) != 1 || boss.Parts[0].DisplayName != "躯干" {
+		t.Fatalf("expected boss parts to remain available, got %+v", boss)
+	}
+}
+
+func TestGetEquipmentDefinitionReadsStableFields(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	itemID := "hmget-sword"
+	if err := store.client.HSet(ctx, store.equipmentKey(itemID), map[string]any{
+		"name":                       "测试长剑",
+		"slot":                       "weapon",
+		"rarity":                     "rare",
+		"image_path":                 "/img/sword.png",
+		"image_alt":                  "测试长剑图片",
+		"attack_power":               "18",
+		"armor_pen_percent":          "0.15",
+		"crit_rate":                  "0.08",
+		"crit_damage_multiplier":     "1.6",
+		"part_type_damage_soft":      "1.1",
+		"part_type_damage_heavy":     "1.2",
+		"part_type_damage_weak":      "1.4",
+		"talent_affinity":            "crit",
+		"unused_field_should_ignore": "x",
+	}).Err(); err != nil {
+		t.Fatalf("seed equipment definition: %v", err)
+	}
+
+	definition, err := store.getEquipmentDefinition(ctx, itemID)
+	if err != nil {
+		t.Fatalf("getEquipmentDefinition: %v", err)
+	}
+	if definition.Name != "测试长剑" || definition.Slot != "weapon" || definition.AttackPower != 18 {
+		t.Fatalf("expected stable equipment definition fields, got %+v", definition)
+	}
+	if definition.TalentAffinity != "crit" || definition.PartTypeDamageWeak != 1.4 {
+		t.Fatalf("expected extended equipment fields, got %+v", definition)
+	}
+}
+
+func TestRecentRewardsForNicknameSupportsLegacyFields(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	if err := store.client.HSet(ctx, store.lastRewardKey(nickname), map[string]any{
+		"boss_id":    "legacy-boss",
+		"boss_name":  "旧奖励 Boss",
+		"item_id":    "legacy-sword",
+		"item_name":  "旧长剑",
+		"granted_at": "1713744000",
+	}).Err(); err != nil {
+		t.Fatalf("seed legacy reward: %v", err)
+	}
+
+	rewards, err := store.recentRewardsForNickname(ctx, nickname)
+	if err != nil {
+		t.Fatalf("recentRewardsForNickname: %v", err)
+	}
+	if len(rewards) != 1 {
+		t.Fatalf("expected one legacy reward, got %+v", rewards)
+	}
+	if rewards[0].BossID != "legacy-boss" || rewards[0].ItemID != "legacy-sword" {
+		t.Fatalf("expected legacy reward fields to stay available, got %+v", rewards[0])
+	}
+}
+
 func TestBossAutoClickKillReturnsRecentRewards(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

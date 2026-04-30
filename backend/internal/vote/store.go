@@ -2483,15 +2483,48 @@ func (s *Store) currentBoss(ctx context.Context) (*Boss, error) {
 }
 
 func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable) (*Boss, error) {
-	values, err := client.HGetAll(ctx, s.bossCurrentKey).Result()
+	values, err := client.HMGet(ctx, s.bossCurrentKey,
+		"id",
+		"template_id",
+		"name",
+		"status",
+		"max_hp",
+		"current_hp",
+		"gold_on_kill",
+		"stone_on_kill",
+		"talent_points_on_kill",
+		"parts",
+		"started_at",
+		"defeated_at",
+	).Result()
 	if err != nil {
 		return nil, err
 	}
-	if len(values) == 0 {
+	id := strings.TrimSpace(stringValue(values, 0))
+	name := strings.TrimSpace(stringValue(values, 2))
+	if id == "" && name == "" {
 		return nil, nil
 	}
 
-	return normalizeBoss(values), nil
+	var parts []BossPart
+	if partsRaw := strings.TrimSpace(stringValue(values, 9)); partsRaw != "" {
+		_ = sonic.Unmarshal([]byte(partsRaw), &parts)
+	}
+
+	return &Boss{
+		ID:                 id,
+		TemplateID:         strings.TrimSpace(stringValue(values, 1)),
+		Name:               name,
+		Status:             strings.TrimSpace(stringValue(values, 3)),
+		MaxHP:              int64Value(values, 4),
+		CurrentHP:          int64Value(values, 5),
+		GoldOnKill:         int64Value(values, 6),
+		StoneOnKill:        int64Value(values, 7),
+		TalentPointsOnKill: int64Value(values, 8),
+		Parts:              parts,
+		StartedAt:          int64Value(values, 10),
+		DefeatedAt:         int64Value(values, 11),
+	}, nil
 }
 
 func normalizeBoss(values map[string]string) *Boss {
@@ -2558,29 +2591,46 @@ func (s *Store) bossStatsForNickname(ctx context.Context, bossID string, nicknam
 }
 
 func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (EquipmentDefinition, error) {
-	values, err := s.client.HGetAll(ctx, s.equipmentKey(itemID)).Result()
+	values, err := s.client.HMGet(ctx, s.equipmentKey(itemID),
+		"name",
+		"slot",
+		"rarity",
+		"image_path",
+		"image_alt",
+		"attack_power",
+		"armor_pen_percent",
+		"crit_rate",
+		"crit_damage_multiplier",
+		"part_type_damage_soft",
+		"part_type_damage_heavy",
+		"part_type_damage_weak",
+		"talent_affinity",
+	).Result()
 	if err != nil {
 		return EquipmentDefinition{}, err
 	}
-	if len(values) == 0 {
+	if stringValue(values, 0) == "" &&
+		stringValue(values, 1) == "" &&
+		stringValue(values, 2) == "" &&
+		stringValue(values, 5) == "" {
 		return EquipmentDefinition{}, ErrEquipmentNotFound
 	}
 
 	return EquipmentDefinition{
 		ItemID:               itemID,
-		Name:                 firstNonEmpty(strings.TrimSpace(values["name"]), itemID),
-		Slot:                 normalizeEquipmentSlot(values["slot"]),
-		Rarity:               normalizeEquipmentRarity(values["rarity"]),
-		ImagePath:            strings.TrimSpace(values["image_path"]),
-		ImageAlt:             strings.TrimSpace(values["image_alt"]),
-		AttackPower:          int64FromString(values["attack_power"]),
-		ArmorPenPercent:      float64FromString(values["armor_pen_percent"]),
-		CritRate:             float64FromString(values["crit_rate"]),
-		CritDamageMultiplier: float64FromString(values["crit_damage_multiplier"]),
-		PartTypeDamageSoft:   float64FromString(values["part_type_damage_soft"]),
-		PartTypeDamageHeavy:  float64FromString(values["part_type_damage_heavy"]),
-		PartTypeDamageWeak:   float64FromString(values["part_type_damage_weak"]),
-		TalentAffinity:       strings.TrimSpace(values["talent_affinity"]),
+		Name:                 firstNonEmpty(strings.TrimSpace(stringValue(values, 0)), itemID),
+		Slot:                 normalizeEquipmentSlot(stringValue(values, 1)),
+		Rarity:               normalizeEquipmentRarity(stringValue(values, 2)),
+		ImagePath:            strings.TrimSpace(stringValue(values, 3)),
+		ImageAlt:             strings.TrimSpace(stringValue(values, 4)),
+		AttackPower:          int64Value(values, 5),
+		ArmorPenPercent:      float64FromString(stringValue(values, 6)),
+		CritRate:             float64FromString(stringValue(values, 7)),
+		CritDamageMultiplier: float64FromString(stringValue(values, 8)),
+		PartTypeDamageSoft:   float64FromString(stringValue(values, 9)),
+		PartTypeDamageHeavy:  float64FromString(stringValue(values, 10)),
+		PartTypeDamageWeak:   float64FromString(stringValue(values, 11)),
+		TalentAffinity:       strings.TrimSpace(stringValue(values, 12)),
 	}, nil
 }
 
@@ -2757,15 +2807,22 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equip
 }
 
 func (s *Store) recentRewardsForNickname(ctx context.Context, nickname string) ([]Reward, error) {
-	values, err := s.client.HGetAll(ctx, s.lastRewardKey(nickname)).Result()
+	values, err := s.client.HMGet(ctx, s.lastRewardKey(nickname),
+		"boss_id",
+		"boss_name",
+		"item_id",
+		"item_name",
+		"granted_at",
+		"recent_rewards",
+	).Result()
 	if err != nil {
 		return nil, err
 	}
-	if len(values) == 0 {
+	if stringValue(values, 2) == "" && stringValue(values, 5) == "" {
 		return []Reward{}, nil
 	}
 
-	if raw := strings.TrimSpace(values["recent_rewards"]); raw != "" {
+	if raw := strings.TrimSpace(stringValue(values, 5)); raw != "" {
 		var rewards []Reward
 		if err := sonic.Unmarshal([]byte(raw), &rewards); err == nil {
 			normalized := make([]Reward, 0, len(rewards))
@@ -2787,17 +2844,17 @@ func (s *Store) recentRewardsForNickname(ctx context.Context, nickname string) (
 	return []Reward{*legacyReward}, nil
 }
 
-func rewardFromRecordValues(values map[string]string) *Reward {
-	if len(values) == 0 || strings.TrimSpace(values["item_id"]) == "" {
+func rewardFromRecordValues(values []any) *Reward {
+	if len(values) == 0 || strings.TrimSpace(stringValue(values, 2)) == "" {
 		return nil
 	}
 
 	return &Reward{
-		BossID:    strings.TrimSpace(values["boss_id"]),
-		BossName:  strings.TrimSpace(values["boss_name"]),
-		ItemID:    strings.TrimSpace(values["item_id"]),
-		ItemName:  strings.TrimSpace(values["item_name"]),
-		GrantedAt: int64FromString(values["granted_at"]),
+		BossID:    strings.TrimSpace(stringValue(values, 0)),
+		BossName:  strings.TrimSpace(stringValue(values, 1)),
+		ItemID:    strings.TrimSpace(stringValue(values, 2)),
+		ItemName:  strings.TrimSpace(stringValue(values, 3)),
+		GrantedAt: int64Value(values, 4),
 	}
 }
 
