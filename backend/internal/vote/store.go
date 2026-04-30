@@ -444,6 +444,7 @@ type Store struct {
 	playerIndexKey          string
 	userPrefix              string
 	leaderboardKey          string
+	totalVotesKey           string
 	bossCurrentKey          string
 	bossHistoryKey          string
 	bossHistoryPrefix       string
@@ -468,6 +469,7 @@ type Store struct {
 	equipmentEnhancePrefix  string
 	critical                StoreOptions
 	luaRunner               luaScriptRunner
+	clickCountScript        *cachedLuaScript
 	bossClickScript         *cachedLuaScript
 	roll                    func(int) int
 	now                     func() time.Time
@@ -491,6 +493,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		playerIndexKey:          namespace + "players:index",
 		userPrefix:              namespace + "user:",
 		leaderboardKey:          namespace + "leaderboard",
+		totalVotesKey:           namespace + "total:votes",
 		bossCurrentKey:          namespace + "boss:current",
 		bossHistoryKey:          namespace + "boss:history",
 		bossHistoryPrefix:       namespace + "boss:history:",
@@ -517,7 +520,8 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		luaRunner: redisLuaRunner{
 			client: client,
 		},
-		bossClickScript: newCachedLuaScript("boss-click", bossClickLuaSource, luaCache),
+		clickCountScript: newCachedLuaScript("click-count", clickCountLuaSource, luaCache),
+		bossClickScript:  newCachedLuaScript("boss-click", bossClickLuaSource, luaCache),
 		roll: func(limit int) int {
 			return rand.IntN(limit)
 		},
@@ -1161,6 +1165,14 @@ func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]Leaderboard
 }
 
 func (s *Store) totalClickCount(ctx context.Context) (int64, error) {
+	totalVotes, err := s.client.Get(ctx, s.totalVotesKey).Int64()
+	if err == nil {
+		return totalVotes, nil
+	}
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return 0, err
+	}
+
 	scores, err := s.client.ZRangeWithScores(ctx, s.leaderboardKey, 0, -1).Result()
 	if err != nil {
 		return 0, err
@@ -1168,6 +1180,9 @@ func (s *Store) totalClickCount(ctx context.Context) (int64, error) {
 	total := int64(0)
 	for _, score := range scores {
 		total += int64(score.Score)
+	}
+	if setErr := s.client.Set(ctx, s.totalVotesKey, strconv.FormatInt(total, 10), 0).Err(); setErr != nil {
+		return 0, setErr
 	}
 	return total, nil
 }
@@ -1225,28 +1240,32 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 
 func (s *Store) applyClickCountOnly(ctx context.Context, nickname string, delta int64, critical bool) (ClickResult, error) {
 	now := time.Now().Unix()
-	pipe := s.client.TxPipeline()
-	userCountCmd := pipe.HIncrBy(ctx, s.userPrefix+nickname, "click_count", delta)
-	pipe.HSet(ctx, s.userPrefix+nickname, map[string]any{
-		"nickname":   nickname,
-		"updated_at": strconv.FormatInt(now, 10),
-	})
-	pipe.ZIncrBy(ctx, s.leaderboardKey, float64(delta), nickname)
-	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
-		Score:  float64(now),
-		Member: nickname,
-	})
-
-	if _, err := pipe.Exec(ctx); err != nil {
+	reply, err := s.clickCountScript.Run(ctx, s.luaRunner,
+		[]string{
+			s.userPrefix + nickname,
+			s.leaderboardKey,
+			s.playerIndexKey,
+			s.totalVotesKey,
+		},
+		delta,
+		nickname,
+		now,
+	)
+	if err != nil {
 		return ClickResult{}, err
 	}
+	values, ok := reply.([]any)
+	if !ok || len(values) < 2 {
+		return ClickResult{}, fmt.Errorf("invalid click count script reply")
+	}
+	userCount := int64FromLuaValue(values[0])
 
 	return ClickResult{
 		Delta:    delta,
 		Critical: critical,
 		UserStats: UserStats{
 			Nickname:   nickname,
-			ClickCount: userCountCmd.Val(),
+			ClickCount: userCount,
 		},
 	}, nil
 }

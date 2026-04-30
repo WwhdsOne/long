@@ -1401,6 +1401,68 @@ func TestClickBossPartWithoutButtonTargetsSelectedPart(t *testing.T) {
 	}
 }
 
+func TestSnapshotTotalVotesUsesDedicatedCounterWhenPresent(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.ZAdd(ctx, store.leaderboardKey,
+		redis.Z{Score: 3, Member: "阿明"},
+		redis.Z{Score: 7, Member: "小红"},
+	).Err(); err != nil {
+		t.Fatalf("seed leaderboard: %v", err)
+	}
+	if err := store.client.Set(ctx, store.totalVotesKey, "15", 0).Err(); err != nil {
+		t.Fatalf("seed total votes key: %v", err)
+	}
+
+	snapshot, err := store.GetSnapshot(ctx)
+	if err != nil {
+		t.Fatalf("get snapshot: %v", err)
+	}
+	if snapshot.TotalVotes != 15 {
+		t.Fatalf("expected dedicated total votes counter to win, got %d", snapshot.TotalVotes)
+	}
+}
+
+func TestClickBossPartIncrementsDedicatedTotalVotesCounter(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	ctx := context.Background()
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "total-votes-boss",
+		Name:  "总点击 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	if _, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明"); err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+
+	totalVotes, err := store.client.Get(ctx, store.totalVotesKey).Int64()
+	if err != nil {
+		t.Fatalf("get dedicated total votes key: %v", err)
+	}
+	if totalVotes != 1 {
+		t.Fatalf("expected dedicated total votes counter to be 1, got %d", totalVotes)
+	}
+
+	snapshot, err := store.GetSnapshot(ctx)
+	if err != nil {
+		t.Fatalf("get snapshot: %v", err)
+	}
+	if snapshot.TotalVotes != 1 {
+		t.Fatalf("expected snapshot total=1 after boss click, got %d", snapshot.TotalVotes)
+	}
+}
+
 func TestClickBossPartReturnsRealtimeBossSummaryFields(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

@@ -2,11 +2,26 @@ package vote
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/redis/go-redis/v9"
 )
+
+const clickCountLuaSource = `
+local delta = tonumber(ARGV[1])
+local nickname = ARGV[2]
+local now = ARGV[3]
+
+local userCount = redis.call("HINCRBY", KEYS[1], "click_count", delta)
+redis.call("HSET", KEYS[1], "nickname", nickname, "updated_at", now)
+redis.call("ZINCRBY", KEYS[2], delta, nickname)
+redis.call("ZADD", KEYS[3], now, nickname)
+local totalVotes = redis.call("INCRBY", KEYS[4], delta)
+
+return {userCount, totalVotes}
+`
 
 const bossClickLuaSource = `
 local delta = tonumber(ARGV[1])
@@ -143,4 +158,26 @@ func (s *cachedLuaScript) Run(ctx context.Context, runner luaScriptRunner, keys 
 
 func isNoScriptError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "NOSCRIPT")
+}
+
+func int64FromLuaValue(value any) int64 {
+	switch v := value.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		if err == nil {
+			return parsed
+		}
+	case []byte:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(string(v)), 10, 64)
+		if err == nil {
+			return parsed
+		}
+	}
+	return 0
 }
