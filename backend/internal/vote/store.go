@@ -2418,11 +2418,14 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 
 	stats := s.baseCombatStats()
 
-	attackPower, armorPen, critRate, critDmgMult := loadoutBonuses(loadout)
+	attackPower, armorPen, critRate, critDmgMult, partTypeSoft, partTypeHeavy, partTypeWeak := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 1.0)
 	stats.CriticalChancePercent += critRate * 100
 	stats.CritDamageMultiplier += critDmgMult
+	stats.PartTypeDamageSoft += partTypeSoft
+	stats.PartTypeDamageHeavy += partTypeHeavy
+	stats.PartTypeDamageWeak += partTypeWeak
 
 	compiledTalents, err := s.compiledTalentSetForNickname(ctx, nickname)
 	if err != nil {
@@ -2468,7 +2471,7 @@ func (s *Store) baseCombatStats() CombatStats {
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64, partTypeSoft float64, partTypeHeavy float64, partTypeWeak float64) {
 	items := []*InventoryItem{
 		loadout.Weapon,
 		loadout.Helmet,
@@ -2485,6 +2488,9 @@ func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critR
 		armorPen += item.ArmorPenPercent
 		critRate += item.CritRate
 		critDmgMult += item.CritDamageMultiplier
+		partTypeSoft += item.PartTypeDamageSoft
+		partTypeHeavy += item.PartTypeDamageHeavy
+		partTypeWeak += item.PartTypeDamageWeak
 	}
 	return
 }

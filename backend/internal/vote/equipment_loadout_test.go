@@ -51,7 +51,7 @@ func TestLoadoutSupportsDesignEquipmentSlotsAndLegacyArmor(t *testing.T) {
 		t.Fatalf("expected equipped chest marker, got %+v", equipped)
 	}
 
-	attackPower, _, _, _ := loadoutBonuses(loadout)
+	attackPower, _, _, _, _, _, _ := loadoutBonuses(loadout)
 	if attackPower != 210 {
 		t.Fatalf("expected all six slots to contribute attack power 210, got %d", attackPower)
 	}
