@@ -57,6 +57,47 @@ export function createAdminPageActions(state) {
     }
   }
 
+  function normalizeTaskRewardItems(items) {
+    return Array.isArray(items)
+      ? items
+          .filter((entry) => entry?.itemId)
+          .map((entry) => ({
+            itemId: String(entry.itemId).trim(),
+            quantity: Number(entry.quantity || 1),
+          }))
+          .filter((entry) => entry.itemId && entry.quantity > 0)
+      : []
+  }
+
+  function validateTaskDefinitionForm() {
+    const taskID = String(taskForm.value.taskId || '').trim()
+    if (!taskID) {
+      return '先填写 taskId。'
+    }
+    if (!String(taskForm.value.title || '').trim()) {
+      return '先填写任务标题。'
+    }
+    if (Number(taskForm.value.targetValue || 0) <= 0) {
+      return '目标值必须大于 0。'
+    }
+    if (taskForm.value.taskType === 'limited') {
+      const startAt = Number(taskForm.value.startAt || 0)
+      const endAt = Number(taskForm.value.endAt || 0)
+      if (startAt <= 0 || endAt <= 0 || endAt <= startAt) {
+        return '限时任务需要填写合法的开始时间和结束时间。'
+      }
+    }
+    const rewardItems = normalizeTaskRewardItems(taskForm.value.rewards?.equipmentItems)
+    const hasRewards = Number(taskForm.value.rewards?.gold || 0) > 0 ||
+      Number(taskForm.value.rewards?.stones || 0) > 0 ||
+      Number(taskForm.value.rewards?.talentPoints || 0) > 0 ||
+      rewardItems.length > 0
+    if (!hasRewards) {
+      return '任务奖励至少填写一项。'
+    }
+    return ''
+  }
+
   async function deleteByID(url, successTip, fallback, afterDelete) {
     saving.value = true
     try {
@@ -343,9 +384,15 @@ export function createAdminPageActions(state) {
   }
 
   async function saveTaskDefinition() {
+    const validationMessage = validateTaskDefinitionForm()
+    if (validationMessage) {
+      errorMessage.value = validationMessage
+      return
+    }
     saving.value = true
     try {
       const taskID = String(taskForm.value.taskId || '').trim()
+      const rewardItems = normalizeTaskRewardItems(taskForm.value.rewards?.equipmentItems)
       const exists = taskDefinitions.value.some((entry) => entry.taskId === taskID)
       const method = exists ? 'PUT' : 'POST'
       const url = exists ? `/api/admin/tasks/${encodeURIComponent(taskID)}` : '/api/admin/tasks'
@@ -363,14 +410,7 @@ export function createAdminPageActions(state) {
             gold: Number(taskForm.value.rewards?.gold || 0),
             stones: Number(taskForm.value.rewards?.stones || 0),
             talentPoints: Number(taskForm.value.rewards?.talentPoints || 0),
-            equipmentItems: Array.isArray(taskForm.value.rewards?.equipmentItems)
-              ? taskForm.value.rewards.equipmentItems
-                  .filter((entry) => entry.itemId)
-                  .map((entry) => ({
-                    itemId: entry.itemId,
-                    quantity: Number(entry.quantity || 1),
-                  }))
-              : [],
+            equipmentItems: rewardItems,
           },
         }),
       })

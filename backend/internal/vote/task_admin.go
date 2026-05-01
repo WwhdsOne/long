@@ -51,6 +51,10 @@ func (s *Store) SaveTaskDefinition(ctx context.Context, item TaskDefinition) err
 	} else if item.CreatedAt == 0 {
 		item.CreatedAt = nowUnix
 	}
+	item.Rewards = normalizeTaskRewards(item.Rewards)
+	if !taskDefinitionHasRewards(item.Rewards) || !taskDefinitionTimeWindowValid(item) {
+		return ErrTaskNotClaimable
+	}
 	item.UpdatedAt = nowUnix
 	return s.taskDefinitionStore.UpsertTaskDefinition(ctx, item)
 }
@@ -65,6 +69,10 @@ func (s *Store) ActivateTaskDefinition(ctx context.Context, taskID string) error
 	}
 	if task == nil {
 		return ErrTaskNotFound
+	}
+	task.Rewards = normalizeTaskRewards(task.Rewards)
+	if !taskDefinitionHasRewards(task.Rewards) || !taskDefinitionTimeWindowValid(*task) {
+		return ErrTaskNotClaimable
 	}
 	task.Status = TaskStatusActive
 	task.UpdatedAt = s.now().Unix()
@@ -98,16 +106,27 @@ func (s *Store) DuplicateTaskDefinition(ctx context.Context, taskID string, newT
 	if task == nil {
 		return nil, ErrTaskNotFound
 	}
+	newTaskID = strings.TrimSpace(newTaskID)
+	if newTaskID != "" {
+		existing, err := s.taskDefinitionStore.GetTaskDefinition(ctx, newTaskID)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return nil, ErrTaskImmutable
+		}
+	}
 	nowUnix := s.now().Unix()
 	copyTask := *task
-	if strings.TrimSpace(newTaskID) == "" {
+	if newTaskID == "" {
 		copyTask.TaskID = fmt.Sprintf("%s-copy-%d", task.TaskID, nowUnix)
 	} else {
-		copyTask.TaskID = strings.TrimSpace(newTaskID)
+		copyTask.TaskID = newTaskID
 	}
 	copyTask.Status = TaskStatusDraft
 	copyTask.CreatedAt = nowUnix
 	copyTask.UpdatedAt = nowUnix
+	copyTask.Rewards = normalizeTaskRewards(copyTask.Rewards)
 	if err := s.taskDefinitionStore.UpsertTaskDefinition(ctx, copyTask); err != nil {
 		return nil, err
 	}
@@ -158,6 +177,40 @@ func (s *Store) GetTaskCycleResults(ctx context.Context, taskID string, cycleKey
 		return TaskCycleResultsView{}, nil
 	}
 	return s.taskCycleArchiveStore.GetTaskCycleResults(ctx, taskID, cycleKey)
+}
+
+func normalizeTaskRewards(rewards TaskRewards) TaskRewards {
+	rewards.EquipmentItems = normalizeTaskEquipmentRewards(rewards.EquipmentItems)
+	return rewards
+}
+
+func normalizeTaskEquipmentRewards(items []TaskEquipmentReward) []TaskEquipmentReward {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]TaskEquipmentReward, 0, len(items))
+	for _, item := range items {
+		itemID := strings.TrimSpace(item.ItemID)
+		if itemID == "" || item.Quantity <= 0 {
+			continue
+		}
+		result = append(result, TaskEquipmentReward{
+			ItemID:   itemID,
+			Quantity: item.Quantity,
+		})
+	}
+	return result
+}
+
+func taskDefinitionHasRewards(rewards TaskRewards) bool {
+	return rewards.Gold > 0 || rewards.Stones > 0 || rewards.TalentPoints > 0 || len(rewards.EquipmentItems) > 0
+}
+
+func taskDefinitionTimeWindowValid(item TaskDefinition) bool {
+	if item.TaskType != TaskTypeLimited {
+		return true
+	}
+	return item.StartAt > 0 && item.EndAt > 0 && item.EndAt > item.StartAt
 }
 
 func (s *Store) archiveTaskCycle(ctx context.Context, task TaskDefinition, cycleKey string, nowUnix int64) (TaskCycleArchive, error) {

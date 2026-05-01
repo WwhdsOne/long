@@ -10,17 +10,18 @@ import (
 
 type stubTaskDefinitionStore struct {
 	items []TaskDefinition
+	upserted []TaskDefinition
 }
 
-func (s stubTaskDefinitionStore) ListActiveTaskDefinitions(_ context.Context, _ int64) ([]TaskDefinition, error) {
+func (s *stubTaskDefinitionStore) ListActiveTaskDefinitions(_ context.Context, _ int64) ([]TaskDefinition, error) {
 	return s.items, nil
 }
 
-func (s stubTaskDefinitionStore) ListTaskDefinitions(_ context.Context) ([]TaskDefinition, error) {
+func (s *stubTaskDefinitionStore) ListTaskDefinitions(_ context.Context) ([]TaskDefinition, error) {
 	return s.items, nil
 }
 
-func (s stubTaskDefinitionStore) GetTaskDefinition(_ context.Context, taskID string) (*TaskDefinition, error) {
+func (s *stubTaskDefinitionStore) GetTaskDefinition(_ context.Context, taskID string) (*TaskDefinition, error) {
 	for _, item := range s.items {
 		if item.TaskID == taskID {
 			copyItem := item
@@ -30,7 +31,19 @@ func (s stubTaskDefinitionStore) GetTaskDefinition(_ context.Context, taskID str
 	return nil, nil
 }
 
-func (s stubTaskDefinitionStore) UpsertTaskDefinition(_ context.Context, _ TaskDefinition) error {
+func (s *stubTaskDefinitionStore) UpsertTaskDefinition(_ context.Context, item TaskDefinition) error {
+	s.upserted = append(s.upserted, item)
+	replaced := false
+	for index := range s.items {
+		if s.items[index].TaskID == item.TaskID {
+			s.items[index] = item
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		s.items = append(s.items, item)
+	}
 	return nil
 }
 
@@ -60,10 +73,11 @@ func (s stubTaskClaimLogStore) HasTaskClaimLog(_ context.Context, _ string, _ st
 func newTaskTestStore(t *testing.T, defs []TaskDefinition) (*Store, func()) {
 	t.Helper()
 	baseStore, cleanup := newTestStore(t)
+	taskDefStore := &stubTaskDefinitionStore{items: defs}
 	taskStore := NewStore(baseStore.client, "vote:", StoreOptions{
 		CriticalChancePercent: 5,
 		CriticalCount:         5,
-		TaskDefinitionStore:   stubTaskDefinitionStore{items: defs},
+		TaskDefinitionStore:   taskDefStore,
 		TaskClaimLogStore:     stubTaskClaimLogStore{},
 	}, nickname.NewValidator([]string{"习近平", "xjp"}))
 	return taskStore, cleanup
@@ -167,6 +181,78 @@ func TestSaveTaskDefinitionRejectsCoreChangeAfterActivation(t *testing.T) {
 		ConditionKind: TaskConditionEnhanceCount,
 		TargetValue:   3,
 	})
+	if err != ErrTaskImmutable {
+		t.Fatalf("expected ErrTaskImmutable, got %v", err)
+	}
+}
+
+func TestSaveTaskDefinitionRejectsLimitedTaskWithoutValidWindow(t *testing.T) {
+	store, cleanup := newTaskTestStore(t, nil)
+	defer cleanup()
+
+	err := store.SaveTaskDefinition(context.Background(), TaskDefinition{
+		TaskID:        "limited-click",
+		Title:         "限时点击",
+		TaskType:      TaskTypeLimited,
+		Status:        TaskStatusDraft,
+		ConditionKind: TaskConditionDailyClicks,
+		TargetValue:   10,
+		Rewards: TaskRewards{
+			Gold: 100,
+		},
+		StartAt: 200,
+		EndAt:   100,
+	})
+	if err != ErrTaskNotClaimable {
+		t.Fatalf("expected ErrTaskNotClaimable, got %v", err)
+	}
+}
+
+func TestSaveTaskDefinitionRejectsTaskWithoutRewards(t *testing.T) {
+	store, cleanup := newTaskTestStore(t, nil)
+	defer cleanup()
+
+	err := store.SaveTaskDefinition(context.Background(), TaskDefinition{
+		TaskID:        "daily-click",
+		Title:         "今日点击",
+		TaskType:      TaskTypeDaily,
+		Status:        TaskStatusDraft,
+		ConditionKind: TaskConditionDailyClicks,
+		TargetValue:   10,
+	})
+	if err != ErrTaskNotClaimable {
+		t.Fatalf("expected ErrTaskNotClaimable, got %v", err)
+	}
+}
+
+func TestDuplicateTaskDefinitionRejectsExistingTargetID(t *testing.T) {
+	store, cleanup := newTaskTestStore(t, []TaskDefinition{
+		{
+			TaskID:        "daily-click",
+			Title:         "今日点击",
+			TaskType:      TaskTypeDaily,
+			Status:        TaskStatusDraft,
+			ConditionKind: TaskConditionDailyClicks,
+			TargetValue:   10,
+			Rewards: TaskRewards{
+				Gold: 100,
+			},
+		},
+		{
+			TaskID:        "existing-copy",
+			Title:         "旧副本",
+			TaskType:      TaskTypeDaily,
+			Status:        TaskStatusDraft,
+			ConditionKind: TaskConditionDailyClicks,
+			TargetValue:   5,
+			Rewards: TaskRewards{
+				Gold: 10,
+			},
+		},
+	})
+	defer cleanup()
+
+	_, err := store.DuplicateTaskDefinition(context.Background(), "daily-click", "existing-copy")
 	if err != ErrTaskImmutable {
 		t.Fatalf("expected ErrTaskImmutable, got %v", err)
 	}

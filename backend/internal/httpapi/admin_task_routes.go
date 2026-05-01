@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -10,6 +11,28 @@ import (
 
 	"long/internal/vote"
 )
+
+func writeTaskAdminError(c *app.RequestContext, err error, fallbackCode string) {
+	switch {
+	case errors.Is(err, vote.ErrTaskNotFound):
+		writeJSON(c, consts.StatusNotFound, map[string]string{
+			"error":   "TASK_NOT_FOUND",
+			"message": "任务不存在。",
+		})
+	case errors.Is(err, vote.ErrTaskImmutable):
+		writeJSON(c, consts.StatusBadRequest, map[string]string{
+			"error":   fallbackCode,
+			"message": "生效中的任务核心规则不能直接修改，建议复制新任务后再上线。",
+		})
+	case errors.Is(err, vote.ErrTaskNotClaimable):
+		writeJSON(c, consts.StatusBadRequest, map[string]string{
+			"error":   fallbackCode,
+			"message": "任务定义不合法，请检查目标值、奖励配置和限时任务的时间窗口。",
+		})
+	default:
+		writeJSON(c, consts.StatusBadRequest, map[string]string{"error": fallbackCode})
+	}
+}
 
 func registerAdminTaskRoutes(router route.IRouter, options Options) {
 	router.GET("/api/admin/tasks", func(ctx context.Context, c *app.RequestContext) {
@@ -35,7 +58,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			return
 		}
 		if err := options.Store.SaveTaskDefinition(ctx, body); err != nil {
-			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "TASK_SAVE_FAILED"})
+			writeTaskAdminError(c, err, "TASK_SAVE_FAILED")
 			return
 		}
 		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
@@ -68,7 +91,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 		}
 		body.TaskID = c.Param("taskId")
 		if err := options.Store.SaveTaskDefinition(ctx, body); err != nil {
-			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "TASK_SAVE_FAILED"})
+			writeTaskAdminError(c, err, "TASK_SAVE_FAILED")
 			return
 		}
 		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
@@ -96,7 +119,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			return
 		}
 		if err := options.Store.ActivateTaskDefinition(ctx, c.Param("taskId")); err != nil {
-			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "TASK_ACTIVATE_FAILED"})
+			writeTaskAdminError(c, err, "TASK_ACTIVATE_FAILED")
 			return
 		}
 		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
@@ -117,7 +140,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			return
 		}
 		if err := options.Store.DeactivateTaskDefinition(ctx, c.Param("taskId")); err != nil {
-			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "TASK_DEACTIVATE_FAILED"})
+			writeTaskAdminError(c, err, "TASK_DEACTIVATE_FAILED")
 			return
 		}
 		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
@@ -143,7 +166,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 		_ = bindJSON(c, &body, nil)
 		item, err := options.Store.DuplicateTaskDefinition(ctx, c.Param("taskId"), body.TaskID)
 		if err != nil {
-			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "TASK_DUPLICATE_FAILED"})
+			writeTaskAdminError(c, err, "TASK_DUPLICATE_FAILED")
 			return
 		}
 		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{

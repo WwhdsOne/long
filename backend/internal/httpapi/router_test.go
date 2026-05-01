@@ -49,6 +49,10 @@ type mockStore struct {
 	lastClickNickname     string
 	lastAutoClickNickname string
 	lastGetStateNickname  string
+	saveTaskErr           error
+	activateTaskErr       error
+	deactivateTaskErr     error
+	duplicateTaskErr      error
 	getStateErr           error
 	clickErr              error
 	equipErr              error
@@ -152,27 +156,100 @@ func (m *mockStore) ListTaskDefinitions(_ context.Context) ([]vote.TaskDefinitio
 
 func (m *mockStore) SaveTaskDefinition(_ context.Context, item vote.TaskDefinition) error {
 	m.lastTaskDefinition = item
+	if m.saveTaskErr != nil {
+		return m.saveTaskErr
+	}
 	return nil
 }
 
 func (m *mockStore) ActivateTaskDefinition(_ context.Context, taskID string) error {
+	if m.activateTaskErr != nil {
+		return m.activateTaskErr
+	}
 	m.lastTaskDefinition.TaskID = taskID
 	m.lastTaskDefinition.Status = vote.TaskStatusActive
 	return nil
 }
 
 func (m *mockStore) DeactivateTaskDefinition(_ context.Context, taskID string) error {
+	if m.deactivateTaskErr != nil {
+		return m.deactivateTaskErr
+	}
 	m.lastTaskDefinition.TaskID = taskID
 	m.lastTaskDefinition.Status = vote.TaskStatusInactive
 	return nil
 }
 
 func (m *mockStore) DuplicateTaskDefinition(_ context.Context, taskID string, newTaskID string) (*vote.TaskDefinition, error) {
+	if m.duplicateTaskErr != nil {
+		return nil, m.duplicateTaskErr
+	}
 	item := &vote.TaskDefinition{TaskID: newTaskID}
 	if item.TaskID == "" {
 		item.TaskID = taskID + "-copy"
 	}
 	return item, nil
+}
+
+func TestAdminTaskRoutesReturnReadableMessagesOnBusinessErrors(t *testing.T) {
+	store := &mockStore{
+		saveTaskErr:      vote.ErrTaskNotClaimable,
+		activateTaskErr:  vote.ErrTaskNotClaimable,
+		duplicateTaskErr: vote.ErrTaskImmutable,
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "task-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected admin login to set cookie")
+	}
+
+	saveRequest := httptest.NewRequest(http.MethodPost, "/api/admin/tasks", strings.NewReader(`{"taskId":"limited-click","title":"限时点击","taskType":"limited","conditionKind":"daily_clicks","targetValue":3}`))
+	saveRequest.Header.Set("Content-Type", "application/json")
+	saveRequest.AddCookie(cookies[0])
+	saveResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveResponse, saveRequest)
+	if saveResponse.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 from task save, got %d", saveResponse.Code)
+	}
+	if !strings.Contains(saveResponse.Body.String(), "任务定义不合法") {
+		t.Fatalf("expected readable task save message, got %s", saveResponse.Body.String())
+	}
+
+	activateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/tasks/limited-click/activate", nil)
+	activateRequest.AddCookie(cookies[0])
+	activateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(activateResponse, activateRequest)
+	if activateResponse.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 from task activate, got %d", activateResponse.Code)
+	}
+	if !strings.Contains(activateResponse.Body.String(), "任务定义不合法") {
+		t.Fatalf("expected readable task activate message, got %s", activateResponse.Body.String())
+	}
+
+	duplicateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/tasks/limited-click/duplicate", strings.NewReader(`{"taskId":"existing-copy"}`))
+	duplicateRequest.Header.Set("Content-Type", "application/json")
+	duplicateRequest.AddCookie(cookies[0])
+	duplicateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(duplicateResponse, duplicateRequest)
+	if duplicateResponse.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 from task duplicate, got %d", duplicateResponse.Code)
+	}
+	if !strings.Contains(duplicateResponse.Body.String(), "生效中的任务") {
+		t.Fatalf("expected readable task duplicate message, got %s", duplicateResponse.Body.String())
+	}
 }
 
 func (m *mockStore) ArchiveExpiredTaskCycles(_ context.Context, now time.Time) ([]vote.TaskCycleArchive, error) {
