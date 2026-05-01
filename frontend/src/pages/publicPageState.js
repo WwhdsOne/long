@@ -801,11 +801,11 @@ function formatItemStats(item) {
 
 function formatItemStatLines(item) {
     const lines = []
-    if (item?.attackPower) lines.push(`攻击力 ${item.attackPower}`)
-    if (item?.armorPenPercent) lines.push(`护甲穿透 ${item.armorPenPercent}%`)
-    if (item?.critRate) lines.push(`暴击率 ${(item.critRate * 100).toFixed(1)}%`)
-    if (item?.critDamageMultiplier) lines.push(`暴击伤害倍率 ${item.critDamageMultiplier}`)
-    if (item?.bossDamagePercent) lines.push(`首领伤害 ${item.bossDamagePercent}%`)
+    if (item?.attackPower) lines.push(`攻击力 ${formatNumber(item.attackPower)}`)
+    if (item?.armorPenPercent) lines.push(`护甲穿透 ${formatNumber(item.armorPenPercent, 1)}%`)
+    if (item?.critRate) lines.push(`暴击率 ${formatNumber(item.critRate * 100, 1)}%`)
+    if (item?.critDamageMultiplier) lines.push(`暴击倍率 +${formatNumber(item.critDamageMultiplier * 100, 0)}%`)
+    if (item?.bossDamagePercent) lines.push(`首领伤害 ${formatNumber(item.bossDamagePercent, 1)}%`)
     return lines
 }
 
