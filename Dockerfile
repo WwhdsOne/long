@@ -6,6 +6,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
 COPY frontend ./
+COPY pixel-assets/ ../pixel-assets/
 
 RUN npm run build
 
