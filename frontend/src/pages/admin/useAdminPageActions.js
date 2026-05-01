@@ -13,6 +13,7 @@ export function createAdminPageActions(state) {
     emptyAnnouncementForm,
     emptyButtonForm,
     emptyEquipmentForm,
+    emptyTaskForm,
     equipmentForm,
     equipmentPage,
     equipmentPrompt,
@@ -22,15 +23,22 @@ export function createAdminPageActions(state) {
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
+    fetchTaskArchives,
+    fetchTaskCycleResults,
+    fetchTasks,
     findBossTemplate,
     generatingEquipmentDraft,
     lootRows,
     readErrorMessage,
     saving,
     selectedBossTemplateId,
+    selectedTaskCycleKey,
+    selectedTaskId,
     setSuccess,
     showEquipmentEditor,
     uploadImageToOSS,
+    taskDefinitions,
+    taskForm,
   } = state
 
   async function postAction(url, successTip, fallback) {
@@ -334,6 +342,147 @@ export function createAdminPageActions(state) {
     }
   }
 
+  async function saveTaskDefinition() {
+    saving.value = true
+    try {
+      const taskID = String(taskForm.value.taskId || '').trim()
+      const exists = taskDefinitions.value.some((entry) => entry.taskId === taskID)
+      const method = exists ? 'PUT' : 'POST'
+      const url = exists ? `/api/admin/tasks/${encodeURIComponent(taskID)}` : '/api/admin/tasks'
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...taskForm.value,
+          taskId: taskID,
+          targetValue: Number(taskForm.value.targetValue || 0),
+          displayOrder: Number(taskForm.value.displayOrder || 0),
+          startAt: Number(taskForm.value.startAt || 0),
+          endAt: Number(taskForm.value.endAt || 0),
+          rewards: {
+            gold: Number(taskForm.value.rewards?.gold || 0),
+            stones: Number(taskForm.value.rewards?.stones || 0),
+            talentPoints: Number(taskForm.value.rewards?.talentPoints || 0),
+            equipmentItems: Array.isArray(taskForm.value.rewards?.equipmentItems)
+              ? taskForm.value.rewards.equipmentItems
+                  .filter((entry) => entry.itemId)
+                  .map((entry) => ({
+                    itemId: entry.itemId,
+                    quantity: Number(entry.quantity || 1),
+                  }))
+              : [],
+          },
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '保存任务失败'))
+      }
+      setSuccess('任务已保存。')
+      taskForm.value = emptyTaskForm()
+      await fetchTasks()
+    } catch (error) {
+      errorMessage.value = error.message || '保存任务失败'
+    } finally {
+      saving.value = false
+    }
+  }
+
+  async function activateTaskDefinition(taskId) {
+    await postAction(`/api/admin/tasks/${encodeURIComponent(taskId)}/activate`, '任务已上线。', '任务上线失败')
+    await fetchTasks()
+  }
+
+  async function deactivateTaskDefinition(taskId) {
+    await postAction(`/api/admin/tasks/${encodeURIComponent(taskId)}/deactivate`, '任务已下线。', '任务下线失败')
+    await fetchTasks()
+  }
+
+  async function duplicateTaskDefinition(taskId) {
+    const nextTaskId = window.prompt(`给复制出的任务输入新的 taskId`, `${taskId}-copy`)
+    if (!nextTaskId) {
+      return
+    }
+    saving.value = true
+    try {
+      const response = await fetch(`/api/admin/tasks/${encodeURIComponent(taskId)}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: nextTaskId }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '复制任务失败'))
+      }
+      setSuccess('任务已复制。')
+      await fetchTasks()
+    } catch (error) {
+      errorMessage.value = error.message || '复制任务失败'
+    } finally {
+      saving.value = false
+    }
+  }
+
+  async function archiveExpiredTasks() {
+    saving.value = true
+    try {
+      const response = await fetch('/api/admin/tasks/archive-expired', { method: 'POST' })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '归档过期任务失败'))
+      }
+      setSuccess('过期任务归档已执行。')
+      if (selectedTaskId.value) {
+        await fetchTaskArchives(selectedTaskId.value)
+        if (selectedTaskCycleKey.value) {
+          await fetchTaskCycleResults(selectedTaskId.value, selectedTaskCycleKey.value)
+        }
+      }
+    } catch (error) {
+      errorMessage.value = error.message || '归档过期任务失败'
+    } finally {
+      saving.value = false
+    }
+  }
+
+  function editTaskDefinition(entry) {
+    taskForm.value = {
+      ...emptyTaskForm(),
+      ...entry,
+      rewards: {
+        gold: Number(entry?.rewards?.gold || 0),
+        stones: Number(entry?.rewards?.stones || 0),
+        talentPoints: Number(entry?.rewards?.talentPoints || 0),
+        equipmentItems: Array.isArray(entry?.rewards?.equipmentItems)
+          ? entry.rewards.equipmentItems.map((item) => ({
+              itemId: item.itemId || '',
+              quantity: Number(item.quantity || 1),
+            }))
+          : [],
+      },
+    }
+    activeTab.value = 'tasks'
+  }
+
+  function openNewTask() {
+    taskForm.value = emptyTaskForm()
+    activeTab.value = 'tasks'
+  }
+
+  function addTaskEquipmentReward() {
+    const items = Array.isArray(taskForm.value.rewards?.equipmentItems) ? taskForm.value.rewards.equipmentItems : []
+    taskForm.value.rewards = {
+      ...taskForm.value.rewards,
+      equipmentItems: [...items, { itemId: '', quantity: 1 }],
+    }
+  }
+
+  function removeTaskEquipmentReward(index) {
+    const items = Array.isArray(taskForm.value.rewards?.equipmentItems) ? [...taskForm.value.rewards.equipmentItems] : []
+    items.splice(index, 1)
+    taskForm.value.rewards = {
+      ...taskForm.value.rewards,
+      equipmentItems: items,
+    }
+  }
+
 
 
   async function deleteBossTemplate(templateId) {
@@ -423,18 +572,27 @@ export function createAdminPageActions(state) {
     deleteMessage,
     disableBossCycle,
     editBossTemplate,
+    editTaskDefinition,
     editButton,
     editEquipment,
     enableBossCycle,
+    archiveExpiredTasks,
+    activateTaskDefinition,
+    addTaskEquipmentReward,
+    deactivateTaskDefinition,
+    duplicateTaskDefinition,
+    openNewTask,
     generateEquipmentDraft,
     openNewEquipment,
     removeLootRow,
+    removeTaskEquipmentReward,
     saveAnnouncement,
     saveBossTemplate,
     saveBossCycleQueue,
     saveButton,
     saveEquipment,
     saveLoot,
+    saveTaskDefinition,
     selectBossTemplate,
     updateEquipmentPrompt,
     uploadButtonImage,

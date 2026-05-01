@@ -88,10 +88,38 @@ export function emptyBossHistoryPage() {
   }
 }
 
+export function emptyTaskForm() {
+  return {
+    taskId: '',
+    title: '',
+    description: '',
+    taskType: 'daily',
+    status: 'draft',
+    conditionKind: 'daily_clicks',
+    targetValue: 1,
+    rewards: {
+      gold: 0,
+      stones: 0,
+      talentPoints: 0,
+      equipmentItems: [],
+    },
+    displayOrder: 0,
+    startAt: 0,
+    endAt: 0,
+  }
+}
+
 export function emptyMessagePage() {
   return {
     items: [],
     nextCursor: '',
+  }
+}
+
+export function emptyTaskCycleResults() {
+  return {
+    archive: null,
+    items: [],
   }
 }
 
@@ -236,6 +264,73 @@ export function normalizePlayerPage(payload) {
       : [],
     nextCursor: payload?.nextCursor || '',
     total: Number(payload?.total ?? 0),
+  }
+}
+
+export function normalizeTaskDefinition(payload) {
+  return {
+    ...emptyTaskForm(),
+    taskId: payload?.taskId || '',
+    title: payload?.title || '',
+    description: payload?.description || '',
+    taskType: payload?.taskType || 'daily',
+    status: payload?.status || 'draft',
+    conditionKind: payload?.conditionKind || 'daily_clicks',
+    targetValue: Number(payload?.targetValue ?? 1),
+    rewards: {
+      gold: Number(payload?.rewards?.gold ?? 0),
+      stones: Number(payload?.rewards?.stones ?? 0),
+      talentPoints: Number(payload?.rewards?.talentPoints ?? 0),
+      equipmentItems: Array.isArray(payload?.rewards?.equipmentItems)
+        ? payload.rewards.equipmentItems.map((entry) => ({
+            itemId: entry?.itemId || '',
+            quantity: Number(entry?.quantity ?? 1),
+          }))
+        : [],
+    },
+    displayOrder: Number(payload?.displayOrder ?? 0),
+    startAt: Number(payload?.startAt ?? 0),
+    endAt: Number(payload?.endAt ?? 0),
+    createdAt: Number(payload?.createdAt ?? 0),
+    updatedAt: Number(payload?.updatedAt ?? 0),
+  }
+}
+
+export function normalizeTaskArchive(payload) {
+  return {
+    taskId: payload?.taskId || '',
+    cycleKey: payload?.cycleKey || '',
+    taskType: payload?.taskType || 'daily',
+    conditionKind: payload?.conditionKind || 'daily_clicks',
+    targetValue: Number(payload?.targetValue ?? 0),
+    startAt: Number(payload?.startAt ?? 0),
+    endAt: Number(payload?.endAt ?? 0),
+    participantsTotal: Number(payload?.participantsTotal ?? 0),
+    completedTotal: Number(payload?.completedTotal ?? 0),
+    claimedTotal: Number(payload?.claimedTotal ?? 0),
+    expiredUnclaimedTotal: Number(payload?.expiredUnclaimedTotal ?? 0),
+    unfinishedTotal: Number(payload?.unfinishedTotal ?? 0),
+    notParticipatedTotal: Number(payload?.notParticipatedTotal ?? 0),
+    archivedAt: Number(payload?.archivedAt ?? 0),
+  }
+}
+
+export function normalizeTaskCycleResults(payload) {
+  return {
+    archive: payload?.archive ? normalizeTaskArchive(payload.archive) : null,
+    items: Array.isArray(payload?.items)
+      ? payload.items.map((entry) => ({
+          taskId: entry?.taskId || '',
+          cycleKey: entry?.cycleKey || '',
+          nickname: entry?.nickname || '',
+          progress: Number(entry?.progress ?? 0),
+          targetValue: Number(entry?.targetValue ?? 0),
+          status: entry?.status || 'unfinished',
+          completedAt: Number(entry?.completedAt ?? 0),
+          claimedAt: Number(entry?.claimedAt ?? 0),
+          archivedAt: Number(entry?.archivedAt ?? 0),
+        }))
+      : [],
   }
 }
 

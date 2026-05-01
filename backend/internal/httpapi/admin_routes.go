@@ -22,6 +22,7 @@ func registerAdminRoutes(router route.IRouter, options Options) {
 	registerAdminOverviewRoutes(router, options)
 	registerAdminBossRoutes(router, options)
 	registerAdminContentRoutes(router, options)
+	registerAdminTaskRoutes(router, options)
 	registerAdminPlayerAuthRoutes(router, options)
 	registerAdminResourceRoutes(router, options)
 }

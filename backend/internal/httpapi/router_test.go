@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bytedance/sonic"
 
@@ -29,10 +30,14 @@ type mockStore struct {
 	announcements         []vote.Announcement
 	latestAnnouncement    *vote.Announcement
 	messagePage           vote.MessagePage
+	tasks                 []vote.PlayerTask
 	result                vote.ClickResult
 	lastBoss              vote.BossUpsert
 	lastBossTemplate      vote.BossTemplateUpsert
 	lastEquipment         vote.EquipmentDefinition
+	lastClaimTaskID       string
+	lastTaskDefinition    vote.TaskDefinition
+	lastArchiveNow        time.Time
 	lastTemplateLootID    string
 	lastTemplateLoot      []vote.BossLootEntry
 	lastCycleQueue        []string
@@ -110,7 +115,167 @@ func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	userState.Stones = m.state.Stones
 	userState.TalentPoints = m.state.TalentPoints
 	userState.RecentRewards = m.state.RecentRewards
+	userState.Tasks = m.tasks
 	return userState
+}
+
+func (m *mockStore) ListTasksForPlayer(_ context.Context, _ string) ([]vote.PlayerTask, error) {
+	return m.tasks, nil
+}
+
+func (m *mockStore) ClaimTaskReward(_ context.Context, _ string, taskID string) (vote.UserState, error) {
+	m.lastClaimTaskID = taskID
+	return m.userStateForNickname("阿明"), nil
+}
+
+func (m *mockStore) ListTaskDefinitions(_ context.Context) ([]vote.TaskDefinition, error) {
+	if m.tasks == nil {
+		return []vote.TaskDefinition{}, nil
+	}
+	items := make([]vote.TaskDefinition, 0, len(m.tasks))
+	for _, item := range m.tasks {
+		items = append(items, vote.TaskDefinition{
+			TaskID:        item.TaskID,
+			Title:         item.Title,
+			Description:   item.Description,
+			TaskType:      item.TaskType,
+			ConditionKind: item.ConditionKind,
+			TargetValue:   item.TargetValue,
+			Rewards:       item.Rewards,
+			DisplayOrder:  item.DisplayOrder,
+			StartAt:       item.StartAt,
+			EndAt:         item.EndAt,
+		})
+	}
+	return items, nil
+}
+
+func (m *mockStore) SaveTaskDefinition(_ context.Context, item vote.TaskDefinition) error {
+	m.lastTaskDefinition = item
+	return nil
+}
+
+func (m *mockStore) ActivateTaskDefinition(_ context.Context, taskID string) error {
+	m.lastTaskDefinition.TaskID = taskID
+	m.lastTaskDefinition.Status = vote.TaskStatusActive
+	return nil
+}
+
+func (m *mockStore) DeactivateTaskDefinition(_ context.Context, taskID string) error {
+	m.lastTaskDefinition.TaskID = taskID
+	m.lastTaskDefinition.Status = vote.TaskStatusInactive
+	return nil
+}
+
+func (m *mockStore) DuplicateTaskDefinition(_ context.Context, taskID string, newTaskID string) (*vote.TaskDefinition, error) {
+	item := &vote.TaskDefinition{TaskID: newTaskID}
+	if item.TaskID == "" {
+		item.TaskID = taskID + "-copy"
+	}
+	return item, nil
+}
+
+func (m *mockStore) ArchiveExpiredTaskCycles(_ context.Context, now time.Time) ([]vote.TaskCycleArchive, error) {
+	m.lastArchiveNow = now
+	return []vote.TaskCycleArchive{{TaskID: "daily-click-1", CycleKey: "2026-05-01"}}, nil
+}
+
+func (m *mockStore) ListTaskCycleArchives(_ context.Context, taskID string) ([]vote.TaskCycleArchive, error) {
+	return []vote.TaskCycleArchive{{TaskID: taskID, CycleKey: "2026-05-01"}}, nil
+}
+
+func (m *mockStore) GetTaskCycleResults(_ context.Context, taskID string, cycleKey string) (vote.TaskCycleResultsView, error) {
+	return vote.TaskCycleResultsView{
+		Archive: vote.TaskCycleArchive{TaskID: taskID, CycleKey: cycleKey},
+		Items:   []vote.TaskCyclePlayerResult{{TaskID: taskID, CycleKey: cycleKey, Nickname: "阿明"}},
+	}, nil
+}
+
+func TestAdminTaskRoutesListAndSave(t *testing.T) {
+	store := &mockStore{
+		tasks: []vote.PlayerTask{
+			{TaskID: "daily-click-1", Title: "今日点击", TargetValue: 10},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "task-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected admin login to set cookie")
+	}
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/admin/tasks", nil)
+	listRequest.AddCookie(cookies[0])
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, listRequest)
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin task list, got %d", listResponse.Code)
+	}
+
+	saveRequest := httptest.NewRequest(http.MethodPost, "/api/admin/tasks", strings.NewReader(`{"taskId":"daily-click-2","title":"今日强化","taskType":"daily","conditionKind":"enhance_count","targetValue":3}`))
+	saveRequest.Header.Set("Content-Type", "application/json")
+	saveRequest.AddCookie(cookies[0])
+	saveResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveResponse, saveRequest)
+	if saveResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin task save, got %d", saveResponse.Code)
+	}
+	if store.lastTaskDefinition.TaskID != "daily-click-2" {
+		t.Fatalf("expected saved task id to be captured, got %+v", store.lastTaskDefinition)
+	}
+
+	activateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/tasks/daily-click-2/activate", nil)
+	activateRequest.AddCookie(cookies[0])
+	activateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(activateResponse, activateRequest)
+	if activateResponse.Code != http.StatusOK || store.lastTaskDefinition.Status != vote.TaskStatusActive {
+		t.Fatalf("expected activate to succeed, code=%d task=%+v", activateResponse.Code, store.lastTaskDefinition)
+	}
+
+	duplicateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/tasks/daily-click-2/duplicate", strings.NewReader(`{"taskId":"daily-click-3"}`))
+	duplicateRequest.Header.Set("Content-Type", "application/json")
+	duplicateRequest.AddCookie(cookies[0])
+	duplicateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(duplicateResponse, duplicateRequest)
+	if duplicateResponse.Code != http.StatusOK {
+		t.Fatalf("expected duplicate to succeed, got %d", duplicateResponse.Code)
+	}
+
+	archiveRequest := httptest.NewRequest(http.MethodPost, "/api/admin/tasks/archive-expired", nil)
+	archiveRequest.AddCookie(cookies[0])
+	archiveResponse := httptest.NewRecorder()
+	handler.ServeHTTP(archiveResponse, archiveRequest)
+	if archiveResponse.Code != http.StatusOK || store.lastArchiveNow.IsZero() {
+		t.Fatalf("expected archive-expired to succeed, code=%d archivedAt=%v", archiveResponse.Code, store.lastArchiveNow)
+	}
+
+	cyclesRequest := httptest.NewRequest(http.MethodGet, "/api/admin/tasks/daily-click-1/cycles", nil)
+	cyclesRequest.AddCookie(cookies[0])
+	cyclesResponse := httptest.NewRecorder()
+	handler.ServeHTTP(cyclesResponse, cyclesRequest)
+	if cyclesResponse.Code != http.StatusOK {
+		t.Fatalf("expected cycles list to succeed, got %d", cyclesResponse.Code)
+	}
+
+	resultsRequest := httptest.NewRequest(http.MethodGet, "/api/admin/tasks/daily-click-1/cycles/2026-05-01/results", nil)
+	resultsRequest.AddCookie(cookies[0])
+	resultsResponse := httptest.NewRecorder()
+	handler.ServeHTTP(resultsResponse, resultsRequest)
+	if resultsResponse.Code != http.StatusOK {
+		t.Fatalf("expected cycle results to succeed, got %d", resultsResponse.Code)
+	}
 }
 
 func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string, comboCount int64) (vote.ClickResult, error) {

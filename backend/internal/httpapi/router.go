@@ -49,6 +49,16 @@ type ButtonStore interface {
 	GetBossResources(context.Context) (vote.BossResources, error)
 	GetLatestAnnouncement(context.Context) (*vote.Announcement, error)
 	ListAnnouncements(context.Context, bool) ([]vote.Announcement, error)
+	ListTasksForPlayer(context.Context, string) ([]vote.PlayerTask, error)
+	ClaimTaskReward(context.Context, string, string) (vote.UserState, error)
+	ListTaskDefinitions(context.Context) ([]vote.TaskDefinition, error)
+	SaveTaskDefinition(context.Context, vote.TaskDefinition) error
+	ActivateTaskDefinition(context.Context, string) error
+	DeactivateTaskDefinition(context.Context, string) error
+	DuplicateTaskDefinition(context.Context, string, string) (*vote.TaskDefinition, error)
+	ArchiveExpiredTaskCycles(context.Context, time.Time) ([]vote.TaskCycleArchive, error)
+	ListTaskCycleArchives(context.Context, string) ([]vote.TaskCycleArchive, error)
+	GetTaskCycleResults(context.Context, string, string) (vote.TaskCycleResultsView, error)
 	SaveAnnouncement(context.Context, vote.AnnouncementUpsert) (*vote.Announcement, error)
 	DeleteAnnouncement(context.Context, string) error
 	CreateMessage(context.Context, string, string) (*vote.Message, error)

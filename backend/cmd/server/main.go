@@ -73,6 +73,9 @@ func run() error {
 	var mongoClient *mongo.Client
 	var bossHistoryStore *mongostore.BossHistoryStore
 	var mongoMessageStore *mongostore.MessageStore
+	var taskDefinitionStore *mongostore.TaskDefinitionStore
+	var taskClaimLogStore *mongostore.TaskClaimLogStore
+	var taskCycleArchiveStore *mongostore.TaskCycleArchiveStore
 	var adminAuditWriter httpapi.AdminAuditWriter
 	var domainEventWriter httpapi.DomainEventWriter
 	if cfg.Mongo.Enabled {
@@ -106,6 +109,18 @@ func run() error {
 		systemLogStore := mongostore.NewSystemLogStore(mongoDB, cfg.Mongo.WriteTimeout)
 		if err := systemLogStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo system log indexes: %w", err)
+		}
+		taskDefinitionStore = mongostore.NewTaskDefinitionStore(mongoDB, cfg.Mongo.WriteTimeout, cfg.Mongo.ReadTimeout)
+		if err := taskDefinitionStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo task definition indexes: %w", err)
+		}
+		taskClaimLogStore = mongostore.NewTaskClaimLogStore(mongoDB, cfg.Mongo.WriteTimeout, cfg.Mongo.ReadTimeout)
+		if err := taskClaimLogStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo task claim log indexes: %w", err)
+		}
+		taskCycleArchiveStore = mongostore.NewTaskCycleArchiveStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := taskCycleArchiveStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo task cycle archive indexes: %w", err)
 		}
 
 		adminAuditQueue := archive.NewAsyncQueue[vote.AdminAuditLog](archive.AsyncQueueConfig{
@@ -162,6 +177,9 @@ func run() error {
 		CriticalCount:         0,
 		BossHistoryStore:      bossHistoryStore,
 		MessageStore:          mongoMessageStore,
+		TaskDefinitionStore:   taskDefinitionStore,
+		TaskClaimLogStore:     taskClaimLogStore,
+		TaskCycleArchiveStore: taskCycleArchiveStore,
 	}, nicknameValidator)
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)
@@ -263,6 +281,15 @@ func run() error {
 		}
 	}()
 
+	go func() {
+		if err := archiveExpiredTaskCyclesLoop(pollCtx, store); err != nil && !errors.Is(err, context.Canceled) {
+			select {
+			case errCh <- fmt.Errorf("archive expired task cycles: %w", err):
+			default:
+			}
+		}
+	}()
+
 	if _, err := stateCache.RefreshSnapshot(startupCtx); err != nil {
 		return fmt.Errorf("warm snapshot cache: %w", err)
 	}
@@ -329,6 +356,22 @@ func processTalentBleedLoop(ctx context.Context, store *vote.Store, changeBus *e
 		}
 		for _, change := range changes {
 			if err := changeBus.PublishChange(context.Background(), change); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func archiveExpiredTaskCyclesLoop(ctx context.Context, store *vote.Store) error {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			if _, err := store.ArchiveExpiredTaskCycles(context.Background(), time.Now()); err != nil {
 				return err
 			}
 		}

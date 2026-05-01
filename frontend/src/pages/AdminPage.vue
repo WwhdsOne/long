@@ -4,6 +4,7 @@ import AdminContentTab from '../components/admin/AdminContentTab.vue'
 import AdminDashboardTab from '../components/admin/AdminDashboardTab.vue'
 import AdminEquipmentTab from '../components/admin/AdminEquipmentTab.vue'
 import AdminHistoryTab from '../components/admin/AdminHistoryTab.vue'
+import AdminTaskTab from '../components/admin/AdminTaskTab.vue'
 import { useAdminPage } from './admin/useAdminPage'
 import {reactive} from "vue";
 
@@ -76,6 +77,7 @@ const admin = reactive(useAdminPage())
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'equipment' }" @click="admin.activeTab = 'equipment'; admin.fetchEquipmentPage(admin.equipmentPage.page)">装备</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'content' }" @click="admin.activeTab = 'content'; admin.fetchAnnouncements(); admin.fetchMessages()">内容</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'history' }" @click="admin.activeTab = 'history'; admin.fetchBossHistory(admin.bossHistoryPage.page)">历史</button>
+          <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'tasks' }" @click="admin.activeTab = 'tasks'; admin.fetchTasks()">任务</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'dashboard' }" @click="admin.activeTab = 'dashboard'">看板</button>
         </div>
 
@@ -151,6 +153,33 @@ const admin = reactive(useAdminPage())
           :loading-history="admin.loadingHistory"
           :format-item-stats="admin.formatItemStats"
           :fetch-boss-history="admin.fetchBossHistory"
+        />
+
+        <AdminTaskTab
+          v-else-if="admin.activeTab === 'tasks'"
+          :task-definitions="admin.taskDefinitions"
+          :task-form="admin.taskForm"
+          :task-archives="admin.taskArchives"
+          :task-cycle-results="admin.taskCycleResults"
+          :selected-task-id="admin.selectedTaskId"
+          :selected-task-cycle-key="admin.selectedTaskCycleKey"
+          :loading-tasks="admin.loadingTasks"
+          :loading-task-archives="admin.loadingTaskArchives"
+          :loading-task-results="admin.loadingTaskResults"
+          :saving="admin.saving"
+          :fetch-tasks="admin.fetchTasks"
+          :fetch-task-archives="admin.fetchTaskArchives"
+          :fetch-task-cycle-results="admin.fetchTaskCycleResults"
+          :save-task-definition="admin.saveTaskDefinition"
+          :activate-task-definition="admin.activateTaskDefinition"
+          :deactivate-task-definition="admin.deactivateTaskDefinition"
+          :duplicate-task-definition="admin.duplicateTaskDefinition"
+          :archive-expired-tasks="admin.archiveExpiredTasks"
+          :edit-task-definition="admin.editTaskDefinition"
+          :open-new-task="admin.openNewTask"
+          :add-task-equipment-reward="admin.addTaskEquipmentReward"
+          :remove-task-equipment-reward="admin.removeTaskEquipmentReward"
+          :format-time="admin.formatTime"
         />
 
         <AdminDashboardTab

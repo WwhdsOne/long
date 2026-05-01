@@ -248,6 +248,72 @@ func TestBattleStateOmitsInventoryAndLegacyRewardFields(t *testing.T) {
 	}
 }
 
+func TestTasksEndpointRequiresSessionAndReturnsPlayerTasks(t *testing.T) {
+	store := &mockStore{
+		tasks: []vote.PlayerTask{
+			{
+				TaskID:      "daily-click-1",
+				Title:       "今日点击",
+				Progress:    3,
+				TargetValue: 10,
+				Status:      vote.TaskPlayerStatusInProgress,
+			},
+		},
+	}
+	authenticator := &mockPlayerAuthenticator{verifyNickname: "阿明"}
+	handler := NewHandler(Options{
+		Store:               store,
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: authenticator,
+	})
+
+	unauthorizedRequest := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	unauthorizedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedResponse, unauthorizedRequest)
+	if unauthorizedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without player session, got %d", unauthorizedResponse.Code)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/api/tasks", nil)
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from tasks endpoint, got %d", response.Code)
+	}
+
+	var payload []vote.PlayerTask
+	if err := json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&payload); err != nil {
+		t.Fatalf("decode tasks response: %v", err)
+	}
+	if len(payload) != 1 || payload[0].TaskID != "daily-click-1" {
+		t.Fatalf("unexpected tasks payload: %+v", payload)
+	}
+}
+
+func TestClaimTaskEndpointUsesAuthenticatedPlayer(t *testing.T) {
+	store := &mockStore{}
+	authenticator := &mockPlayerAuthenticator{verifyNickname: "阿明"}
+	handler := NewHandler(Options{
+		Store:               store,
+		Broadcaster:         &mockBroadcaster{},
+		PlayerAuthenticator: authenticator,
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/tasks/daily-click-1/claim", nil)
+	request.AddCookie(&http.Cookie{Name: playerSessionCookieName, Value: "player-token"})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from claim task endpoint, got %d", response.Code)
+	}
+	if store.lastClaimTaskID != "daily-click-1" {
+		t.Fatalf("expected claim endpoint to use task id, got %q", store.lastClaimTaskID)
+	}
+}
+
 func TestAdminCanResetPlayerPassword(t *testing.T) {
 	playerAuthenticator := &mockPlayerAuthenticator{}
 	handler := NewHandler(Options{

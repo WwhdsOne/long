@@ -45,6 +45,10 @@ var ErrTalentPointsInsufficient = errors.New("talent points insufficient")
 var ErrTalentInvalidCost = errors.New("talent invalid cost")
 var ErrTalentInvalidLevel = errors.New("invalid level")
 var ErrTalentMaxLevel = errors.New("already at max level")
+var ErrTaskNotFound = errors.New("task not found")
+var ErrTaskNotClaimable = errors.New("task not claimable")
+var ErrTaskAlreadyClaimed = errors.New("task already claimed")
+var ErrTaskImmutable = errors.New("task immutable after activation")
 
 const (
 	bossStatusActive   = "active"
@@ -310,6 +314,7 @@ type UserState struct {
 	Stones            int64                `json:"stones"`
 	TalentPoints      int64                `json:"talentPoints"`
 	RecentRewards     []Reward             `json:"recentRewards,omitempty"`
+	Tasks             []PlayerTask         `json:"tasks,omitempty"`
 	TalentEvents      []TalentTriggerEvent `json:"talentEvents,omitempty"`
 	TalentCombatState *TalentCombatState   `json:"talentCombatState,omitempty"`
 }
@@ -445,6 +450,24 @@ type StoreOptions struct {
 		ListMessages(context.Context, string, int64) (MessagePage, error)
 		DeleteMessage(context.Context, string) error
 	}
+	TaskDefinitionStore interface {
+		ListActiveTaskDefinitions(context.Context, int64) ([]TaskDefinition, error)
+		ListTaskDefinitions(context.Context) ([]TaskDefinition, error)
+		GetTaskDefinition(context.Context, string) (*TaskDefinition, error)
+		UpsertTaskDefinition(context.Context, TaskDefinition) error
+	}
+	TaskClaimLogStore interface {
+		HasTaskClaimed(context.Context, string, string, string) (bool, error)
+		WriteTaskClaimLog(context.Context, TaskClaimLog) error
+		ListTaskClaimLogs(context.Context, string, string) ([]TaskClaimLog, error)
+		HasTaskClaimLog(context.Context, string, string) (bool, error)
+	}
+	TaskCycleArchiveStore interface {
+		UpsertTaskCycleArchive(context.Context, TaskCycleArchive) error
+		UpsertTaskCyclePlayerResults(context.Context, []TaskCyclePlayerResult) error
+		ListTaskCycleArchives(context.Context, string) ([]TaskCycleArchive, error)
+		GetTaskCycleResults(context.Context, string, string) (TaskCycleResultsView, error)
+	}
 }
 
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
@@ -478,6 +501,8 @@ type Store struct {
 	equipmentInstanceSeqKey string
 	equipmentSpentPrefix    string
 	equipmentEnhancePrefix  string
+	taskProgressPrefix      string
+	taskParticipantsPrefix  string
 	critical                StoreOptions
 	luaRunner               luaScriptRunner
 	clickCountScript        *cachedLuaScript
@@ -495,6 +520,24 @@ type Store struct {
 		CreateMessage(context.Context, string, string) (*Message, error)
 		ListMessages(context.Context, string, int64) (MessagePage, error)
 		DeleteMessage(context.Context, string) error
+	}
+	taskDefinitionStore interface {
+		ListActiveTaskDefinitions(context.Context, int64) ([]TaskDefinition, error)
+		ListTaskDefinitions(context.Context) ([]TaskDefinition, error)
+		GetTaskDefinition(context.Context, string) (*TaskDefinition, error)
+		UpsertTaskDefinition(context.Context, TaskDefinition) error
+	}
+	taskClaimLogStore interface {
+		HasTaskClaimed(context.Context, string, string, string) (bool, error)
+		WriteTaskClaimLog(context.Context, TaskClaimLog) error
+		ListTaskClaimLogs(context.Context, string, string) ([]TaskClaimLog, error)
+		HasTaskClaimLog(context.Context, string, string) (bool, error)
+	}
+	taskCycleArchiveStore interface {
+		UpsertTaskCycleArchive(context.Context, TaskCycleArchive) error
+		UpsertTaskCyclePlayerResults(context.Context, []TaskCyclePlayerResult) error
+		ListTaskCycleArchives(context.Context, string) ([]TaskCycleArchive, error)
+		GetTaskCycleResults(context.Context, string, string) (TaskCycleResultsView, error)
 	}
 
 	combatStatsCache   map[string]CombatStats
@@ -538,6 +581,8 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		equipmentInstanceSeqKey: namespace + "instance:seq",
 		equipmentSpentPrefix:    namespace + "user-equipment-spent:",
 		equipmentEnhancePrefix:  namespace + "user-equipment-enhance:",
+		taskProgressPrefix:      namespace + "task:progress:",
+		taskParticipantsPrefix:  namespace + "task:participants:",
 		critical:                options,
 		luaRunner: redisLuaRunner{
 			client: client,
@@ -547,13 +592,16 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		roll: func(limit int) int {
 			return rand.IntN(limit)
 		},
-		now:                 time.Now,
-		validator:           validator,
-		bossHistoryArchiver: options.BossHistoryArchiver,
-		bossHistoryStore:    options.BossHistoryStore,
-		messageStore:        options.MessageStore,
-		combatStatsCache:    make(map[string]CombatStats),
-		compiledTalentCache: make(map[string]*CompiledTalentSet),
+		now:                   time.Now,
+		validator:             validator,
+		bossHistoryArchiver:   options.BossHistoryArchiver,
+		bossHistoryStore:      options.BossHistoryStore,
+		messageStore:          options.MessageStore,
+		taskDefinitionStore:   options.TaskDefinitionStore,
+		taskClaimLogStore:     options.TaskClaimLogStore,
+		taskCycleArchiveStore: options.TaskCycleArchiveStore,
+		combatStatsCache:      make(map[string]CombatStats),
+		compiledTalentCache:   make(map[string]*CompiledTalentSet),
 	}
 }
 
@@ -680,6 +728,7 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		Loadout:       Loadout{},
 		CombatStats:   s.baseCombatStats(),
 		RecentRewards: []Reward{},
+		Tasks:         []PlayerTask{},
 	}
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
@@ -729,6 +778,12 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		return UserState{}, err
 	}
 	userState.RecentRewards = recentRewards
+
+	tasks, err := s.ListTasksForPlayer(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.Tasks = tasks
 
 	boss, err := s.currentBoss(ctx)
 	if err != nil {
@@ -807,6 +862,9 @@ func (s *Store) EquipItem(ctx context.Context, nickname string, instanceID strin
 		return State{}, err
 	}
 	s.invalidatePlayerCombatCaches(normalizedNickname)
+	if err := s.recordTaskEvent(ctx, normalizedNickname, TaskConditionEnhanceCount, 1); err != nil {
+		return State{}, err
+	}
 
 	return s.GetState(ctx, normalizedNickname)
 }
@@ -1439,7 +1497,17 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
-	return s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx, comboCount)
+	result, err = s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx, comboCount)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	if recordErr := s.recordTaskEvent(ctx, nickname, TaskConditionDailyClicks, 1); recordErr != nil {
+		return ClickResult{}, recordErr
+	}
+	if recordErr := s.recordTaskEvent(ctx, nickname, TaskConditionWeeklyClicks, 1); recordErr != nil {
+		return ClickResult{}, recordErr
+	}
+	return result, nil
 }
 
 func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult, targetIdx int, comboCount int64) (ClickResult, error) {
@@ -2183,11 +2251,13 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 		stoneBase = int64(math.Floor(float64(stoneBase) * 0.5))
 	}
 	rewardForNickname := make([]Reward, 0, len(lootEntries))
+	qualifiedNicknames := make([]string, 0, len(participants))
 	for _, participant := range participants {
 		nickname, ok := participant.Member.(string)
 		if !ok || nickname == "" || participant.Score < float64(minDamage) {
 			continue
 		}
+		qualifiedNicknames = append(qualifiedNicknames, nickname)
 
 		goldDelta := rollResourceReward(s.roll, goldBase, 0.75, 1.25)
 		stoneDelta := rollResourceReward(s.roll, stoneBase, 0.67, 1.33)
@@ -2237,6 +2307,11 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 
 	if _, err = pipe.Exec(ctx); err != nil {
 		return nil, nil, err
+	}
+	for _, nickname := range qualifiedNicknames {
+		if recordErr := s.recordTaskEvent(ctx, nickname, TaskConditionBossKills, 1); recordErr != nil {
+			return nil, nil, recordErr
+		}
 	}
 
 	if err := s.SaveBossToHistory(ctx, boss); err != nil {

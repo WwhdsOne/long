@@ -11,6 +11,8 @@ import {
   emptyLootRows,
   emptyMessagePage,
   emptyPlayerPage,
+  emptyTaskCycleResults,
+  emptyTaskForm,
   formatItemStats,
   formatTime,
   normalizeAdminState,
@@ -20,6 +22,9 @@ import {
   normalizeEquipmentPage,
   normalizeMessagePage,
   normalizePlayerPage,
+  normalizeTaskArchive,
+  normalizeTaskCycleResults,
+  normalizeTaskDefinition,
 } from './state'
 import { fetchWithTimeout, readErrorMessage } from './request'
 import { createAdminPageActions } from './useAdminPageActions'
@@ -52,6 +57,12 @@ export function useAdminPage() {
   const bossHistoryPage = ref(emptyBossHistoryPage())
   const announcements = ref([])
   const messagePage = ref(emptyMessagePage())
+  const taskDefinitions = ref([])
+  const taskForm = ref(emptyTaskForm())
+  const taskArchives = ref([])
+  const taskCycleResults = ref(emptyTaskCycleResults())
+  const selectedTaskId = ref('')
+  const selectedTaskCycleKey = ref('')
 
   const loadingHistory = ref(false)
   const loadingButtons = ref(false)
@@ -60,6 +71,9 @@ export function useAdminPage() {
   const loadingAnnouncements = ref(false)
   const loadingMessages = ref(false)
   const loadingPlayers = ref(false)
+  const loadingTasks = ref(false)
+  const loadingTaskArchives = ref(false)
+  const loadingTaskResults = ref(false)
 
   const hasBoss = computed(() => Boolean(adminState.value.boss))
   const bossTemplates = computed(() => adminState.value.bossPool ?? [])
@@ -267,11 +281,74 @@ export function useAdminPage() {
     }
   }
 
+  async function fetchTasks() {
+    loadingTasks.value = true
+    try {
+      const response = await fetchWithTimeout('/api/admin/tasks')
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '任务列表加载失败'))
+      }
+      const payload = await response.json()
+      taskDefinitions.value = Array.isArray(payload) ? payload.map(normalizeTaskDefinition) : []
+    } catch (error) {
+      errorMessage.value = error.message || '任务列表加载失败'
+    } finally {
+      loadingTasks.value = false
+    }
+  }
+
+  async function fetchTaskArchives(taskId = selectedTaskId.value) {
+    if (!taskId) {
+      taskArchives.value = []
+      return
+    }
+    loadingTaskArchives.value = true
+    selectedTaskId.value = taskId
+    selectedTaskCycleKey.value = ''
+    taskCycleResults.value = emptyTaskCycleResults()
+    try {
+      const response = await fetchWithTimeout(`/api/admin/tasks/${encodeURIComponent(taskId)}/cycles`)
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '任务周期归档加载失败'))
+      }
+      const payload = await response.json()
+      taskArchives.value = Array.isArray(payload) ? payload.map(normalizeTaskArchive) : []
+    } catch (error) {
+      errorMessage.value = error.message || '任务周期归档加载失败'
+    } finally {
+      loadingTaskArchives.value = false
+    }
+  }
+
+  async function fetchTaskCycleResults(taskId = selectedTaskId.value, cycleKey = selectedTaskCycleKey.value) {
+    if (!taskId || !cycleKey) {
+      taskCycleResults.value = emptyTaskCycleResults()
+      return
+    }
+    loadingTaskResults.value = true
+    selectedTaskId.value = taskId
+    selectedTaskCycleKey.value = cycleKey
+    try {
+      const response = await fetchWithTimeout(
+        `/api/admin/tasks/${encodeURIComponent(taskId)}/cycles/${encodeURIComponent(cycleKey)}/results`,
+      )
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '任务周期明细加载失败'))
+      }
+      taskCycleResults.value = normalizeTaskCycleResults(await response.json())
+    } catch (error) {
+      errorMessage.value = error.message || '任务周期明细加载失败'
+    } finally {
+      loadingTaskResults.value = false
+    }
+  }
+
   async function refreshAll() {
     await Promise.all([
       fetchAdminState(),
       fetchPlayerPage(),
       fetchEquipmentPage(equipmentPage.value.page),
+      fetchTasks(),
     ])
   }
 
@@ -290,6 +367,7 @@ export function useAdminPage() {
         fetchMessages(),
         fetchPlayerPage(),
         fetchEquipmentPage(),
+        fetchTasks(),
       ])
     } catch {
       checkingSession.value = false
@@ -314,7 +392,7 @@ export function useAdminPage() {
       checkingSession.value = false
       setSuccess('后台已解锁。')
       await fetchAdminState()
-      await Promise.all([fetchPlayerPage(), fetchEquipmentPage()])
+      await Promise.all([fetchPlayerPage(), fetchEquipmentPage(), fetchTasks()])
     } catch (error) {
       errorMessage.value = error.message || '登录失败'
     } finally {
@@ -331,6 +409,12 @@ export function useAdminPage() {
     playerPage.value = emptyPlayerPage()
     bossHistoryPage.value = emptyBossHistoryPage()
     messagePage.value = emptyMessagePage()
+    taskDefinitions.value = []
+    taskForm.value = emptyTaskForm()
+    taskArchives.value = []
+    taskCycleResults.value = emptyTaskCycleResults()
+    selectedTaskId.value = ''
+    selectedTaskCycleKey.value = ''
     announcements.value = []
     checkingSession.value = false
     successMessage.value = ''
@@ -386,6 +470,7 @@ export function useAdminPage() {
     emptyEquipmentPage,
     emptyMessagePage,
     emptyPlayerPage,
+    emptyTaskForm,
     equipmentForm,
     equipmentPage,
     equipmentPrompt,
@@ -395,6 +480,9 @@ export function useAdminPage() {
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
+    fetchTaskArchives,
+    fetchTaskCycleResults,
+    fetchTasks,
     findBossTemplate,
     generatingEquipmentDraft,
     loading,
@@ -415,14 +503,23 @@ export function useAdminPage() {
     normalizeMessagePage,
     normalizePlayerPage,
     playerPage,
+    taskArchives,
+    taskCycleResults,
+    taskDefinitions,
+    taskForm,
     readErrorMessage,
     fetchWithTimeout,
     saving,
     selectedBossTemplateId,
+    selectedTaskCycleKey,
+    selectedTaskId,
     setSuccess,
     showEquipmentEditor,
     successMessage,
     syncBossTemplateEditor,
+    loadingTaskArchives,
+    loadingTaskResults,
+    loadingTasks,
     uploadImageToOSS,
   }
 
@@ -466,11 +563,16 @@ export function useAdminPage() {
     loadingHistory,
     loadingMessages,
     loadingPlayers,
+    loadingTaskArchives,
+    loadingTaskResults,
+    loadingTasks,
     showEquipmentEditor,
     loginForm,
     lootRows,
     messagePage,
     playerPage,
+    selectedTaskCycleKey,
+    selectedTaskId,
     checkSession,
     fetchAdminState,
     fetchAnnouncements,
@@ -478,6 +580,9 @@ export function useAdminPage() {
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
+    fetchTaskArchives,
+    fetchTaskCycleResults,
+    fetchTasks,
     fetchPlayerPage,
     login,
     logout,
@@ -487,6 +592,10 @@ export function useAdminPage() {
     selectedBossTemplate,
     selectedBossTemplateId,
     successMessage,
+    taskArchives,
+    taskCycleResults,
+    taskDefinitions,
+    taskForm,
     uploadingImage,
   }
 }

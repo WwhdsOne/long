@@ -131,6 +131,7 @@ const myBossStats = ref(null)
 const myBossDamageValue = ref(0)
 const bossLeaderboardCountValue = ref(-1)
 const inventory = ref([])
+const tasks = ref([])
 const loadout = ref(emptyLoadout())
 const combatStats = ref(defaultCombatStats())
 const recentRewards = ref([])
@@ -1472,6 +1473,30 @@ function applyPlayerProfileState(payload) {
     if ('talentPoints' in payload) {
         talentPoints.value = Number(payload.talentPoints ?? 0)
     }
+    if ('tasks' in payload) {
+        tasks.value = Array.isArray(payload.tasks) ? payload.tasks : []
+    }
+}
+
+async function claimTask(taskId) {
+    if (!nickname.value) {
+        errorMessage.value = '先登录账号再领取任务奖励。'
+        return {ok: false, message: errorMessage.value}
+    }
+
+    const response = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/claim`, {
+        method: 'POST',
+    })
+    if (!response.ok) {
+        const message = await readErrorMessage(response, '任务奖励领取失败，请稍后重试。')
+        errorMessage.value = message
+        return {ok: false, message}
+    }
+
+    const payload = await response.json()
+    applyUserState(payload)
+    errorMessage.value = ''
+    return {ok: true}
 }
 
 function applyClickResult(payload) {
@@ -2529,6 +2554,7 @@ export function usePublicPageState() {
         latestAnnouncement,
         announcements,
         myBossStats,
+        tasks,
         inventory,
         loadout,
         loadoutSlots,
@@ -2630,6 +2656,7 @@ export function usePublicPageState() {
         closeRewardModal,
         loadMessages,
         submitMessage,
+        claimTask,
         toggleAutoClick,
         clickButton,
         toggleItemEquip,
