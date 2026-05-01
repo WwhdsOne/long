@@ -862,7 +862,7 @@ func (s *Store) EquipItem(ctx context.Context, nickname string, instanceID strin
 		return State{}, err
 	}
 	s.invalidatePlayerCombatCaches(normalizedNickname)
-	if err := s.recordTaskEvent(ctx, normalizedNickname, TaskConditionEnhanceCount, 1); err != nil {
+	if err := s.recordTaskEvent(ctx, normalizedNickname, TaskEventEnhance, 1); err != nil {
 		return State{}, err
 	}
 
@@ -1501,10 +1501,7 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
-	if recordErr := s.recordTaskEvent(ctx, nickname, TaskConditionDailyClicks, 1); recordErr != nil {
-		return ClickResult{}, recordErr
-	}
-	if recordErr := s.recordTaskEvent(ctx, nickname, TaskConditionWeeklyClicks, 1); recordErr != nil {
+	if recordErr := s.recordTaskEvent(ctx, nickname, TaskEventClick, 1); recordErr != nil {
 		return ClickResult{}, recordErr
 	}
 	return result, nil
@@ -2309,7 +2306,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 		return nil, nil, err
 	}
 	for _, nickname := range qualifiedNicknames {
-		if recordErr := s.recordTaskEvent(ctx, nickname, TaskConditionBossKills, 1); recordErr != nil {
+		if recordErr := s.recordTaskEvent(ctx, nickname, TaskEventBossKill, 1); recordErr != nil {
 			return nil, nil, recordErr
 		}
 	}

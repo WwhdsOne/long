@@ -29,6 +29,24 @@ const (
 	TaskConditionEnhanceCount TaskConditionKind = "enhance_count"
 )
 
+// TaskEventKind 任务统计的行为类型。
+type TaskEventKind string
+
+const (
+	TaskEventClick    TaskEventKind = "click"
+	TaskEventBossKill TaskEventKind = "boss_kill"
+	TaskEventEnhance  TaskEventKind = "enhance"
+)
+
+// TaskWindowKind 任务累计窗口类型。
+type TaskWindowKind string
+
+const (
+	TaskWindowDaily      TaskWindowKind = "daily"
+	TaskWindowWeekly     TaskWindowKind = "weekly"
+	TaskWindowFixedRange TaskWindowKind = "fixed_range"
+)
+
 // TaskPlayerStatus 玩家在某个任务周期下的结果状态。
 type TaskPlayerStatus string
 
@@ -60,6 +78,8 @@ type TaskDefinition struct {
 	Title         string            `json:"title"`
 	Description   string            `json:"description"`
 	TaskType      TaskType          `json:"taskType"`
+	EventKind     TaskEventKind     `json:"eventKind"`
+	WindowKind    TaskWindowKind    `json:"windowKind"`
 	Status        TaskStatus        `json:"status"`
 	ConditionKind TaskConditionKind `json:"conditionKind"`
 	TargetValue   int64             `json:"targetValue"`
@@ -86,6 +106,8 @@ type TaskCycleArchive struct {
 	TaskID                string            `json:"taskId"`
 	CycleKey              string            `json:"cycleKey"`
 	TaskType              TaskType          `json:"taskType"`
+	EventKind             TaskEventKind     `json:"eventKind"`
+	WindowKind            TaskWindowKind    `json:"windowKind"`
 	ConditionKind         TaskConditionKind `json:"conditionKind"`
 	TargetValue           int64             `json:"targetValue"`
 	StartAt               int64             `json:"startAt,omitempty"`
@@ -124,6 +146,8 @@ type PlayerTask struct {
 	Title         string            `json:"title"`
 	Description   string            `json:"description"`
 	TaskType      TaskType          `json:"taskType"`
+	EventKind     TaskEventKind     `json:"eventKind"`
+	WindowKind    TaskWindowKind    `json:"windowKind"`
 	ConditionKind TaskConditionKind `json:"conditionKind"`
 	TargetValue   int64             `json:"targetValue"`
 	Rewards       TaskRewards       `json:"rewards"`
@@ -136,4 +160,89 @@ type PlayerTask struct {
 	CompletedAt   int64             `json:"completedAt,omitempty"`
 	ClaimedAt     int64             `json:"claimedAt,omitempty"`
 	CanClaim      bool              `json:"canClaim"`
+}
+
+// NormalizeTaskDefinitionModel 将任务定义补齐为新旧字段并存的兼容模型。
+func NormalizeTaskDefinitionModel(item TaskDefinition) TaskDefinition {
+	if item.EventKind == "" {
+		item.EventKind = taskEventKindFromLegacy(item.ConditionKind)
+	}
+	if item.WindowKind == "" {
+		item.WindowKind = taskWindowKindFromLegacy(item.TaskType, item.ConditionKind)
+	}
+	item.TaskType = legacyTaskTypeFromWindowKind(item.WindowKind)
+	item.ConditionKind = legacyConditionKindFromModel(item.EventKind, item.WindowKind)
+	return item
+}
+
+// NormalizeTaskArchiveModel 将任务归档补齐为新旧字段并存的兼容模型。
+func NormalizeTaskArchiveModel(item TaskCycleArchive) TaskCycleArchive {
+	if item.EventKind == "" {
+		item.EventKind = taskEventKindFromLegacy(item.ConditionKind)
+	}
+	if item.WindowKind == "" {
+		item.WindowKind = taskWindowKindFromLegacy(item.TaskType, item.ConditionKind)
+	}
+	item.TaskType = legacyTaskTypeFromWindowKind(item.WindowKind)
+	item.ConditionKind = legacyConditionKindFromModel(item.EventKind, item.WindowKind)
+	return item
+}
+
+func taskEventKindFromLegacy(conditionKind TaskConditionKind) TaskEventKind {
+	switch conditionKind {
+	case TaskConditionDailyClicks, TaskConditionWeeklyClicks:
+		return TaskEventClick
+	case TaskConditionBossKills:
+		return TaskEventBossKill
+	case TaskConditionEnhanceCount:
+		return TaskEventEnhance
+	default:
+		return TaskEventClick
+	}
+}
+
+func taskWindowKindFromLegacy(taskType TaskType, conditionKind TaskConditionKind) TaskWindowKind {
+	switch conditionKind {
+	case TaskConditionDailyClicks:
+		if taskType != TaskTypeLimited {
+			return TaskWindowDaily
+		}
+	case TaskConditionWeeklyClicks:
+		if taskType != TaskTypeLimited {
+			return TaskWindowWeekly
+		}
+	}
+	switch taskType {
+	case TaskTypeWeekly:
+		return TaskWindowWeekly
+	case TaskTypeLimited:
+		return TaskWindowFixedRange
+	default:
+		return TaskWindowDaily
+	}
+}
+
+func legacyTaskTypeFromWindowKind(windowKind TaskWindowKind) TaskType {
+	switch windowKind {
+	case TaskWindowWeekly:
+		return TaskTypeWeekly
+	case TaskWindowFixedRange:
+		return TaskTypeLimited
+	default:
+		return TaskTypeDaily
+	}
+}
+
+func legacyConditionKindFromModel(eventKind TaskEventKind, windowKind TaskWindowKind) TaskConditionKind {
+	switch eventKind {
+	case TaskEventBossKill:
+		return TaskConditionBossKills
+	case TaskEventEnhance:
+		return TaskConditionEnhanceCount
+	default:
+		if windowKind == TaskWindowWeekly {
+			return TaskConditionWeeklyClicks
+		}
+		return TaskConditionDailyClicks
+	}
 }

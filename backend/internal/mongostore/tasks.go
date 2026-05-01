@@ -14,6 +14,24 @@ import (
 
 const taskDefinitionsCollectionName = "task_definitions"
 
+type taskDefinitionDocument struct {
+	TaskID        string                 `bson:"task_id"`
+	Title         string                 `bson:"title"`
+	Description   string                 `bson:"description"`
+	TaskType      vote.TaskType          `bson:"task_type"`
+	EventKind     vote.TaskEventKind     `bson:"event_kind"`
+	WindowKind    vote.TaskWindowKind    `bson:"window_kind"`
+	Status        vote.TaskStatus        `bson:"status"`
+	ConditionKind vote.TaskConditionKind `bson:"condition_kind"`
+	TargetValue   int64                  `bson:"target_value"`
+	Rewards       vote.TaskRewards       `bson:"rewards"`
+	DisplayOrder  int64                  `bson:"display_order"`
+	StartAt       int64                  `bson:"start_at"`
+	EndAt         int64                  `bson:"end_at"`
+	CreatedAt     int64                  `bson:"created_at"`
+	UpdatedAt     int64                  `bson:"updated_at"`
+}
+
 // TaskDefinitionStore 负责任务定义的读写。
 type TaskDefinitionStore struct {
 	collection   *mongo.Collection
@@ -54,6 +72,7 @@ func (s *TaskDefinitionStore) UpsertTaskDefinition(ctx context.Context, item vot
 	if s == nil || s.collection == nil {
 		return nil
 	}
+	item = vote.NormalizeTaskDefinitionModel(item)
 	taskID := strings.TrimSpace(item.TaskID)
 	if taskID == "" {
 		return nil
@@ -68,6 +87,8 @@ func (s *TaskDefinitionStore) UpsertTaskDefinition(ctx context.Context, item vot
 			"title":          item.Title,
 			"description":    item.Description,
 			"task_type":      item.TaskType,
+			"event_kind":     item.EventKind,
+			"window_kind":    item.WindowKind,
 			"status":         item.Status,
 			"condition_kind": item.ConditionKind,
 			"target_value":   item.TargetValue,
@@ -93,21 +114,7 @@ func (s *TaskDefinitionStore) GetTaskDefinition(ctx context.Context, taskID stri
 	}
 	readCtx, cancel := withTimeout(ctx, s.readTimeout)
 	defer cancel()
-	var doc struct {
-		TaskID        string                 `bson:"task_id"`
-		Title         string                 `bson:"title"`
-		Description   string                 `bson:"description"`
-		TaskType      vote.TaskType          `bson:"task_type"`
-		Status        vote.TaskStatus        `bson:"status"`
-		ConditionKind vote.TaskConditionKind `bson:"condition_kind"`
-		TargetValue   int64                  `bson:"target_value"`
-		Rewards       vote.TaskRewards       `bson:"rewards"`
-		DisplayOrder  int64                  `bson:"display_order"`
-		StartAt       int64                  `bson:"start_at"`
-		EndAt         int64                  `bson:"end_at"`
-		CreatedAt     int64                  `bson:"created_at"`
-		UpdatedAt     int64                  `bson:"updated_at"`
-	}
+	var doc taskDefinitionDocument
 	err := s.collection.FindOne(readCtx, bson.M{"task_id": taskID}).Decode(&doc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -115,11 +122,13 @@ func (s *TaskDefinitionStore) GetTaskDefinition(ctx context.Context, taskID stri
 		}
 		return nil, err
 	}
-	return &vote.TaskDefinition{
+	item := vote.NormalizeTaskDefinitionModel(vote.TaskDefinition{
 		TaskID:        doc.TaskID,
 		Title:         doc.Title,
 		Description:   doc.Description,
 		TaskType:      doc.TaskType,
+		EventKind:     doc.EventKind,
+		WindowKind:    doc.WindowKind,
 		Status:        doc.Status,
 		ConditionKind: doc.ConditionKind,
 		TargetValue:   doc.TargetValue,
@@ -129,7 +138,8 @@ func (s *TaskDefinitionStore) GetTaskDefinition(ctx context.Context, taskID stri
 		EndAt:         doc.EndAt,
 		CreatedAt:     doc.CreatedAt,
 		UpdatedAt:     doc.UpdatedAt,
-	}, nil
+	})
+	return &item, nil
 }
 
 func (s *TaskDefinitionStore) ListActiveTaskDefinitions(ctx context.Context, nowUnix int64) ([]vote.TaskDefinition, error) {
@@ -167,29 +177,17 @@ func (s *TaskDefinitionStore) ListActiveTaskDefinitions(ctx context.Context, now
 
 	items := make([]vote.TaskDefinition, 0)
 	for cursor.Next(readCtx) {
-		var doc struct {
-			TaskID        string                 `bson:"task_id"`
-			Title         string                 `bson:"title"`
-			Description   string                 `bson:"description"`
-			TaskType      vote.TaskType          `bson:"task_type"`
-			Status        vote.TaskStatus        `bson:"status"`
-			ConditionKind vote.TaskConditionKind `bson:"condition_kind"`
-			TargetValue   int64                  `bson:"target_value"`
-			Rewards       vote.TaskRewards       `bson:"rewards"`
-			DisplayOrder  int64                  `bson:"display_order"`
-			StartAt       int64                  `bson:"start_at"`
-			EndAt         int64                  `bson:"end_at"`
-			CreatedAt     int64                  `bson:"created_at"`
-			UpdatedAt     int64                  `bson:"updated_at"`
-		}
+		var doc taskDefinitionDocument
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, err
 		}
-		items = append(items, vote.TaskDefinition{
+		items = append(items, vote.NormalizeTaskDefinitionModel(vote.TaskDefinition{
 			TaskID:        doc.TaskID,
 			Title:         doc.Title,
 			Description:   doc.Description,
 			TaskType:      doc.TaskType,
+			EventKind:     doc.EventKind,
+			WindowKind:    doc.WindowKind,
 			Status:        doc.Status,
 			ConditionKind: doc.ConditionKind,
 			TargetValue:   doc.TargetValue,
@@ -199,7 +197,7 @@ func (s *TaskDefinitionStore) ListActiveTaskDefinitions(ctx context.Context, now
 			EndAt:         doc.EndAt,
 			CreatedAt:     doc.CreatedAt,
 			UpdatedAt:     doc.UpdatedAt,
-		})
+		}))
 	}
 	if err := cursor.Err(); err != nil {
 		return nil, err
@@ -224,29 +222,17 @@ func (s *TaskDefinitionStore) ListTaskDefinitions(ctx context.Context) ([]vote.T
 
 	items := make([]vote.TaskDefinition, 0)
 	for cursor.Next(readCtx) {
-		var doc struct {
-			TaskID        string                 `bson:"task_id"`
-			Title         string                 `bson:"title"`
-			Description   string                 `bson:"description"`
-			TaskType      vote.TaskType          `bson:"task_type"`
-			Status        vote.TaskStatus        `bson:"status"`
-			ConditionKind vote.TaskConditionKind `bson:"condition_kind"`
-			TargetValue   int64                  `bson:"target_value"`
-			Rewards       vote.TaskRewards       `bson:"rewards"`
-			DisplayOrder  int64                  `bson:"display_order"`
-			StartAt       int64                  `bson:"start_at"`
-			EndAt         int64                  `bson:"end_at"`
-			CreatedAt     int64                  `bson:"created_at"`
-			UpdatedAt     int64                  `bson:"updated_at"`
-		}
+		var doc taskDefinitionDocument
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, err
 		}
-		items = append(items, vote.TaskDefinition{
+		items = append(items, vote.NormalizeTaskDefinitionModel(vote.TaskDefinition{
 			TaskID:        doc.TaskID,
 			Title:         doc.Title,
 			Description:   doc.Description,
 			TaskType:      doc.TaskType,
+			EventKind:     doc.EventKind,
+			WindowKind:    doc.WindowKind,
 			Status:        doc.Status,
 			ConditionKind: doc.ConditionKind,
 			TargetValue:   doc.TargetValue,
@@ -256,7 +242,7 @@ func (s *TaskDefinitionStore) ListTaskDefinitions(ctx context.Context) ([]vote.T
 			EndAt:         doc.EndAt,
 			CreatedAt:     doc.CreatedAt,
 			UpdatedAt:     doc.UpdatedAt,
-		})
+		}))
 	}
 	if err := cursor.Err(); err != nil {
 		return nil, err

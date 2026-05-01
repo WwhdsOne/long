@@ -27,16 +27,27 @@ function taskStatusLabel(status) {
   }
 }
 
-function taskTypeLabel(taskType) {
-  switch (taskType) {
-    case 'daily':
-      return '日常'
-    case 'weekly':
-      return '周常'
-    case 'limited':
-      return '限时'
+function eventLabel(eventKind) {
+  switch (eventKind) {
+    case 'boss_kill':
+      return '击败 Boss'
+    case 'enhance':
+      return '强化次数'
+    case 'click':
     default:
-      return taskType || '任务'
+      return '点击次数'
+  }
+}
+
+function windowLabel(windowKind) {
+  switch (windowKind) {
+    case 'weekly':
+      return '按周累计'
+    case 'fixed_range':
+      return '固定时间窗'
+    case 'daily':
+    default:
+      return '按天累计'
   }
 }
 
@@ -86,7 +97,7 @@ async function handleClaimTask(taskId) {
         >
           <div class="social-card__head">
             <div>
-              <p class="vote-stage__eyebrow">{{ taskTypeLabel(task.taskType) }} · {{ taskStatusLabel(task.status) }}</p>
+              <p class="vote-stage__eyebrow">{{ eventLabel(task.eventKind) }} · {{ windowLabel(task.windowKind) }} · {{ taskStatusLabel(task.status) }}</p>
               <strong>{{ task.title }}</strong>
             </div>
             <strong>{{ task.progress }}/{{ task.targetValue }}</strong>

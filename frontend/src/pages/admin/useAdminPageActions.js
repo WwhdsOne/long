@@ -69,7 +69,79 @@ export function createAdminPageActions(state) {
       : []
   }
 
+  function legacyTaskTypeForWindow(windowKind) {
+    switch (windowKind) {
+      case 'weekly':
+        return 'weekly'
+      case 'fixed_range':
+        return 'limited'
+      default:
+        return 'daily'
+    }
+  }
+
+  function legacyConditionKindForTask(eventKind, windowKind) {
+    switch (eventKind) {
+      case 'boss_kill':
+        return 'boss_kills'
+      case 'enhance':
+        return 'enhance_count'
+      default:
+        return windowKind === 'weekly' ? 'weekly_clicks' : 'daily_clicks'
+    }
+  }
+
+  function eventKindFromLegacyCondition(conditionKind) {
+    switch (conditionKind) {
+      case 'boss_kills':
+        return 'boss_kill'
+      case 'enhance_count':
+        return 'enhance'
+      default:
+        return 'click'
+    }
+  }
+
+  function windowKindFromLegacyTask(taskType, conditionKind) {
+    if (conditionKind === 'weekly_clicks' && taskType !== 'limited') {
+      return 'weekly'
+    }
+    if (conditionKind === 'daily_clicks' && taskType !== 'limited') {
+      return 'daily'
+    }
+    switch (taskType) {
+      case 'weekly':
+        return 'weekly'
+      case 'limited':
+        return 'fixed_range'
+      default:
+        return 'daily'
+    }
+  }
+
+  function normalizeTaskFormModel() {
+    const legacyTaskType = String(taskForm.value.taskType || '').trim()
+    const legacyConditionKind = String(taskForm.value.conditionKind || '').trim()
+    const derivedEventKind = eventKindFromLegacyCondition(legacyConditionKind)
+    const derivedWindowKind = windowKindFromLegacyTask(legacyTaskType, legacyConditionKind)
+    const rawEventKind = String(taskForm.value.eventKind || '').trim()
+    const rawWindowKind = String(taskForm.value.windowKind || '').trim()
+    const eventKind = !rawEventKind || (rawEventKind === 'click' && derivedEventKind !== 'click')
+      ? derivedEventKind
+      : rawEventKind
+    const windowKind = !rawWindowKind || (rawWindowKind === 'daily' && derivedWindowKind !== 'daily')
+      ? derivedWindowKind
+      : rawWindowKind
+    return {
+      eventKind,
+      windowKind,
+      taskType: legacyTaskType || legacyTaskTypeForWindow(windowKind),
+      conditionKind: legacyConditionKind || legacyConditionKindForTask(eventKind, windowKind),
+    }
+  }
+
   function validateTaskDefinitionForm() {
+    const model = normalizeTaskFormModel()
     const taskID = String(taskForm.value.taskId || '').trim()
     if (!taskID) {
       return '先填写 taskId。'
@@ -80,11 +152,11 @@ export function createAdminPageActions(state) {
     if (Number(taskForm.value.targetValue || 0) <= 0) {
       return '目标值必须大于 0。'
     }
-    if (taskForm.value.taskType === 'limited') {
+    if (model.windowKind === 'fixed_range') {
       const startAt = Number(taskForm.value.startAt || 0)
       const endAt = Number(taskForm.value.endAt || 0)
       if (startAt <= 0 || endAt <= 0 || endAt <= startAt) {
-        return '限时任务需要填写合法的开始时间和结束时间。'
+        return '固定时间窗任务需要填写合法的开始时间和结束时间。'
       }
     }
     const rewardItems = normalizeTaskRewardItems(taskForm.value.rewards?.equipmentItems)
@@ -391,6 +463,7 @@ export function createAdminPageActions(state) {
     }
     saving.value = true
     try {
+      const model = normalizeTaskFormModel()
       const taskID = String(taskForm.value.taskId || '').trim()
       const rewardItems = normalizeTaskRewardItems(taskForm.value.rewards?.equipmentItems)
       const exists = taskDefinitions.value.some((entry) => entry.taskId === taskID)
@@ -402,10 +475,14 @@ export function createAdminPageActions(state) {
         body: JSON.stringify({
           ...taskForm.value,
           taskId: taskID,
+          eventKind: model.eventKind,
+          windowKind: model.windowKind,
+          taskType: legacyTaskTypeForWindow(model.windowKind),
+          conditionKind: legacyConditionKindForTask(model.eventKind, model.windowKind),
           targetValue: Number(taskForm.value.targetValue || 0),
           displayOrder: Number(taskForm.value.displayOrder || 0),
-          startAt: Number(taskForm.value.startAt || 0),
-          endAt: Number(taskForm.value.endAt || 0),
+          startAt: model.windowKind === 'fixed_range' ? Number(taskForm.value.startAt || 0) : 0,
+          endAt: model.windowKind === 'fixed_range' ? Number(taskForm.value.endAt || 0) : 0,
           rewards: {
             gold: Number(taskForm.value.rewards?.gold || 0),
             stones: Number(taskForm.value.rewards?.stones || 0),

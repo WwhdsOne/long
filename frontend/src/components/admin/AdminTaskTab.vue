@@ -1,6 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
 
+function toDatetimeLocal(ts) {
+  if (!ts || ts <= 0) return ''
+  const d = new Date(ts * 1000)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function fromDatetimeLocal(str) {
+  if (!str) return 0
+  return Math.floor(new Date(str).getTime() / 1000)
+}
+
 const props = defineProps({
   taskDefinitions: { type: Array, required: true },
   taskForm: { type: Object, required: true },
@@ -29,7 +41,7 @@ const props = defineProps({
 })
 
 const taskStatusFilter = ref('all')
-const taskTypeFilter = ref('all')
+const taskWindowFilter = ref('all')
 const archiveStatusFilter = ref('all')
 
 const filteredTaskDefinitions = computed(() =>
@@ -37,7 +49,7 @@ const filteredTaskDefinitions = computed(() =>
     if (taskStatusFilter.value !== 'all' && item.status !== taskStatusFilter.value) {
       return false
     }
-    if (taskTypeFilter.value !== 'all' && item.taskType !== taskTypeFilter.value) {
+    if (taskWindowFilter.value !== 'all' && item.windowKind !== taskWindowFilter.value) {
       return false
     }
     return true
@@ -67,31 +79,43 @@ function taskStatusLabel(status) {
   }
 }
 
-function conditionLabel(kind) {
+function eventLabel(kind) {
   switch (kind) {
-    case 'daily_clicks':
-      return '当天点击'
-    case 'weekly_clicks':
-      return '周点击'
-    case 'boss_kills':
+    case 'boss_kill':
       return '击败 Boss'
-    case 'enhance_count':
+    case 'enhance':
       return '强化次数'
+    case 'click':
     default:
-      return kind || '未设置'
+      return '点击次数'
   }
+}
+
+function windowLabel(kind) {
+  switch (kind) {
+    case 'weekly':
+      return '按周累计'
+    case 'fixed_range':
+      return '固定时间窗'
+    case 'daily':
+    default:
+      return '按天累计'
+  }
+}
+
+function taskMetaLabel(item) {
+  return `${eventLabel(item?.eventKind)} · ${windowLabel(item?.windowKind)}`
 }
 
 function cycleLabel(kind) {
   switch (kind) {
-    case 'daily':
-      return '日常'
     case 'weekly':
-      return '周常'
-    case 'limited':
-      return '限时'
+      return '周周期'
+    case 'fixed_range':
+      return '时间窗'
+    case 'daily':
     default:
-      return kind || '未知'
+      return kind || '未设置'
   }
 }
 
@@ -128,11 +152,11 @@ function equipmentOptionLabel(item) {
       <button class="nickname-form__ghost" type="button" :disabled="saving" @click="archiveExpiredTasks">归档过期任务</button>
 
       <!-- Filter Selects -->
-      <select v-model="taskTypeFilter" class="nickname-form__input" style="max-width: 140px;">
+      <select v-model="taskWindowFilter" class="nickname-form__input" style="max-width: 140px;">
         <option value="all">全部周期</option>
         <option value="daily">日常</option>
         <option value="weekly">周常</option>
-        <option value="limited">限时</option>
+        <option value="fixed_range">限时</option>
       </select>
 
       <select v-model="taskStatusFilter" class="nickname-form__input" style="max-width: 140px;">
@@ -160,13 +184,13 @@ function equipmentOptionLabel(item) {
           <article v-for="item in filteredTaskDefinitions" :key="item.taskId" class="social-card" style="margin-bottom: 0.75rem;">
             <div class="social-card__head">
               <div>
-                <p class="vote-stage__eyebrow">{{ cycleLabel(item.taskType) }} · {{ taskStatusLabel(item.status) }}</p>
+                <p class="vote-stage__eyebrow">{{ windowLabel(item.windowKind) }} · {{ taskStatusLabel(item.status) }}</p>
                 <strong>{{ item.title || item.taskId }}</strong>
               </div>
               <strong>{{ item.taskId }}</strong>
             </div>
             <p class="social-card__copy">{{ item.description || '未填写描述' }}</p>
-            <p class="social-card__copy">{{ conditionLabel(item.conditionKind) }} ≥ {{ item.targetValue }}</p>
+            <p class="social-card__copy">{{ taskMetaLabel(item) }} ≥ {{ item.targetValue }}</p>
             <div class="admin-inline-actions">
               <button class="nickname-form__ghost" type="button" @click="editTaskDefinition(item)">编辑</button>
               <button class="nickname-form__ghost" type="button" @click="duplicateTaskDefinition(item.taskId)">复制</button>
@@ -214,21 +238,20 @@ function equipmentOptionLabel(item) {
           </div>
 
           <div class="form-group">
-            <label for="taskType">任务类型</label>
-            <select id="taskType" v-model="taskForm.taskType" class="nickname-form__input">
-              <option value="daily">日常</option>
-              <option value="weekly">周常</option>
-              <option value="limited">限时</option>
+            <label for="eventKind">行为类型</label>
+            <select id="eventKind" v-model="taskForm.eventKind" class="nickname-form__input">
+              <option value="click">点击次数</option>
+              <option value="boss_kill">击败 Boss</option>
+              <option value="enhance">强化次数</option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="conditionKind">任务条件</label>
-            <select id="conditionKind" v-model="taskForm.conditionKind" class="nickname-form__input">
-              <option value="daily_clicks">当天点击</option>
-              <option value="weekly_clicks">周点击</option>
-              <option value="boss_kills">击败 Boss</option>
-              <option value="enhance_count">强化次数</option>
+            <label for="windowKind">累计窗口</label>
+            <select id="windowKind" v-model="taskForm.windowKind" class="nickname-form__input">
+              <option value="daily">按天累计</option>
+              <option value="weekly">按周累计</option>
+              <option value="fixed_range">固定时间窗</option>
             </select>
           </div>
 
@@ -242,14 +265,14 @@ function equipmentOptionLabel(item) {
             <input id="displayOrder" v-model="taskForm.displayOrder" class="nickname-form__input" type="number" min="0" />
           </div>
 
-          <div v-if="taskForm.taskType === 'limited'">
+          <div v-if="taskForm.windowKind === 'fixed_range'">
             <div class="form-group">
-              <label for="startAt">开始时间戳（限时任务必填）</label>
-              <input id="startAt" v-model="taskForm.startAt" class="nickname-form__input" type="number" min="0" />
+              <label for="startAt">开始时间</label>
+              <input id="startAt" :value="toDatetimeLocal(taskForm.startAt)" @input="taskForm.startAt = fromDatetimeLocal($event.target.value)" class="nickname-form__input" type="datetime-local" />
             </div>
             <div class="form-group">
-              <label for="endAt">结束时间戳（必须大于开始时间）</label>
-              <input id="endAt" v-model="taskForm.endAt" class="nickname-form__input" type="number" min="0" />
+              <label for="endAt">结束时间</label>
+              <input id="endAt" :value="toDatetimeLocal(taskForm.endAt)" @input="taskForm.endAt = fromDatetimeLocal($event.target.value)" class="nickname-form__input" type="datetime-local" />
             </div>
           </div>
 
@@ -313,7 +336,7 @@ function equipmentOptionLabel(item) {
             <div class="social-card__head">
               <div>
                 <p class="vote-stage__eyebrow">{{ archive.cycleKey }}</p>
-                <strong>{{ cycleLabel(archive.taskType) }} · {{ conditionLabel(archive.conditionKind) }}</strong>
+                <strong>{{ taskMetaLabel(archive) }}</strong>
               </div>
               <button class="nickname-form__ghost" type="button" @click="fetchTaskCycleResults(archive.taskId, archive.cycleKey)">查看明细</button>
             </div>

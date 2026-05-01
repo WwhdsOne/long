@@ -12,7 +12,14 @@ func (s *Store) ListTaskDefinitions(ctx context.Context) ([]TaskDefinition, erro
 	if s.taskDefinitionStore == nil {
 		return []TaskDefinition{}, nil
 	}
-	return s.taskDefinitionStore.ListTaskDefinitions(ctx)
+	items, err := s.taskDefinitionStore.ListTaskDefinitions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for index := range items {
+		items[index] = NormalizeTaskDefinitionModel(items[index])
+	}
+	return items, nil
 }
 
 // SaveTaskDefinition 创建或更新任务定义。
@@ -26,21 +33,17 @@ func (s *Store) SaveTaskDefinition(ctx context.Context, item TaskDefinition) err
 	if item.TaskID == "" || item.Title == "" || item.TargetValue <= 0 {
 		return ErrTaskNotClaimable
 	}
-	if item.TaskType == "" {
-		item.TaskType = TaskTypeDaily
-	}
 	if item.Status == "" {
 		item.Status = TaskStatusDraft
 	}
-	if item.ConditionKind == "" {
-		item.ConditionKind = TaskConditionDailyClicks
-	}
+	item = NormalizeTaskDefinitionModel(item)
 	nowUnix := s.now().Unix()
 	existing, err := s.taskDefinitionStore.GetTaskDefinition(ctx, item.TaskID)
 	if err != nil {
 		return err
 	}
 	if existing != nil {
+		*existing = NormalizeTaskDefinitionModel(*existing)
 		if existing.Status == TaskStatusActive && taskCoreChanged(*existing, item) {
 			return ErrTaskImmutable
 		}
@@ -70,6 +73,7 @@ func (s *Store) ActivateTaskDefinition(ctx context.Context, taskID string) error
 	if task == nil {
 		return ErrTaskNotFound
 	}
+	*task = NormalizeTaskDefinitionModel(*task)
 	task.Rewards = normalizeTaskRewards(task.Rewards)
 	if !taskDefinitionHasRewards(task.Rewards) || !taskDefinitionTimeWindowValid(*task) {
 		return ErrTaskNotClaimable
@@ -90,6 +94,7 @@ func (s *Store) DeactivateTaskDefinition(ctx context.Context, taskID string) err
 	if task == nil {
 		return ErrTaskNotFound
 	}
+	*task = NormalizeTaskDefinitionModel(*task)
 	task.Status = TaskStatusInactive
 	task.UpdatedAt = s.now().Unix()
 	return s.taskDefinitionStore.UpsertTaskDefinition(ctx, *task)
@@ -106,6 +111,7 @@ func (s *Store) DuplicateTaskDefinition(ctx context.Context, taskID string, newT
 	if task == nil {
 		return nil, ErrTaskNotFound
 	}
+	*task = NormalizeTaskDefinitionModel(*task)
 	newTaskID = strings.TrimSpace(newTaskID)
 	if newTaskID != "" {
 		existing, err := s.taskDefinitionStore.GetTaskDefinition(ctx, newTaskID)
@@ -143,6 +149,7 @@ func (s *Store) ArchiveExpiredTaskCycles(ctx context.Context, nowTime time.Time)
 	}
 	archives := make([]TaskCycleArchive, 0)
 	for _, task := range taskDefs {
+		task = NormalizeTaskDefinitionModel(task)
 		cycleKey, shouldArchive := archiveCycleKeyForTask(task, nowTime)
 		if !shouldArchive {
 			continue
@@ -154,7 +161,7 @@ func (s *Store) ArchiveExpiredTaskCycles(ctx context.Context, nowTime time.Time)
 		if archive.TaskID != "" {
 			archives = append(archives, archive)
 		}
-		if task.TaskType == TaskTypeLimited && task.EndAt > 0 && task.EndAt < nowTime.Unix() && task.Status == TaskStatusActive {
+		if task.WindowKind == TaskWindowFixedRange && task.EndAt > 0 && task.EndAt < nowTime.Unix() && task.Status == TaskStatusActive {
 			task.Status = TaskStatusExpired
 			task.UpdatedAt = nowTime.Unix()
 			if err := s.taskDefinitionStore.UpsertTaskDefinition(ctx, task); err != nil {
@@ -169,14 +176,26 @@ func (s *Store) ListTaskCycleArchives(ctx context.Context, taskID string) ([]Tas
 	if s.taskCycleArchiveStore == nil {
 		return []TaskCycleArchive{}, nil
 	}
-	return s.taskCycleArchiveStore.ListTaskCycleArchives(ctx, taskID)
+	items, err := s.taskCycleArchiveStore.ListTaskCycleArchives(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	for index := range items {
+		items[index] = NormalizeTaskArchiveModel(items[index])
+	}
+	return items, nil
 }
 
 func (s *Store) GetTaskCycleResults(ctx context.Context, taskID string, cycleKey string) (TaskCycleResultsView, error) {
 	if s.taskCycleArchiveStore == nil {
 		return TaskCycleResultsView{}, nil
 	}
-	return s.taskCycleArchiveStore.GetTaskCycleResults(ctx, taskID, cycleKey)
+	result, err := s.taskCycleArchiveStore.GetTaskCycleResults(ctx, taskID, cycleKey)
+	if err != nil {
+		return TaskCycleResultsView{}, err
+	}
+	result.Archive = NormalizeTaskArchiveModel(result.Archive)
+	return result, nil
 }
 
 func normalizeTaskRewards(rewards TaskRewards) TaskRewards {
@@ -207,13 +226,15 @@ func taskDefinitionHasRewards(rewards TaskRewards) bool {
 }
 
 func taskDefinitionTimeWindowValid(item TaskDefinition) bool {
-	if item.TaskType != TaskTypeLimited {
+	item = NormalizeTaskDefinitionModel(item)
+	if item.WindowKind != TaskWindowFixedRange {
 		return true
 	}
 	return item.StartAt > 0 && item.EndAt > 0 && item.EndAt > item.StartAt
 }
 
 func (s *Store) archiveTaskCycle(ctx context.Context, task TaskDefinition, cycleKey string, nowUnix int64) (TaskCycleArchive, error) {
+	task = NormalizeTaskDefinitionModel(task)
 	participantKey := s.taskParticipantsKey(task.TaskID, cycleKey)
 	participants, err := s.client.SMembers(ctx, participantKey).Result()
 	if err != nil {
@@ -249,6 +270,8 @@ func (s *Store) archiveTaskCycle(ctx context.Context, task TaskDefinition, cycle
 		TaskID:        task.TaskID,
 		CycleKey:      cycleKey,
 		TaskType:      task.TaskType,
+		EventKind:     task.EventKind,
+		WindowKind:    task.WindowKind,
 		ConditionKind: task.ConditionKind,
 		TargetValue:   task.TargetValue,
 		StartAt:       task.StartAt,
@@ -312,24 +335,30 @@ func (s *Store) archiveTaskCycle(ctx context.Context, task TaskDefinition, cycle
 }
 
 func taskCoreChanged(existing TaskDefinition, next TaskDefinition) bool {
-	return existing.TaskType != next.TaskType ||
-		existing.ConditionKind != next.ConditionKind ||
+	existing = NormalizeTaskDefinitionModel(existing)
+	next = NormalizeTaskDefinitionModel(next)
+	return existing.EventKind != next.EventKind ||
+		existing.WindowKind != next.WindowKind ||
 		existing.TargetValue != next.TargetValue ||
 		existing.StartAt != next.StartAt ||
 		existing.EndAt != next.EndAt
 }
 
 func archiveCycleKeyForTask(task TaskDefinition, nowTime time.Time) (string, bool) {
+	task = NormalizeTaskDefinitionModel(task)
 	localNow := nowTime.In(taskTimeLocation)
-	switch task.TaskType {
-	case TaskTypeDaily:
+	switch task.WindowKind {
+	case TaskWindowDaily:
 		prev := localNow.AddDate(0, 0, -1)
 		return prev.Format("2006-01-02"), true
-	case TaskTypeWeekly:
+	case TaskWindowWeekly:
+		if localNow.Weekday() != time.Monday {
+			return "", false
+		}
 		prev := localNow.AddDate(0, 0, -7)
 		year, week := prev.ISOWeek()
 		return fmt.Sprintf("%04d-W%02d", year, week), true
-	case TaskTypeLimited:
+	case TaskWindowFixedRange:
 		if task.EndAt <= 0 || nowTime.Unix() <= task.EndAt {
 			return "", false
 		}

@@ -94,6 +94,8 @@ export function emptyTaskForm() {
     title: '',
     description: '',
     taskType: 'daily',
+    eventKind: 'click',
+    windowKind: 'daily',
     status: 'draft',
     conditionKind: 'daily_clicks',
     targetValue: 1,
@@ -106,6 +108,67 @@ export function emptyTaskForm() {
     displayOrder: 0,
     startAt: 0,
     endAt: 0,
+  }
+}
+
+function taskEventKindFromLegacy(conditionKind) {
+  switch (conditionKind) {
+    case 'boss_kills':
+      return 'boss_kill'
+    case 'enhance_count':
+      return 'enhance'
+    default:
+      return 'click'
+  }
+}
+
+function taskWindowKindFromLegacy(taskType, conditionKind) {
+  if (conditionKind === 'weekly_clicks' && taskType !== 'limited') {
+    return 'weekly'
+  }
+  if (conditionKind === 'daily_clicks' && taskType !== 'limited') {
+    return 'daily'
+  }
+  switch (taskType) {
+    case 'weekly':
+      return 'weekly'
+    case 'limited':
+      return 'fixed_range'
+    default:
+      return 'daily'
+  }
+}
+
+function legacyTaskTypeFromWindowKind(windowKind) {
+  switch (windowKind) {
+    case 'weekly':
+      return 'weekly'
+    case 'fixed_range':
+      return 'limited'
+    default:
+      return 'daily'
+  }
+}
+
+function legacyConditionKindFromModel(eventKind, windowKind) {
+  switch (eventKind) {
+    case 'boss_kill':
+      return 'boss_kills'
+    case 'enhance':
+      return 'enhance_count'
+    default:
+      return windowKind === 'weekly' ? 'weekly_clicks' : 'daily_clicks'
+  }
+}
+
+function normalizeTaskModelFields(payload) {
+  const eventKind = payload?.eventKind || taskEventKindFromLegacy(payload?.conditionKind || '')
+  const windowKind = payload?.windowKind || taskWindowKindFromLegacy(payload?.taskType || '', payload?.conditionKind || '')
+  return {
+    eventKind,
+    windowKind,
+    taskType: legacyTaskTypeFromWindowKind(windowKind),
+    conditionKind: legacyConditionKindFromModel(eventKind, windowKind),
   }
 }
 
@@ -268,14 +331,17 @@ export function normalizePlayerPage(payload) {
 }
 
 export function normalizeTaskDefinition(payload) {
+  const model = normalizeTaskModelFields(payload)
   return {
     ...emptyTaskForm(),
     taskId: payload?.taskId || '',
     title: payload?.title || '',
     description: payload?.description || '',
-    taskType: payload?.taskType || 'daily',
+    taskType: model.taskType,
+    eventKind: model.eventKind,
+    windowKind: model.windowKind,
     status: payload?.status || 'draft',
-    conditionKind: payload?.conditionKind || 'daily_clicks',
+    conditionKind: model.conditionKind,
     targetValue: Number(payload?.targetValue ?? 1),
     rewards: {
       gold: Number(payload?.rewards?.gold ?? 0),
@@ -297,11 +363,14 @@ export function normalizeTaskDefinition(payload) {
 }
 
 export function normalizeTaskArchive(payload) {
+  const model = normalizeTaskModelFields(payload)
   return {
     taskId: payload?.taskId || '',
     cycleKey: payload?.cycleKey || '',
-    taskType: payload?.taskType || 'daily',
-    conditionKind: payload?.conditionKind || 'daily_clicks',
+    taskType: model.taskType,
+    eventKind: model.eventKind,
+    windowKind: model.windowKind,
+    conditionKind: model.conditionKind,
     targetValue: Number(payload?.targetValue ?? 0),
     startAt: Number(payload?.startAt ?? 0),
     endAt: Number(payload?.endAt ?? 0),

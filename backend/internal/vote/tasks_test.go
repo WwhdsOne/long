@@ -133,10 +133,10 @@ func TestRecordTaskEventUpdatesProgressAndParticipants(t *testing.T) {
 	store.now = func() time.Time { return nowTime }
 	ctx := context.Background()
 
-	if err := store.recordTaskEvent(ctx, "阿明", TaskConditionDailyClicks, 1); err != nil {
+	if err := store.recordTaskEvent(ctx, "阿明", TaskEventClick, 1); err != nil {
 		t.Fatalf("record first event: %v", err)
 	}
-	if err := store.recordTaskEvent(ctx, "阿明", TaskConditionDailyClicks, 1); err != nil {
+	if err := store.recordTaskEvent(ctx, "阿明", TaskEventClick, 1); err != nil {
 		t.Fatalf("record second event: %v", err)
 	}
 
@@ -222,6 +222,106 @@ func TestSaveTaskDefinitionRejectsTaskWithoutRewards(t *testing.T) {
 	})
 	if err != ErrTaskNotClaimable {
 		t.Fatalf("expected ErrTaskNotClaimable, got %v", err)
+	}
+}
+
+func TestSaveTaskDefinitionNormalizesLegacyFields(t *testing.T) {
+	baseStore, cleanup := newTestStore(t)
+	defer cleanup()
+
+	taskDefStore := &stubTaskDefinitionStore{}
+	store := NewStore(baseStore.client, "vote:", StoreOptions{
+		CriticalChancePercent: 5,
+		CriticalCount:         5,
+		TaskDefinitionStore:   taskDefStore,
+		TaskClaimLogStore:     stubTaskClaimLogStore{},
+	}, nickname.NewValidator([]string{"习近平", "xjp"}))
+
+	err := store.SaveTaskDefinition(context.Background(), TaskDefinition{
+		TaskID:        "daily-click",
+		Title:         "今日点击",
+		TaskType:      TaskTypeDaily,
+		Status:        TaskStatusDraft,
+		ConditionKind: TaskConditionDailyClicks,
+		TargetValue:   10,
+		Rewards: TaskRewards{
+			Gold: 100,
+		},
+	})
+	if err != nil {
+		t.Fatalf("save task definition: %v", err)
+	}
+	if len(taskDefStore.upserted) != 1 {
+		t.Fatalf("expected one upserted task, got %d", len(taskDefStore.upserted))
+	}
+	item := taskDefStore.upserted[0]
+	if item.EventKind != TaskEventClick {
+		t.Fatalf("expected event kind click, got %q", item.EventKind)
+	}
+	if item.WindowKind != TaskWindowDaily {
+		t.Fatalf("expected window kind daily, got %q", item.WindowKind)
+	}
+}
+
+func TestSaveTaskDefinitionRejectsFixedRangeWithoutValidWindow(t *testing.T) {
+	store, cleanup := newTaskTestStore(t, nil)
+	defer cleanup()
+
+	err := store.SaveTaskDefinition(context.Background(), TaskDefinition{
+		TaskID:      "campaign-click",
+		Title:       "活动点击",
+		Status:      TaskStatusDraft,
+		EventKind:   TaskEventClick,
+		WindowKind:  TaskWindowFixedRange,
+		TargetValue: 10,
+		Rewards: TaskRewards{
+			Gold: 100,
+		},
+		StartAt: 200,
+		EndAt:   100,
+	})
+	if err != ErrTaskNotClaimable {
+		t.Fatalf("expected ErrTaskNotClaimable, got %v", err)
+	}
+}
+
+func TestRecordTaskEventUpdatesFixedRangeTaskProgress(t *testing.T) {
+	store, cleanup := newTaskTestStore(t, []TaskDefinition{{
+		TaskID:      "campaign-click-1",
+		Title:       "活动点击",
+		Status:      TaskStatusActive,
+		EventKind:   TaskEventClick,
+		WindowKind:  TaskWindowFixedRange,
+		TargetValue: 2,
+		StartAt:     time.Date(2026, 5, 2, 0, 0, 0, 0, taskTimeLocation).Unix(),
+		EndAt:       time.Date(2026, 5, 5, 23, 59, 59, 0, taskTimeLocation).Unix(),
+	}})
+	defer cleanup()
+
+	nowTime := time.Date(2026, 5, 3, 10, 0, 0, 0, taskTimeLocation)
+	store.now = func() time.Time { return nowTime }
+	ctx := context.Background()
+
+	if err := store.recordTaskEvent(ctx, "阿明", TaskEventClick, 1); err != nil {
+		t.Fatalf("record first event: %v", err)
+	}
+	if err := store.recordTaskEvent(ctx, "阿明", TaskEventClick, 1); err != nil {
+		t.Fatalf("record second event: %v", err)
+	}
+
+	items, err := store.ListTasksForPlayer(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one task, got %+v", items)
+	}
+	if items[0].Progress != 2 || items[0].Status != TaskPlayerStatusCompletedUnclaimed {
+		t.Fatalf("unexpected task progress after events: %+v", items[0])
+	}
+	expectedCycleKey := "campaign-click-1:1777651200:1777996799"
+	if items[0].CycleKey != expectedCycleKey {
+		t.Fatalf("expected cycle key %q, got %q", expectedCycleKey, items[0].CycleKey)
 	}
 }
 
