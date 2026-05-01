@@ -38,4 +38,11 @@ describe('AdminPage 任务管理接线', () => {
     expect(tabSource).toContain('equipmentOptions')
     expect(tabSource).toContain('<select v-model="entry.itemId"')
   })
+
+  it('任务面板使用行为类型和累计窗口模型', () => {
+    const tabSource = readFileSync(path.resolve(currentDir, '../components/admin/AdminTaskTab.vue'), 'utf8')
+    expect(tabSource).toContain('eventKind')
+    expect(tabSource).toContain('windowKind')
+    expect(tabSource).toContain("taskForm.windowKind === 'fixed_range'")
+  })
 })

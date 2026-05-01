@@ -38,6 +38,7 @@ func (s *Store) ListTasksForPlayer(ctx context.Context, nickname string) ([]Play
 
 	items := make([]PlayerTask, 0, len(taskDefs))
 	for _, taskDef := range taskDefs {
+		taskDef = NormalizeTaskDefinitionModel(taskDef)
 		cycleKey := currentTaskCycleKey(taskDef, nowTime)
 		progress, status, completedAt, claimedAt, err := s.taskProgressForPlayer(ctx, normalizedNickname, taskDef, cycleKey)
 		if err != nil {
@@ -48,6 +49,8 @@ func (s *Store) ListTasksForPlayer(ctx context.Context, nickname string) ([]Play
 			Title:         taskDef.Title,
 			Description:   taskDef.Description,
 			TaskType:      taskDef.TaskType,
+			EventKind:     taskDef.EventKind,
+			WindowKind:    taskDef.WindowKind,
 			ConditionKind: taskDef.ConditionKind,
 			TargetValue:   taskDef.TargetValue,
 			Rewards:       taskDef.Rewards,
@@ -86,6 +89,7 @@ func (s *Store) ClaimTaskReward(ctx context.Context, nickname string, taskID str
 		return UserState{}, ErrTaskNotFound
 	}
 	nowTime := s.now()
+	*taskDef = NormalizeTaskDefinitionModel(*taskDef)
 	if !taskIsActiveAt(*taskDef, nowTime.Unix()) {
 		return UserState{}, ErrTaskNotClaimable
 	}
@@ -179,7 +183,7 @@ func (s *Store) ClaimTaskReward(ctx context.Context, nickname string, taskID str
 	return s.GetUserState(ctx, normalizedNickname)
 }
 
-func (s *Store) recordTaskEvent(ctx context.Context, nickname string, eventKind TaskConditionKind, delta int64) error {
+func (s *Store) recordTaskEvent(ctx context.Context, nickname string, eventKind TaskEventKind, delta int64) error {
 	if s.taskDefinitionStore == nil || delta <= 0 {
 		return nil
 	}
@@ -198,6 +202,7 @@ func (s *Store) recordTaskEvent(ctx context.Context, nickname string, eventKind 
 		return err
 	}
 	for _, taskDef := range taskDefs {
+		taskDef = NormalizeTaskDefinitionModel(taskDef)
 		if !taskMatchesEvent(taskDef, eventKind) {
 			continue
 		}
@@ -209,8 +214,9 @@ func (s *Store) recordTaskEvent(ctx context.Context, nickname string, eventKind 
 	return nil
 }
 
-func taskMatchesEvent(task TaskDefinition, eventKind TaskConditionKind) bool {
-	return task.ConditionKind == eventKind
+func taskMatchesEvent(task TaskDefinition, eventKind TaskEventKind) bool {
+	task = NormalizeTaskDefinitionModel(task)
+	return task.EventKind == eventKind
 }
 
 func taskIsActiveAt(task TaskDefinition, nowUnix int64) bool {
@@ -227,14 +233,15 @@ func taskIsActiveAt(task TaskDefinition, nowUnix int64) bool {
 }
 
 func currentTaskCycleKey(task TaskDefinition, nowTime time.Time) string {
+	task = NormalizeTaskDefinitionModel(task)
 	localNow := nowTime.In(taskTimeLocation)
-	switch task.TaskType {
-	case TaskTypeDaily:
+	switch task.WindowKind {
+	case TaskWindowDaily:
 		return localNow.Format("2006-01-02")
-	case TaskTypeWeekly:
+	case TaskWindowWeekly:
 		year, week := localNow.ISOWeek()
 		return fmt.Sprintf("%04d-W%02d", year, week)
-	case TaskTypeLimited:
+	case TaskWindowFixedRange:
 		return fmt.Sprintf("%s:%d:%d", task.TaskID, task.StartAt, task.EndAt)
 	default:
 		return localNow.Format("2006-01-02")
@@ -322,15 +329,16 @@ func (s *Store) taskParticipantsKey(taskID string, cycleKey string) string {
 }
 
 func taskCycleTTL(task TaskDefinition, nowUnix int64) time.Duration {
+	task = NormalizeTaskDefinitionModel(task)
 	nowTime := time.Unix(nowUnix, 0).In(taskTimeLocation)
-	switch task.TaskType {
-	case TaskTypeDaily:
+	switch task.WindowKind {
+	case TaskWindowDaily:
 		expireAt := time.Date(nowTime.Year(), nowTime.Month(), nowTime.Day()+3, 0, 0, 0, 0, taskTimeLocation)
 		return time.Until(expireAt)
-	case TaskTypeWeekly:
+	case TaskWindowWeekly:
 		expireAt := nowTime.AddDate(0, 0, 10)
 		return time.Until(expireAt)
-	case TaskTypeLimited:
+	case TaskWindowFixedRange:
 		if task.EndAt > 0 {
 			return time.Until(time.Unix(task.EndAt, 0).Add(72 * time.Hour))
 		}

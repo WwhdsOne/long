@@ -17,6 +17,25 @@ const (
 	taskCyclePlayerResultsCollectionName = "task_cycle_player_results"
 )
 
+type taskCycleArchiveDocument struct {
+	TaskID                string                 `bson:"task_id"`
+	CycleKey              string                 `bson:"cycle_key"`
+	TaskType              vote.TaskType          `bson:"task_type"`
+	EventKind             vote.TaskEventKind     `bson:"event_kind"`
+	WindowKind            vote.TaskWindowKind    `bson:"window_kind"`
+	ConditionKind         vote.TaskConditionKind `bson:"condition_kind"`
+	TargetValue           int64                  `bson:"target_value"`
+	StartAt               int64                  `bson:"start_at"`
+	EndAt                 int64                  `bson:"end_at"`
+	ParticipantsTotal     int64                  `bson:"participants_total"`
+	CompletedTotal        int64                  `bson:"completed_total"`
+	ClaimedTotal          int64                  `bson:"claimed_total"`
+	ExpiredUnclaimedTotal int64                  `bson:"expired_unclaimed_total"`
+	UnfinishedTotal       int64                  `bson:"unfinished_total"`
+	NotParticipatedTotal  int64                  `bson:"not_participated_total"`
+	ArchivedAt            int64                  `bson:"archived_at"`
+}
+
 // TaskCycleArchiveStore 负责任务周期归档。
 type TaskCycleArchiveStore struct {
 	archives      *mongo.Collection
@@ -65,6 +84,7 @@ func (s *TaskCycleArchiveStore) UpsertTaskCycleArchive(ctx context.Context, item
 	if s == nil || s.archives == nil {
 		return nil
 	}
+	item = vote.NormalizeTaskArchiveModel(item)
 	taskID := strings.TrimSpace(item.TaskID)
 	cycleKey := strings.TrimSpace(item.CycleKey)
 	if taskID == "" || cycleKey == "" {
@@ -79,6 +99,8 @@ func (s *TaskCycleArchiveStore) UpsertTaskCycleArchive(ctx context.Context, item
 			"task_id":                 taskID,
 			"cycle_key":               cycleKey,
 			"task_type":               item.TaskType,
+			"event_kind":              item.EventKind,
+			"window_kind":             item.WindowKind,
 			"condition_kind":          item.ConditionKind,
 			"target_value":            item.TargetValue,
 			"start_at":                item.StartAt,
@@ -147,29 +169,16 @@ func (s *TaskCycleArchiveStore) ListTaskCycleArchives(ctx context.Context, taskI
 	defer cursor.Close(readCtx)
 	items := make([]vote.TaskCycleArchive, 0)
 	for cursor.Next(readCtx) {
-		var doc struct {
-			TaskID                string                 `bson:"task_id"`
-			CycleKey              string                 `bson:"cycle_key"`
-			TaskType              vote.TaskType          `bson:"task_type"`
-			ConditionKind         vote.TaskConditionKind `bson:"condition_kind"`
-			TargetValue           int64                  `bson:"target_value"`
-			StartAt               int64                  `bson:"start_at"`
-			EndAt                 int64                  `bson:"end_at"`
-			ParticipantsTotal     int64                  `bson:"participants_total"`
-			CompletedTotal        int64                  `bson:"completed_total"`
-			ClaimedTotal          int64                  `bson:"claimed_total"`
-			ExpiredUnclaimedTotal int64                  `bson:"expired_unclaimed_total"`
-			UnfinishedTotal       int64                  `bson:"unfinished_total"`
-			NotParticipatedTotal  int64                  `bson:"not_participated_total"`
-			ArchivedAt            int64                  `bson:"archived_at"`
-		}
+		var doc taskCycleArchiveDocument
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, err
 		}
-		items = append(items, vote.TaskCycleArchive{
+		items = append(items, vote.NormalizeTaskArchiveModel(vote.TaskCycleArchive{
 			TaskID:                doc.TaskID,
 			CycleKey:              doc.CycleKey,
 			TaskType:              doc.TaskType,
+			EventKind:             doc.EventKind,
+			WindowKind:            doc.WindowKind,
 			ConditionKind:         doc.ConditionKind,
 			TargetValue:           doc.TargetValue,
 			StartAt:               doc.StartAt,
@@ -181,7 +190,7 @@ func (s *TaskCycleArchiveStore) ListTaskCycleArchives(ctx context.Context, taskI
 			UnfinishedTotal:       doc.UnfinishedTotal,
 			NotParticipatedTotal:  doc.NotParticipatedTotal,
 			ArchivedAt:            doc.ArchivedAt,
-		})
+		}))
 	}
 	if err := cursor.Err(); err != nil {
 		return nil, err
@@ -195,22 +204,7 @@ func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID 
 	}
 	readCtx, cancel := withTimeout(ctx, s.writeTimeout)
 	defer cancel()
-	var archiveDoc struct {
-		TaskID                string                 `bson:"task_id"`
-		CycleKey              string                 `bson:"cycle_key"`
-		TaskType              vote.TaskType          `bson:"task_type"`
-		ConditionKind         vote.TaskConditionKind `bson:"condition_kind"`
-		TargetValue           int64                  `bson:"target_value"`
-		StartAt               int64                  `bson:"start_at"`
-		EndAt                 int64                  `bson:"end_at"`
-		ParticipantsTotal     int64                  `bson:"participants_total"`
-		CompletedTotal        int64                  `bson:"completed_total"`
-		ClaimedTotal          int64                  `bson:"claimed_total"`
-		ExpiredUnclaimedTotal int64                  `bson:"expired_unclaimed_total"`
-		UnfinishedTotal       int64                  `bson:"unfinished_total"`
-		NotParticipatedTotal  int64                  `bson:"not_participated_total"`
-		ArchivedAt            int64                  `bson:"archived_at"`
-	}
+	var archiveDoc taskCycleArchiveDocument
 	if err := s.archives.FindOne(readCtx, bson.M{
 		"task_id":   strings.TrimSpace(taskID),
 		"cycle_key": strings.TrimSpace(cycleKey),
@@ -263,10 +257,12 @@ func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID 
 		return vote.TaskCycleResultsView{}, err
 	}
 	return vote.TaskCycleResultsView{
-		Archive: vote.TaskCycleArchive{
+		Archive: vote.NormalizeTaskArchiveModel(vote.TaskCycleArchive{
 			TaskID:                archiveDoc.TaskID,
 			CycleKey:              archiveDoc.CycleKey,
 			TaskType:              archiveDoc.TaskType,
+			EventKind:             archiveDoc.EventKind,
+			WindowKind:            archiveDoc.WindowKind,
 			ConditionKind:         archiveDoc.ConditionKind,
 			TargetValue:           archiveDoc.TargetValue,
 			StartAt:               archiveDoc.StartAt,
@@ -278,7 +274,7 @@ func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID 
 			UnfinishedTotal:       archiveDoc.UnfinishedTotal,
 			NotParticipatedTotal:  archiveDoc.NotParticipatedTotal,
 			ArchivedAt:            archiveDoc.ArchivedAt,
-		},
+		}),
 		Items: items,
 	}, nil
 }
