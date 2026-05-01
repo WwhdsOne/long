@@ -30,7 +30,7 @@ func main() {
 
 func run() error {
 	if len(os.Args) < 2 {
-		return errors.New("用法: go -C backend run ./cmd/migratecolddata <plan|migrate|verify|cleanup>")
+		return errors.New("用法: go -C backend run ./cmd/migratecolddata <plan|migrate|verify|verify-mongo-only|cleanup|all>")
 	}
 
 	cfg, err := config.LoadTest()
@@ -74,6 +74,19 @@ func run() error {
 	}, nickname.NewSensitiveLexiconValidator())
 
 	command := strings.ToLower(strings.TrimSpace(os.Args[1]))
+	return runCommand(command, ctx, cfg, redisClient, mongoDB, redisStore, bossStore, messageStore)
+}
+
+func runCommand(
+	command string,
+	ctx context.Context,
+	cfg config.Config,
+	redisClient redis.UniversalClient,
+	mongoDB *mongo.Database,
+	redisStore *vote.Store,
+	bossStore *mongostore.BossHistoryStore,
+	messageStore *mongostore.MessageStore,
+) error {
 	switch command {
 	case "plan":
 		return runPlan(ctx, cfg, redisClient, mongoDB, redisStore)
@@ -81,8 +94,17 @@ func run() error {
 		return runMigrate(ctx, redisStore, bossStore, messageStore)
 	case "verify":
 		return runVerify(ctx, cfg, redisClient, mongoDB, redisStore)
+	case "verify-mongo-only":
+		return runVerifyMongoOnly(ctx, mongoDB)
 	case "cleanup":
-		return runCleanup(ctx, cfg, redisClient)
+		return runCleanup(ctx, cfg, redisClient, redisStore)
+	case "all":
+		return runAll(
+			func() error { return runPlan(ctx, cfg, redisClient, mongoDB, redisStore) },
+			func() error { return runMigrate(ctx, redisStore, bossStore, messageStore) },
+			func() error { return runVerifyForAll(ctx, cfg, redisClient, mongoDB, redisStore) },
+			func() error { return runCleanup(ctx, cfg, redisClient, redisStore) },
+		)
 	default:
 		return fmt.Errorf("未知命令 %q", command)
 	}
@@ -115,6 +137,9 @@ func runPlan(ctx context.Context, cfg config.Config, redisClient redis.Universal
 	fmt.Printf("Cleanup 将删除 key:\n")
 	fmt.Printf("- %s\n", cfg.RedisPrefix+"boss:history")
 	fmt.Printf("- %s*\n", cfg.RedisPrefix+"boss:history:")
+	fmt.Printf("- %s{bossID}:damage\n", cfg.RedisPrefix+"boss:")
+	fmt.Printf("- %s{bossID}:loot\n", cfg.RedisPrefix+"boss:")
+	fmt.Printf("- %s{bossID}:reward-lock\n", cfg.RedisPrefix+"boss:")
 	fmt.Printf("- %s\n", cfg.RedisPrefix+"messages")
 	fmt.Printf("- %s\n", cfg.RedisPrefix+"message:seq")
 	fmt.Printf("- %s*\n", cfg.RedisPrefix+"message:")
@@ -157,15 +182,62 @@ func runMigrate(ctx context.Context, redisStore *vote.Store, bossStore *mongosto
 }
 
 func runVerify(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *vote.Store) error {
+	redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount, err := loadVerifyCounts(ctx, cfg, redisClient, mongoDB, redisStore)
+	if err != nil {
+		return err
+	}
+
+	if err := checkVerifyCounts(redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount, true); err != nil {
+		return err
+	}
+
+	fmt.Printf("校验通过: boss=%d messages=%d\n", mongoBossCount, mongoMessageCount)
+	return nil
+}
+
+func runVerifyForAll(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *vote.Store) error {
+	redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount, err := loadVerifyCounts(ctx, cfg, redisClient, mongoDB, redisStore)
+	if err != nil {
+		return err
+	}
+
+	if shouldUseMongoOnlyVerifyForAll(redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount) {
+		fmt.Printf("检测到 Redis 源数据可能已提前清理，自动切换为 Mongo-only 校验: boss redis=%d mongo=%d, messages redis=%d mongo=%d\n",
+			redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount)
+		fmt.Printf("Mongo 校验通过: boss=%d messages=%d\n", mongoBossCount, mongoMessageCount)
+		return nil
+	}
+
+	if err := checkVerifyCounts(redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount, true); err != nil {
+		return err
+	}
+
+	fmt.Printf("校验通过: boss=%d messages=%d\n", mongoBossCount, mongoMessageCount)
+	return nil
+}
+
+func loadVerifyCounts(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *vote.Store) (int64, int64, int64, int64, error) {
 	redisBossHistory, err := redisStore.ListBossHistory(ctx)
 	if err != nil {
-		return fmt.Errorf("load redis boss history: %w", err)
+		return 0, 0, 0, 0, fmt.Errorf("load redis boss history: %w", err)
 	}
 	redisMessageCount, err := redisClient.ZCard(ctx, cfg.RedisPrefix+"messages").Result()
 	if err != nil {
-		return fmt.Errorf("count redis messages: %w", err)
+		return 0, 0, 0, 0, fmt.Errorf("count redis messages: %w", err)
 	}
 
+	mongoBossCount, err := mongoDB.Collection("boss_history").CountDocuments(ctx, bson.D{})
+	if err != nil {
+		return 0, 0, 0, 0, fmt.Errorf("count mongo boss history: %w", err)
+	}
+	mongoMessageCount, err := mongoDB.Collection("wall_messages").CountDocuments(ctx, bson.M{"status": bson.M{"$ne": "deleted"}})
+	if err != nil {
+		return 0, 0, 0, 0, fmt.Errorf("count mongo messages: %w", err)
+	}
+	return int64(len(redisBossHistory)), mongoBossCount, redisMessageCount, mongoMessageCount, nil
+}
+
+func runVerifyMongoOnly(ctx context.Context, mongoDB *mongo.Database) error {
 	mongoBossCount, err := mongoDB.Collection("boss_history").CountDocuments(ctx, bson.D{})
 	if err != nil {
 		return fmt.Errorf("count mongo boss history: %w", err)
@@ -175,34 +247,39 @@ func runVerify(ctx context.Context, cfg config.Config, redisClient redis.Univers
 		return fmt.Errorf("count mongo messages: %w", err)
 	}
 
-	if int64(len(redisBossHistory)) != mongoBossCount {
-		return fmt.Errorf("boss 历史数量不一致: redis=%d mongo=%d", len(redisBossHistory), mongoBossCount)
+	if err := checkVerifyCounts(0, mongoBossCount, 0, mongoMessageCount, false); err != nil {
+		return err
+	}
+
+	fmt.Printf("Mongo 校验通过: boss=%d messages=%d\n", mongoBossCount, mongoMessageCount)
+	return nil
+}
+
+func checkVerifyCounts(redisBossCount int64, mongoBossCount int64, redisMessageCount int64, mongoMessageCount int64, compareRedis bool) error {
+	if !compareRedis {
+		return nil
+	}
+	if redisBossCount != mongoBossCount {
+		return fmt.Errorf("boss 历史数量不一致: redis=%d mongo=%d", redisBossCount, mongoBossCount)
 	}
 	if redisMessageCount != mongoMessageCount {
 		return fmt.Errorf("留言数量不一致: redis=%d mongo=%d", redisMessageCount, mongoMessageCount)
 	}
-
-	fmt.Printf("校验通过: boss=%d messages=%d\n", mongoBossCount, mongoMessageCount)
 	return nil
 }
 
-func runCleanup(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient) error {
-	bossKeys, err := redisClient.Keys(ctx, cfg.RedisPrefix+"boss:history:*").Result()
-	if err != nil {
-		return fmt.Errorf("list boss history keys: %w", err)
+func shouldUseMongoOnlyVerifyForAll(redisBossCount int64, mongoBossCount int64, redisMessageCount int64, mongoMessageCount int64) bool {
+	if mongoBossCount < redisBossCount || mongoMessageCount < redisMessageCount {
+		return false
 	}
-	messageKeys, err := redisClient.Keys(ctx, cfg.RedisPrefix+"message:*").Result()
-	if err != nil {
-		return fmt.Errorf("list message keys: %w", err)
-	}
+	return mongoBossCount > redisBossCount || mongoMessageCount > redisMessageCount
+}
 
-	keys := []string{
-		cfg.RedisPrefix + "boss:history",
-		cfg.RedisPrefix + "messages",
-		cfg.RedisPrefix + "message:seq",
+func runCleanup(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, redisStore *vote.Store) error {
+	keys, err := collectCleanupKeys(ctx, cfg, redisClient, redisStore)
+	if err != nil {
+		return err
 	}
-	keys = append(keys, bossKeys...)
-	keys = append(keys, messageKeys...)
 	if len(keys) == 0 {
 		fmt.Println("没有需要删除的 Redis 冷数据 key")
 		return nil
@@ -213,6 +290,72 @@ func runCleanup(ctx context.Context, cfg config.Config, redisClient redis.Univer
 		return fmt.Errorf("delete redis cold keys: %w", err)
 	}
 	fmt.Printf("已删除 Redis 冷数据 key 数量: %d\n", deleted)
+	return nil
+}
+
+func collectCleanupKeys(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, redisStore *vote.Store) ([]string, error) {
+	bossKeys, err := redisClient.Keys(ctx, cfg.RedisPrefix+"boss:history:*").Result()
+	if err != nil {
+		return nil, fmt.Errorf("list boss history keys: %w", err)
+	}
+	messageKeys, err := redisClient.Keys(ctx, cfg.RedisPrefix+"message:*").Result()
+	if err != nil {
+		return nil, fmt.Errorf("list message keys: %w", err)
+	}
+	bossHistory, err := redisStore.ListBossHistory(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load redis boss history: %w", err)
+	}
+
+	keys := []string{
+		cfg.RedisPrefix + "boss:history",
+		cfg.RedisPrefix + "messages",
+		cfg.RedisPrefix + "message:seq",
+	}
+	keys = append(keys, bossKeys...)
+	keys = append(keys, messageKeys...)
+	for _, item := range bossHistory {
+		bossID := strings.TrimSpace(item.ID)
+		if bossID == "" {
+			continue
+		}
+		keys = append(keys,
+			cfg.RedisPrefix+"boss:"+bossID+":damage",
+			cfg.RedisPrefix+"boss:"+bossID+":loot",
+			cfg.RedisPrefix+"boss:"+bossID+":reward-lock",
+		)
+	}
+	return uniqueStrings(keys), nil
+}
+
+func uniqueStrings(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(items))
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if strings.TrimSpace(item) == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+	return result
+}
+
+func runAll(steps ...func() error) error {
+	for _, step := range steps {
+		if step == nil {
+			continue
+		}
+		if err := step(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
