@@ -802,10 +802,16 @@ function formatItemStats(item) {
 function formatItemStatLines(item) {
     const lines = []
     if (item?.attackPower) lines.push(`攻击力 ${formatNumber(item.attackPower)}`)
-    if (item?.armorPenPercent) lines.push(`护甲穿透 ${formatNumber(item.armorPenPercent, 1)}%`)
-    if (item?.critRate) lines.push(`暴击率 ${formatNumber(item.critRate * 100, 1)}%`)
-    if (item?.critDamageMultiplier) lines.push(`暴击倍率 +${formatNumber(item.critDamageMultiplier * 100, 0)}%`)
-    if (item?.bossDamagePercent) lines.push(`首领伤害 ${formatNumber(item.bossDamagePercent, 1)}%`)
+    if (item?.armorPenPercent) {
+        lines.push(`护甲穿透 ${formatNumber(item.armorPenPercent * 100, 2)}%`)
+    }
+    if (item?.critRate) lines.push(`暴击率 ${formatNumber(item.critRate * 100, 2)}%`)
+    if (item?.critDamageMultiplier) lines.push(`暴击倍率 +${formatNumber(item.critDamageMultiplier * 100, 2)}%`)
+    if (item?.bossDamagePercent) lines.push(`首领伤害 ${formatNumber(item.bossDamagePercent, 2)}%`)
+    if (item?.partTypeDamageSoft) lines.push(`软组织伤害 ${formatNumber(item.partTypeDamageSoft * 100, 2)}%`)
+    if (item?.partTypeDamageHeavy) lines.push(`重甲伤害 ${formatNumber(item.partTypeDamageHeavy * 100, 2)}%`)
+    if (item?.partTypeDamageWeak) lines.push(`弱点伤害 ${formatNumber(item.partTypeDamageWeak * 100, 2)}%`)
+
     return lines
 }
 

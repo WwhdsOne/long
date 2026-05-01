@@ -462,8 +462,11 @@ select {
   align-items: baseline;
 }
 
-.armory-backpack-cell__meta span.rarity-text {
+.armory-backpack-cell__meta span.rarity-text--supreme {
   color: transparent;
+}
+
+.armory-backpack-cell__meta span.rarity-text {
   display: inline;
   line-height: 1.2;
 }
@@ -1659,8 +1662,11 @@ select {
   font-size: 0.82rem;
 }
 
-.loadout-slot span.rarity-text {
+.loadout-slot span.rarity-text--supreme {
   color: transparent;
+}
+
+.loadout-slot span.rarity-text {
   display: inline;
 }
 
