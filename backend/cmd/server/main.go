@@ -77,6 +77,7 @@ func run() error {
 	var taskDefinitionStore *mongostore.TaskDefinitionStore
 	var taskClaimLogStore *mongostore.TaskClaimLogStore
 	var taskCycleArchiveStore *mongostore.TaskCycleArchiveStore
+	var equipmentDraftFailureWriter httpapi.EquipmentDraftFailureWriter
 	var adminAuditWriter httpapi.AdminAuditWriter
 	var domainEventWriter httpapi.DomainEventWriter
 	if cfg.Mongo.Enabled {
@@ -123,6 +124,11 @@ func run() error {
 		if err := taskCycleArchiveStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo task cycle archive indexes: %w", err)
 		}
+		equipmentDraftFailureStore := mongostore.NewEquipmentDraftFailureStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := equipmentDraftFailureStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo equipment draft failure indexes: %w", err)
+		}
+		equipmentDraftFailureWriter = equipmentDraftFailureStore
 
 		adminAuditQueue := archive.NewAsyncQueue[vote.AdminAuditLog](archive.AsyncQueueConfig{
 			Name:         "admin-audit",
@@ -182,7 +188,6 @@ func run() error {
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
 		CriticalChancePercent: 5,
-		CriticalCount:         0,
 		BossHistoryStore:      bossHistoryStore,
 		BossHistoryArchiver:   bossHistoryQueue,
 		MessageStore:          mongoMessageStore,
@@ -231,17 +236,18 @@ func run() error {
 		})
 	}
 	httpServer := httpapi.NewHertzServer(serverAddress(cfg.Port), httpapi.Options{
-		Store:                   store,
-		StateView:               stateCache,
-		ChangePublisher:         changeBus,
-		ClickGuard:              clickLimiter,
-		Afk:                     afkService,
-		PlayerAuthenticator:     playerAuthenticator,
-		Events:                  eventHandler,
-		RealtimeHub:             hub,
-		PublicDir:               cfg.PublicDir,
-		OSSSigner:               ossSigner,
-		EquipmentDraftGenerator: equipmentDraftGenerator,
+		Store:                       store,
+		StateView:                   stateCache,
+		ChangePublisher:             changeBus,
+		ClickGuard:                  clickLimiter,
+		Afk:                         afkService,
+		PlayerAuthenticator:         playerAuthenticator,
+		Events:                      eventHandler,
+		RealtimeHub:                 hub,
+		PublicDir:                   cfg.PublicDir,
+		OSSSigner:                   ossSigner,
+		EquipmentDraftGenerator:     equipmentDraftGenerator,
+		EquipmentDraftFailureWriter: equipmentDraftFailureWriter,
 		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
 			Username:      cfg.Admin.Username,
 			Password:      cfg.Admin.Password,

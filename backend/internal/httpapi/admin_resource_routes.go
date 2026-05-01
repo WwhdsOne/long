@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -37,6 +38,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 
 		draft, err := options.EquipmentDraftGenerator.GenerateEquipmentDraft(ctx, body.Prompt)
 		if err != nil {
+			writeEquipmentDraftFailureLog(ctx, options.EquipmentDraftFailureWriter, body.Prompt, err)
 			if errors.Is(err, ErrInvalidEquipmentDraft) {
 				xlog.L().Warn("invalid equipment draft", xlog.Err(err))
 				writeJSON(c, consts.StatusUnprocessableEntity, map[string]string{"error": "INVALID_EQUIPMENT_DRAFT"})
@@ -163,4 +165,32 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 		})
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
+}
+
+func writeEquipmentDraftFailureLog(ctx context.Context, writer EquipmentDraftFailureWriter, prompt string, err error) {
+	if writer == nil || err == nil {
+		return
+	}
+
+	item := vote.EquipmentDraftFailureLog{
+		Prompt:       prompt,
+		ErrorMessage: err.Error(),
+		CreatedAt:    time.Now().Unix(),
+	}
+
+	var generateErr *EquipmentDraftGenerateError
+	if errors.As(err, &generateErr) {
+		if strings.TrimSpace(generateErr.Prompt) != "" {
+			item.Prompt = strings.TrimSpace(generateErr.Prompt)
+		}
+		item.Draft = generateErr.Draft
+		item.RawResponse = generateErr.RawResponse
+		if strings.TrimSpace(generateErr.Error()) != "" {
+			item.ErrorMessage = generateErr.Error()
+		}
+	}
+
+	if writeErr := writer.WriteEquipmentDraftFailure(ctx, item); writeErr != nil {
+		xlog.L().Warn("write equipment draft failure log failed", xlog.Err(writeErr))
+	}
 }

@@ -163,26 +163,32 @@ type EquipmentDraftGenerator interface {
 	GenerateEquipmentDraft(context.Context, string) (vote.EquipmentDefinition, error)
 }
 
+// EquipmentDraftFailureWriter 负责记录装备草稿生成失败上下文。
+type EquipmentDraftFailureWriter interface {
+	WriteEquipmentDraftFailure(context.Context, vote.EquipmentDraftFailureLog) error
+}
+
 // Options 路由配置，注入业务逻辑、实时更新和静态资源。
 type Options struct {
-	Store                   ButtonStore
-	StateView               StateView
-	Broadcaster             Broadcaster
-	ChangePublisher         ChangePublisher
-	ClickGuard              ClickGuard
-	AutoClick               AutoClickController
-	Afk                     AfkController
-	PlayerAuthenticator     PlayerAuthenticator
-	Events                  app.HandlerFunc
-	RealtimeHub             RealtimeHub
-	PublicDir               string
-	AdminAuthenticator      *adminauth.Authenticator
-	OSSSigner               OSSSigner
-	EquipmentDraftGenerator EquipmentDraftGenerator
-	AdminBossHistoryReader  AdminBossHistoryReader
-	MessageStore            MessageStore
-	AdminAuditWriter        AdminAuditWriter
-	DomainEventWriter       DomainEventWriter
+	Store                       ButtonStore
+	StateView                   StateView
+	Broadcaster                 Broadcaster
+	ChangePublisher             ChangePublisher
+	ClickGuard                  ClickGuard
+	AutoClick                   AutoClickController
+	Afk                         AfkController
+	PlayerAuthenticator         PlayerAuthenticator
+	Events                      app.HandlerFunc
+	RealtimeHub                 RealtimeHub
+	PublicDir                   string
+	AdminAuthenticator          *adminauth.Authenticator
+	OSSSigner                   OSSSigner
+	EquipmentDraftGenerator     EquipmentDraftGenerator
+	EquipmentDraftFailureWriter EquipmentDraftFailureWriter
+	AdminBossHistoryReader      AdminBossHistoryReader
+	MessageStore                MessageStore
+	AdminAuditWriter            AdminAuditWriter
+	DomainEventWriter           DomainEventWriter
 }
 
 const adminSessionCookieName = "long_admin_session"

@@ -155,6 +155,15 @@ type EquipmentDefinition struct {
 	TalentAffinity       string  `json:"talentAffinity,omitempty"`      // 天赋系绑定
 }
 
+// EquipmentDraftFailureLog 记录装备草稿生成失败上下文，便于回放和调参。
+type EquipmentDraftFailureLog struct {
+	Prompt       string              `json:"prompt"`
+	Draft        EquipmentDefinition `json:"draft"`
+	ErrorMessage string              `json:"errorMessage"`
+	RawResponse  string              `json:"rawResponse"`
+	CreatedAt    int64               `json:"createdAt"`
+}
+
 // Announcement 更新公告
 type Announcement struct {
 	ID          string `json:"id"`
@@ -234,7 +243,6 @@ type CombatStats struct {
 	EffectiveIncrement    int64   `json:"effectiveIncrement"`
 	NormalDamage          int64   `json:"normalDamage"`
 	CriticalChancePercent float64 `json:"criticalChancePercent"`
-	CriticalCount         int64   `json:"criticalCount"`
 	CriticalDamage        int64   `json:"criticalDamage"`
 	AttackPower           int64   `json:"attackPower"`
 	ArmorPenPercent       float64 `json:"armorPenPercent"`
@@ -438,7 +446,6 @@ type StateChange struct {
 // StoreOptions 暴击机制配置
 type StoreOptions struct {
 	CriticalChancePercent int
-	CriticalCount         int64
 	BossHistoryArchiver   interface{ Enqueue(BossHistoryEntry) bool }
 	BossHistoryStore      interface {
 		SaveBossHistory(context.Context, BossHistoryEntry) error
@@ -2453,7 +2460,6 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 func (s *Store) baseCombatStats() CombatStats {
 	return deriveCombatStats(CombatStats{
 		CriticalChancePercent: clampFloat(float64(s.critical.CriticalChancePercent), 0, 100),
-		CriticalCount:         s.critical.CriticalCount,
 		AttackPower:           5,
 		ArmorPenPercent:       0,
 		CritDamageMultiplier:  1.5,
@@ -2487,23 +2493,17 @@ func deriveCombatStats(stats CombatStats) CombatStats {
 	stats.EffectiveIncrement = max(1, stats.AttackPower)
 	stats.NormalDamage = stats.EffectiveIncrement
 
-	if stats.CriticalCount <= 1 {
-		stats.CriticalCount = 1
-	}
-
 	if stats.CritDamageMultiplier < 1.0 {
 		stats.CritDamageMultiplier = 1.0
 	}
-
-	countBasedCriticalDamage := max(stats.NormalDamage+stats.CriticalCount-1, stats.NormalDamage)
 	multiplierBasedCriticalDamage := max(int64(float64(stats.NormalDamage)*stats.CritDamageMultiplier), stats.NormalDamage)
-	stats.CriticalDamage = max(countBasedCriticalDamage, multiplierBasedCriticalDamage)
+	stats.CriticalDamage = multiplierBasedCriticalDamage
 
 	return stats
 }
 
 func hasCriticalBonus(stats CombatStats) bool {
-	return stats.CriticalCount > 1 || stats.CritDamageMultiplier > 1.0
+	return stats.CritDamageMultiplier > 1.0
 }
 
 // CalcBossPartDamage 计算对 Boss 部位的伤害（新减法公式）。
@@ -2561,7 +2561,6 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 		NormalDamage:          normalDamage,
 		CriticalDamage:        criticalDamage,
 		CriticalChancePercent: stats.CriticalChancePercent,
-		CriticalCount:         stats.CriticalCount,
 		AttackPower:           atk,
 		ArmorPenPercent:       stats.ArmorPenPercent,
 		CritDamageMultiplier:  critMult,

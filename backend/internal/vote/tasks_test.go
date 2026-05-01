@@ -9,7 +9,7 @@ import (
 )
 
 type stubTaskDefinitionStore struct {
-	items []TaskDefinition
+	items    []TaskDefinition
 	upserted []TaskDefinition
 }
 
@@ -76,7 +76,6 @@ func newTaskTestStore(t *testing.T, defs []TaskDefinition) (*Store, func()) {
 	taskDefStore := &stubTaskDefinitionStore{items: defs}
 	taskStore := NewStore(baseStore.client, "vote:", StoreOptions{
 		CriticalChancePercent: 5,
-		CriticalCount:         5,
 		TaskDefinitionStore:   taskDefStore,
 		TaskClaimLogStore:     stubTaskClaimLogStore{},
 	}, nickname.NewValidator([]string{"习近平", "xjp"}))
@@ -232,7 +231,6 @@ func TestSaveTaskDefinitionNormalizesLegacyFields(t *testing.T) {
 	taskDefStore := &stubTaskDefinitionStore{}
 	store := NewStore(baseStore.client, "vote:", StoreOptions{
 		CriticalChancePercent: 5,
-		CriticalCount:         5,
 		TaskDefinitionStore:   taskDefStore,
 		TaskClaimLogStore:     stubTaskClaimLogStore{},
 	}, nickname.NewValidator([]string{"习近平", "xjp"}))

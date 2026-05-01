@@ -41,6 +41,15 @@ describe('PublicPage 稀有度展示', () => {
     expect(profileSource).toContain('  formatRarityLabel,')
   })
 
+  it('资料页背包栏和装备栏复用统一稀有度样式', () => {
+    const profileSource = readFileSync(path.resolve(currentDir, './ArmoryPage.vue'), 'utf8')
+
+    expect(profileSource).toContain('loadout-slot__rarity')
+    expect(profileSource).toContain('armory-backpack-cell__rarity')
+    expect(profileSource).toContain('equipmentNameClass(loadout[slot.value])')
+    expect(profileSource).toContain('equipmentNameClass(item)')
+  })
+
   it('样式定义了六档稀有度与至臻动态文字效果', () => {
     expect(styleSource).toContain('.rarity-text--common')
     expect(styleSource).toContain('.rarity-text--supreme')
