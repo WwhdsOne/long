@@ -9,6 +9,7 @@ const pageSource = [
   './PublicPage.vue',
   './BattlePage.vue',
   './ArmoryPage.vue',
+  './TaskPage.vue',
   './MessagesPage.vue',
   './publicPageState.js',
 ]
@@ -19,6 +20,7 @@ describe('PublicPage 三合一边界', () => {
   it('提供战斗、天赋、三合一资料分区和消息导航，并默认进入战斗页', () => {
     expect(pageSource).toContain("import BattlePage from './BattlePage.vue'")
     expect(pageSource).toContain("import ArmoryPage from './ArmoryPage.vue'")
+    expect(pageSource).toContain("import TaskPage from './TaskPage.vue'")
     expect(pageSource).toContain("import MessagesPage from './MessagesPage.vue'")
     expect(pageSource).toContain("id: 'battle'")
     expect(pageSource).toContain("id: 'talents'")
@@ -50,6 +52,7 @@ describe('PublicPage 三合一边界', () => {
     const armorySource = readFileSync(path.resolve(currentDir, './ArmoryPage.vue'), 'utf8')
     expect(armorySource).toContain('armory-layout')
     expect(armorySource).toContain('armory-backpack-grid')
+    expect(armorySource).not.toContain("sectionID('tasks')")
     expect(armorySource).not.toContain('player-hud__tabs')
     expect(armorySource).not.toContain('activeHudTab')
   })

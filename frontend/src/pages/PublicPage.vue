@@ -3,6 +3,7 @@ import {ref} from 'vue'
 import BattlePage from './BattlePage.vue'
 import ArmoryPage from './ArmoryPage.vue'
 import MessagesPage from './MessagesPage.vue'
+import TaskPage from './TaskPage.vue'
 import TalentsPage from './TalentsPage.vue'
 import {usePublicPageState} from './publicPageState'
 
@@ -31,7 +32,7 @@ const {
 registerPublicPageLifecycle()
 
 const loginModalOpen = ref(false)
-const armoryPageIDs = new Set(['resources', 'tasks', 'inventory', 'stats', 'loadout'])
+const armoryPageIDs = new Set(['resources', 'inventory', 'stats', 'loadout'])
 
 function isArmoryPage(pageID) {
   return armoryPageIDs.has(pageID)
@@ -145,6 +146,7 @@ async function handleLoginSubmit() {
 
     <BattlePage v-if="currentPublicPage === 'battle'" />
     <TalentsPage v-else-if="currentPublicPage === 'talents'" />
+    <TaskPage v-else-if="currentPublicPage === 'tasks'" />
     <ArmoryPage v-else-if="isArmoryPage(currentPublicPage)" :focus-section="currentPublicPage" />
     <MessagesPage v-else />
   </main>

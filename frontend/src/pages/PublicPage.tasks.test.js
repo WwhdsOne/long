@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const armorySource = readFileSync(path.resolve(currentDir, './ArmoryPage.vue'), 'utf8')
+const taskPageSource = readFileSync(path.resolve(currentDir, './TaskPage.vue'), 'utf8')
 const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 
 describe('PublicPage 任务面板', () => {
@@ -18,10 +18,9 @@ describe('PublicPage 任务面板', () => {
   })
 
   it('任务页展示任务列表和领取按钮', () => {
-    expect(armorySource).toContain('当前任务')
-    expect(armorySource).toContain('claimTask')
-    expect(armorySource).toContain('task-card')
-    expect(armorySource).toContain("sectionID('tasks')")
+    expect(taskPageSource).toContain('当前任务')
+    expect(taskPageSource).toContain('claimTask')
+    expect(taskPageSource).toContain('task-card')
   })
 
   it('个人资料态会承接任务列表并提供领取动作', () => {
