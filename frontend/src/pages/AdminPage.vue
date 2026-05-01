@@ -161,6 +161,7 @@ const admin = reactive(useAdminPage())
           :task-form="admin.taskForm"
           :task-archives="admin.taskArchives"
           :task-cycle-results="admin.taskCycleResults"
+          :equipment-options="admin.equipmentOptions"
           :selected-task-id="admin.selectedTaskId"
           :selected-task-cycle-key="admin.selectedTaskCycleKey"
           :loading-tasks="admin.loadingTasks"

@@ -30,4 +30,12 @@ describe('AdminPage 任务管理接线', () => {
     expect(adminActionSource).toContain('async function duplicateTaskDefinition(taskId)')
     expect(adminActionSource).toContain('async function archiveExpiredTasks()')
   })
+
+  it('任务面板支持筛选和装备奖励下拉选择', () => {
+    const tabSource = readFileSync(path.resolve(currentDir, '../components/admin/AdminTaskTab.vue'), 'utf8')
+    expect(tabSource).toContain('taskStatusFilter')
+    expect(tabSource).toContain('archiveStatusFilter')
+    expect(tabSource).toContain('equipmentOptions')
+    expect(tabSource).toContain('<select v-model="entry.itemId"')
+  })
 })
