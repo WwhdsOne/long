@@ -381,15 +381,18 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="loadout-slot__main">
                   <template v-if="loadout[slot.value]">
-                    <strong v-if="loadout[slot.value]" class="loadout-slot__name">
+
+                  <strong v-if="loadout[slot.value]" class="loadout-slot__name">
                       <span :class="equipmentNameClass(loadout[slot.value])">{{
                           formatRarityLabel(loadout[slot.value].rarity)
                         }} · {{ equipmentNameParts(loadout[slot.value]).text }}</span>
-                      <br>
-                      <span class="loadout-slot__meta"> 强化 +{{ loadout[slot.value].enhanceLevel || 0 }}</span>
-                    </strong>
-                    <strong v-else class="loadout-slot__empty">未穿戴</strong>
+                    <br>
+                    <span class="loadout-slot__meta"> 强化 +{{ loadout[slot.value].enhanceLevel || 0 }}</span>
+                  </strong>
                   </template>
+
+                  <strong v-else class="loadout-slot__empty">未穿戴</strong>
+
 
                 </div>
                 <article v-if="loadout[slot.value]" class="armory-item-tooltip" aria-label="装备属性">
