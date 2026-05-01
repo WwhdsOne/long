@@ -456,11 +456,15 @@ select {
   font-size: 0.84rem;
   line-height: 1.2;
   color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
 }
 
-.armory-backpack-cell__meta span {
-  color: var(--ink-soft);
-  font-size: 0.75rem;
+.armory-backpack-cell__meta span.rarity-text {
+  color: transparent;
+  display: inline;
   line-height: 1.2;
 }
 
@@ -1643,10 +1647,21 @@ select {
   margin-bottom: 4px; /* 名字和图片之间的间距，按需调整 */
 }
 
-.loadout-slot span {
-  display: block;
-  color: var(--ink-soft);
-  font-size: 0.9rem;
+.loadout-slot__name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.loadout-slot__rarity,
+.armory-backpack-cell__rarity {
+  font-size: 0.82rem;
+}
+
+.loadout-slot span.rarity-text {
+  color: transparent;
+  display: inline;
 }
 
 .loadout-slot strong {

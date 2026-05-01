@@ -29,4 +29,13 @@ describe('PublicPage 任务面板', () => {
     expect(stateSource).toContain("if ('tasks' in payload)")
     expect(stateSource).toContain("fetch(`/api/tasks/${encodeURIComponent(taskId)}/claim`")
   })
+
+  it('登录后会拉取资料，并以 10 秒频率轮询任务列表更新红点', () => {
+    expect(stateSource).toContain('const TASK_POLL_INTERVAL_MS = 10000')
+    expect(stateSource).toContain('async function loadTasks()')
+    expect(stateSource).toContain("const response = await fetch('/api/tasks')")
+    expect(stateSource).toContain('startTaskPolling()')
+    expect(stateSource).toContain('stopTaskPolling()')
+    expect(stateSource).toContain('await loadPlayerProfile()')
+  })
 })

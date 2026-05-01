@@ -13,6 +13,7 @@ const AUTO_CLICK_RATE_LABEL = '每秒固定 3 次'
 const EQUIPMENT_ENHANCE_COST = 10
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
 const AFK_HEARTBEAT_INTERVAL_MS = 15000
+const TASK_POLL_INTERVAL_MS = 10000
 const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'pursuit', 'heavy', 'normal']
 const DAMAGE_VARIANTS = {
     normal: {
@@ -199,6 +200,7 @@ const comboTriggerFlash = ref(false)
 const comboTimeoutPercent = ref(100)
 let comboTimer = 0
 let comboTickTimer = 0
+let taskPollingTimer = 0
 
 function partTypeForKey(key) {
   if (!key || !boss.value?.parts) return ''
@@ -887,6 +889,41 @@ async function loadPlayerProfile() {
 
     const payload = await response.json()
     applyPlayerProfileState(payload)
+}
+
+async function loadTasks() {
+    if (!nickname.value) {
+        tasks.value = []
+        return
+    }
+
+    const response = await fetch('/api/tasks')
+    if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '任务列表加载失败，请稍后重试。'))
+    }
+
+    const payload = await response.json()
+    tasks.value = Array.isArray(payload) ? payload : []
+}
+
+function stopTaskPolling() {
+    if (!taskPollingTimer) {
+        return
+    }
+    window.clearInterval(taskPollingTimer)
+    taskPollingTimer = 0
+}
+
+function startTaskPolling() {
+    stopTaskPolling()
+    if (!nickname.value) {
+        return
+    }
+    taskPollingTimer = window.setInterval(() => {
+        void loadTasks().catch(() => {
+            // 红点轮询失败不打断主流程，下次继续重试。
+        })
+    }, TASK_POLL_INTERVAL_MS)
 }
 
 function handlePublicRouteChange() {
@@ -1685,6 +1722,7 @@ function clearTalentVisualState() {
 function clearUserRealtimeState() {
     userStats.value = null
     inventory.value = []
+    tasks.value = []
     loadout.value = emptyLoadout()
     combatStats.value = defaultCombatStats()
     gold.value = 0
@@ -2358,7 +2396,13 @@ async function submitNickname() {
         passwordDraft.value = ''
         await reportPresence(true)
         await loadAfkSettlement()
+        try {
+            await loadPlayerProfile()
+        } catch (error) {
+            errorMessage.value = error.message || '资料加载失败，请稍后重试。'
+        }
         startPresenceHeartbeat()
+        startTaskPolling()
         connectRealtime(resolvedNickname)
     } catch (error) {
         errorMessage.value = error.message || '登录失败，请稍后重试。'
@@ -2382,6 +2426,7 @@ async function resetNickname() {
 
 function clearPlayerSessionState() {
     stopPresenceHeartbeat()
+    stopTaskPolling()
     nickname.value = ''
     nicknameDraft.value = ''
     passwordDraft.value = ''
@@ -2409,7 +2454,13 @@ async function loadPlayerSession() {
         nicknameDraft.value = resolvedNickname
         await reportPresence(true)
         await loadAfkSettlement()
+        try {
+            await loadPlayerProfile()
+        } catch (error) {
+            errorMessage.value = error.message || '资料加载失败，请稍后重试。'
+        }
         startPresenceHeartbeat()
+        startTaskPolling()
     } catch {
         clearPlayerSessionState()
     }
@@ -2529,6 +2580,7 @@ function registerPublicPageLifecycle() {
          window.clearInterval(talentTickTimer)
          talentTickTimer = 0
          stopPresenceHeartbeat()
+         stopTaskPolling()
         realtimeTransport?.close()
         burstTimers.forEach((timer) => window.clearTimeout(timer))
         burstTimers.clear()

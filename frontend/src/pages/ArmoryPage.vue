@@ -381,7 +381,8 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="loadout-slot__main">
                   <strong v-if="loadout[slot.value]" class="loadout-slot__name">
-                    <span :class="equipmentNameClass(loadout[slot.value])">{{ formatRarityLabel(loadout[slot.value].rarity) }} · {{ equipmentNameParts(loadout[slot.value]).prefix }}{{ equipmentNameParts(loadout[slot.value]).text }}</span>
+                    <span :class="equipmentNameClass(loadout[slot.value])">{{ formatRarityLabel(loadout[slot.value].rarity) }} · {{ equipmentNameParts(loadout[slot.value]).text }}</span>
+                    <br>
                     <span class="loadout-slot__meta"> 强化 +{{ loadout[slot.value].enhanceLevel || 0 }}</span>
                   </strong>
                   <strong v-else class="loadout-slot__empty">未穿戴</strong>
@@ -470,10 +471,11 @@ onBeforeUnmount(() => {
             </article>
             <div class="armory-backpack-cell__meta">
               <strong>
+                <span :class="['armory-backpack-cell__rarity', equipmentNameClass(item)]">{{ formatRarityLabel(item.rarity) }} </span>
                 <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
-                <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
+                <span :class="equipmentNameClass(item)">·{{ equipmentNameParts(item).text }}</span>
               </strong>
-              <span>{{ formatRarityLabel(item.rarity) }} · {{ item.slot || '未分类' }}</span>
+              <span>{{ item.slot || '未分类' }}</span>
               <span>强化 +{{ item.enhanceLevel || 0 }} · {{ item.equipped ? '已装备' : '点击穿戴' }}</span>
               <span>{{ item.locked ? '已锁定（不参与一键分解）' : '未锁定' }}</span>
             </div>
