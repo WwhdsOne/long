@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -14,6 +13,8 @@ import (
 
 	"github.com/bytedance/sonic"
 	"gopkg.in/yaml.v3"
+
+	"long/internal/xlog"
 )
 
 // RedisConfig holds the connection settings for the Redis instance.
@@ -71,6 +72,30 @@ type RealtimeConfig struct {
 	DebounceMs int
 }
 
+// LogConfig 控制结构化日志输出行为。
+type LogConfig struct {
+	Level         string
+	Format        string
+	IncludeCaller bool
+}
+
+// MongoConfig 控制 MongoDB 冷数据存储。
+type MongoConfig struct {
+	Enabled        bool
+	URI            string
+	Database       string
+	ConnectTimeout time.Duration
+	WriteTimeout   time.Duration
+	ReadTimeout    time.Duration
+}
+
+// ArchiveConfig 控制冷数据归档与读源切换。
+type ArchiveConfig struct {
+	BossHistoryDualWrite  bool
+	BossHistoryReadSource string
+	AdminAuditEnabled     bool
+}
+
 // Config 运行时配置集合
 type Config struct {
 	Port        int
@@ -81,6 +106,9 @@ type Config struct {
 	OSS         OSSConfig
 	LLM         LLMConfig
 	Realtime    RealtimeConfig
+	Log         LogConfig
+	Mongo       MongoConfig
+	Archive     ArchiveConfig
 	RedisPrefix string
 	PublicDir   string
 }
@@ -129,6 +157,24 @@ type fileConfig struct {
 	Realtime struct {
 		DebounceMs int `yaml:"debounce_ms"`
 	} `yaml:"realtime"`
+	Log struct {
+		Level         string `yaml:"level"`
+		Format        string `yaml:"format"`
+		IncludeCaller bool   `yaml:"include_caller"`
+	} `yaml:"log"`
+	Mongo struct {
+		Enabled          bool   `yaml:"enabled"`
+		URI              string `yaml:"uri"`
+		Database         string `yaml:"database"`
+		ConnectTimeoutMS int    `yaml:"connect_timeout_ms"`
+		WriteTimeoutMS   int    `yaml:"write_timeout_ms"`
+		ReadTimeoutMS    int    `yaml:"read_timeout_ms"`
+	} `yaml:"mongo"`
+	Archive struct {
+		BossHistoryDualWrite  bool   `yaml:"boss_history_dual_write"`
+		BossHistoryReadSource string `yaml:"boss_history_read_source"`
+		AdminAuditEnabled     bool   `yaml:"admin_audit_enabled"`
+	} `yaml:"archive"`
 }
 
 type consulKV struct {
@@ -220,6 +266,24 @@ func loadFromConsul() (Config, consulSource, error) {
 		Realtime: RealtimeConfig{
 			DebounceMs: parsed.Realtime.DebounceMs,
 		},
+		Log: LogConfig{
+			Level:         normalizeLogLevel(parsed.Log.Level),
+			Format:        normalizeLogFormat(parsed.Log.Format),
+			IncludeCaller: parsed.Log.IncludeCaller,
+		},
+		Mongo: MongoConfig{
+			Enabled:        parsed.Mongo.Enabled,
+			URI:            strings.TrimSpace(parsed.Mongo.URI),
+			Database:       strings.TrimSpace(parsed.Mongo.Database),
+			ConnectTimeout: time.Duration(parsed.Mongo.ConnectTimeoutMS) * time.Millisecond,
+			WriteTimeout:   time.Duration(parsed.Mongo.WriteTimeoutMS) * time.Millisecond,
+			ReadTimeout:    time.Duration(parsed.Mongo.ReadTimeoutMS) * time.Millisecond,
+		},
+		Archive: ArchiveConfig{
+			BossHistoryDualWrite:  parsed.Archive.BossHistoryDualWrite,
+			BossHistoryReadSource: normalizeBossHistoryReadSource(parsed.Archive.BossHistoryReadSource),
+			AdminAuditEnabled:     parsed.Archive.AdminAuditEnabled,
+		},
 		RedisPrefix: parsed.RedisPrefix,
 		PublicDir:   resolvePublicDir(),
 	}
@@ -280,6 +344,20 @@ func validate(config Config) error {
 		return errors.New("llm.base_url is required when llm is enabled")
 	case config.LLM.Enabled && config.LLM.Timeout <= 0:
 		return errors.New("llm.timeout_ms must be greater than 0 when llm is enabled")
+	case config.Mongo.Enabled && strings.TrimSpace(config.Mongo.URI) == "":
+		return errors.New("mongo.uri is required when mongo is enabled")
+	case config.Mongo.Enabled && strings.TrimSpace(config.Mongo.Database) == "":
+		return errors.New("mongo.database is required when mongo is enabled")
+	case config.Mongo.Enabled && config.Mongo.ConnectTimeout <= 0:
+		return errors.New("mongo.connect_timeout_ms must be greater than 0 when mongo is enabled")
+	case config.Mongo.Enabled && config.Mongo.WriteTimeout <= 0:
+		return errors.New("mongo.write_timeout_ms must be greater than 0 when mongo is enabled")
+	case config.Mongo.Enabled && config.Mongo.ReadTimeout <= 0:
+		return errors.New("mongo.read_timeout_ms must be greater than 0 when mongo is enabled")
+	case strings.TrimSpace(config.Archive.BossHistoryReadSource) != "" &&
+		config.Archive.BossHistoryReadSource != "redis" &&
+		config.Archive.BossHistoryReadSource != "mongo":
+		return errors.New("archive.boss_history_read_source must be one of redis,mongo")
 	}
 
 	return nil
@@ -291,6 +369,30 @@ func normalizeLLMBaseURL(baseURL string) string {
 		return "https://api.openai.com/v1"
 	}
 	return strings.TrimRight(trimmed, "/")
+}
+
+func normalizeLogLevel(level string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(level))
+	if trimmed == "" {
+		return "info"
+	}
+	return trimmed
+}
+
+func normalizeLogFormat(format string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(format))
+	if trimmed == "" {
+		return "json"
+	}
+	return trimmed
+}
+
+func normalizeBossHistoryReadSource(source string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(source))
+	if trimmed == "" {
+		return "redis"
+	}
+	return trimmed
 }
 
 // Enabled reports whether OSS direct-upload has been configured.
@@ -373,7 +475,7 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 	for {
 		_, nextIndex, err := fetchConfigPayload(context.Background(), consulAddr, configKey, lastIndex)
 		if err != nil {
-			log.Printf("watch consul config failed: %v", err)
+			xlog.L().Warn("watch consul config failed", xlog.Err(err))
 			time.Sleep(10 * time.Second)
 			continue
 		}
@@ -382,7 +484,7 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 			continue
 		}
 
-		log.Printf("consul config changed, exiting for restart")
+		xlog.L().Info("consul config changed, exiting for restart")
 		exitProcess(0)
 	}
 }

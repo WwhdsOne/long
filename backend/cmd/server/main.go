@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -16,21 +15,28 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
 
 	"long/internal/admin"
+	"long/internal/archive"
 	"long/internal/config"
 	"long/internal/events"
 	"long/internal/httpapi"
+	"long/internal/mongostore"
 	"long/internal/nickname"
 	ossupload "long/internal/oss"
 	playerauth "long/internal/playerauth"
 	"long/internal/ratelimit"
 	"long/internal/vote"
+	"long/internal/xlog"
 )
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
 
@@ -40,6 +46,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	logger, err := xlog.Init(xlog.Config{
+		Level:         cfg.Log.Level,
+		Format:        cfg.Log.Format,
+		IncludeCaller: cfg.Log.IncludeCaller,
+	})
+	if err != nil {
+		return fmt.Errorf("init logger: %w", err)
+	}
+	defer func() {
+		_ = logger.Sync()
+	}()
 
 	redisOptions := &redis.Options{
 		Addr:     net.JoinHostPort(cfg.Redis.Host, fmt.Sprintf("%d", cfg.Redis.Port)),
@@ -61,10 +78,48 @@ func run() error {
 		return fmt.Errorf("connect redis: %w", err)
 	}
 
+	var mongoClient *mongo.Client
+	var bossHistoryArchive *archive.BossHistoryQueue
+	var adminBossHistoryReader httpapi.AdminBossHistoryReader
+	if cfg.Mongo.Enabled {
+		mongoClient, err = mongo.Connect(startupCtx, options.Client().
+			ApplyURI(cfg.Mongo.URI).
+			SetConnectTimeout(cfg.Mongo.ConnectTimeout))
+		if err != nil {
+			return fmt.Errorf("connect mongo: %w", err)
+		}
+		if err := mongoClient.Ping(startupCtx, nil); err != nil {
+			return fmt.Errorf("ping mongo: %w", err)
+		}
+
+		mongoDB := mongoClient.Database(cfg.Mongo.Database)
+		bossHistoryStore := mongostore.NewBossHistoryStore(mongoDB, cfg.Mongo.WriteTimeout, cfg.Mongo.ReadTimeout)
+		if err := bossHistoryStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo indexes: %w", err)
+		}
+		adminBossHistoryReader = bossHistoryStore
+
+		if cfg.Archive.BossHistoryDualWrite {
+			bossHistoryArchive = archive.NewBossHistoryQueue(archive.BossHistoryQueueConfig{
+				BufferSize:   128,
+				WorkerCount:  2,
+				WriteTimeout: cfg.Mongo.WriteTimeout,
+			}, bossHistoryStore)
+			bossHistoryArchive.Start()
+			defer bossHistoryArchive.Close()
+		}
+		defer func() {
+			if mongoClient != nil {
+				_ = mongoClient.Disconnect(context.Background())
+			}
+		}()
+	}
+
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
 		CriticalChancePercent: 5,
 		CriticalCount:         0,
+		BossHistoryArchiver:   bossHistoryArchive,
 	}, nicknameValidator)
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)
@@ -123,12 +178,13 @@ func run() error {
 			Password:      cfg.Admin.Password,
 			SessionSecret: cfg.Admin.SessionSecret,
 		}),
+		AdminBossHistoryReader: selectAdminBossHistoryReader(cfg, store, adminBossHistoryReader),
 	})
 
 	errCh := make(chan error, 1)
 	listenAddr := serverAddress(cfg.Port)
 	go func() {
-		log.Printf("Vote wall listening on %s", listenAddr)
+		xlog.L().Info("vote wall listening", zap.String("listen_addr", listenAddr))
 		if err := httpServer.Run(); err != nil {
 			errCh <- err
 		}
@@ -251,4 +307,11 @@ func serverAddress(port int) string {
 	}
 
 	return net.JoinHostPort(host, fmt.Sprintf("%d", listenPort))
+}
+
+func selectAdminBossHistoryReader(cfg config.Config, store *vote.Store, mongoReader httpapi.AdminBossHistoryReader) httpapi.AdminBossHistoryReader {
+	if cfg.Archive.BossHistoryReadSource == "mongo" && mongoReader != nil {
+		return mongoReader
+	}
+	return store
 }

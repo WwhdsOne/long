@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/vote"
+	"long/internal/xlog"
 )
 
 const afkStartDelay = 60 * time.Second
@@ -114,7 +114,7 @@ func (s *AfkService) ConsumeSettlement(nickname string) vote.AfkSettlement {
 		return vote.AfkSettlement{}
 	}
 	if err := s.redis.Del(ctx, s.settlementKey(nickname)).Err(); err != nil {
-		log.Printf("afk consume settlement delete failed nickname=%s err=%v", nickname, err)
+		xlog.L().Warn("afk consume settlement delete failed", xlog.Err(err))
 	}
 	return vote.AfkSettlement{
 		Kills:      state.Kills,
@@ -162,7 +162,7 @@ func (s *AfkService) runOnce(ctx context.Context) {
 
 	nicknames, err := s.redis.ZRange(ctx, s.playersIndexKey(), 0, -1).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		log.Printf("afk load players failed err=%v", err)
+		xlog.L().Warn("afk load players failed", xlog.Err(err))
 		return
 	}
 
@@ -180,7 +180,7 @@ func (s *AfkService) runOnce(ctx context.Context) {
 func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix int64) {
 	state, exists, err := s.loadPlayerState(ctx, nickname)
 	if err != nil {
-		log.Printf("afk load player failed nickname=%s err=%v", nickname, err)
+		xlog.L().Warn("afk load player failed", xlog.Err(err))
 		return
 	}
 	if !exists {
@@ -201,7 +201,7 @@ func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix
 
 	if !state.AfkActive {
 		if err := s.startAfk(ctx, nickname, &state, nowUnix); err != nil {
-			log.Printf("afk start failed nickname=%s err=%v", nickname, err)
+			xlog.L().Warn("afk start failed", xlog.Err(err))
 			return
 		}
 	}
@@ -215,7 +215,7 @@ func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix
 		if errors.Is(err, vote.ErrInvalidNickname) || errors.Is(err, vote.ErrSensitiveNickname) {
 			return
 		}
-		log.Printf("afk attack failed nickname=%s err=%v", nickname, err)
+		xlog.L().Warn("afk attack failed", xlog.Err(err))
 		return
 	}
 
@@ -225,7 +225,7 @@ func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix
 			state.Rewards = append(state.Rewards, result.RecentRewards...)
 		}
 		if err := s.savePlayerState(ctx, nickname, state); err != nil {
-			log.Printf("afk save player failed nickname=%s err=%v", nickname, err)
+			xlog.L().Warn("afk save player failed", xlog.Err(err))
 		}
 		publishChange(ctx, s.changePublisher, vote.StateChange{
 			Type:             vote.StateChangeBossChanged,
@@ -289,7 +289,7 @@ func (s *AfkService) stopAfk(ctx context.Context, nickname string) {
 			EndedAt:    s.now().Unix(),
 			Rewards:    append([]vote.Reward(nil), state.Rewards...),
 		}); err != nil {
-			log.Printf("afk merge settlement failed nickname=%s err=%v", nickname, err)
+			xlog.L().Warn("afk merge settlement failed", xlog.Err(err))
 		}
 	}
 

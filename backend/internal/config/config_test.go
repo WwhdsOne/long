@@ -52,6 +52,21 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               base_url: "https://llm.example.com/v1/"
               model: "gpt-test"
               timeout_ms: 15000
+            log:
+              level: "debug"
+              format: "console"
+              include_caller: true
+            mongo:
+              enabled: true
+              uri: "mongodb://127.0.0.1:27017"
+              database: "vote_wall"
+              connect_timeout_ms: 3000
+              write_timeout_ms: 2000
+              read_timeout_ms: 4000
+            archive:
+              boss_history_dual_write: true
+              boss_history_read_source: "mongo"
+              admin_audit_enabled: true
         `))
 
 		w.Header().Set("X-Consul-Index", "7")
@@ -110,6 +125,42 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.LLM.Timeout != 15*time.Second {
 		t.Fatalf("expected llm timeout 15s, got %s", cfg.LLM.Timeout)
+	}
+	if cfg.Log.Level != "debug" {
+		t.Fatalf("expected log level debug, got %q", cfg.Log.Level)
+	}
+	if cfg.Log.Format != "console" {
+		t.Fatalf("expected log format console, got %q", cfg.Log.Format)
+	}
+	if !cfg.Log.IncludeCaller {
+		t.Fatal("expected include caller enabled")
+	}
+	if !cfg.Mongo.Enabled {
+		t.Fatal("expected mongo enabled")
+	}
+	if cfg.Mongo.URI != "mongodb://127.0.0.1:27017" {
+		t.Fatalf("expected mongo uri, got %q", cfg.Mongo.URI)
+	}
+	if cfg.Mongo.Database != "vote_wall" {
+		t.Fatalf("expected mongo database vote_wall, got %q", cfg.Mongo.Database)
+	}
+	if cfg.Mongo.ConnectTimeout != 3*time.Second {
+		t.Fatalf("expected mongo connect timeout 3s, got %s", cfg.Mongo.ConnectTimeout)
+	}
+	if cfg.Mongo.WriteTimeout != 2*time.Second {
+		t.Fatalf("expected mongo write timeout 2s, got %s", cfg.Mongo.WriteTimeout)
+	}
+	if cfg.Mongo.ReadTimeout != 4*time.Second {
+		t.Fatalf("expected mongo read timeout 4s, got %s", cfg.Mongo.ReadTimeout)
+	}
+	if !cfg.Archive.BossHistoryDualWrite {
+		t.Fatal("expected boss history dual write enabled")
+	}
+	if cfg.Archive.BossHistoryReadSource != "mongo" {
+		t.Fatalf("expected boss history read source mongo, got %q", cfg.Archive.BossHistoryReadSource)
+	}
+	if !cfg.Archive.AdminAuditEnabled {
+		t.Fatal("expected admin audit enabled")
 	}
 }
 
@@ -195,6 +246,80 @@ func TestLoadTestRequiresConsulEnv(t *testing.T) {
 	}
 }
 
+func TestValidateRequiresMongoFieldsWhenEnabled(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Config)
+		wantErr string
+	}{
+		{
+			name: "uri",
+			mutate: func(cfg *Config) {
+				cfg.Mongo.URI = ""
+			},
+			wantErr: "mongo.uri is required when mongo is enabled",
+		},
+		{
+			name: "database",
+			mutate: func(cfg *Config) {
+				cfg.Mongo.Database = ""
+			},
+			wantErr: "mongo.database is required when mongo is enabled",
+		},
+		{
+			name: "connect timeout",
+			mutate: func(cfg *Config) {
+				cfg.Mongo.ConnectTimeout = 0
+			},
+			wantErr: "mongo.connect_timeout_ms must be greater than 0 when mongo is enabled",
+		},
+		{
+			name: "write timeout",
+			mutate: func(cfg *Config) {
+				cfg.Mongo.WriteTimeout = 0
+			},
+			wantErr: "mongo.write_timeout_ms must be greater than 0 when mongo is enabled",
+		},
+		{
+			name: "read timeout",
+			mutate: func(cfg *Config) {
+				cfg.Mongo.ReadTimeout = 0
+			},
+			wantErr: "mongo.read_timeout_ms must be greater than 0 when mongo is enabled",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := validConfigForTest()
+			cfg.Mongo = MongoConfig{
+				Enabled:        true,
+				URI:            "mongodb://127.0.0.1:27017",
+				Database:       "vote_wall",
+				ConnectTimeout: 3 * time.Second,
+				WriteTimeout:   2 * time.Second,
+				ReadTimeout:    4 * time.Second,
+			}
+			tt.mutate(&cfg)
+
+			err := validate(cfg)
+			if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("expected %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestValidateRejectsUnknownBossHistoryReadSource(t *testing.T) {
+	cfg := validConfigForTest()
+	cfg.Archive.BossHistoryReadSource = "postgres"
+
+	err := validate(cfg)
+	if err == nil || err.Error() != "archive.boss_history_read_source must be one of redis,mongo" {
+		t.Fatalf("expected archive read source validation error, got %v", err)
+	}
+}
+
 func validConfigForTest() Config {
 	return Config{
 		Port: 2333,
@@ -202,7 +327,7 @@ func validConfigForTest() Config {
 			Host: "127.0.0.1",
 			Port: 6379,
 		},
-		RedisPrefix:        "vote:",
+		RedisPrefix: "vote:",
 		RateLimit: RateLimitConfig{
 			Limit:             30,
 			Window:            2 * time.Second,

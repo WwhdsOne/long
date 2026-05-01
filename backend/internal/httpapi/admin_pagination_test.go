@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,15 @@ import (
 	"long/internal/admin"
 	"long/internal/vote"
 )
+
+type mockBossHistoryReader struct {
+	page vote.AdminBossHistoryPage
+	err  error
+}
+
+func (m *mockBossHistoryReader) ListAdminBossHistoryPage(_ context.Context, _ int64, _ int64) (vote.AdminBossHistoryPage, error) {
+	return m.page, m.err
+}
 
 func TestAdminStateReturnsLightweightSummary(t *testing.T) {
 	store := &mockStore{
@@ -52,6 +62,59 @@ func TestAdminStateReturnsLightweightSummary(t *testing.T) {
 	}
 	if got := int64(payload["playerCount"].(float64)); got != 12 {
 		t.Fatalf("expected playerCount 12, got %d", got)
+	}
+}
+
+func TestAdminBossHistoryPagePrefersOptionalReader(t *testing.T) {
+	store := &mockStore{
+		adminBossHistoryPage: vote.AdminBossHistoryPage{
+			Items: []vote.BossHistoryEntry{
+				{Boss: vote.Boss{ID: "redis-boss", Name: "Redis Boss", Status: "defeated", StartedAt: 1}},
+			},
+			Page:       1,
+			PageSize:   20,
+			Total:      1,
+			TotalPages: 1,
+		},
+	}
+	reader := &mockBossHistoryReader{
+		page: vote.AdminBossHistoryPage{
+			Items: []vote.BossHistoryEntry{
+				{Boss: vote.Boss{ID: "mongo-boss", Name: "Mongo Boss", Status: "defeated", StartedAt: 2}},
+			},
+			Page:       1,
+			PageSize:   20,
+			Total:      1,
+			TotalPages: 1,
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:                  store,
+		AdminBossHistoryReader: reader,
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	cookie := loginAdminForTest(t, handler)
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/boss/history?page=1&pageSize=20", nil)
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin boss history page, got %d", response.Code)
+	}
+
+	var payload vote.AdminBossHistoryPage
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode boss history page: %v", err)
+	}
+	if len(payload.Items) != 1 || payload.Items[0].ID != "mongo-boss" {
+		t.Fatalf("expected optional reader payload, got %+v", payload)
 	}
 }
 

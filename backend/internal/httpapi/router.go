@@ -89,6 +89,11 @@ type ChangePublisher interface {
 	PublishChange(context.Context, vote.StateChange) error
 }
 
+// AdminBossHistoryReader 负责后台 Boss 历史分页读取，可选替换 Redis 默认读源。
+type AdminBossHistoryReader interface {
+	ListAdminBossHistoryPage(context.Context, int64, int64) (vote.AdminBossHistoryPage, error)
+}
+
 // ClickGuard 点击频率限制接口。
 type ClickGuard interface {
 	Allow(string) (time.Duration, error)
@@ -147,6 +152,7 @@ type Options struct {
 	AdminAuthenticator      *adminauth.Authenticator
 	OSSSigner               OSSSigner
 	EquipmentDraftGenerator EquipmentDraftGenerator
+	AdminBossHistoryReader  AdminBossHistoryReader
 }
 
 const adminSessionCookieName = "long_admin_session"

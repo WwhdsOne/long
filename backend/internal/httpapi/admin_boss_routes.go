@@ -283,7 +283,12 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		history, err := options.Store.ListAdminBossHistoryPage(ctx, page, pageSize)
+		var historyReader AdminBossHistoryReader = options.Store
+		if options.AdminBossHistoryReader != nil {
+			historyReader = options.AdminBossHistoryReader
+		}
+
+		history, err := historyReader.ListAdminBossHistoryPage(ctx, page, pageSize)
 		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_HISTORY_FAILED"})
 			return

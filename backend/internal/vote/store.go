@@ -434,6 +434,7 @@ type StateChange struct {
 type StoreOptions struct {
 	CriticalChancePercent int
 	CriticalCount         int64
+	BossHistoryArchiver   interface{ Enqueue(BossHistoryEntry) bool }
 }
 
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
@@ -474,6 +475,7 @@ type Store struct {
 	roll                    func(int) int
 	now                     func() time.Time
 	validator               interface{ Validate(string) error }
+	bossHistoryArchiver     interface{ Enqueue(BossHistoryEntry) bool }
 
 	combatStatsCache   map[string]CombatStats
 	combatStatsCacheMu sync.RWMutex
@@ -527,6 +529,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		},
 		now:                 time.Now,
 		validator:           validator,
+		bossHistoryArchiver: options.BossHistoryArchiver,
 		combatStatsCache:    make(map[string]CombatStats),
 		compiledTalentCache: make(map[string]*CompiledTalentSet),
 	}

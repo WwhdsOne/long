@@ -8,6 +8,8 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
+
+	"long/internal/xlog"
 )
 
 // SaveBossToHistory 将 Boss 快照存入历史列表。
@@ -47,10 +49,15 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 	if score == 0 {
 		score = float64(time.Now().Unix())
 	}
-	return s.client.ZAdd(ctx, s.bossHistoryKey, redis.Z{
+	if err := s.client.ZAdd(ctx, s.bossHistoryKey, redis.Z{
 		Score:  score,
 		Member: boss.ID,
-	}).Err()
+	}).Err(); err != nil {
+		return err
+	}
+
+	s.enqueueBossHistoryArchive(ctx, boss)
+	return nil
 }
 
 // ListBossHistory 返回历史 Boss 列表（按时间倒序）。
@@ -83,4 +90,27 @@ func (s *Store) ListBossHistory(ctx context.Context) ([]BossHistoryEntry, error)
 	}
 
 	return entries, nil
+}
+
+func (s *Store) enqueueBossHistoryArchive(ctx context.Context, boss *Boss) {
+	if s.bossHistoryArchiver == nil || boss == nil {
+		return
+	}
+
+	loot, err := s.loadBossLoot(ctx, boss.ID)
+	if err != nil {
+		return
+	}
+	damage, err := s.ListBossLeaderboard(ctx, boss.ID, 20)
+	if err != nil {
+		return
+	}
+
+	if ok := s.bossHistoryArchiver.Enqueue(BossHistoryEntry{
+		Boss:   *boss,
+		Loot:   loot,
+		Damage: damage,
+	}); !ok {
+		xlog.L().Warn("enqueue boss history archive failed")
+	}
 }

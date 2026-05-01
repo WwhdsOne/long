@@ -34,3 +34,18 @@ llm:
   timeout_ms: 30000
 realtime:
   debounce_ms: 50
+log:
+  level: "info"
+  format: "json"
+  include_caller: false
+mongo:
+  enabled: false
+  uri: "mongodb://127.0.0.1:27017"
+  database: "vote_wall"
+  connect_timeout_ms: 3000
+  write_timeout_ms: 2000
+  read_timeout_ms: 3000
+archive:
+  boss_history_dual_write: false
+  boss_history_read_source: "redis"
+  admin_audit_enabled: false
