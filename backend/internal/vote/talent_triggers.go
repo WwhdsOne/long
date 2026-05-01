@@ -196,10 +196,7 @@ func applyArmorUltimateTrigger(tc *talentTriggerContext) {
 	}
 
 	ratio := tc.compiledTalents.Armor.UltimateDamageRatio
-	dmg := int64(float64(maxInt64(1, tc.baseDamage)) * ratio)
-	if dmg > tc.part.CurrentHP {
-		dmg = tc.part.CurrentHP
-	}
+	dmg := min(int64(float64(maxInt64(1, tc.baseDamage))*ratio), tc.part.CurrentHP)
 	_, dmg, _ = applyBossPartDamageDelta(tc.boss, tc.part, dmg)
 	tc.totalExtra += dmg
 	tc.combatState.JudgmentDayUsed[pk] = now

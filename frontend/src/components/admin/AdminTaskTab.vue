@@ -122,16 +122,19 @@ function equipmentOptionLabel(item) {
 
 <template>
   <div class="admin-section">
-    <div class="admin-inline-actions" style="margin-bottom: 1rem;">
+    <div class="admin-inline-actions" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;">
       <button class="nickname-form__submit" type="button" :disabled="saving" @click="openNewTask">新建任务</button>
       <button class="nickname-form__ghost" type="button" :disabled="loadingTasks" @click="fetchTasks">刷新任务</button>
       <button class="nickname-form__ghost" type="button" :disabled="saving" @click="archiveExpiredTasks">归档过期任务</button>
+
+      <!-- Filter Selects -->
       <select v-model="taskTypeFilter" class="nickname-form__input" style="max-width: 140px;">
         <option value="all">全部周期</option>
         <option value="daily">日常</option>
         <option value="weekly">周常</option>
         <option value="limited">限时</option>
       </select>
+
       <select v-model="taskStatusFilter" class="nickname-form__input" style="max-width: 140px;">
         <option value="all">全部状态</option>
         <option value="draft">草稿</option>
@@ -195,60 +198,99 @@ function equipmentOptionLabel(item) {
           <strong>{{ taskForm.taskId || '新任务' }}</strong>
         </div>
         <form class="admin-form" @submit.prevent="saveTaskDefinition">
-          <input v-model="taskForm.taskId" class="nickname-form__input" type="text" placeholder="taskId" />
-          <input v-model="taskForm.title" class="nickname-form__input" type="text" placeholder="标题" />
-          <textarea v-model="taskForm.description" class="nickname-form__input" rows="3" placeholder="描述"></textarea>
-          <select v-model="taskForm.taskType" class="nickname-form__input">
-            <option value="daily">日常</option>
-            <option value="weekly">周常</option>
-            <option value="limited">限时</option>
-          </select>
-          <select v-model="taskForm.conditionKind" class="nickname-form__input">
-            <option value="daily_clicks">当天点击</option>
-            <option value="weekly_clicks">周点击</option>
-            <option value="boss_kills">击败 Boss</option>
-            <option value="enhance_count">强化次数</option>
-          </select>
-          <input v-model="taskForm.targetValue" class="nickname-form__input" type="number" min="1" placeholder="目标值" />
-          <input v-model="taskForm.displayOrder" class="nickname-form__input" type="number" min="0" placeholder="展示顺序" />
-          <input
-            v-if="taskForm.taskType === 'limited'"
-            v-model="taskForm.startAt"
-            class="nickname-form__input"
-            type="number"
-            min="0"
-            placeholder="开始时间戳，限时任务必填"
-          />
-          <input
-            v-if="taskForm.taskType === 'limited'"
-            v-model="taskForm.endAt"
-            class="nickname-form__input"
-            type="number"
-            min="0"
-            placeholder="结束时间戳，且必须大于开始时间"
-          />
+          <div class="form-group">
+            <label for="taskId">任务 ID</label>
+            <input id="taskId" v-model="taskForm.taskId" class="nickname-form__input" type="text" />
+          </div>
+
+          <div class="form-group">
+            <label for="title">标题</label>
+            <input id="title" v-model="taskForm.title" class="nickname-form__input" type="text" />
+          </div>
+
+          <div class="form-group">
+            <label for="description">描述</label>
+            <textarea id="description" v-model="taskForm.description" class="nickname-form__input" rows="3"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="taskType">任务类型</label>
+            <select id="taskType" v-model="taskForm.taskType" class="nickname-form__input">
+              <option value="daily">日常</option>
+              <option value="weekly">周常</option>
+              <option value="limited">限时</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="conditionKind">任务条件</label>
+            <select id="conditionKind" v-model="taskForm.conditionKind" class="nickname-form__input">
+              <option value="daily_clicks">当天点击</option>
+              <option value="weekly_clicks">周点击</option>
+              <option value="boss_kills">击败 Boss</option>
+              <option value="enhance_count">强化次数</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="targetValue">目标值</label>
+            <input id="targetValue" v-model="taskForm.targetValue" class="nickname-form__input" type="number" min="1" />
+          </div>
+
+          <div class="form-group">
+            <label for="displayOrder">展示顺序</label>
+            <input id="displayOrder" v-model="taskForm.displayOrder" class="nickname-form__input" type="number" min="0" />
+          </div>
+
+          <div v-if="taskForm.taskType === 'limited'">
+            <div class="form-group">
+              <label for="startAt">开始时间戳（限时任务必填）</label>
+              <input id="startAt" v-model="taskForm.startAt" class="nickname-form__input" type="number" min="0" />
+            </div>
+            <div class="form-group">
+              <label for="endAt">结束时间戳（必须大于开始时间）</label>
+              <input id="endAt" v-model="taskForm.endAt" class="nickname-form__input" type="number" min="0" />
+            </div>
+          </div>
 
           <div class="leaderboard-list">
             <p>奖励配置</p>
-            <input v-model="taskForm.rewards.gold" class="nickname-form__input" type="number" min="0" placeholder="金币" />
-            <input v-model="taskForm.rewards.stones" class="nickname-form__input" type="number" min="0" placeholder="强化石" />
-            <input v-model="taskForm.rewards.talentPoints" class="nickname-form__input" type="number" min="0" placeholder="天赋点" />
+            <div class="form-group">
+              <label for="gold">金币</label>
+              <input id="gold" v-model="taskForm.rewards.gold" class="nickname-form__input" type="number" min="0" />
+            </div>
+            <div class="form-group">
+              <label for="stones">强化石</label>
+              <input id="stones" v-model="taskForm.rewards.stones" class="nickname-form__input" type="number" min="0" />
+            </div>
+            <div class="form-group">
+              <label for="talentPoints">天赋点</label>
+              <input id="talentPoints" v-model="taskForm.rewards.talentPoints" class="nickname-form__input" type="number" min="0" />
+            </div>
+
             <div
-              v-for="(entry, index) in taskForm.rewards.equipmentItems"
-              :key="`${index}-${entry.itemId}`"
-              class="admin-inline-actions"
+                v-for="(entry, index) in taskForm.rewards.equipmentItems"
+                :key="`${index}-${entry.itemId}`"
+                class="admin-inline-actions"
             >
-              <select v-model="entry.itemId" class="nickname-form__input">
-                <option value="">选择装备模板</option>
-                <option v-for="item in equipmentOptions" :key="item.itemId" :value="item.itemId">
-                  {{ equipmentOptionLabel(item) }}
-                </option>
-              </select>
-              <input v-model="entry.quantity" class="nickname-form__input" type="number" min="1" placeholder="数量" />
+              <div class="form-group">
+                <label for="itemId">选择装备模板</label>
+                <select v-model="entry.itemId" class="nickname-form__input">
+                  <option value="">选择装备模板</option>
+                  <option v-for="item in equipmentOptions" :key="item.itemId" :value="item.itemId">
+                    {{ equipmentOptionLabel(item) }}
+                  </option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="quantity">数量</label>
+                <input v-model="entry.quantity" class="nickname-form__input" type="number" min="1" />
+              </div>
               <button class="nickname-form__ghost" type="button" @click="removeTaskEquipmentReward(index)">移除</button>
             </div>
             <button class="nickname-form__ghost" type="button" @click="addTaskEquipmentReward">添加装备奖励</button>
           </div>
+
           <button class="nickname-form__submit" type="submit" :disabled="saving">{{ saving ? '保存中...' : '保存任务' }}</button>
         </form>
       </article>

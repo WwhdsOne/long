@@ -41,7 +41,7 @@ log:
 mongo:
   enabled: true
   uri: "mongodb://127.0.0.1:27017"
-  database: "vote_wall"
+  database: "hai-world"
   connect_timeout_ms: 3000
   write_timeout_ms: 2000
   read_timeout_ms: 3000

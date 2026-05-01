@@ -2181,7 +2181,7 @@ func TestProcessTalentBleedTicksSettlesEveryTwoHundredMs(t *testing.T) {
 
 	totalBleedDamage := int64(0)
 	totalBleedEvents := 0
-	for i := 0; i < 15; i++ {
+	for range 15 {
 		currentTime = currentTime.Add(200 * time.Millisecond)
 		changes, err = store.ProcessTalentBleedTicks(ctx)
 		if err != nil {
@@ -2375,13 +2375,13 @@ func TestArmorCoreCollapseCountDoesNotResetWhenCollapseExpires(t *testing.T) {
 
 	clickKey := "boss-part:0-0"
 	triggerCount := armorCoreCollapseTriggerForLevel(1)
-	for i := 0; i < triggerCount; i++ {
+	for i := range triggerCount {
 		if _, err := store.ClickBossPart(ctx, clickKey, nickname); err != nil {
 			t.Fatalf("trigger collapse click %d: %v", i+1, err)
 		}
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		if _, err := store.ClickBossPart(ctx, clickKey, nickname); err != nil {
 			t.Fatalf("during collapse click %d: %v", i+1, err)
 		}
@@ -2440,14 +2440,14 @@ func TestArmorCoreCollapseDoesNotRetriggerWhileActive(t *testing.T) {
 
 	clickKey := "boss-part:0-0"
 	triggerCount := armorCoreCollapseTriggerForLevel(1)
-	for i := 0; i < triggerCount; i++ {
+	for i := range triggerCount {
 		if _, err := store.ClickBossPart(ctx, clickKey, nickname); err != nil {
 			t.Fatalf("trigger collapse click %d: %v", i+1, err)
 		}
 	}
 
 	retriggerCount := 0
-	for i := 0; i < triggerCount; i++ {
+	for i := range triggerCount {
 		result, err := store.ClickBossPart(ctx, clickKey, nickname)
 		if err != nil {
 			t.Fatalf("during collapse click %d: %v", i+1, err)

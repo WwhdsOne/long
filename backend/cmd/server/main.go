@@ -27,7 +27,7 @@ import (
 	"long/internal/mongostore"
 	"long/internal/nickname"
 	ossupload "long/internal/oss"
-	playerauth "long/internal/playerauth"
+	"long/internal/playerauth"
 	"long/internal/ratelimit"
 	"long/internal/vote"
 	"long/internal/xlog"
@@ -72,6 +72,7 @@ func run() error {
 
 	var mongoClient *mongo.Client
 	var bossHistoryStore *mongostore.BossHistoryStore
+	var bossHistoryQueue *archive.BossHistoryQueue
 	var mongoMessageStore *mongostore.MessageStore
 	var taskDefinitionStore *mongostore.TaskDefinitionStore
 	var taskClaimLogStore *mongostore.TaskClaimLogStore
@@ -152,6 +153,13 @@ func run() error {
 		systemLogQueue.Start()
 		defer systemLogQueue.Close()
 		xlog.SetSystemLogHook(xlog.HookFromWriter(systemLogQueueWriter{queue: systemLogQueue}))
+		bossHistoryQueue = archive.NewBossHistoryQueue(archive.BossHistoryQueueConfig{
+			BufferSize:   256,
+			WorkerCount:  2,
+			WriteTimeout: cfg.Mongo.WriteTimeout,
+		}, bossHistoryStore)
+		bossHistoryQueue.Start()
+		defer bossHistoryQueue.Close()
 		defer func() {
 			if mongoClient != nil {
 				_ = mongoClient.Disconnect(context.Background())
@@ -176,6 +184,7 @@ func run() error {
 		CriticalChancePercent: 5,
 		CriticalCount:         0,
 		BossHistoryStore:      bossHistoryStore,
+		BossHistoryArchiver:   bossHistoryQueue,
 		MessageStore:          mongoMessageStore,
 		TaskDefinitionStore:   taskDefinitionStore,
 		TaskClaimLogStore:     taskClaimLogStore,
@@ -238,8 +247,9 @@ func run() error {
 			Password:      cfg.Admin.Password,
 			SessionSecret: cfg.Admin.SessionSecret,
 		}),
-		AdminAuditWriter:  adminAuditWriter,
-		DomainEventWriter: domainEventWriter,
+		AdminAuditWriter:       adminAuditWriter,
+		DomainEventWriter:      domainEventWriter,
+		AdminBossHistoryReader: bossHistoryStore,
 	})
 
 	errCh := make(chan error, 1)

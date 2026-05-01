@@ -65,8 +65,9 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 		entry.Damage = damage
 	}
 
-	if s.bossHistoryStore != nil {
-		return s.bossHistoryStore.SaveBossHistory(ctx, entry)
+	if s.bossHistoryArchiver != nil {
+		s.enqueueBossHistoryArchive(ctx, entry)
+		return nil
 	}
 
 	key := s.bossHistoryPrefix + boss.ID
@@ -85,7 +86,6 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 		return err
 	}
 
-	s.enqueueBossHistoryArchive(ctx, entry)
 	return nil
 }
 

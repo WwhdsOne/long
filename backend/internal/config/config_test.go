@@ -63,10 +63,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               connect_timeout_ms: 3000
               write_timeout_ms: 2000
               read_timeout_ms: 4000
-            archive:
-              boss_history_dual_write: true
-              boss_history_read_source: "mongo"
-              admin_audit_enabled: true
         `))
 
 		w.Header().Set("X-Consul-Index", "7")
@@ -152,15 +148,6 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.Mongo.ReadTimeout != 4*time.Second {
 		t.Fatalf("expected mongo read timeout 4s, got %s", cfg.Mongo.ReadTimeout)
-	}
-	if !cfg.Archive.BossHistoryDualWrite {
-		t.Fatal("expected boss history dual write enabled")
-	}
-	if cfg.Archive.BossHistoryReadSource != "mongo" {
-		t.Fatalf("expected boss history read source mongo, got %q", cfg.Archive.BossHistoryReadSource)
-	}
-	if !cfg.Archive.AdminAuditEnabled {
-		t.Fatal("expected admin audit enabled")
 	}
 }
 
@@ -307,16 +294,6 @@ func TestValidateRequiresMongoFieldsWhenEnabled(t *testing.T) {
 				t.Fatalf("expected %q, got %v", tt.wantErr, err)
 			}
 		})
-	}
-}
-
-func TestValidateRejectsUnknownBossHistoryReadSource(t *testing.T) {
-	cfg := validConfigForTest()
-	cfg.Archive.BossHistoryReadSource = "postgres"
-
-	err := validate(cfg)
-	if err == nil || err.Error() != "archive.boss_history_read_source must be one of redis,mongo" {
-		t.Fatalf("expected archive read source validation error, got %v", err)
 	}
 }
 

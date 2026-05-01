@@ -90,11 +90,7 @@ type MongoConfig struct {
 }
 
 // ArchiveConfig 控制冷数据归档与读源切换。
-type ArchiveConfig struct {
-	BossHistoryDualWrite  bool
-	BossHistoryReadSource string
-	AdminAuditEnabled     bool
-}
+type ArchiveConfig struct{}
 
 // Config 运行时配置集合
 type Config struct {
@@ -170,11 +166,7 @@ type fileConfig struct {
 		WriteTimeoutMS   int    `yaml:"write_timeout_ms"`
 		ReadTimeoutMS    int    `yaml:"read_timeout_ms"`
 	} `yaml:"mongo"`
-	Archive struct {
-		BossHistoryDualWrite  bool   `yaml:"boss_history_dual_write"`
-		BossHistoryReadSource string `yaml:"boss_history_read_source"`
-		AdminAuditEnabled     bool   `yaml:"admin_audit_enabled"`
-	} `yaml:"archive"`
+	Archive struct{} `yaml:"archive"`
 }
 
 type consulKV struct {
@@ -279,11 +271,7 @@ func loadFromConsul() (Config, consulSource, error) {
 			WriteTimeout:   time.Duration(parsed.Mongo.WriteTimeoutMS) * time.Millisecond,
 			ReadTimeout:    time.Duration(parsed.Mongo.ReadTimeoutMS) * time.Millisecond,
 		},
-		Archive: ArchiveConfig{
-			BossHistoryDualWrite:  parsed.Archive.BossHistoryDualWrite,
-			BossHistoryReadSource: normalizeBossHistoryReadSource(parsed.Archive.BossHistoryReadSource),
-			AdminAuditEnabled:     parsed.Archive.AdminAuditEnabled,
-		},
+		Archive:     ArchiveConfig{},
 		RedisPrefix: parsed.RedisPrefix,
 		PublicDir:   resolvePublicDir(),
 	}
@@ -354,10 +342,6 @@ func validate(config Config) error {
 		return errors.New("mongo.write_timeout_ms must be greater than 0 when mongo is enabled")
 	case config.Mongo.Enabled && config.Mongo.ReadTimeout <= 0:
 		return errors.New("mongo.read_timeout_ms must be greater than 0 when mongo is enabled")
-	case strings.TrimSpace(config.Archive.BossHistoryReadSource) != "" &&
-		config.Archive.BossHistoryReadSource != "redis" &&
-		config.Archive.BossHistoryReadSource != "mongo":
-		return errors.New("archive.boss_history_read_source must be one of redis,mongo")
 	}
 
 	return nil
@@ -383,14 +367,6 @@ func normalizeLogFormat(format string) string {
 	trimmed := strings.ToLower(strings.TrimSpace(format))
 	if trimmed == "" {
 		return "json"
-	}
-	return trimmed
-}
-
-func normalizeBossHistoryReadSource(source string) string {
-	trimmed := strings.ToLower(strings.TrimSpace(source))
-	if trimmed == "" {
-		return "redis"
 	}
 	return trimmed
 }

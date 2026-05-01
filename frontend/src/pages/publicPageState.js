@@ -109,11 +109,11 @@ const profilePageMap = {
 const publicPages = [
     {id: 'battle', label: '战斗', path: '/'},
     {id: 'resources', label: '资源', path: '/profile/resources'},
-    {id: 'tasks', label: '任务', path: '/profile/tasks'},
     {id: 'inventory', label: '背包', path: '/profile/inventory'},
     {id: 'stats', label: '属性', path: '/profile/stats'},
     {id: 'loadout', label: '装备栏', path: '/profile/loadout'},
     {id: 'talents', label: '天赋', path: '/talents'},
+    {id: 'tasks', label: '任务', path: '/profile/tasks'},
     {id: 'messages', label: '消息', path: '/messages'},
 ]
 

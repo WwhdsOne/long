@@ -12,35 +12,35 @@ type compiledNormalTalents struct {
 }
 
 type compiledArmorTalents struct {
-	CollapseTrigger   int64
-	CollapseDuration  int64
-	AutoStrikeTrigger int64
-	AutoStrikeRatio   float64
-	CollapseAmp       float64
-	UltimateTrigger      int64
-	UltimateDamageRatio  float64
-	UltimateCooldown     int64
+	CollapseTrigger     int64
+	CollapseDuration    int64
+	AutoStrikeTrigger   int64
+	AutoStrikeRatio     float64
+	CollapseAmp         float64
+	UltimateTrigger     int64
+	UltimateDamageRatio float64
+	UltimateCooldown    int64
 }
 
 type compiledCritTalents struct {
-	OmenCap               int
-	OmenPerWeakCrit       int
-	SkinnerChance         float64
-	SkinnerDuration       int64
-	SkinnerCooldown       int64
-	OmenKillThreshold     float64
-	OmenKillDmgPerOmen    float64
-	OmenResonatePerOmen   float64
-	OmenReapThresholds    []int
-	OmenReapDamageMults   []float64
-	BleedRatio            float64
-	BleedDuration         int64
-	WeakspotInsightMult   float64
-	FinalCutOmenTrigger   int
-	FinalCutDamageRatio   float64
-	DoomMarkThreshold     float64
-	DoomMarkCount         int
-	DoomOmenPerMark       int
+	OmenCap             int
+	OmenPerWeakCrit     int
+	SkinnerChance       float64
+	SkinnerDuration     int64
+	SkinnerCooldown     int64
+	OmenKillThreshold   float64
+	OmenKillDmgPerOmen  float64
+	OmenResonatePerOmen float64
+	OmenReapThresholds  []int
+	OmenReapDamageMults []float64
+	BleedRatio          float64
+	BleedDuration       int64
+	WeakspotInsightMult float64
+	FinalCutOmenTrigger int
+	FinalCutDamageRatio float64
+	DoomMarkThreshold   float64
+	DoomMarkCount       int
+	DoomOmenPerMark     int
 }
 
 type CompiledTalentSet struct {
@@ -320,10 +320,7 @@ func compileArmorTalents(compiled *CompiledTalentSet) compiledArmorTalents {
 		CollapseAmp:      1.0,
 	}
 	if compiled.Has("armor_core") {
-		armor.CollapseTrigger = int64(armorCoreCollapseTriggerForLevel(compiled.Level("armor_core")))
-		if armor.CollapseTrigger < 1 {
-			armor.CollapseTrigger = 1
-		}
+		armor.CollapseTrigger = max(int64(armorCoreCollapseTriggerForLevel(compiled.Level("armor_core"))), 1)
 	}
 	if compiled.Has("armor_collapse_ext") {
 		armor.CollapseAmp *= armorCollapseResonanceAmpForLevel(compiled.Level("armor_collapse_ext"))
