@@ -9,14 +9,24 @@ const armorySource = readFileSync(path.resolve(currentDir, './ArmoryPage.vue'), 
 const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 
 describe('PublicPage 任务面板', () => {
-  it('资料页资源区展示任务列表和领取按钮', () => {
+  it('任务作为独立资料页签展示，并在可领取时显示红点提示', () => {
+    const publicSource = readFileSync(path.resolve(currentDir, './PublicPage.vue'), 'utf8')
+    expect(publicSource).toContain('hasClaimableTasks')
+    expect(publicSource).toContain('public-nav__task-dot')
+    expect(stateSource).toContain("id: 'tasks'")
+    expect(stateSource).toContain("path: '/profile/tasks'")
+  })
+
+  it('任务页展示任务列表和领取按钮', () => {
     expect(armorySource).toContain('当前任务')
     expect(armorySource).toContain('claimTask')
     expect(armorySource).toContain('task-card')
+    expect(armorySource).toContain("sectionID('tasks')")
   })
 
   it('个人资料态会承接任务列表并提供领取动作', () => {
     expect(stateSource).toContain('const tasks = ref([])')
+    expect(stateSource).toContain('const hasClaimableTasks = computed')
     expect(stateSource).toContain("if ('tasks' in payload)")
     expect(stateSource).toContain("fetch(`/api/tasks/${encodeURIComponent(taskId)}/claim`")
   })

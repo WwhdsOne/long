@@ -10,6 +10,7 @@ const {
   publicPages,
   currentPublicPage,
   navigatePublicPage,
+  hasClaimableTasks,
   syncing,
   syncLabel,
   lastUpdatedAt,
@@ -30,7 +31,7 @@ const {
 registerPublicPageLifecycle()
 
 const loginModalOpen = ref(false)
-const armoryPageIDs = new Set(['resources', 'inventory', 'stats', 'loadout'])
+const armoryPageIDs = new Set(['resources', 'tasks', 'inventory', 'stats', 'loadout'])
 
 function isArmoryPage(pageID) {
   return armoryPageIDs.has(pageID)
@@ -64,7 +65,8 @@ async function handleLoginSubmit() {
         type="button"
         @click="navigatePublicPage(page.id)"
     >
-      {{ page.label }}
+      <span>{{ page.label }}</span>
+      <span v-if="page.id === 'tasks' && hasClaimableTasks" class="public-nav__task-dot" aria-label="有可领取任务"></span>
     </button>
     <button
         class="public-nav__item public-nav__auth"

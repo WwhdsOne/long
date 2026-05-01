@@ -100,6 +100,7 @@ const DAMAGE_VARIANTS = {
 
 const profilePageMap = {
     resources: 'resources',
+    tasks: 'tasks',
     inventory: 'inventory',
     stats: 'stats',
     loadout: 'loadout',
@@ -108,6 +109,7 @@ const profilePageMap = {
 const publicPages = [
     {id: 'battle', label: '战斗', path: '/'},
     {id: 'resources', label: '资源', path: '/profile/resources'},
+    {id: 'tasks', label: '任务', path: '/profile/tasks'},
     {id: 'inventory', label: '背包', path: '/profile/inventory'},
     {id: 'stats', label: '属性', path: '/profile/stats'},
     {id: 'loadout', label: '装备栏', path: '/profile/loadout'},
@@ -132,6 +134,7 @@ const myBossDamageValue = ref(0)
 const bossLeaderboardCountValue = ref(-1)
 const inventory = ref([])
 const tasks = ref([])
+const hasClaimableTasks = computed(() => tasks.value.some((item) => Boolean(item?.canClaim)))
 const loadout = ref(emptyLoadout())
 const combatStats = ref(defaultCombatStats())
 const recentRewards = ref([])
@@ -830,6 +833,9 @@ function resolvePublicPage(pathname) {
     }
     if (pathname.startsWith('/profile/resources')) {
         return 'resources'
+    }
+    if (pathname.startsWith('/profile/tasks')) {
+        return 'tasks'
     }
     if (pathname.startsWith('/profile/inventory')) {
         return 'inventory'
@@ -2555,6 +2561,7 @@ export function usePublicPageState() {
         announcements,
         myBossStats,
         tasks,
+        hasClaimableTasks,
         inventory,
         loadout,
         loadoutSlots,

@@ -23,6 +23,7 @@ describe('PublicPage 三合一边界', () => {
     expect(pageSource).toContain("id: 'battle'")
     expect(pageSource).toContain("id: 'talents'")
     expect(pageSource).toContain("id: 'resources'")
+    expect(pageSource).toContain("id: 'tasks'")
     expect(pageSource).toContain("id: 'inventory'")
     expect(pageSource).toContain("id: 'stats'")
     expect(pageSource).toContain("id: 'loadout'")
