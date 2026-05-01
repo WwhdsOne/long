@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -36,7 +37,6 @@ func TestOpenAIEquipmentDraftGeneratorCallsChatCompletions(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		// 👇 这里我全部改成合法数值了！
 		_, _ = w.Write([]byte(`{
 			"choices": [{
 				"message": {
@@ -60,6 +60,42 @@ func TestOpenAIEquipmentDraftGeneratorCallsChatCompletions(t *testing.T) {
 	}
 	if draft.ItemID != "soft-blade" || draft.Slot != "weapon" || draft.TalentAffinity != "normal" {
 		t.Fatalf("unexpected draft: %+v", draft)
+	}
+}
+
+func TestOpenAIEquipmentDraftGeneratorReturnsRawResponseOnInvalidDraft(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices": [{
+				"message": {
+					"content": "{\"itemId\":\"bad-blade\",\"name\":\"坏刀\",\"slot\":\"weapon\",\"rarity\":\"史诗\",\"description\":\"测试描述\",\"attackPower\":150,\"armorPenPercent\":0.95,\"critDamageMultiplier\":1.0,\"partTypeDamageSoft\":0.2,\"partTypeDamageHeavy\":0.2,\"partTypeDamageWeak\":0.2,\"talentAffinity\":\"normal\"}"
+				}
+			}]
+		}`))
+	}))
+	defer server.Close()
+
+	generator := NewOpenAIEquipmentDraftGenerator(EquipmentDraftGeneratorConfig{
+		APIKey:  "sk-test",
+		BaseURL: server.URL + "/v1",
+		Model:   "gpt-test",
+		Timeout: time.Second,
+	})
+
+	_, err := generator.GenerateEquipmentDraft(context.Background(), "自然语言描述")
+	if err == nil {
+		t.Fatal("expected invalid draft error")
+	}
+	var generateErr *EquipmentDraftGenerateError
+	if !errors.As(err, &generateErr) {
+		t.Fatalf("expected equipment draft generate error, got %T %v", err, err)
+	}
+	if generateErr.RawResponse == "" {
+		t.Fatalf("expected raw response in error, got %+v", generateErr)
+	}
+	if generateErr.Draft.ItemID != "bad-blade" {
+		t.Fatalf("expected partial draft in error, got %+v", generateErr.Draft)
 	}
 }
 

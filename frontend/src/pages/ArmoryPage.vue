@@ -21,11 +21,6 @@ const {
   stones,
   talentPoints,
   isLoggedIn,
-  myClicks,
-  myRank,
-  myBossDamage,
-  normalDamage,
-  criticalDamage,
   equippedItems,
   formatRarityLabel,
   formatNumber,
@@ -52,6 +47,52 @@ const bulkSalvageConfirmData = ref(null)
 const bulkSalvageFeedback = ref('')
 const bulkSalvaging = ref(false)
 const salvageRuleModalOpen = ref(false)
+
+function formatTrimmedNumber(value, digits = 2) {
+  const normalized = Number(value ?? 0)
+  if (!Number.isFinite(normalized)) return '0'
+  return normalized.toFixed(digits).replace(/\.?0+$/, '')
+}
+
+function formatPercentValue(value) {
+  return `${formatTrimmedNumber(value, 2)}%`
+}
+
+function formatRatioPercentValue(value) {
+  return `${formatTrimmedNumber(Number(value ?? 0) * 100, 2)}%`
+}
+
+function formatMultiplierValue(value) {
+  return `x${formatTrimmedNumber(value, 2)}`
+}
+
+function formatCritDamageBonus(value) {
+  return `+${formatTrimmedNumber((Number(value ?? 0) - 1) * 100, 2)}%`
+}
+
+function formatArmorPenPercent(value) {
+  return formatRatioPercentValue(value)
+}
+
+const combatStatSummaryItems = computed(() => [
+  {label: '攻击力', value: formatNumber(combatStats.value?.attackPower ?? 0)},
+  {label: '暴击伤害', value: formatNumber(combatStats.value?.criticalDamage ?? 0)},
+  {label: '暴击率', value: formatPercentValue(combatStats.value?.criticalChancePercent ?? 0)},
+  {label: '护甲穿透', value: formatArmorPenPercent(combatStats.value?.armorPenPercent ?? 0)},
+  {label: '暴击倍率', value: formatCritDamageBonus(combatStats.value?.critDamageMultiplier ?? 0)},
+  {label: '全伤害加成', value: formatRatioPercentValue(combatStats.value?.allDamageAmplify ?? 0)},
+  {label: '软组织增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageSoft ?? 0)},
+  {label: '重甲增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageHeavy ?? 0)},
+  {label: '弱点增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageWeak ?? 0)},
+  {label: '部位增伤', value: formatRatioPercentValue(combatStats.value?.perPartDamagePercent ?? 0)},
+  {label: '低血量增伤倍率', value: formatMultiplierValue(combatStats.value?.lowHpMultiplier ?? 1)},
+  {label: '低血量阈值', value: formatRatioPercentValue(combatStats.value?.lowHpThreshold ?? 0)},
+])
+
+const loadoutColumns = computed(() => [
+  loadoutSlots.slice(0, 3),
+  loadoutSlots.slice(3, 6),
+])
 
 function sectionID(section) {
   return `armory-${section}`
@@ -280,10 +321,10 @@ onMounted(() => {
 })
 
 watch(
-  () => props.focusSection,
-  (nextSection) => {
-    nextTick(() => scrollToSection(nextSection))
-  },
+    () => props.focusSection,
+    (nextSection) => {
+      nextTick(() => scrollToSection(nextSection))
+    },
 )
 
 onBeforeUnmount(() => {
@@ -293,7 +334,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <section class="stage-layout stage-layout--single">
+  <section class="stage-layout stage-layout--single">
     <section class="armory-layout">
       <aside class="armory-layout__left">
         <section :id="sectionID('stats')" class="armory-block">
@@ -301,30 +342,14 @@ onBeforeUnmount(() => {
             <p class="vote-stage__eyebrow">战斗属性</p>
             <strong>{{ isLoggedIn ? nickname : '未登录' }}</strong>
           </div>
-          <div class="me-card__stats">
-            <article>
-              <span>普通伤害</span>
-              <strong>{{ normalDamage }}</strong>
-            </article>
-            <article>
-              <span>暴击伤害</span>
-              <strong>{{ criticalDamage }}</strong>
-            </article>
-            <article>
-              <span>暴击率</span>
-              <strong>{{ formatNumber(combatStats.criticalChancePercent, 2) }}%</strong>
-            </article>
-            <article>
-              <span>我的 Boss 伤害</span>
-              <strong>{{ myBossDamage }}</strong>
-            </article>
-            <article>
-              <span>我的点击</span>
-              <strong>{{ isLoggedIn ? myClicks : '--' }}</strong>
-            </article>
-            <article>
-              <span>我的排名</span>
-              <strong>{{ isLoggedIn ? `#${myRank ?? '--'}` : '--' }}</strong>
+          <div class="armory-combat-summary">
+            <article
+                v-for="item in combatStatSummaryItems"
+                :key="item.label"
+                class="armory-combat-summary__item"
+            >
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
             </article>
           </div>
         </section>
@@ -334,24 +359,45 @@ onBeforeUnmount(() => {
             <p class="vote-stage__eyebrow">装备栏</p>
             <strong>{{ equippedItems.length }} / {{ loadoutSlots.length }}</strong>
           </div>
-          <div class="loadout-grid">
-            <article v-for="slot in loadoutSlots" :key="slot.value" class="loadout-slot">
-              <div class="loadout-slot__main">
-                <span>{{ slot.label }}</span>
-                <strong v-if="loadout[slot.value]">
-                  <span v-if="equipmentNameParts(loadout[slot.value]).prefix">{{ equipmentNameParts(loadout[slot.value]).prefix }}</span>
-                  <span :class="equipmentNameClass(loadout[slot.value])">{{ equipmentNameParts(loadout[slot.value]).text }}</span>
-                </strong>
-                <strong v-else>未穿戴</strong>
-              </div>
-              <ul v-if="loadout[slot.value]" class="loadout-slot__attrs">
-                <li>{{ formatRarityLabel(loadout[slot.value].rarity) }}</li>
-                <li v-for="line in formatItemStatLines(loadout[slot.value])" :key="line">
-                  {{ line }}
-                </li>
-              </ul>
-              <p v-else class="loadout-slot__empty">暂无属性</p>
-            </article>
+          <div class="loadout-grid loadout-grid--paired">
+            <div v-for="(column, columnIndex) in loadoutColumns" :key="columnIndex" class="loadout-column">
+              <article
+                  v-for="slot in column"
+                  :key="slot.value"
+                  class="loadout-slot"
+                  :class="{ 'loadout-slot--equipped': Boolean(loadout[slot.value]) }"
+              >
+                <div class="loadout-slot__visual">
+                  <img
+                      v-if="loadout[slot.value]?.imagePath"
+                      class="loadout-slot__icon"
+                      :src="loadout[slot.value].imagePath"
+                      :alt="loadout[slot.value].imageAlt || loadout[slot.value].name || loadout[slot.value].itemId"
+                  />
+                  <span v-else-if="loadout[slot.value]" class="loadout-slot__fallback">
+                    {{ equipmentNameParts(loadout[slot.value]).text.slice(0, 1) || '?' }}
+                  </span>
+                  <span v-else class="loadout-slot__placeholder">{{ slot.label }}</span>
+                </div>
+                <div class="loadout-slot__main">
+                  <strong v-if="loadout[slot.value]" class="loadout-slot__name">
+                    <span :class="equipmentNameClass(loadout[slot.value])">{{ formatRarityLabel(loadout[slot.value].rarity) }} · {{ equipmentNameParts(loadout[slot.value]).prefix }}{{ equipmentNameParts(loadout[slot.value]).text }}</span>
+                    <span class="loadout-slot__meta"> 强化 +{{ loadout[slot.value].enhanceLevel || 0 }}</span>
+                  </strong>
+                  <strong v-else class="loadout-slot__empty">未穿戴</strong>
+                </div>
+                <article v-if="loadout[slot.value]" class="armory-item-tooltip" aria-label="装备属性">
+                  <p class="vote-stage__eyebrow">装备属性</p>
+                  <strong>{{ loadout[slot.value].name || loadout[slot.value].itemId }}</strong>
+                  <p>{{ formatRarityLabel(loadout[slot.value].rarity) }} · 强化
+                    +{{ loadout[slot.value].enhanceLevel || 0 }}</p>
+                  <ul v-if="formatItemStatLines(loadout[slot.value]).length > 0" class="armory-item-tooltip__stats">
+                    <li v-for="line in formatItemStatLines(loadout[slot.value])" :key="line">{{ line }}</li>
+                  </ul>
+                  <p v-else>暂无词条</p>
+                </article>
+              </article>
+            </div>
           </div>
         </section>
       </aside>
@@ -362,17 +408,17 @@ onBeforeUnmount(() => {
           <div class="armory-inventory-head__actions">
             <strong>{{ inventory.length }} 件</strong>
             <button
-              class="nickname-form__ghost armory-inventory-head__bulk-button"
-              type="button"
-              @click="openSalvageRuleModal"
+                class="nickname-form__ghost armory-inventory-head__bulk-button"
+                type="button"
+                @click="openSalvageRuleModal"
             >
               分解规则
             </button>
             <button
-              class="nickname-form__ghost armory-inventory-head__bulk-button"
-              type="button"
-              :disabled="!isLoggedIn || !canBulkSalvage || bulkSalvaging"
-              @click="openBulkSalvageConfirm"
+                class="nickname-form__ghost armory-inventory-head__bulk-button"
+                type="button"
+                :disabled="!isLoggedIn || !canBulkSalvage || bulkSalvaging"
+                @click="openBulkSalvageConfirm"
             >
               一键分解未穿戴
             </button>
@@ -392,24 +438,26 @@ onBeforeUnmount(() => {
         </div>
         <div v-else class="armory-backpack-grid">
           <article
-            v-for="item in inventory"
-            :key="item.instanceId || `${item.itemId}-${item.name}`"
-            class="armory-backpack-cell"
+              v-for="item in inventory"
+              :key="item.instanceId || `${item.itemId}-${item.name}`"
+              class="armory-backpack-cell"
           >
             <button
-              class="armory-backpack-cell__button"
-              type="button"
-              :disabled="!isLoggedIn || actioningItemId === (item.instanceId || item.itemId)"
-              @click="toggleItemEquip(item.instanceId || item.itemId, item.equipped)"
-              @contextmenu="openItemContextMenu($event, item)"
+                class="armory-backpack-cell__button"
+                type="button"
+                :disabled="!isLoggedIn || actioningItemId === (item.instanceId || item.itemId)"
+                @click="toggleItemEquip(item.instanceId || item.itemId, item.equipped)"
+                @contextmenu="openItemContextMenu($event, item)"
             >
               <img
-                v-if="item.imagePath"
-                class="armory-backpack-cell__icon"
-                :src="item.imagePath"
-                :alt="item.imageAlt || item.name || item.itemId"
+                  v-if="item.imagePath"
+                  class="armory-backpack-cell__icon"
+                  :src="item.imagePath"
+                  :alt="item.imageAlt || item.name || item.itemId"
               />
-              <span v-else class="armory-backpack-cell__fallback">{{ equipmentNameParts(item).text.slice(0, 1) || '?' }}</span>
+              <span v-else class="armory-backpack-cell__fallback">{{
+                  equipmentNameParts(item).text.slice(0, 1) || '?'
+                }}</span>
             </button>
             <article class="armory-item-tooltip" aria-label="装备属性">
               <p class="vote-stage__eyebrow">装备属性</p>
@@ -436,10 +484,10 @@ onBeforeUnmount(() => {
     </section>
 
     <section
-      v-if="contextMenu.open && contextMenu.item"
-      class="inventory-context-menu"
-      :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
-      @click.stop
+        v-if="contextMenu.open && contextMenu.item"
+        class="inventory-context-menu"
+        :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+        @click.stop
     >
       <button class="inventory-context-menu__item" type="button" @click="handleContextToggleEquip">
         {{ contextMenu.item.equipped ? '卸下' : '穿戴' }}
@@ -496,7 +544,8 @@ onBeforeUnmount(() => {
           <p>预计金币：{{ bulkSalvageConfirmData.gold }}</p>
           <p>预计强化石：{{ bulkSalvageConfirmData.stones }}</p>
           <p v-if="bulkSalvageConfirmData.hasEnhanced">已强化装备会额外返还 60% 已消耗强化石（向下取整）。</p>
-          <p>自动排除：穿戴中 {{ bulkSalvageConfirmData.excludedEquipped }} 件、已锁定 {{ bulkSalvageConfirmData.excludedLocked }} 件、至臻 {{ bulkSalvageConfirmData.excludedTopRarity }} 件。</p>
+          <p>自动排除：穿戴中 {{ bulkSalvageConfirmData.excludedEquipped }} 件、已锁定
+            {{ bulkSalvageConfirmData.excludedLocked }} 件、至臻 {{ bulkSalvageConfirmData.excludedTopRarity }} 件。</p>
           <p v-if="Object.keys(bulkSalvageConfirmData.byRarity).length > 0">
             分解明细：
             <span v-for="(count, rarity) in bulkSalvageConfirmData.byRarity" :key="rarity">
@@ -532,14 +581,14 @@ onBeforeUnmount(() => {
 
           <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>
-              <tr>
-                <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">装备品质</th>
-                <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">金币</th>
-                <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">强化石</th>
-              </tr>
+            <tr>
+              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">装备品质</th>
+              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">金币</th>
+              <th style="border:1px solid #ccc; padding:6px; background:#f5f5f5;">强化石</th>
+            </tr>
             </thead>
             <tbody>
-              <tr>
+            <tr>
               <td style="border:1px solid #ccc; padding:6px;">普通</td>
               <td style="border:1px solid #ccc; padding:6px;">200</td>
               <td style="border:1px solid #ccc; padding:6px;">0</td>
@@ -568,7 +617,7 @@ onBeforeUnmount(() => {
               <td style="border:1px solid #ccc; padding:6px;">至臻</td>
               <td style="border:1px solid #ccc; padding:6px;">10000</td>
               <td style="border:1px solid #ccc; padding:6px;">50</td>
-              </tr>
+            </tr>
             </tbody>
           </table>
         </div>
@@ -594,7 +643,7 @@ onBeforeUnmount(() => {
           </p>
           <p>基础金币：{{ salvagePreview(salvageConfirmItem).gold }}</p>
           <p>基础强化石：{{ salvagePreview(salvageConfirmItem).stones }}</p>
-          <p>若已强化，将额外返还 60% 已消耗强化石（向下取整）。</p>
+          <p>若已强化，将额外返还 60% 已消耗强化石。</p>
         </div>
         <div class="announcement-modal__actions">
           <button class="nickname-form__ghost" type="button" @click="cancelSalvage">取消</button>

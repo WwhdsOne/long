@@ -19,6 +19,34 @@ import (
 
 var ErrInvalidEquipmentDraft = errors.New("invalid equipment draft")
 
+type EquipmentDraftGenerateError struct {
+	Message     string
+	Prompt      string
+	Draft       vote.EquipmentDefinition
+	RawResponse string
+	Cause       error
+}
+
+func (e *EquipmentDraftGenerateError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if strings.TrimSpace(e.Message) != "" {
+		return e.Message
+	}
+	if e.Cause != nil {
+		return e.Cause.Error()
+	}
+	return "equipment draft generate failed"
+}
+
+func (e *EquipmentDraftGenerateError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
 // ============================================================================
 // 配置与生成器
 // ============================================================================
@@ -56,13 +84,17 @@ func NewOpenAIEquipmentDraftGenerator(config EquipmentDraftGeneratorConfig) *Ope
 
 func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Context, prompt string) (vote.EquipmentDefinition, error) {
 	if strings.TrimSpace(prompt) == "" {
-		return vote.EquipmentDefinition{}, fmt.Errorf("%w: prompt is required", ErrInvalidEquipmentDraft)
+		return vote.EquipmentDefinition{}, &EquipmentDraftGenerateError{
+			Prompt:  prompt,
+			Message: fmt.Sprintf("%v: prompt is required", ErrInvalidEquipmentDraft),
+			Cause:   fmt.Errorf("%w: prompt is required", ErrInvalidEquipmentDraft),
+		}
 	}
 
 	// 第一步：由 AI 决定稀有度
 	rarity, err := g.determineRarity(ctx, prompt)
 	if err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("determine rarity: %w", err)
+		return vote.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(prompt, vote.EquipmentDefinition{}, "", fmt.Errorf("determine rarity: %w", err))
 	}
 
 	// 第二步：根据稀有度拼接详细规则，生成装备草稿
@@ -85,11 +117,20 @@ func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Conte
 		return vote.EquipmentDefinition{}, fmt.Errorf("encode llm request: %w", err)
 	}
 
-	content, err := g.chatOnce(ctx, body)
+	result, err := g.chatOnce(ctx, body)
 	if err != nil {
-		return vote.EquipmentDefinition{}, err
+		return vote.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(prompt, vote.EquipmentDefinition{}, "", err)
 	}
-	return parseEquipmentDraftJSON([]byte(content))
+	draft, parseErr := parseEquipmentDraftJSON([]byte(result.Content))
+	if parseErr != nil {
+		return vote.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(
+			prompt,
+			bestEffortDecodeEquipmentDraft([]byte(result.Content)),
+			result.RawResponse,
+			parseErr,
+		)
+	}
+	return draft, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -126,13 +167,13 @@ func (g *OpenAIEquipmentDraftGenerator) determineRarity(ctx context.Context, use
 		return "", err
 	}
 
-	content, err := g.chatOnce(ctx, body)
+	result, err := g.chatOnce(ctx, body)
 	if err != nil {
 		return "", err
 	}
 
 	var rr rarityResponse
-	if err := sonic.Unmarshal([]byte(content), &rr); err != nil {
+	if err := sonic.Unmarshal([]byte(result.Content), &rr); err != nil {
 		return "", fmt.Errorf("%w: decode rarity response", ErrInvalidEquipmentDraft)
 	}
 	rr.Rarity = strings.TrimSpace(rr.Rarity)
@@ -146,36 +187,59 @@ func (g *OpenAIEquipmentDraftGenerator) determineRarity(ctx context.Context, use
 // 通用 HTTP 调用封装
 // ---------------------------------------------------------------------------
 
-func (g *OpenAIEquipmentDraftGenerator) chatOnce(ctx context.Context, body []byte) (string, error) {
+type chatCompletionResult struct {
+	Content     string
+	RawResponse string
+}
+
+func (g *OpenAIEquipmentDraftGenerator) chatOnce(ctx context.Context, body []byte) (chatCompletionResult, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, g.baseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return "", fmt.Errorf("build llm request: %w", err)
+		return chatCompletionResult{}, fmt.Errorf("build llm request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+g.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := g.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("call llm provider: %w", err)
+		return chatCompletionResult{}, &EquipmentDraftGenerateError{
+			Message: "call llm provider: " + err.Error(),
+			Cause:   fmt.Errorf("call llm provider: %w", err),
+		}
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("read llm response: %w", err)
+		return chatCompletionResult{}, fmt.Errorf("read llm response: %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("llm provider returned status %d: %s", resp.StatusCode, string(respBody))
+		return chatCompletionResult{}, &EquipmentDraftGenerateError{
+			Message:     fmt.Sprintf("llm provider returned status %d", resp.StatusCode),
+			RawResponse: string(respBody),
+			Cause:       fmt.Errorf("llm provider returned status %d: %s", resp.StatusCode, string(respBody)),
+		}
 	}
 
 	var payload chatCompletionResponse
 	if err := sonic.Unmarshal(respBody, &payload); err != nil {
-		return "", fmt.Errorf("%w: decode llm response", ErrInvalidEquipmentDraft)
+		return chatCompletionResult{}, &EquipmentDraftGenerateError{
+			Message:     fmt.Sprintf("%v: decode llm response", ErrInvalidEquipmentDraft),
+			RawResponse: string(respBody),
+			Cause:       fmt.Errorf("%w: decode llm response", ErrInvalidEquipmentDraft),
+		}
 	}
 	if len(payload.Choices) == 0 {
-		return "", fmt.Errorf("%w: empty llm choices", ErrInvalidEquipmentDraft)
+		return chatCompletionResult{}, &EquipmentDraftGenerateError{
+			Message:     fmt.Sprintf("%v: empty llm choices", ErrInvalidEquipmentDraft),
+			RawResponse: string(respBody),
+			Cause:       fmt.Errorf("%w: empty llm choices", ErrInvalidEquipmentDraft),
+		}
 	}
-	return payload.Choices[0].Message.Content, nil
+	return chatCompletionResult{
+		Content:     payload.Choices[0].Message.Content,
+		RawResponse: string(respBody),
+	}, nil
 }
 
 // ============================================================================
@@ -279,6 +343,37 @@ func parseEquipmentDraftJSON(raw []byte) (vote.EquipmentDefinition, error) {
 		return vote.EquipmentDefinition{}, err
 	}
 	return draft, nil
+}
+
+func bestEffortDecodeEquipmentDraft(raw []byte) vote.EquipmentDefinition {
+	var draft vote.EquipmentDefinition
+	_ = sonic.Unmarshal(raw, &draft)
+	return draft
+}
+
+func wrapEquipmentDraftGenerateError(prompt string, draft vote.EquipmentDefinition, rawResponse string, err error) error {
+	if err == nil {
+		return nil
+	}
+	var generateErr *EquipmentDraftGenerateError
+	if errors.As(err, &generateErr) {
+		if strings.TrimSpace(generateErr.Prompt) == "" {
+			generateErr.Prompt = prompt
+		}
+		if generateErr.Draft.ItemID == "" && draft.ItemID != "" {
+			generateErr.Draft = draft
+		}
+		if strings.TrimSpace(generateErr.RawResponse) == "" {
+			generateErr.RawResponse = rawResponse
+		}
+		return generateErr
+	}
+	return &EquipmentDraftGenerateError{
+		Prompt:      prompt,
+		Draft:       draft,
+		RawResponse: rawResponse,
+		Cause:       err,
+	}
 }
 
 // ============================================================================

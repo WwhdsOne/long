@@ -776,7 +776,6 @@ function defaultCombatStats() {
         normalDamage: 1,
         criticalDamage: 1,
         criticalChancePercent: 0,
-        criticalCount: 1,
         attackPower: 0,
         armorPenPercent: 0,
         critDamageMultiplier: 0,

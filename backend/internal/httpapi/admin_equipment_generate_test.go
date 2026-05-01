@@ -13,17 +13,38 @@ import (
 )
 
 type fakeEquipmentDraftGenerator struct {
-	draft      vote.EquipmentDefinition
-	err        error
-	lastPrompt string
+	draft        vote.EquipmentDefinition
+	err          error
+	lastPrompt   string
+	rawResponse  string
+	returnDetail bool
 }
 
 func (f *fakeEquipmentDraftGenerator) GenerateEquipmentDraft(_ context.Context, prompt string) (vote.EquipmentDefinition, error) {
 	f.lastPrompt = prompt
 	if f.err != nil {
+		if f.returnDetail {
+			return vote.EquipmentDefinition{}, &EquipmentDraftGenerateError{
+				Message:     f.err.Error(),
+				Prompt:      prompt,
+				Draft:       f.draft,
+				RawResponse: f.rawResponse,
+				Cause:       f.err,
+			}
+		}
 		return vote.EquipmentDefinition{}, f.err
 	}
 	return f.draft, nil
+}
+
+type fakeEquipmentDraftFailureWriter struct {
+	items []vote.EquipmentDraftFailureLog
+	err   error
+}
+
+func (f *fakeEquipmentDraftFailureWriter) WriteEquipmentDraftFailure(ctx context.Context, item vote.EquipmentDraftFailureLog) error {
+	f.items = append(f.items, item)
+	return f.err
 }
 
 func TestAdminEquipmentGenerateRequiresLogin(t *testing.T) {
@@ -98,8 +119,17 @@ func TestAdminEquipmentGenerateReturnsDraftWithoutSaving(t *testing.T) {
 }
 
 func TestAdminEquipmentGenerateRejectsInvalidDraft(t *testing.T) {
+	writer := &fakeEquipmentDraftFailureWriter{}
 	generator := &fakeEquipmentDraftGenerator{
-		err: ErrInvalidEquipmentDraft,
+		draft: vote.EquipmentDefinition{
+			ItemID: "bad-weapon",
+			Name:   "坏掉的草稿",
+			Slot:   "weapon",
+			Rarity: "史诗",
+		},
+		err:          ErrInvalidEquipmentDraft,
+		rawResponse:  `{"itemId":"bad-weapon"}`,
+		returnDetail: true,
 	}
 	handler := newNativeTestHandler(Options{
 		Store: &mockStore{},
@@ -108,7 +138,8 @@ func TestAdminEquipmentGenerateRejectsInvalidDraft(t *testing.T) {
 			Password:      "secret",
 			SessionSecret: "session-secret",
 		}),
-		EquipmentDraftGenerator: generator,
+		EquipmentDraftGenerator:     generator,
+		EquipmentDraftFailureWriter: writer,
 	})
 	sessionCookie := loginAdminForEquipmentGenerate(t, handler)
 
@@ -123,11 +154,26 @@ func TestAdminEquipmentGenerateRejectsInvalidDraft(t *testing.T) {
 	if response.StatusCode() != consts.StatusUnprocessableEntity {
 		t.Fatalf("expected generate 422, got %d body=%s", response.StatusCode(), response.Body())
 	}
+	if len(writer.items) != 1 {
+		t.Fatalf("expected one failure log, got %d", len(writer.items))
+	}
+	if writer.items[0].Prompt != "给我攻速很快的武器" {
+		t.Fatalf("expected prompt to be logged, got %+v", writer.items[0])
+	}
+	if writer.items[0].Draft.ItemID != "bad-weapon" {
+		t.Fatalf("expected draft to be logged, got %+v", writer.items[0].Draft)
+	}
+	if writer.items[0].RawResponse != `{"itemId":"bad-weapon"}` {
+		t.Fatalf("expected raw response logged, got %+v", writer.items[0])
+	}
 }
 
 func TestAdminEquipmentGenerateHandlesProviderFailure(t *testing.T) {
+	writer := &fakeEquipmentDraftFailureWriter{}
 	generator := &fakeEquipmentDraftGenerator{
-		err: errors.New("provider failed"),
+		err:          errors.New("provider failed"),
+		rawResponse:  `provider timeout`,
+		returnDetail: true,
 	}
 	handler := newNativeTestHandler(Options{
 		Store: &mockStore{},
@@ -136,7 +182,8 @@ func TestAdminEquipmentGenerateHandlesProviderFailure(t *testing.T) {
 			Password:      "secret",
 			SessionSecret: "session-secret",
 		}),
-		EquipmentDraftGenerator: generator,
+		EquipmentDraftGenerator:     generator,
+		EquipmentDraftFailureWriter: writer,
 	})
 	sessionCookie := loginAdminForEquipmentGenerate(t, handler)
 
@@ -150,6 +197,15 @@ func TestAdminEquipmentGenerateHandlesProviderFailure(t *testing.T) {
 	)
 	if response.StatusCode() != consts.StatusBadGateway {
 		t.Fatalf("expected generate 502, got %d body=%s", response.StatusCode(), response.Body())
+	}
+	if len(writer.items) != 1 {
+		t.Fatalf("expected one failure log, got %d", len(writer.items))
+	}
+	if writer.items[0].ErrorMessage != "provider failed" {
+		t.Fatalf("expected provider error logged, got %+v", writer.items[0])
+	}
+	if writer.items[0].RawResponse != "provider timeout" {
+		t.Fatalf("expected provider raw response logged, got %+v", writer.items[0])
 	}
 }
 

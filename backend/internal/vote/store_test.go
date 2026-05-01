@@ -27,7 +27,6 @@ func newTestStore(t *testing.T) (*Store, func()) {
 
 	return NewStore(client, "vote:", StoreOptions{
 			CriticalChancePercent: 5,
-			CriticalCount:         5,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
 			_ = client.Close()
 			server.Close()
@@ -1831,7 +1830,6 @@ func TestEquipmentCritRateContributesToCriticalChance(t *testing.T) {
 	defer cleanup()
 
 	store.critical.CriticalChancePercent = 0
-	store.critical.CriticalCount = 5
 	store.roll = func(limit int) int {
 		return 0
 	}
@@ -1886,7 +1884,6 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 	stats := CombatStats{
 		AttackPower:           100,
 		CriticalChancePercent: 0,
-		CriticalCount:         5,
 		CritDamageMultiplier:  2.0,
 	}
 
@@ -1899,6 +1896,19 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 	}
 }
 
+func TestCalcBossPartDamageDoesNotUseLegacyCriticalCountFloor(t *testing.T) {
+	stats := CombatStats{
+		AttackPower:           100,
+		CriticalChancePercent: 0,
+		CritDamageMultiplier:  1.0,
+	}
+
+	result := CalcBossPartDamage(stats, PartTypeSoft, 0, 1, 100, 100)
+	if result.CriticalDamage != 100 {
+		t.Fatalf("expected critical damage 100 without legacy count floor, got %+v", result)
+	}
+}
+
 func TestCritFinalCutTriggersAtOmenCap(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -1906,7 +1916,6 @@ func TestCritFinalCutTriggersAtOmenCap(t *testing.T) {
 	currentTime := time.Unix(1_700_400_000, 0)
 	store.now = func() time.Time { return currentTime }
 	store.critical.CriticalChancePercent = 100
-	store.critical.CriticalCount = 5
 	store.roll = func(limit int) int { return 0 }
 
 	ctx := context.Background()
@@ -1968,7 +1977,6 @@ func TestCritFinalCutDoesNotTriggerBelowOmenCap(t *testing.T) {
 	currentTime := time.Unix(1_700_410_000, 0)
 	store.now = func() time.Time { return currentTime }
 	store.critical.CriticalChancePercent = 100
-	store.critical.CriticalCount = 5
 	store.roll = func(limit int) int { return 0 }
 
 	ctx := context.Background()
@@ -2027,7 +2035,6 @@ func TestCritBleedSettlesOverDurationAndExpires(t *testing.T) {
 	currentTime := time.Unix(1_700_420_000, 0)
 	store.now = func() time.Time { return currentTime }
 	store.critical.CriticalChancePercent = 100
-	store.critical.CriticalCount = 30
 	store.roll = func(limit int) int { return 0 }
 
 	ctx := context.Background()
@@ -2078,7 +2085,6 @@ func TestCritBleedSettlesOverDurationAndExpires(t *testing.T) {
 	}
 
 	store.critical.CriticalChancePercent = 0
-	store.critical.CriticalCount = 0
 	store.roll = func(limit int) int { return maxInt(0, limit-1) }
 	store.invalidateCombatStatsCache(nickname)
 
@@ -2121,7 +2127,6 @@ func TestProcessTalentBleedTicksSettlesEveryTwoHundredMs(t *testing.T) {
 	currentTime := time.Unix(1_700_430_000, 0)
 	store.now = func() time.Time { return currentTime }
 	store.critical.CriticalChancePercent = 100
-	store.critical.CriticalCount = 30
 	store.roll = func(limit int) int { return 0 }
 
 	ctx := context.Background()

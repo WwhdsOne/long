@@ -70,7 +70,6 @@ func run() error {
 
 	redisStore := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
 		CriticalChancePercent: 5,
-		CriticalCount:         0,
 	}, nickname.NewSensitiveLexiconValidator())
 
 	command := strings.ToLower(strings.TrimSpace(os.Args[1]))

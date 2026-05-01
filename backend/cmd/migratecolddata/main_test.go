@@ -28,7 +28,6 @@ func TestCollectCleanupKeys包含历史Boss残留键且不误删当前Boss(t *te
 
 	store := vote.NewStore(client, "vote:", vote.StoreOptions{
 		CriticalChancePercent: 5,
-		CriticalCount:         0,
 	}, nickname.NewSensitiveLexiconValidator())
 
 	ctx := context.Background()
