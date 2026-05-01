@@ -7,8 +7,6 @@ const (
 	maxAdminPageSize     = 100
 )
 
-
-
 type AdminEquipmentPage struct {
 	Items      []EquipmentDefinition `json:"items"`
 	Page       int64                 `json:"page"`
@@ -24,8 +22,6 @@ type AdminBossHistoryPage struct {
 	Total      int64              `json:"total"`
 	TotalPages int64              `json:"totalPages"`
 }
-
-
 
 func (s *Store) ListAdminEquipmentPage(ctx context.Context, page int64, pageSize int64) (AdminEquipmentPage, error) {
 	items, err := s.ListEquipmentDefinitions(ctx)
@@ -44,6 +40,10 @@ func (s *Store) ListAdminEquipmentPage(ctx context.Context, page int64, pageSize
 }
 
 func (s *Store) ListAdminBossHistoryPage(ctx context.Context, page int64, pageSize int64) (AdminBossHistoryPage, error) {
+	if s.bossHistoryStore != nil {
+		return s.bossHistoryStore.ListAdminBossHistoryPage(ctx, page, pageSize)
+	}
+
 	items, err := s.ListBossHistory(ctx)
 	if err != nil {
 		return AdminBossHistoryPage{}, err

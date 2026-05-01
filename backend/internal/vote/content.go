@@ -123,6 +123,22 @@ func (s *Store) CreateMessage(ctx context.Context, nickname string, content stri
 		return nil, err
 	}
 
+	if s.messageStore != nil {
+		item, err := s.messageStore.CreateMessage(ctx, normalizedNickname, normalizedContent)
+		if err != nil {
+			return nil, err
+		}
+		now := item.CreatedAt
+		if now == 0 {
+			now = time.Now().Unix()
+		}
+		_ = s.client.ZAdd(ctx, s.playerIndexKey, redis.Z{
+			Score:  float64(now),
+			Member: item.Nickname,
+		}).Err()
+		return item, nil
+	}
+
 	id, err := s.client.Incr(ctx, s.messageSeqKey).Result()
 	if err != nil {
 		return nil, err
@@ -160,6 +176,10 @@ func (s *Store) CreateMessage(ctx context.Context, nickname string, content stri
 
 // ListMessages 返回公共留言分页。
 func (s *Store) ListMessages(ctx context.Context, cursor string, limit int64) (MessagePage, error) {
+	if s.messageStore != nil {
+		return s.messageStore.ListMessages(ctx, cursor, limit)
+	}
+
 	if limit <= 0 {
 		limit = 50
 	}
@@ -209,6 +229,9 @@ func (s *Store) DeleteMessage(ctx context.Context, id string) error {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil
+	}
+	if s.messageStore != nil {
+		return s.messageStore.DeleteMessage(ctx, id)
 	}
 	pipe := s.client.TxPipeline()
 	pipe.ZRem(ctx, s.messageKey, id)

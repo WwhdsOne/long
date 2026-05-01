@@ -1,6 +1,7 @@
 package xlog
 
 import (
+	"context"
 	"strings"
 
 	"go.uber.org/zap"
@@ -14,7 +15,17 @@ type Config struct {
 	IncludeCaller bool
 }
 
+// SystemLogEntry 表示一条系统日志记录。
+type SystemLogEntry struct {
+	Level     string
+	Module    string
+	Message   string
+	RequestID string
+	CreatedAt int64
+}
+
 var globalLogger = zap.NewNop()
+var systemLogHook func(zapcore.Entry) error
 
 // Init 初始化并替换全局日志器。
 func Init(cfg Config) (*zap.Logger, error) {
@@ -33,6 +44,9 @@ func Init(cfg Config) (*zap.Logger, error) {
 	logger, err := loggerConfig.Build()
 	if err != nil {
 		return nil, err
+	}
+	if systemLogHook != nil {
+		logger = logger.WithOptions(zap.Hooks(systemLogHook))
 	}
 
 	globalLogger = logger
@@ -53,6 +67,31 @@ func Sync() error {
 // Err 是错误字段快捷方法。
 func Err(err error) zap.Field {
 	return zap.Error(err)
+}
+
+// SetSystemLogHook 设置 warn/error 级别日志的附加落库钩子。
+func SetSystemLogHook(hook func(zapcore.Entry) error) {
+	systemLogHook = hook
+}
+
+// HookFromWriter 将系统日志写入器包装为 zap hook。
+func HookFromWriter(writer interface {
+	WriteSystemLog(context.Context, SystemLogEntry) error
+}) func(zapcore.Entry) error {
+	return func(entry zapcore.Entry) error {
+		if writer == nil {
+			return nil
+		}
+		if entry.Level < zapcore.WarnLevel {
+			return nil
+		}
+		return writer.WriteSystemLog(context.Background(), SystemLogEntry{
+			Level:     entry.Level.String(),
+			Module:    entry.LoggerName,
+			Message:   entry.Message,
+			CreatedAt: entry.Time.Unix(),
+		})
+	}
 }
 
 func parseLevel(level string) zapcore.Level {

@@ -94,6 +94,23 @@ type AdminBossHistoryReader interface {
 	ListAdminBossHistoryPage(context.Context, int64, int64) (vote.AdminBossHistoryPage, error)
 }
 
+// MessageStore 负责留言墙读写，可选替换 Redis 默认实现。
+type MessageStore interface {
+	CreateMessage(context.Context, string, string) (*vote.Message, error)
+	ListMessages(context.Context, string, int64) (vote.MessagePage, error)
+	DeleteMessage(context.Context, string) error
+}
+
+// AdminAuditWriter 负责后台审计日志写入。
+type AdminAuditWriter interface {
+	WriteAdminAuditLog(context.Context, vote.AdminAuditLog) error
+}
+
+// DomainEventWriter 负责业务事件写入。
+type DomainEventWriter interface {
+	WriteDomainEvent(context.Context, vote.DomainEvent) error
+}
+
 // ClickGuard 点击频率限制接口。
 type ClickGuard interface {
 	Allow(string) (time.Duration, error)
@@ -153,6 +170,9 @@ type Options struct {
 	OSSSigner               OSSSigner
 	EquipmentDraftGenerator EquipmentDraftGenerator
 	AdminBossHistoryReader  AdminBossHistoryReader
+	MessageStore            MessageStore
+	AdminAuditWriter        AdminAuditWriter
+	DomainEventWriter       DomainEventWriter
 }
 
 const adminSessionCookieName = "long_admin_session"

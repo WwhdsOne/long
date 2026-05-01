@@ -60,6 +60,11 @@ func (a *Authenticator) Verify(token string) bool {
 	return hmac.Equal([]byte(parts[1]), []byte(expected))
 }
 
+// Username 返回当前固定管理员账号名。
+func (a *Authenticator) Username() string {
+	return a.username
+}
+
 func (a *Authenticator) sign(payload string) string {
 	mac := hmac.New(sha256.New, a.secret)
 	_, _ = mac.Write([]byte(payload))

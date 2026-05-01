@@ -6,6 +6,28 @@ import (
 	"testing"
 )
 
+type recordingMessageStore struct {
+	created *Message
+	page    MessagePage
+	deleted string
+}
+
+func (m *recordingMessageStore) CreateMessage(_ context.Context, nickname string, content string) (*Message, error) {
+	if m.created != nil {
+		return m.created, nil
+	}
+	return &Message{ID: "101", Nickname: nickname, Content: content, CreatedAt: 123}, nil
+}
+
+func (m *recordingMessageStore) ListMessages(_ context.Context, _ string, _ int64) (MessagePage, error) {
+	return m.page, nil
+}
+
+func (m *recordingMessageStore) DeleteMessage(_ context.Context, id string) error {
+	m.deleted = id
+	return nil
+}
+
 func TestGetSnapshotIncludesAnnouncementVersion(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -67,6 +89,25 @@ func TestCreateMessageAndListMessages(t *testing.T) {
 	}
 	if page.Items[1].ID != first.ID || page.Items[1].Nickname != "阿明" {
 		t.Fatalf("expected first message second, got %+v", page.Items[1])
+	}
+}
+
+func TestCreateMessageDelegatesToExternalStoreAfterValidation(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+	store.messageStore = &recordingMessageStore{}
+
+	ctx := context.Background()
+	message, err := store.CreateMessage(ctx, "阿明", "你好呀")
+	if err != nil {
+		t.Fatalf("create message with external store: %v", err)
+	}
+	if message.ID != "101" || message.Nickname != "阿明" {
+		t.Fatalf("unexpected delegated message: %+v", message)
+	}
+
+	if _, err := store.CreateMessage(ctx, "阿明", "我是XJP后援会"); !errors.Is(err, ErrSensitiveContent) {
+		t.Fatalf("expected sensitive content validation before delegation, got %v", err)
 	}
 }
 

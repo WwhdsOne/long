@@ -179,6 +179,15 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 	}, nil
 }
 
+// ListBossHistory 返回全部 Boss 历史倒序列表。
+func (s *BossHistoryStore) ListBossHistory(ctx context.Context) ([]vote.BossHistoryEntry, error) {
+	page, err := s.ListAdminBossHistoryPage(ctx, 1, 1000000)
+	if err != nil {
+		return nil, err
+	}
+	return page.Items, nil
+}
+
 func normalizePage(page int64, pageSize int64) (int64, int64) {
 	if page <= 0 {
 		page = 1

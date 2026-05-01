@@ -9,6 +9,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
+
+	"long/internal/vote"
 )
 
 func registerAdminRoutes(router route.IRouter, options Options) {
@@ -36,6 +38,14 @@ func registerAdminSessionRoutes(router route.IRouter, options Options) {
 
 		token, ok := options.AdminAuthenticator.Login(body.Username, body.Password)
 		if !ok {
+			writeAdminAudit(context.Background(), options.AdminAuditWriter, vote.AdminAuditLog{
+				Operator:    strings.TrimSpace(body.Username),
+				Action:      "admin.login",
+				RequestPath: requestPath(c),
+				RequestIP:   requestIP(c),
+				Result:      "failed",
+				ErrorCode:   "INVALID_CREDENTIALS",
+			})
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{
 				"error":   "INVALID_CREDENTIALS",
 				"message": "账号或口令不对。",
@@ -44,11 +54,25 @@ func registerAdminSessionRoutes(router route.IRouter, options Options) {
 		}
 
 		c.SetCookie(adminSessionCookieName, token, 0, "/", "", protocol.CookieSameSiteLaxMode, false, true)
+		writeAdminAudit(context.Background(), options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "admin.login",
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 
 	router.POST("/api/admin/logout", func(_ context.Context, c *app.RequestContext) {
 		c.SetCookie(adminSessionCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, false, true)
+		writeAdminAudit(context.Background(), options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "admin.logout",
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 

@@ -16,6 +16,11 @@ type bossResourceReader interface {
 }
 
 func registerPublicRoutes(router route.IRouter, options Options, stateView StateView) {
+	messageStore := MessageStore(options.Store)
+	if options.MessageStore != nil {
+		messageStore = options.MessageStore
+	}
+
 	router.GET("/api/health", func(_ context.Context, c *app.RequestContext) {
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
@@ -72,7 +77,7 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 	})
 
 	router.GET("/api/messages", func(ctx context.Context, c *app.RequestContext) {
-		page, err := options.Store.ListMessages(ctx, c.Query("cursor"), 50)
+		page, err := messageStore.ListMessages(ctx, c.Query("cursor"), 50)
 		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "MESSAGE_LIST_FAILED"})
 			return
@@ -100,7 +105,7 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 			return
 		}
 
-		message, err := options.Store.CreateMessage(ctx, nickname, body.Content)
+		message, err := messageStore.CreateMessage(ctx, nickname, body.Content)
 		if err != nil {
 			if writeNicknameError(c, err) || writeContentError(c, err) {
 				return
@@ -113,6 +118,13 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 			Type:      vote.StateChangeMessageCreated,
 			Nickname:  nickname,
 			Timestamp: time.Now().Unix(),
+		})
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "message.created",
+			Nickname:  nickname,
+			Payload: map[string]any{
+				"message_id": message.ID,
+			},
 		})
 		writeJSON(c, consts.StatusOK, message)
 	})

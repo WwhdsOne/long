@@ -42,6 +42,22 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "boss.activate",
+			TargetType:  "boss",
+			TargetID:    boss.ID,
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "boss.activated",
+			BossID:    boss.ID,
+			Payload: map[string]any{
+				"name": boss.Name,
+			},
+		})
 		writeJSON(c, consts.StatusOK, boss)
 	})
 
@@ -60,6 +76,20 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			Type:             vote.StateChangeBossChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
+		})
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "boss.deactivate",
+			TargetType:  "boss",
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "boss.deactivated",
+			Payload: map[string]any{
+				"operator": options.AdminAuthenticator.Username(),
+			},
 		})
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
@@ -114,6 +144,16 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "boss.template.create",
+			TargetType:  "boss_template",
+			TargetID:    body.ID,
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 
@@ -141,6 +181,16 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "boss.template.update",
+			TargetType:  "boss_template",
+			TargetID:    body.ID,
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 
@@ -154,6 +204,15 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_DELETE_FAILED"})
 			return
 		}
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "boss.template.delete",
+			TargetType:  "boss_template",
+			TargetID:    c.Param("templateId"),
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
 
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
@@ -217,6 +276,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "boss.cycle.enable",
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
 		writeJSON(c, consts.StatusOK, boss)
 	})
 
@@ -268,6 +334,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			Type:             vote.StateChangeBossChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
+		})
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "boss.cycle.disable",
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
 		})
 		writeJSON(c, consts.StatusOK, boss)
 	})

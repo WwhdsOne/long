@@ -50,6 +50,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.equipped",
+			Nickname:  nickname,
+			ItemID:    c.Param("instanceId"),
+		})
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -82,6 +87,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.unequipped",
+			Nickname:  nickname,
+			ItemID:    c.Param("instanceId"),
+		})
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -162,6 +172,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.enhanced",
+			Nickname:  nickname,
+			ItemID:    c.Param("instanceId"),
+		})
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -201,6 +216,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.locked",
+			Nickname:  nickname,
+			ItemID:    c.Param("instanceId"),
+		})
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -240,6 +260,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.unlocked",
+			Nickname:  nickname,
+			ItemID:    c.Param("instanceId"),
+		})
 		writeJSON(c, consts.StatusOK, state)
 	})
 
@@ -285,6 +310,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.salvaged",
+			Nickname:  nickname,
+			ItemID:    c.Param("instanceId"),
+		})
 		writeJSON(c, consts.StatusOK, result)
 	})
 
@@ -313,6 +343,13 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.bulk_salvaged",
+			Nickname:  nickname,
+			Payload: map[string]any{
+				"count": result.SalvagedCount,
+			},
+		})
 		writeJSON(c, consts.StatusOK, result)
 	})
 }

@@ -22,6 +22,40 @@ func (m *mockBossHistoryReader) ListAdminBossHistoryPage(_ context.Context, _ in
 	return m.page, m.err
 }
 
+type mockMessageStore struct {
+	page          vote.MessagePage
+	created       *vote.Message
+	deletedID     string
+	listCursor    string
+	listLimit     int64
+	createNick    string
+	createContent string
+	err           error
+}
+
+func (m *mockMessageStore) CreateMessage(_ context.Context, nickname string, content string) (*vote.Message, error) {
+	m.createNick = nickname
+	m.createContent = content
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.created != nil {
+		return m.created, nil
+	}
+	return &vote.Message{ID: "1", Nickname: nickname, Content: content, CreatedAt: 1}, nil
+}
+
+func (m *mockMessageStore) ListMessages(_ context.Context, cursor string, limit int64) (vote.MessagePage, error) {
+	m.listCursor = cursor
+	m.listLimit = limit
+	return m.page, m.err
+}
+
+func (m *mockMessageStore) DeleteMessage(_ context.Context, id string) error {
+	m.deletedID = id
+	return m.err
+}
+
 func TestAdminStateReturnsLightweightSummary(t *testing.T) {
 	store := &mockStore{
 		adminState: vote.AdminState{
@@ -115,6 +149,50 @@ func TestAdminBossHistoryPagePrefersOptionalReader(t *testing.T) {
 	}
 	if len(payload.Items) != 1 || payload.Items[0].ID != "mongo-boss" {
 		t.Fatalf("expected optional reader payload, got %+v", payload)
+	}
+}
+
+func TestAdminMessagesPreferOptionalMessageStore(t *testing.T) {
+	store := &mockStore{
+		messagePage: vote.MessagePage{
+			Items: []vote.Message{{ID: "redis-1", Nickname: "阿明", Content: "redis"}},
+		},
+	}
+	messageStore := &mockMessageStore{
+		page: vote.MessagePage{
+			Items: []vote.Message{{ID: "mongo-1", Nickname: "小红", Content: "mongo"}},
+		},
+	}
+
+	handler := NewHandler(Options{
+		Store:        store,
+		MessageStore: messageStore,
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	cookie := loginAdminForTest(t, handler)
+	request := httptest.NewRequest(http.MethodGet, "/api/admin/messages?cursor=10", nil)
+	request.AddCookie(cookie)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin messages, got %d", response.Code)
+	}
+
+	var payload vote.MessagePage
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode message page: %v", err)
+	}
+	if len(payload.Items) != 1 || payload.Items[0].ID != "mongo-1" {
+		t.Fatalf("expected optional message store payload, got %+v", payload)
+	}
+	if messageStore.listCursor != "10" || messageStore.listLimit != 50 {
+		t.Fatalf("unexpected message store list params: cursor=%q limit=%d", messageStore.listCursor, messageStore.listLimit)
 	}
 }
 

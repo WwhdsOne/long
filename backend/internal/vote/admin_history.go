@@ -40,6 +40,35 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 		values["parts"] = string(partsRaw)
 	}
 
+	entry := BossHistoryEntry{
+		Boss: Boss{
+			ID:                 boss.ID,
+			TemplateID:         boss.TemplateID,
+			Name:               boss.Name,
+			Status:             boss.Status,
+			MaxHP:              boss.MaxHP,
+			CurrentHP:          boss.CurrentHP,
+			GoldOnKill:         maxInt64(0, boss.GoldOnKill),
+			StoneOnKill:        maxInt64(0, boss.StoneOnKill),
+			TalentPointsOnKill: maxInt64(0, boss.TalentPointsOnKill),
+			Parts:              boss.Parts,
+			StartedAt:          boss.StartedAt,
+			DefeatedAt:         boss.DefeatedAt,
+		},
+	}
+	loot, err := s.loadBossLoot(ctx, boss.ID)
+	if err == nil {
+		entry.Loot = loot
+	}
+	damage, err := s.ListBossLeaderboard(ctx, boss.ID, 20)
+	if err == nil {
+		entry.Damage = damage
+	}
+
+	if s.bossHistoryStore != nil {
+		return s.bossHistoryStore.SaveBossHistory(ctx, entry)
+	}
+
 	key := s.bossHistoryPrefix + boss.ID
 	if err := s.client.HSet(ctx, key, values).Err(); err != nil {
 		return err
@@ -56,12 +85,16 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 		return err
 	}
 
-	s.enqueueBossHistoryArchive(ctx, boss)
+	s.enqueueBossHistoryArchive(ctx, entry)
 	return nil
 }
 
 // ListBossHistory 返回历史 Boss 列表（按时间倒序）。
 func (s *Store) ListBossHistory(ctx context.Context) ([]BossHistoryEntry, error) {
+	if s.bossHistoryStore != nil {
+		return s.bossHistoryStore.ListBossHistory(ctx)
+	}
+
 	ids, err := s.client.ZRevRange(ctx, s.bossHistoryKey, 0, -1).Result()
 	if err != nil {
 		return nil, err
@@ -92,25 +125,12 @@ func (s *Store) ListBossHistory(ctx context.Context) ([]BossHistoryEntry, error)
 	return entries, nil
 }
 
-func (s *Store) enqueueBossHistoryArchive(ctx context.Context, boss *Boss) {
-	if s.bossHistoryArchiver == nil || boss == nil {
+func (s *Store) enqueueBossHistoryArchive(ctx context.Context, entry BossHistoryEntry) {
+	if s.bossHistoryArchiver == nil {
 		return
 	}
-
-	loot, err := s.loadBossLoot(ctx, boss.ID)
-	if err != nil {
-		return
-	}
-	damage, err := s.ListBossLeaderboard(ctx, boss.ID, 20)
-	if err != nil {
-		return
-	}
-
-	if ok := s.bossHistoryArchiver.Enqueue(BossHistoryEntry{
-		Boss:   *boss,
-		Loot:   loot,
-		Damage: damage,
-	}); !ok {
+	_ = ctx
+	if ok := s.bossHistoryArchiver.Enqueue(entry); !ok {
 		xlog.L().Warn("enqueue boss history archive failed")
 	}
 }

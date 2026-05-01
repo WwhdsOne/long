@@ -435,6 +435,16 @@ type StoreOptions struct {
 	CriticalChancePercent int
 	CriticalCount         int64
 	BossHistoryArchiver   interface{ Enqueue(BossHistoryEntry) bool }
+	BossHistoryStore      interface {
+		SaveBossHistory(context.Context, BossHistoryEntry) error
+		ListAdminBossHistoryPage(context.Context, int64, int64) (AdminBossHistoryPage, error)
+		ListBossHistory(context.Context) ([]BossHistoryEntry, error)
+	}
+	MessageStore interface {
+		CreateMessage(context.Context, string, string) (*Message, error)
+		ListMessages(context.Context, string, int64) (MessagePage, error)
+		DeleteMessage(context.Context, string) error
+	}
 }
 
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
@@ -476,6 +486,16 @@ type Store struct {
 	now                     func() time.Time
 	validator               interface{ Validate(string) error }
 	bossHistoryArchiver     interface{ Enqueue(BossHistoryEntry) bool }
+	bossHistoryStore        interface {
+		SaveBossHistory(context.Context, BossHistoryEntry) error
+		ListAdminBossHistoryPage(context.Context, int64, int64) (AdminBossHistoryPage, error)
+		ListBossHistory(context.Context) ([]BossHistoryEntry, error)
+	}
+	messageStore interface {
+		CreateMessage(context.Context, string, string) (*Message, error)
+		ListMessages(context.Context, string, int64) (MessagePage, error)
+		DeleteMessage(context.Context, string) error
+	}
 
 	combatStatsCache   map[string]CombatStats
 	combatStatsCacheMu sync.RWMutex
@@ -530,6 +550,8 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		now:                 time.Now,
 		validator:           validator,
 		bossHistoryArchiver: options.BossHistoryArchiver,
+		bossHistoryStore:    options.BossHistoryStore,
+		messageStore:        options.MessageStore,
 		combatStatsCache:    make(map[string]CombatStats),
 		compiledTalentCache: make(map[string]*CompiledTalentSet),
 	}

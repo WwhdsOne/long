@@ -12,6 +12,11 @@ import (
 )
 
 func registerAdminContentRoutes(router route.IRouter, options Options) {
+	messageStore := MessageStore(options.Store)
+	if options.MessageStore != nil {
+		messageStore = options.MessageStore
+	}
+
 	router.GET("/api/admin/announcements", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
@@ -75,7 +80,7 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		page, err := options.Store.ListMessages(ctx, c.Query("cursor"), 50)
+		page, err := messageStore.ListMessages(ctx, c.Query("cursor"), 50)
 		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "MESSAGE_LIST_FAILED"})
 			return
@@ -89,10 +94,26 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		if err := options.Store.DeleteMessage(ctx, c.Param("id")); err != nil {
+		if err := messageStore.DeleteMessage(ctx, c.Param("id")); err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "MESSAGE_DELETE_FAILED"})
 			return
 		}
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "message.delete",
+			TargetType:  "message",
+			TargetID:    c.Param("id"),
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "message.deleted",
+			Payload: map[string]any{
+				"message_id": c.Param("id"),
+				"operator":   options.AdminAuthenticator.Username(),
+			},
+		})
 		publishChange(ctx, options.ChangePublisher, vote.StateChange{
 			Type:      vote.StateChangeMessageDeleted,
 			Timestamp: time.Now().Unix(),

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol"
@@ -13,6 +14,7 @@ import (
 	adminauth "long/internal/admin"
 	playerauth "long/internal/playerauth"
 	"long/internal/vote"
+	"long/internal/xlog"
 )
 
 func writeJSON(c *app.RequestContext, status int, payload any) {
@@ -154,6 +156,42 @@ func publishChange(ctx context.Context, publisher ChangePublisher, change vote.S
 		return
 	}
 	_ = publisher.PublishChange(ctx, change)
+}
+
+func writeAdminAudit(ctx context.Context, writer AdminAuditWriter, item vote.AdminAuditLog) {
+	if writer == nil {
+		return
+	}
+	if item.CreatedAt == 0 {
+		item.CreatedAt = time.Now().Unix()
+	}
+	if err := writer.WriteAdminAuditLog(ctx, item); err != nil {
+		xlog.L().Warn("write admin audit log failed", xlog.Err(err))
+	}
+}
+
+func writeDomainEvent(ctx context.Context, writer DomainEventWriter, item vote.DomainEvent) {
+	if writer == nil {
+		return
+	}
+	if item.CreatedAt == 0 {
+		item.CreatedAt = time.Now().Unix()
+	}
+	if err := writer.WriteDomainEvent(ctx, item); err != nil {
+		xlog.L().Warn("write domain event failed", xlog.Err(err))
+	}
+}
+
+func requestPath(c *app.RequestContext) string {
+	return string(c.Path())
+}
+
+func requestIP(c *app.RequestContext) string {
+	forwarded := strings.TrimSpace(string(c.Request.Header.Peek("X-Forwarded-For")))
+	if forwarded != "" {
+		return forwarded
+	}
+	return strings.TrimSpace(c.ClientIP())
 }
 
 func parseAdminPageParams(c *app.RequestContext) (int64, int64, bool) {

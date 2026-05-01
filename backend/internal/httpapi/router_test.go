@@ -842,6 +842,40 @@ func TestPostMessageRejectsSensitiveContent(t *testing.T) {
 	}
 }
 
+func TestPublicMessagesPreferOptionalMessageStore(t *testing.T) {
+	store := &mockStore{
+		messagePage: vote.MessagePage{
+			Items: []vote.Message{{ID: "redis-1", Nickname: "阿明", Content: "redis"}},
+		},
+	}
+	messageStore := &mockMessageStore{
+		page: vote.MessagePage{
+			Items: []vote.Message{{ID: "mongo-1", Nickname: "小红", Content: "mongo"}},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:        store,
+		MessageStore: messageStore,
+		Broadcaster:  &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/messages?cursor=99", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+
+	var payload vote.MessagePage
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(payload.Items) != 1 || payload.Items[0].ID != "mongo-1" {
+		t.Fatalf("expected optional message store payload, got %+v", payload)
+	}
+}
+
 func TestAdminLoginCreatesSessionAndStateRequiresAuth(t *testing.T) {
 	store := &mockStore{
 		adminState: vote.AdminState{

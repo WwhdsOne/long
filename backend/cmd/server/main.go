@@ -46,17 +46,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	logger, err := xlog.Init(xlog.Config{
-		Level:         cfg.Log.Level,
-		Format:        cfg.Log.Format,
-		IncludeCaller: cfg.Log.IncludeCaller,
-	})
-	if err != nil {
-		return fmt.Errorf("init logger: %w", err)
+	if !cfg.Mongo.Enabled {
+		return errors.New("mongo.enabled 必须为 true，冷数据已固定切换到 MongoDB")
 	}
-	defer func() {
-		_ = logger.Sync()
-	}()
 
 	redisOptions := &redis.Options{
 		Addr:     net.JoinHostPort(cfg.Redis.Host, fmt.Sprintf("%d", cfg.Redis.Port)),
@@ -79,8 +71,10 @@ func run() error {
 	}
 
 	var mongoClient *mongo.Client
-	var bossHistoryArchive *archive.BossHistoryQueue
-	var adminBossHistoryReader httpapi.AdminBossHistoryReader
+	var bossHistoryStore *mongostore.BossHistoryStore
+	var mongoMessageStore *mongostore.MessageStore
+	var adminAuditWriter httpapi.AdminAuditWriter
+	var domainEventWriter httpapi.DomainEventWriter
 	if cfg.Mongo.Enabled {
 		mongoClient, err = mongo.Connect(startupCtx, options.Client().
 			ApplyURI(cfg.Mongo.URI).
@@ -93,21 +87,56 @@ func run() error {
 		}
 
 		mongoDB := mongoClient.Database(cfg.Mongo.Database)
-		bossHistoryStore := mongostore.NewBossHistoryStore(mongoDB, cfg.Mongo.WriteTimeout, cfg.Mongo.ReadTimeout)
+		bossHistoryStore = mongostore.NewBossHistoryStore(mongoDB, cfg.Mongo.WriteTimeout, cfg.Mongo.ReadTimeout)
 		if err := bossHistoryStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo indexes: %w", err)
 		}
-		adminBossHistoryReader = bossHistoryStore
-
-		if cfg.Archive.BossHistoryDualWrite {
-			bossHistoryArchive = archive.NewBossHistoryQueue(archive.BossHistoryQueueConfig{
-				BufferSize:   128,
-				WorkerCount:  2,
-				WriteTimeout: cfg.Mongo.WriteTimeout,
-			}, bossHistoryStore)
-			bossHistoryArchive.Start()
-			defer bossHistoryArchive.Close()
+		mongoMessageStore = mongostore.NewMessageStore(mongoDB, cfg.Mongo.WriteTimeout, cfg.Mongo.ReadTimeout)
+		if err := mongoMessageStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo message indexes: %w", err)
 		}
+		adminAuditStore := mongostore.NewAdminAuditStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := adminAuditStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo admin audit indexes: %w", err)
+		}
+		domainEventStore := mongostore.NewDomainEventStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := domainEventStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo domain event indexes: %w", err)
+		}
+		systemLogStore := mongostore.NewSystemLogStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := systemLogStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo system log indexes: %w", err)
+		}
+
+		adminAuditQueue := archive.NewAsyncQueue[vote.AdminAuditLog](archive.AsyncQueueConfig{
+			Name:         "admin-audit",
+			BufferSize:   256,
+			WorkerCount:  2,
+			WriteTimeout: cfg.Mongo.WriteTimeout,
+		}, adminAuditStore.WriteAdminAuditLog)
+		adminAuditQueue.Start()
+		defer adminAuditQueue.Close()
+		adminAuditWriter = adminAuditQueueWriter{queue: adminAuditQueue}
+
+		domainEventQueue := archive.NewAsyncQueue[vote.DomainEvent](archive.AsyncQueueConfig{
+			Name:         "domain-events",
+			BufferSize:   512,
+			WorkerCount:  2,
+			WriteTimeout: cfg.Mongo.WriteTimeout,
+		}, domainEventStore.WriteDomainEvent)
+		domainEventQueue.Start()
+		defer domainEventQueue.Close()
+		domainEventWriter = domainEventQueueWriter{queue: domainEventQueue}
+
+		systemLogQueue := archive.NewAsyncQueue[xlog.SystemLogEntry](archive.AsyncQueueConfig{
+			Name:         "system-logs",
+			BufferSize:   512,
+			WorkerCount:  2,
+			WriteTimeout: cfg.Mongo.WriteTimeout,
+		}, systemLogStore.WriteSystemLog)
+		systemLogQueue.Start()
+		defer systemLogQueue.Close()
+		xlog.SetSystemLogHook(xlog.HookFromWriter(systemLogQueueWriter{queue: systemLogQueue}))
 		defer func() {
 			if mongoClient != nil {
 				_ = mongoClient.Disconnect(context.Background())
@@ -115,11 +144,24 @@ func run() error {
 		}()
 	}
 
+	logger, err := xlog.Init(xlog.Config{
+		Level:         cfg.Log.Level,
+		Format:        cfg.Log.Format,
+		IncludeCaller: cfg.Log.IncludeCaller,
+	})
+	if err != nil {
+		return fmt.Errorf("init logger: %w", err)
+	}
+	defer func() {
+		_ = logger.Sync()
+	}()
+
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
 		CriticalChancePercent: 5,
 		CriticalCount:         0,
-		BossHistoryArchiver:   bossHistoryArchive,
+		BossHistoryStore:      bossHistoryStore,
+		MessageStore:          mongoMessageStore,
 	}, nicknameValidator)
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)
@@ -178,7 +220,8 @@ func run() error {
 			Password:      cfg.Admin.Password,
 			SessionSecret: cfg.Admin.SessionSecret,
 		}),
-		AdminBossHistoryReader: selectAdminBossHistoryReader(cfg, store, adminBossHistoryReader),
+		AdminAuditWriter:  adminAuditWriter,
+		DomainEventWriter: domainEventWriter,
 	})
 
 	errCh := make(chan error, 1)
@@ -309,9 +352,35 @@ func serverAddress(port int) string {
 	return net.JoinHostPort(host, fmt.Sprintf("%d", listenPort))
 }
 
-func selectAdminBossHistoryReader(cfg config.Config, store *vote.Store, mongoReader httpapi.AdminBossHistoryReader) httpapi.AdminBossHistoryReader {
-	if cfg.Archive.BossHistoryReadSource == "mongo" && mongoReader != nil {
-		return mongoReader
+type adminAuditQueueWriter struct {
+	queue *archive.AsyncQueue[vote.AdminAuditLog]
+}
+
+func (w adminAuditQueueWriter) WriteAdminAuditLog(_ context.Context, item vote.AdminAuditLog) error {
+	if w.queue != nil {
+		w.queue.Enqueue(item)
 	}
-	return store
+	return nil
+}
+
+type domainEventQueueWriter struct {
+	queue *archive.AsyncQueue[vote.DomainEvent]
+}
+
+func (w domainEventQueueWriter) WriteDomainEvent(_ context.Context, item vote.DomainEvent) error {
+	if w.queue != nil {
+		w.queue.Enqueue(item)
+	}
+	return nil
+}
+
+type systemLogQueueWriter struct {
+	queue *archive.AsyncQueue[xlog.SystemLogEntry]
+}
+
+func (w systemLogQueueWriter) WriteSystemLog(_ context.Context, item xlog.SystemLogEntry) error {
+	if w.queue != nil {
+		w.queue.Enqueue(item)
+	}
+	return nil
 }

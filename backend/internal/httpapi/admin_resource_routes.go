@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -11,12 +10,12 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 
 	"long/internal/vote"
+	"long/internal/xlog"
 )
 
 func registerAdminResourceRoutes(router route.IRouter, options Options) {
 	registerAdminEquipmentRoutes(router, options)
 }
-
 
 func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 	router.POST("/api/admin/equipment/generate", func(ctx context.Context, c *app.RequestContext) {
@@ -39,7 +38,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 		draft, err := options.EquipmentDraftGenerator.GenerateEquipmentDraft(ctx, body.Prompt)
 		if err != nil {
 			if errors.Is(err, ErrInvalidEquipmentDraft) {
-				fmt.Printf("invalid equipment draft: %s\n", err)
+				xlog.L().Warn("invalid equipment draft", xlog.Err(err))
 				writeJSON(c, consts.StatusUnprocessableEntity, map[string]string{"error": "INVALID_EQUIPMENT_DRAFT"})
 				return
 			}
@@ -65,6 +64,23 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SAVE_FAILED"})
 			return
 		}
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "equipment.create",
+			TargetType:  "equipment",
+			TargetID:    body.ItemID,
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.created",
+			ItemID:    body.ItemID,
+			Payload: map[string]any{
+				"name": body.Name,
+				"slot": body.Slot,
+			},
+		})
 
 		publishChange(ctx, options.ChangePublisher, vote.StateChange{
 			Type:             vote.StateChangeEquipmentMetaChanged,
@@ -90,6 +106,23 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SAVE_FAILED"})
 			return
 		}
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "equipment.update",
+			TargetType:  "equipment",
+			TargetID:    body.ItemID,
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.updated",
+			ItemID:    body.ItemID,
+			Payload: map[string]any{
+				"name": body.Name,
+				"slot": body.Slot,
+			},
+		})
 
 		publishChange(ctx, options.ChangePublisher, vote.StateChange{
 			Type:             vote.StateChangeEquipmentMetaChanged,
@@ -109,6 +142,19 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_DELETE_FAILED"})
 			return
 		}
+		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "equipment.delete",
+			TargetType:  "equipment",
+			TargetID:    c.Param("itemId"),
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "equipment.deleted",
+			ItemID:    c.Param("itemId"),
+		})
 
 		publishChange(ctx, options.ChangePublisher, vote.StateChange{
 			Type:             vote.StateChangeEquipmentMetaChanged,

@@ -9,6 +9,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/route"
 
 	playerauth "long/internal/playerauth"
+	"long/internal/vote"
 )
 
 func registerPlayerAuthRoutes(router route.IRouter, options Options) {
@@ -47,6 +48,10 @@ func registerPlayerAuthRoutes(router route.IRouter, options Options) {
 		}
 
 		setPlayerSessionCookie(c, token)
+		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+			EventType: "player.login",
+			Nickname:  nickname,
+		})
 		writeJSON(c, consts.StatusOK, map[string]any{
 			"authenticated": true,
 			"nickname":      nickname,
