@@ -472,9 +472,10 @@ onBeforeUnmount(() => {
             </article>
             <div class="armory-backpack-cell__meta">
               <strong>
-                <span :class="['armory-backpack-cell__rarity', equipmentNameClass(item)]">{{ formatRarityLabel(item.rarity) }} </span>
-                <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
-                <span :class="equipmentNameClass(item)">·{{ equipmentNameParts(item).text }}</span>
+                <span :class="['armory-backpack-cell__rarity', equipmentNameClass(item)]">{{ formatRarityLabel(item.rarity) }}</span>
+<!--                <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>-->
+                <span style="font-size:15px">·</span>
+                <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
               </strong>
               <span>{{ item.slot || '未分类' }}</span>
               <span>强化 +{{ item.enhanceLevel || 0 }} · {{ item.equipped ? '已装备' : '点击穿戴' }}</span>

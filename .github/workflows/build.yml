@@ -95,7 +95,7 @@ jobs:
           script: |
             set -e
             mkdir -p "${{ env.DEPLOY_PATH }}/release"
-            rm -rf "${{ env.DEPLOY_PATH }}/release"/*
+            find "${{ env.DEPLOY_PATH }}/release" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
       - name: Upload release bundle to server
         uses: appleboy/scp-action@v0.1.7
