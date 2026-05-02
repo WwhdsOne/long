@@ -381,7 +381,8 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="loadout-slot__main">
                   <strong v-if="loadout[slot.value]" class="loadout-slot__name">
-                    <span :class="equipmentNameClass(loadout[slot.value])">{{ formatRarityLabel(loadout[slot.value].rarity) }} · {{ equipmentNameParts(loadout[slot.value]).text }}</span>
+                    <span :class="['loadout-slot__rarity', equipmentNameClass(loadout[slot.value])]">{{ formatRarityLabel(loadout[slot.value].rarity) }}</span>
+                    <span :class="equipmentNameClass(loadout[slot.value])"> · {{ equipmentNameParts(loadout[slot.value]).text }}</span>
                     <br>
                     <span class="loadout-slot__meta"> 强化 +{{ loadout[slot.value].enhanceLevel || 0 }}</span>
                   </strong>

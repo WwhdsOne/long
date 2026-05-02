@@ -6,8 +6,8 @@ MAKEFLAGS += --no-print-directory
 .DEFAULT_GOAL := help
 
 .PHONY: help deps deps-ci dev build test check \
-	backend-run backend-test backend-vet \
-	frontend-dev frontend-build frontend-preview
+	backend-run backend-test backend-vet backend-fix \
+	frontend-dev frontend-build frontend-preview frontend-test
 
 help: ## 显示可用命令
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "%-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -43,7 +43,7 @@ build: frontend-build ## 构建前端产物到 backend/public
 
 test: backend-test ## 运行后端测试
 
-check: test backend-vet build ## 执行 CI 校验
+check: test backend-vet frontend-test build ## 执行 CI 校验
 
 backend-run: ## 单独启动后端服务
 	$(GO) -C backend run ./cmd/server
@@ -54,11 +54,17 @@ backend-test: ## 运行后端测试
 backend-vet: ## 运行 go vet
 	$(GO) -C backend vet ./...
 
+backend-fix: ## 运行 go fix
+	$(GO) -C backend fix ./...
+
 frontend-dev: ## 单独启动前端开发服务器
 	$(NPM) --prefix frontend run dev
 
 frontend-build: ## 构建前端产物
 	$(NPM) --prefix frontend run build
+
+frontend-test: ## 运行前端测试
+	$(NPM) --prefix frontend run test
 
 frontend-preview: ## 预览前端产物
 	$(NPM) --prefix frontend run preview
