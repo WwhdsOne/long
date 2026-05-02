@@ -11,7 +11,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/protocol/sse"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const (
@@ -25,31 +25,33 @@ type onlineCountPayload struct {
 }
 
 type realtimeUserStatePayload struct {
-	UserStats          *vote.UserStats          `json:"userStats,omitempty"`
-	MyBossStats        *vote.BossUserStats      `json:"myBossStats,omitempty"`
-	Loadout            vote.Loadout             `json:"loadout"`
-	CombatStats        vote.CombatStats         `json:"combatStats"`
-	Gold               int64                    `json:"gold"`
-	Stones             int64                    `json:"stones"`
-	TalentPoints       int64                    `json:"talentPoints"`
-	RecentRewards      []vote.Reward            `json:"recentRewards,omitempty"`
-	TalentEvents       []vote.TalentTriggerEvent `json:"talentEvents,omitempty"`
-	TalentCombatState  *vote.TalentCombatState  `json:"talentCombatState,omitempty"`
+	UserStats                          *core.UserStats           `json:"userStats,omitempty"`
+	MyBossStats                        *core.BossUserStats       `json:"myBossStats,omitempty"`
+	Loadout                            core.Loadout              `json:"loadout"`
+	CombatStats                        core.CombatStats          `json:"combatStats"`
+	Gold                               int64                     `json:"gold"`
+	Stones                             int64                     `json:"stones"`
+	TalentPoints                       int64                     `json:"talentPoints"`
+	RecentRewards                      []core.Reward             `json:"recentRewards,omitempty"`
+	TalentEvents                       []core.TalentTriggerEvent `json:"talentEvents,omitempty"`
+	TalentCombatState                  *core.TalentCombatState   `json:"talentCombatState,omitempty"`
+	EquippedBattleClickSkinID          string                    `json:"equippedBattleClickSkinId,omitempty"`
+	EquippedBattleClickCursorImagePath string                    `json:"equippedBattleClickCursorImagePath,omitempty"`
 }
 
 type publicStatePayload struct {
 	TotalVotes          int64                       `json:"totalVotes"`
-	Leaderboard         *[]vote.LeaderboardEntry    `json:"leaderboard,omitempty"`
-	Boss                *vote.Boss                  `json:"boss,omitempty"`
-	BossLeaderboard     []vote.BossLeaderboardEntry `json:"bossLeaderboard"`
+	Leaderboard         *[]core.LeaderboardEntry    `json:"leaderboard,omitempty"`
+	Boss                *core.Boss                  `json:"boss,omitempty"`
+	BossLeaderboard     []core.BossLeaderboardEntry `json:"bossLeaderboard"`
 	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
 }
 
 // StateReader 提供 SSE 初始状态所需的公共态与个人态读取能力。
 type StateReader interface {
-	GetSnapshot(context.Context) (vote.Snapshot, error)
-	GetUserState(context.Context, string) (vote.UserState, error)
-	GetBossResources(context.Context) (vote.BossResources, error)
+	GetSnapshot(context.Context) (core.Snapshot, error)
+	GetUserState(context.Context, string) (core.UserState, error)
+	GetBossResources(context.Context) (core.BossResources, error)
 }
 
 // ServerEvent 是发往浏览器的一条 SSE 事件。
@@ -97,7 +99,7 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 	return client.ch, unsubscribe
 }
 
-func (h *Hub) BroadcastPublic(snapshot vote.Snapshot, includeLeaderboard bool) error {
+func (h *Hub) BroadcastPublic(snapshot core.Snapshot, includeLeaderboard bool) error {
 	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot, includeLeaderboard))
 	if err != nil {
 		return err
@@ -112,7 +114,7 @@ func (h *Hub) BroadcastPublic(snapshot vote.Snapshot, includeLeaderboard bool) e
 	return nil
 }
 
-func buildPublicStatePayload(snapshot vote.Snapshot, includeLeaderboard bool) publicStatePayload {
+func buildPublicStatePayload(snapshot core.Snapshot, includeLeaderboard bool) publicStatePayload {
 	payload := publicStatePayload{
 		TotalVotes:          snapshot.TotalVotes,
 		Boss:                snapshot.Boss,
@@ -120,19 +122,19 @@ func buildPublicStatePayload(snapshot vote.Snapshot, includeLeaderboard bool) pu
 		AnnouncementVersion: snapshot.AnnouncementVersion,
 	}
 	if payload.BossLeaderboard == nil {
-		payload.BossLeaderboard = []vote.BossLeaderboardEntry{}
+		payload.BossLeaderboard = []core.BossLeaderboardEntry{}
 	}
 	if includeLeaderboard {
 		leaderboard := snapshot.Leaderboard
 		if leaderboard == nil {
-			leaderboard = []vote.LeaderboardEntry{}
+			leaderboard = []core.LeaderboardEntry{}
 		}
 		payload.Leaderboard = &leaderboard
 	}
 	return payload
 }
 
-func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
+func (h *Hub) BroadcastUser(nickname string, state core.UserState) error {
 	normalizedNickname := strings.TrimSpace(nickname)
 	if normalizedNickname == "" {
 		return nil
@@ -155,18 +157,20 @@ func (h *Hub) BroadcastUser(nickname string, state vote.UserState) error {
 	return nil
 }
 
-func buildRealtimeUserStatePayload(state vote.UserState) realtimeUserStatePayload {
+func buildRealtimeUserStatePayload(state core.UserState) realtimeUserStatePayload {
 	return realtimeUserStatePayload{
-		UserStats:         state.UserStats,
-		MyBossStats:       state.MyBossStats,
-		Loadout:           state.Loadout,
-		CombatStats:       state.CombatStats,
-		Gold:              state.Gold,
-		Stones:            state.Stones,
-		TalentPoints:      state.TalentPoints,
-		RecentRewards:     state.RecentRewards,
-		TalentEvents:      state.TalentEvents,
-		TalentCombatState: state.TalentCombatState,
+		UserStats:                          state.UserStats,
+		MyBossStats:                        state.MyBossStats,
+		Loadout:                            state.Loadout,
+		CombatStats:                        state.CombatStats,
+		Gold:                               state.Gold,
+		Stones:                             state.Stones,
+		TalentPoints:                       state.TalentPoints,
+		RecentRewards:                      state.RecentRewards,
+		TalentEvents:                       state.TalentEvents,
+		TalentCombatState:                  state.TalentCombatState,
+		EquippedBattleClickSkinID:          state.EquippedBattleClickSkinID,
+		EquippedBattleClickCursorImagePath: state.EquippedBattleClickCursorImagePath,
 	}
 }
 

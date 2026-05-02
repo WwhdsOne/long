@@ -10,7 +10,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 func registerEquipmentRoutes(router route.IRouter, options Options) {
@@ -34,11 +34,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			if writeNicknameError(c, err) {
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotFound) {
+			if errors.Is(err, core.ErrEquipmentNotFound) {
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+			if errors.Is(err, core.ErrEquipmentNotOwned) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_NOT_OWNED",
 					"message": "这件装备还不在你的背包里。",
@@ -50,7 +50,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.equipped",
 			Nickname:  nickname,
 			ItemID:    c.Param("instanceId"),
@@ -78,7 +78,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			if writeNicknameError(c, err) {
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotFound) {
+			if errors.Is(err, core.ErrEquipmentNotFound) {
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
 				return
 			}
@@ -87,7 +87,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.unequipped",
 			Nickname:  nickname,
 			ItemID:    c.Param("instanceId"),
@@ -136,32 +136,32 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			if writeNicknameError(c, err) {
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotFound) {
+			if errors.Is(err, core.ErrEquipmentNotFound) {
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+			if errors.Is(err, core.ErrEquipmentNotOwned) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_NOT_OWNED",
 					"message": "这件装备还不在你的背包里。",
 				})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentEnhanceMaxLevel) {
+			if errors.Is(err, core.ErrEquipmentEnhanceMaxLevel) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_ENHANCE_MAX_LEVEL",
 					"message": "这件装备已达到强化上限。",
 				})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentEnhanceInsufficientGold) {
+			if errors.Is(err, core.ErrEquipmentEnhanceInsufficientGold) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_ENHANCE_GOLD_NOT_ENOUGH",
 					"message": "金币不足，无法强化。",
 				})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentEnhanceInsufficientStones) {
+			if errors.Is(err, core.ErrEquipmentEnhanceInsufficientStones) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_ENHANCE_STONE_NOT_ENOUGH",
 					"message": "强化石不足，无法强化。",
@@ -172,7 +172,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.enhanced",
 			Nickname:  nickname,
 			ItemID:    c.Param("instanceId"),
@@ -200,11 +200,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			if writeNicknameError(c, err) {
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotFound) {
+			if errors.Is(err, core.ErrEquipmentNotFound) {
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+			if errors.Is(err, core.ErrEquipmentNotOwned) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_NOT_OWNED",
 					"message": "这件装备还不在你的背包里。",
@@ -216,7 +216,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.locked",
 			Nickname:  nickname,
 			ItemID:    c.Param("instanceId"),
@@ -244,11 +244,11 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			if writeNicknameError(c, err) {
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotFound) {
+			if errors.Is(err, core.ErrEquipmentNotFound) {
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+			if errors.Is(err, core.ErrEquipmentNotOwned) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_NOT_OWNED",
 					"message": "这件装备还不在你的背包里。",
@@ -260,7 +260,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.unlocked",
 			Nickname:  nickname,
 			ItemID:    c.Param("instanceId"),
@@ -288,18 +288,18 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			if writeNicknameError(c, err) {
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotFound) {
+			if errors.Is(err, core.ErrEquipmentNotFound) {
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentNotOwned) {
+			if errors.Is(err, core.ErrEquipmentNotOwned) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_NOT_OWNED",
 					"message": "这件装备还不在你的背包里。",
 				})
 				return
 			}
-			if errors.Is(err, vote.ErrEquipmentLocked) {
+			if errors.Is(err, core.ErrEquipmentLocked) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_LOCKED",
 					"message": "这件装备已锁定，解锁后才能分解。",
@@ -310,7 +310,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.salvaged",
 			Nickname:  nickname,
 			ItemID:    c.Param("instanceId"),
@@ -343,7 +343,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		}
 
 		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.bulk_salvaged",
 			Nickname:  nickname,
 			Payload: map[string]any{
@@ -355,8 +355,8 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 }
 
 func publishEquipmentChange(ctx context.Context, nickname string, publisher ChangePublisher) {
-	publishChange(ctx, publisher, vote.StateChange{
-		Type:      vote.StateChangeEquipmentChanged,
+	publishChange(ctx, publisher, core.StateChange{
+		Type:      core.StateChangeEquipmentChanged,
 		Nickname:  strings.TrimSpace(nickname),
 		Timestamp: time.Now().Unix(),
 	})

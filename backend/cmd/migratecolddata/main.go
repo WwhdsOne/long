@@ -16,9 +16,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"long/internal/config"
+	"long/internal/core"
 	"long/internal/mongostore"
 	"long/internal/nickname"
-	"long/internal/vote"
 )
 
 func main() {
@@ -68,7 +68,7 @@ func run() error {
 		return err
 	}
 
-	redisStore := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
+	redisStore := core.NewStore(redisClient, cfg.RedisPrefix, core.StoreOptions{
 		CriticalChancePercent: 5,
 	}, nickname.NewSensitiveLexiconValidator())
 
@@ -82,7 +82,7 @@ func runCommand(
 	cfg config.Config,
 	redisClient redis.UniversalClient,
 	mongoDB *mongo.Database,
-	redisStore *vote.Store,
+	redisStore *core.Store,
 	bossStore *mongostore.BossHistoryStore,
 	messageStore *mongostore.MessageStore,
 ) error {
@@ -109,7 +109,7 @@ func runCommand(
 	}
 }
 
-func runPlan(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *vote.Store) error {
+func runPlan(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *core.Store) error {
 	bossHistory, err := redisStore.ListBossHistory(ctx)
 	if err != nil {
 		return fmt.Errorf("load redis boss history: %w", err)
@@ -145,7 +145,7 @@ func runPlan(ctx context.Context, cfg config.Config, redisClient redis.Universal
 	return nil
 }
 
-func runMigrate(ctx context.Context, redisStore *vote.Store, bossStore *mongostore.BossHistoryStore, messageStore *mongostore.MessageStore) error {
+func runMigrate(ctx context.Context, redisStore *core.Store, bossStore *mongostore.BossHistoryStore, messageStore *mongostore.MessageStore) error {
 	bossHistory, err := redisStore.ListBossHistory(ctx)
 	if err != nil {
 		return fmt.Errorf("load redis boss history: %w", err)
@@ -180,7 +180,7 @@ func runMigrate(ctx context.Context, redisStore *vote.Store, bossStore *mongosto
 	return nil
 }
 
-func runVerify(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *vote.Store) error {
+func runVerify(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *core.Store) error {
 	redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount, err := loadVerifyCounts(ctx, cfg, redisClient, mongoDB, redisStore)
 	if err != nil {
 		return err
@@ -194,7 +194,7 @@ func runVerify(ctx context.Context, cfg config.Config, redisClient redis.Univers
 	return nil
 }
 
-func runVerifyForAll(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *vote.Store) error {
+func runVerifyForAll(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *core.Store) error {
 	redisBossCount, mongoBossCount, redisMessageCount, mongoMessageCount, err := loadVerifyCounts(ctx, cfg, redisClient, mongoDB, redisStore)
 	if err != nil {
 		return err
@@ -215,7 +215,7 @@ func runVerifyForAll(ctx context.Context, cfg config.Config, redisClient redis.U
 	return nil
 }
 
-func loadVerifyCounts(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *vote.Store) (int64, int64, int64, int64, error) {
+func loadVerifyCounts(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, mongoDB *mongo.Database, redisStore *core.Store) (int64, int64, int64, int64, error) {
 	redisBossHistory, err := redisStore.ListBossHistory(ctx)
 	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("load redis boss history: %w", err)
@@ -274,7 +274,7 @@ func shouldUseMongoOnlyVerifyForAll(redisBossCount int64, mongoBossCount int64, 
 	return mongoBossCount > redisBossCount || mongoMessageCount > redisMessageCount
 }
 
-func runCleanup(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, redisStore *vote.Store) error {
+func runCleanup(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, redisStore *core.Store) error {
 	keys, err := collectCleanupKeys(ctx, cfg, redisClient, redisStore)
 	if err != nil {
 		return err
@@ -292,7 +292,7 @@ func runCleanup(ctx context.Context, cfg config.Config, redisClient redis.Univer
 	return nil
 }
 
-func collectCleanupKeys(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, redisStore *vote.Store) ([]string, error) {
+func collectCleanupKeys(ctx context.Context, cfg config.Config, redisClient redis.UniversalClient, redisStore *core.Store) ([]string, error) {
 	bossKeys, err := redisClient.Keys(ctx, cfg.RedisPrefix+"boss:history:*").Result()
 	if err != nil {
 		return nil, fmt.Errorf("list boss history keys: %w", err)

@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const adminAuditCollectionName = "admin_audit_logs"
@@ -38,7 +38,7 @@ func (s *AdminAuditStore) EnsureIndexes(ctx context.Context) error {
 	return err
 }
 
-func (s *AdminAuditStore) WriteAdminAuditLog(ctx context.Context, item vote.AdminAuditLog) error {
+func (s *AdminAuditStore) WriteAdminAuditLog(ctx context.Context, item core.AdminAuditLog) error {
 	if s == nil || s.collection == nil {
 		return nil
 	}

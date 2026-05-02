@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const taskPageSource = readFileSync(path.resolve(currentDir, './TaskPage.vue'), 'utf8')
 const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
+const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
 
 describe('PublicPage 任务面板', () => {
   it('任务作为独立资料页签展示，并在可领取时显示红点提示', () => {
@@ -21,6 +22,10 @@ describe('PublicPage 任务面板', () => {
     expect(taskPageSource).toContain('当前任务')
     expect(taskPageSource).toContain('claimTask')
     expect(taskPageSource).toContain('task-card')
+    expect(taskPageSource).toContain('task-card__grid')
+    expect(taskPageSource).not.toContain('style="margin-bottom: 0.75rem;"')
+    expect(styleSource).toContain('.task-card__grid {')
+    expect(styleSource).toContain('grid-template-columns: repeat(4, minmax(0, 1fr));')
   })
 
   it('个人资料态会承接任务列表并提供领取动作', () => {

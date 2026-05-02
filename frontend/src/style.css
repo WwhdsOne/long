@@ -2082,6 +2082,284 @@ select {
   margin-top: 0;
 }
 
+.shop-current-cursor {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shop-current-cursor__image,
+.shop-cursor-card__image {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  flex: 0 0 72px;
+}
+
+.shop-current-cursor__image {
+  padding: 6px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(183, 53, 97, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.shop-cursor-card__image {
+  display: block;
+  margin: 0 auto;
+}
+
+.shop-layout {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(1280px, 100%);
+}
+
+.shop-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.shop-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 18px;
+}
+
+.shop-panel__header strong {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--display);
+  font-size: clamp(1.8rem, 3.4vw, 2.6rem);
+  color: var(--ink);
+}
+
+.shop-panel__summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.shop-panel__gold {
+  display: grid;
+  gap: 4px;
+  min-width: 120px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 241, 214, 0.94));
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.shop-panel__gold span {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+  letter-spacing: 0.06em;
+}
+
+.shop-panel__gold strong {
+  margin: 0;
+  font-size: 1.4rem;
+  color: var(--gold-deep);
+}
+
+.shop-current-cursor {
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(183, 53, 97, 0.14);
+}
+
+.shop-current-cursor__meta {
+  display: grid;
+  gap: 4px;
+}
+
+.shop-current-cursor__meta span {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.shop-current-cursor__reset-btn {
+  font-size: 0.78rem;
+  padding: 4px 12px;
+  width: auto;
+}
+
+.shop-cursor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.shop-cursor-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(183, 53, 97, 0.14);
+  box-shadow: 0 12px 28px rgba(218, 67, 110, 0.08);
+}
+
+.shop-cursor-card__visual {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 238, 242, 0.88));
+  border: 1px solid rgba(183, 53, 97, 0.14);
+  overflow: hidden;
+}
+
+.shop-cursor-card__image,
+.shop-cursor-card__fallback {
+  width: 72px;
+  height: 72px;
+}
+
+.shop-cursor-card__fallback {
+  display: grid;
+  place-items: center;
+  color: var(--primary-deep);
+  font-size: 1.4rem;
+  font-weight: 900;
+}
+
+.shop-cursor-card__main {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shop-cursor-card__title {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.shop-cursor-card__price {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--primary-deep);
+}
+
+.shop-cursor-card__desc {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.shop-cursor-card__action {
+  grid-column: 1 / -1;
+}
+
+.shop-cursor-card__action .nickname-form__submit {
+  width: 100%;
+  margin-top: 0;
+}
+
+.task-card__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.task-card__item {
+  margin: 0;
+  align-self: stretch;
+}
+
+.task-equipment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.task-equipment-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.05);
+  font-size: 0.82rem;
+  cursor: default;
+}
+
+.task-equipment-chip__name {
+  font-weight: 700;
+}
+
+.task-equipment-chip__image {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border-radius: 6px;
+}
+
+.task-equipment-chip__rarity {
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.task-equipment-chip:hover .task-equipment-tooltip,
+.task-equipment-chip:focus-within .task-equipment-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.task-equipment-tooltip {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+}
+
+@media (max-width: 1120px) {
+  .shop-cursor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-card__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .shop-panel__header {
+    flex-direction: column;
+  }
+
+  .shop-panel__summary {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .shop-cursor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-card__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .equipment-admin__pager {
   margin-top: 0;
   align-items: center;
@@ -3493,11 +3771,10 @@ select {
   position: absolute;
   pointer-events: none;
   z-index: 9999;
-  width: 128px;
-  height: 128px;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  object-position: center;
   image-rendering: pixelated;
   opacity: 0;
   transition: transform 0.08s ease-out;
@@ -5236,3 +5513,53 @@ select {
 .loadout-slot__name {
   margin-bottom: 3.65px;
 }
+
+.vote-stage__boss-note strong {
+  font-weight: bold;
+  color: #f39c12; /* Gold color for emphasis */
+  font-size: 1.2em; /* Larger text size */
+}
+
+/* ===== 移动端 Boss 战斗区域 ===== */
+@media (max-width: 640px) {
+  .boss-part-grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px;
+  }
+
+  .boss-left-panels {
+    position: static;
+    width: 100%;
+    left: auto;
+    top: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .boss-right-panel {
+    position: static;
+    width: 100%;
+    right: auto;
+    top: auto;
+  }
+
+  .boss-part-grid {
+    max-width: 100%;
+    margin: 4px auto;
+    gap: 3px;
+    padding: 4px;
+  }
+
+  .boss-part-grid__row {
+    gap: 3px;
+  }
+
+  .boss-part-cell {
+    padding: 2px;
+    border-width: 1.5px;
+  }
+}
+

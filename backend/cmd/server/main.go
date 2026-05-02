@@ -22,6 +22,7 @@ import (
 	"long/internal/admin"
 	"long/internal/archive"
 	"long/internal/config"
+	"long/internal/core"
 	"long/internal/events"
 	"long/internal/httpapi"
 	"long/internal/mongostore"
@@ -29,7 +30,6 @@ import (
 	ossupload "long/internal/oss"
 	"long/internal/playerauth"
 	"long/internal/ratelimit"
-	"long/internal/vote"
 	"long/internal/xlog"
 )
 
@@ -79,9 +79,12 @@ func run() error {
 	var taskDefinitionStore *mongostore.TaskDefinitionStore
 	var taskClaimLogStore *mongostore.TaskClaimLogStore
 	var taskCycleArchiveStore *mongostore.TaskCycleArchiveStore
+	var shopItemStore *mongostore.ShopItemStore
+	var shopPurchaseLogStore *mongostore.ShopPurchaseLogStore
 	var equipmentDraftFailureWriter httpapi.EquipmentDraftFailureWriter
 	var adminAuditWriter httpapi.AdminAuditWriter
 	var domainEventWriter httpapi.DomainEventWriter
+	var accessLogQueue *archive.AsyncQueue[xlog.AccessLogEntry]
 	if cfg.Mongo.Enabled {
 		mongoClient, err = mongo.Connect(startupCtx, options.Client().
 			ApplyURI(cfg.Mongo.URI).
@@ -126,13 +129,21 @@ func run() error {
 		if err := taskCycleArchiveStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo task cycle archive indexes: %w", err)
 		}
+		shopItemStore = mongostore.NewShopItemStore(mongoDB, cfg.Mongo.WriteTimeout, cfg.Mongo.ReadTimeout)
+		if err := shopItemStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo shop item indexes: %w", err)
+		}
+		shopPurchaseLogStore = mongostore.NewShopPurchaseLogStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := shopPurchaseLogStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo shop purchase log indexes: %w", err)
+		}
 		equipmentDraftFailureStore := mongostore.NewEquipmentDraftFailureStore(mongoDB, cfg.Mongo.WriteTimeout)
 		if err := equipmentDraftFailureStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo equipment draft failure indexes: %w", err)
 		}
 		equipmentDraftFailureWriter = equipmentDraftFailureStore
 
-		adminAuditQueue := archive.NewAsyncQueue[vote.AdminAuditLog](archive.AsyncQueueConfig{
+		adminAuditQueue := archive.NewAsyncQueue[core.AdminAuditLog](archive.AsyncQueueConfig{
 			Name:         "admin-audit",
 			BufferSize:   256,
 			WorkerCount:  2,
@@ -142,7 +153,7 @@ func run() error {
 		defer adminAuditQueue.Close()
 		adminAuditWriter = adminAuditQueueWriter{queue: adminAuditQueue}
 
-		domainEventQueue := archive.NewAsyncQueue[vote.DomainEvent](archive.AsyncQueueConfig{
+		domainEventQueue := archive.NewAsyncQueue[core.DomainEvent](archive.AsyncQueueConfig{
 			Name:         "domain-events",
 			BufferSize:   512,
 			WorkerCount:  2,
@@ -161,6 +172,18 @@ func run() error {
 		systemLogQueue.Start()
 		defer systemLogQueue.Close()
 		xlog.SetSystemLogHook(xlog.HookFromWriter(systemLogQueueWriter{queue: systemLogQueue}))
+		accessLogStore := mongostore.NewAccessLogStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := accessLogStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo access log indexes: %w", err)
+		}
+		accessLogQueue = archive.NewAsyncQueue[xlog.AccessLogEntry](archive.AsyncQueueConfig{
+			Name:         "access-logs",
+			BufferSize:   1024,
+			WorkerCount:  4,
+			WriteTimeout: cfg.Mongo.WriteTimeout,
+		}, accessLogStore.WriteAccessLog)
+		accessLogQueue.Start()
+		defer accessLogQueue.Close()
 		bossHistoryQueue = archive.NewBossHistoryQueue(archive.BossHistoryQueueConfig{
 			BufferSize:   256,
 			WorkerCount:  2,
@@ -188,7 +211,7 @@ func run() error {
 	}()
 
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
-	store := vote.NewStore(redisClient, cfg.RedisPrefix, vote.StoreOptions{
+	store := core.NewStore(redisClient, cfg.RedisPrefix, core.StoreOptions{
 		CriticalChancePercent: 5,
 		BossHistoryStore:      bossHistoryStore,
 		BossHistoryArchiver:   bossHistoryQueue,
@@ -196,11 +219,13 @@ func run() error {
 		TaskDefinitionStore:   taskDefinitionStore,
 		TaskClaimLogStore:     taskClaimLogStore,
 		TaskCycleArchiveStore: taskCycleArchiveStore,
+		ShopCatalogStore:      shopItemStore,
+		ShopPurchaseLogStore:  shopPurchaseLogStore,
 	}, nicknameValidator)
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)
 	dispatcher := events.NewDispatcher(stateCache, hub, cfg.Realtime.DebounceMs)
-	changeBus := events.NewRedisChangeBus(redisClient, vote.RealtimeEventChannel(cfg.RedisPrefix))
+	changeBus := events.NewRedisChangeBus(redisClient, core.RealtimeEventChannel(cfg.RedisPrefix))
 	playerAuthenticator := playerauth.NewService(redisClient, playerauth.Config{
 		Namespace: cfg.RedisPrefix,
 		JWTSecret: cfg.PlayerAuth.JWTSecret,
@@ -257,12 +282,13 @@ func run() error {
 		}),
 		AdminAuditWriter:       adminAuditWriter,
 		DomainEventWriter:      domainEventWriter,
+		AccessLogQueue:         accessLogQueue,
 		AdminBossHistoryReader: bossHistoryStore,
 	})
 
 	errCh := make(chan error, 1)
 	go func() {
-		xlog.L().Info("vote wall listening", zap.String("listen_addr", listenAddr))
+		xlog.L().Info("🌟hai-world🌟 listening", zap.String("listen_addr", listenAddr))
 		if err := httpServer.Run(); err != nil {
 			errCh <- err
 		}
@@ -414,7 +440,7 @@ func broadcastLeaderboardOnMinute(ctx context.Context, dispatcher *events.Dispat
 	}
 }
 
-func processTalentBleedLoop(ctx context.Context, store *vote.Store, changeBus *events.RedisChangeBus) error {
+func processTalentBleedLoop(ctx context.Context, store *core.Store, changeBus *events.RedisChangeBus) error {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -437,7 +463,7 @@ func processTalentBleedLoop(ctx context.Context, store *vote.Store, changeBus *e
 	}
 }
 
-func archiveExpiredTaskCyclesLoop(ctx context.Context, store *vote.Store) error {
+func archiveExpiredTaskCyclesLoop(ctx context.Context, store *core.Store) error {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
@@ -471,10 +497,10 @@ func serverAddress(port int) string {
 }
 
 type adminAuditQueueWriter struct {
-	queue *archive.AsyncQueue[vote.AdminAuditLog]
+	queue *archive.AsyncQueue[core.AdminAuditLog]
 }
 
-func (w adminAuditQueueWriter) WriteAdminAuditLog(_ context.Context, item vote.AdminAuditLog) error {
+func (w adminAuditQueueWriter) WriteAdminAuditLog(_ context.Context, item core.AdminAuditLog) error {
 	if w.queue != nil {
 		w.queue.Enqueue(item)
 	}
@@ -482,10 +508,10 @@ func (w adminAuditQueueWriter) WriteAdminAuditLog(_ context.Context, item vote.A
 }
 
 type domainEventQueueWriter struct {
-	queue *archive.AsyncQueue[vote.DomainEvent]
+	queue *archive.AsyncQueue[core.DomainEvent]
 }
 
-func (w domainEventQueueWriter) WriteDomainEvent(_ context.Context, item vote.DomainEvent) error {
+func (w domainEventQueueWriter) WriteDomainEvent(_ context.Context, item core.DomainEvent) error {
 	if w.queue != nil {
 		w.queue.Enqueue(item)
 	}

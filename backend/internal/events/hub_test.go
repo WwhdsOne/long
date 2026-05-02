@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
@@ -16,7 +16,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	xiaohong, unsubscribeXiaohong := hub.Subscribe("小红")
 	defer unsubscribeXiaohong()
 
-	if err := hub.BroadcastPublic(vote.Snapshot{}, true); err != nil {
+	if err := hub.BroadcastPublic(core.Snapshot{}, true); err != nil {
 		t.Fatalf("broadcast public snapshot: %v", err)
 	}
 
@@ -30,9 +30,11 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 		t.Fatalf("expected public_state for 小红, got %+v", xiaohongEvent)
 	}
 
-	if err := hub.BroadcastUser("阿明", vote.UserState{
-		UserStats:   &vote.UserStats{Nickname: "阿明", ClickCount: 8},
-		CombatStats: vote.CombatStats{EffectiveIncrement: 3},
+	if err := hub.BroadcastUser("阿明", core.UserState{
+		UserStats:                          &core.UserStats{Nickname: "阿明", ClickCount: 8},
+		CombatStats:                        core.CombatStats{EffectiveIncrement: 3},
+		EquippedBattleClickSkinID:          "skin-basic",
+		EquippedBattleClickCursorImagePath: "https://example.com/basic.png",
 	}); err != nil {
 		t.Fatalf("broadcast user state: %v", err)
 	}
@@ -44,6 +46,12 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	payload := string(amingEvent.Payload)
 	if !strings.Contains(payload, `"userStats":{"nickname":"阿明","clickCount":8}`) {
 		t.Fatalf("expected user stats in slim payload, got %s", payload)
+	}
+	if !strings.Contains(payload, `"equippedBattleClickSkinId":"skin-basic"`) {
+		t.Fatalf("expected equipped battle click skin id in slim payload, got %s", payload)
+	}
+	if !strings.Contains(payload, `"equippedBattleClickCursorImagePath":"https://example.com/basic.png"`) {
+		t.Fatalf("expected equipped battle click cursor path in slim payload, got %s", payload)
 	}
 	if strings.Contains(payload, `"inventory"`) {
 		t.Fatalf("expected slim user payload to omit inventory, got %s", payload)

@@ -13,7 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const (
@@ -203,12 +203,12 @@ func pendingMigrationFilter() bson.M {
 }
 
 func normalizeTaskDefinitionDocument(doc bson.M) (bson.M, bool) {
-	item := vote.NormalizeTaskDefinitionModel(vote.TaskDefinition{
+	item := core.NormalizeTaskDefinitionModel(core.TaskDefinition{
 		TaskID:        stringValue(doc["task_id"]),
-		TaskType:      vote.TaskType(stringValue(doc["task_type"])),
-		EventKind:     vote.TaskEventKind(stringValue(doc["event_kind"])),
-		WindowKind:    vote.TaskWindowKind(stringValue(doc["window_kind"])),
-		ConditionKind: vote.TaskConditionKind(stringValue(doc["condition_kind"])),
+		TaskType:      core.TaskType(stringValue(doc["task_type"])),
+		EventKind:     core.TaskEventKind(stringValue(doc["event_kind"])),
+		WindowKind:    core.TaskWindowKind(stringValue(doc["window_kind"])),
+		ConditionKind: core.TaskConditionKind(stringValue(doc["condition_kind"])),
 	})
 	update := bson.M{
 		"task_type":      string(item.TaskType),
@@ -220,12 +220,12 @@ func normalizeTaskDefinitionDocument(doc bson.M) (bson.M, bool) {
 }
 
 func normalizeTaskArchiveDocument(doc bson.M) (bson.M, bool) {
-	item := vote.NormalizeTaskArchiveModel(vote.TaskCycleArchive{
+	item := core.NormalizeTaskArchiveModel(core.TaskCycleArchive{
 		TaskID:        stringValue(doc["task_id"]),
-		TaskType:      vote.TaskType(stringValue(doc["task_type"])),
-		EventKind:     vote.TaskEventKind(stringValue(doc["event_kind"])),
-		WindowKind:    vote.TaskWindowKind(stringValue(doc["window_kind"])),
-		ConditionKind: vote.TaskConditionKind(stringValue(doc["condition_kind"])),
+		TaskType:      core.TaskType(stringValue(doc["task_type"])),
+		EventKind:     core.TaskEventKind(stringValue(doc["event_kind"])),
+		WindowKind:    core.TaskWindowKind(stringValue(doc["window_kind"])),
+		ConditionKind: core.TaskConditionKind(stringValue(doc["condition_kind"])),
 	})
 	update := bson.M{
 		"task_type":      string(item.TaskType),

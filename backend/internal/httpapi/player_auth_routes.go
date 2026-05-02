@@ -8,8 +8,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
+	"long/internal/core"
 	playerauth "long/internal/playerauth"
-	"long/internal/vote"
 )
 
 func registerPlayerAuthRoutes(router route.IRouter, options Options) {
@@ -48,7 +48,7 @@ func registerPlayerAuthRoutes(router route.IRouter, options Options) {
 		}
 
 		setPlayerSessionCookie(c, token)
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "player.login",
 			Nickname:  nickname,
 		})
@@ -127,11 +127,11 @@ func registerPlayerAuthRoutes(router route.IRouter, options Options) {
 				return
 			}
 			switch {
-			case errors.Is(err, vote.ErrTaskNotFound):
+			case errors.Is(err, core.ErrTaskNotFound):
 				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "TASK_NOT_FOUND"})
-			case errors.Is(err, vote.ErrTaskAlreadyClaimed):
+			case errors.Is(err, core.ErrTaskAlreadyClaimed):
 				writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "TASK_ALREADY_CLAIMED"})
-			case errors.Is(err, vote.ErrTaskNotClaimable):
+			case errors.Is(err, core.ErrTaskNotClaimable):
 				writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "TASK_NOT_CLAIMABLE"})
 			default:
 				writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "TASK_CLAIM_FAILED"})
@@ -139,7 +139,7 @@ func registerPlayerAuthRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "task.claimed",
 			Nickname:  nickname,
 			Payload: map[string]any{

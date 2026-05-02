@@ -5,30 +5,30 @@ import (
 	"strings"
 	"sync"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 // Cache 在进程内缓存公共快照与个人态，避免每次推送都回源 Redis 聚合。
 type Cache struct {
-	reader              StateReader
-	mu                  sync.RWMutex
-	snapshot            vote.Snapshot
-	snapshotReady       bool
-	bossResources       vote.BossResources
-	bossResourcesReady  bool
-	users               map[string]vote.UserState
+	reader             StateReader
+	mu                 sync.RWMutex
+	snapshot           core.Snapshot
+	snapshotReady      bool
+	bossResources      core.BossResources
+	bossResourcesReady bool
+	users              map[string]core.UserState
 }
 
 // NewCache 创建一个可作为只读视图使用的状态缓存。
 func NewCache(reader StateReader) *Cache {
 	return &Cache{
 		reader: reader,
-		users:  make(map[string]vote.UserState),
+		users:  make(map[string]core.UserState),
 	}
 }
 
 // GetSnapshot 返回缓存中的公共快照；未命中时回源加载。
-func (c *Cache) GetSnapshot(ctx context.Context) (vote.Snapshot, error) {
+func (c *Cache) GetSnapshot(ctx context.Context) (core.Snapshot, error) {
 	c.mu.RLock()
 	if c.snapshotReady {
 		snapshot := c.snapshot
@@ -41,18 +41,18 @@ func (c *Cache) GetSnapshot(ctx context.Context) (vote.Snapshot, error) {
 }
 
 // RefreshSnapshot 强制回源刷新公共快照。
-func (c *Cache) RefreshSnapshot(ctx context.Context) (vote.Snapshot, error) {
+func (c *Cache) RefreshSnapshot(ctx context.Context) (core.Snapshot, error) {
 	snapshot, err := c.reader.GetSnapshot(ctx)
 	if err != nil {
-		return vote.Snapshot{}, err
+		return core.Snapshot{}, err
 	}
 
 	c.mu.Lock()
 	c.snapshot = snapshot
 	c.snapshotReady = true
 	if snapshot.Boss == nil {
-		c.bossResources = vote.BossResources{
-			BossLoot: []vote.BossLootEntry{},
+		c.bossResources = core.BossResources{
+			BossLoot: []core.BossLootEntry{},
 		}
 		c.bossResourcesReady = true
 	} else if c.bossResources.BossID != snapshot.Boss.ID {
@@ -64,7 +64,7 @@ func (c *Cache) RefreshSnapshot(ctx context.Context) (vote.Snapshot, error) {
 }
 
 // GetBossResources 返回当前 Boss 的低频公共资源；未命中时回源加载。
-func (c *Cache) GetBossResources(ctx context.Context) (vote.BossResources, error) {
+func (c *Cache) GetBossResources(ctx context.Context) (core.BossResources, error) {
 	c.mu.RLock()
 	if c.bossResourcesReady {
 		resources := c.bossResources
@@ -77,10 +77,10 @@ func (c *Cache) GetBossResources(ctx context.Context) (vote.BossResources, error
 }
 
 // RefreshBossResources 强制回源刷新 Boss 低频资源。
-func (c *Cache) RefreshBossResources(ctx context.Context) (vote.BossResources, error) {
+func (c *Cache) RefreshBossResources(ctx context.Context) (core.BossResources, error) {
 	resources, err := c.reader.GetBossResources(ctx)
 	if err != nil {
-		return vote.BossResources{}, err
+		return core.BossResources{}, err
 	}
 
 	c.mu.Lock()
@@ -92,7 +92,7 @@ func (c *Cache) RefreshBossResources(ctx context.Context) (vote.BossResources, e
 }
 
 // GetUserState 返回指定昵称的个人态；未命中时回源加载。
-func (c *Cache) GetUserState(ctx context.Context, nickname string) (vote.UserState, error) {
+func (c *Cache) GetUserState(ctx context.Context, nickname string) (core.UserState, error) {
 	normalizedNickname := strings.TrimSpace(nickname)
 	if normalizedNickname == "" {
 		return c.reader.GetUserState(ctx, "")
@@ -109,11 +109,11 @@ func (c *Cache) GetUserState(ctx context.Context, nickname string) (vote.UserSta
 }
 
 // RefreshUser 强制回源刷新一个昵称的个人态。
-func (c *Cache) RefreshUser(ctx context.Context, nickname string) (vote.UserState, error) {
+func (c *Cache) RefreshUser(ctx context.Context, nickname string) (core.UserState, error) {
 	normalizedNickname := strings.TrimSpace(nickname)
 	userState, err := c.reader.GetUserState(ctx, normalizedNickname)
 	if err != nil {
-		return vote.UserState{}, err
+		return core.UserState{}, err
 	}
 	if normalizedNickname == "" {
 		return userState, nil
@@ -127,8 +127,8 @@ func (c *Cache) RefreshUser(ctx context.Context, nickname string) (vote.UserStat
 }
 
 // RefreshUsers 批量刷新多个昵称的个人态。
-func (c *Cache) RefreshUsers(ctx context.Context, nicknames []string) (map[string]vote.UserState, error) {
-	refreshed := make(map[string]vote.UserState, len(nicknames))
+func (c *Cache) RefreshUsers(ctx context.Context, nicknames []string) (map[string]core.UserState, error) {
+	refreshed := make(map[string]core.UserState, len(nicknames))
 	seen := make(map[string]struct{}, len(nicknames))
 
 	for _, nickname := range nicknames {
@@ -152,16 +152,16 @@ func (c *Cache) RefreshUsers(ctx context.Context, nicknames []string) (map[strin
 }
 
 // GetState 返回公共快照与个人态组合后的完整状态。
-func (c *Cache) GetState(ctx context.Context, nickname string) (vote.State, error) {
+func (c *Cache) GetState(ctx context.Context, nickname string) (core.State, error) {
 	snapshot, err := c.GetSnapshot(ctx)
 	if err != nil {
-		return vote.State{}, err
+		return core.State{}, err
 	}
 
 	userState, err := c.GetUserState(ctx, nickname)
 	if err != nil {
-		return vote.State{}, err
+		return core.State{}, err
 	}
 
-	return vote.ComposeState(snapshot, userState), nil
+	return core.ComposeState(snapshot, userState), nil
 }

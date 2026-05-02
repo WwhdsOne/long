@@ -4,6 +4,7 @@ import AdminContentTab from '../components/admin/AdminContentTab.vue'
 import AdminDashboardTab from '../components/admin/AdminDashboardTab.vue'
 import AdminEquipmentTab from '../components/admin/AdminEquipmentTab.vue'
 import AdminHistoryTab from '../components/admin/AdminHistoryTab.vue'
+import AdminShopTab from '../components/admin/AdminShopTab.vue'
 import AdminTaskTab from '../components/admin/AdminTaskTab.vue'
 import { useAdminPage } from './admin/useAdminPage'
 import {reactive} from "vue";
@@ -75,6 +76,7 @@ const admin = reactive(useAdminPage())
         <div class="admin-tabs">
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'boss' }" @click="admin.activeTab = 'boss'">Boss</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'equipment' }" @click="admin.activeTab = 'equipment'; admin.fetchEquipmentPage(admin.equipmentPage.page)">装备</button>
+          <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'shop' }" @click="admin.activeTab = 'shop'; admin.fetchShopItems()">商店</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'content' }" @click="admin.activeTab = 'content'; admin.fetchAnnouncements(); admin.fetchMessages()">内容</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'history' }" @click="admin.activeTab = 'history'; admin.fetchBossHistory(admin.bossHistoryPage.page)">历史</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'tasks' }" @click="admin.activeTab = 'tasks'; admin.fetchTasks()">任务</button>
@@ -131,6 +133,20 @@ const admin = reactive(useAdminPage())
           :delete-equipment="admin.deleteEquipment"
           :fetch-equipment-page="admin.fetchEquipmentPage"
           :upload-equipment-image="admin.uploadEquipmentImage"
+        />
+        <AdminShopTab
+          v-else-if="admin.activeTab === 'shop'"
+          :shop-items="admin.shopItems"
+          :shop-item-form="admin.shopItemForm"
+          :loading-shop-items="admin.loadingShopItems"
+          :saving="admin.saving"
+          :open-new-shop-item="admin.openNewShopItem"
+          :save-shop-item="admin.saveShopItem"
+          :edit-shop-item="admin.editShopItem"
+          :delete-shop-item="admin.deleteShopItem"
+          :upload-shop-image="admin.uploadShopImage"
+          :upload-shop-preview-image="admin.uploadShopPreviewImage"
+          :upload-shop-cursor-image="admin.uploadShopCursorImage"
         />
         <AdminContentTab
           v-else-if="admin.activeTab === 'content'"

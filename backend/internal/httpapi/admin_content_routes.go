@@ -8,7 +8,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 func registerAdminContentRoutes(router route.IRouter, options Options) {
@@ -37,7 +37,7 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body vote.AnnouncementUpsert
+		var body core.AnnouncementUpsert
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
@@ -50,8 +50,8 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_SAVE_FAILED"})
 			return
 		}
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:      vote.StateChangeAnnouncementChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:      core.StateChangeAnnouncementChanged,
 			Timestamp: time.Now().Unix(),
 		})
 		writeJSON(c, consts.StatusOK, item)
@@ -67,8 +67,8 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ANNOUNCEMENT_DELETE_FAILED"})
 			return
 		}
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:      vote.StateChangeAnnouncementChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:      core.StateChangeAnnouncementChanged,
 			Timestamp: time.Now().Unix(),
 		})
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
@@ -98,7 +98,7 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "MESSAGE_DELETE_FAILED"})
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "message.delete",
 			TargetType:  "message",
@@ -107,15 +107,15 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "message.deleted",
 			Payload: map[string]any{
 				"message_id": c.Param("id"),
 				"operator":   options.AdminAuthenticator.Username(),
 			},
 		})
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:      vote.StateChangeMessageDeleted,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:      core.StateChangeMessageDeleted,
 			Timestamp: time.Now().Unix(),
 		})
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
@@ -134,7 +134,7 @@ func registerAdminContentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		policy, err := options.OSSSigner.CreatePolicy(ctx)
+		policy, err := options.OSSSigner.CreatePolicy(ctx, string(c.QueryArgs().Peek("category")))
 		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "OSS_POLICY_FAILED"})
 			return

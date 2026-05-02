@@ -109,6 +109,7 @@ const profilePageMap = {
 
 const publicPages = [
     {id: 'battle', label: '战斗', path: '/'},
+    {id: 'shop', label: '外观商店', path: '/shop'},
     {id: 'resources', label: '资源', path: '/profile/resources'},
     {id: 'inventory', label: '背包', path: '/profile/inventory'},
     {id: 'stats', label: '属性', path: '/profile/stats'},
@@ -638,9 +639,13 @@ const messageDraft = ref('')
 const messageError = ref('')
 const autoClickEnabled = ref(false)
 const autoClickTargetKey = ref('')
+const shopItems = ref([])
+const loadingShopItems = ref(false)
 const gold = ref(0)
 const stones = ref(0)
 const talentPoints = ref(0)
+const equippedBattleClickSkinId = ref('')
+const equippedBattleClickCursorImagePath = ref('')
 const afkSettlement = ref(null)
 const rewardModal = ref(null)
 const currentPublicPage = ref(resolvePublicPage(window.location.pathname))
@@ -842,6 +847,9 @@ function isProfilePublicPage(page) {
 }
 
 function resolvePublicPage(pathname) {
+    if (pathname.startsWith('/shop')) {
+        return 'shop'
+    }
     if (pathname.startsWith('/messages')) {
         return 'messages'
     }
@@ -879,6 +887,10 @@ async function navigatePublicPage(page) {
 }
 
 async function activatePublicPage(page) {
+    if (page === 'shop') {
+        await loadShopItems()
+        return
+    }
     if (isProfilePublicPage(page)) {
         try {
             await loadPlayerProfile()
@@ -920,6 +932,20 @@ async function loadTasks() {
 
     const payload = await response.json()
     tasks.value = Array.isArray(payload) ? payload : []
+}
+
+async function loadShopItems() {
+    loadingShopItems.value = true
+    try {
+        const response = await fetch('/api/shop/items')
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, '商店列表加载失败，请稍后重试。'))
+        }
+        const payload = await response.json()
+        shopItems.value = Array.isArray(payload) ? payload : []
+    } finally {
+        loadingShopItems.value = false
+    }
 }
 
 function stopTaskPolling() {
@@ -1534,6 +1560,12 @@ function applyPlayerProfileState(payload) {
     if ('tasks' in payload) {
         tasks.value = Array.isArray(payload.tasks) ? payload.tasks : []
     }
+    if ('equippedBattleClickSkinId' in payload) {
+        equippedBattleClickSkinId.value = payload.equippedBattleClickSkinId || ''
+    }
+    if ('equippedBattleClickCursorImagePath' in payload) {
+        equippedBattleClickCursorImagePath.value = payload.equippedBattleClickCursorImagePath || ''
+    }
 }
 
 async function claimTask(taskId) {
@@ -1555,6 +1587,87 @@ async function claimTask(taskId) {
     applyUserState(payload)
     errorMessage.value = ''
     return {ok: true}
+}
+
+async function purchaseShopItem(itemId) {
+    if (!nickname.value) {
+        errorMessage.value = '先登录账号再购买。'
+        return {ok: false, message: errorMessage.value}
+    }
+
+    try {
+        const response = await fetch(`/api/shop/items/${encodeURIComponent(itemId)}/purchase`, {
+            method: 'POST',
+        })
+        if (!response.ok) {
+            const message = await readErrorMessage(response, '购买失败，请稍后重试。')
+            errorMessage.value = message
+            return {ok: false, message}
+        }
+        const payload = await response.json()
+        applyUserState(payload.userState)
+        await loadShopItems()
+        errorMessage.value = ''
+        return {ok: true}
+    } catch (error) {
+        const message = error.message || '购买失败，请稍后重试。'
+        errorMessage.value = message
+        return {ok: false, message}
+    }
+}
+
+async function equipShopItem(itemId) {
+    if (!nickname.value) {
+        errorMessage.value = '先登录账号再使用。'
+        return {ok: false, message: errorMessage.value}
+    }
+
+    try {
+        const response = await fetch(`/api/shop/items/${encodeURIComponent(itemId)}/equip`, {
+            method: 'POST',
+        })
+        if (!response.ok) {
+            const message = await readErrorMessage(response, '切换失败，请稍后重试。')
+            errorMessage.value = message
+            return {ok: false, message}
+        }
+        const payload = await response.json()
+        applyUserState(payload.userState)
+        await loadShopItems()
+        errorMessage.value = ''
+        return {ok: true}
+    } catch (error) {
+        const message = error.message || '切换失败，请稍后重试。'
+        errorMessage.value = message
+        return {ok: false, message}
+    }
+}
+
+async function unequipShopItem() {
+    if (!nickname.value) {
+        errorMessage.value = '先登录账号再操作。'
+        return {ok: false, message: errorMessage.value}
+    }
+
+    try {
+        const response = await fetch('/api/shop/items/unequip', {
+            method: 'POST',
+        })
+        if (!response.ok) {
+            const message = await readErrorMessage(response, '恢复默认失败，请稍后重试。')
+            errorMessage.value = message
+            return {ok: false, message}
+        }
+        const payload = await response.json()
+        applyUserState(payload.userState)
+        await loadShopItems()
+        errorMessage.value = ''
+        return {ok: true}
+    } catch (error) {
+        const message = error.message || '恢复默认失败，请稍后重试。'
+        errorMessage.value = message
+        return {ok: false, message}
+    }
 }
 
 function applyClickResult(payload) {
@@ -1744,6 +1857,8 @@ function clearUserRealtimeState() {
     gold.value = 0
     stones.value = 0
     talentPoints.value = 0
+    equippedBattleClickSkinId.value = ''
+    equippedBattleClickCursorImagePath.value = ''
     myBossStats.value = null
     myBossDamageValue.value = 0
     bossLeaderboardCountValue.value = -1
@@ -2417,6 +2532,9 @@ async function submitNickname() {
         } catch (error) {
             errorMessage.value = error.message || '资料加载失败，请稍后重试。'
         }
+        if (currentPublicPage.value === 'shop') {
+            await loadShopItems()
+        }
         startPresenceHeartbeat()
         startTaskPolling()
         connectRealtime(resolvedNickname)
@@ -2437,6 +2555,9 @@ async function resetNickname() {
     stopPresenceHeartbeat()
     await reportPresence(false)
     clearPlayerSessionState()
+    if (currentPublicPage.value === 'shop') {
+        void loadShopItems()
+    }
     connectRealtime('')
 }
 
@@ -2474,6 +2595,9 @@ async function loadPlayerSession() {
             await loadPlayerProfile()
         } catch (error) {
             errorMessage.value = error.message || '资料加载失败，请稍后重试。'
+        }
+        if (currentPublicPage.value === 'shop') {
+            await loadShopItems()
         }
         startPresenceHeartbeat()
         startTaskPolling()
@@ -2683,9 +2807,13 @@ export function usePublicPageState() {
         messageError,
         autoClickEnabled,
         autoClickTargetKey,
+        shopItems,
+        loadingShopItems,
         gold,
         stones,
         talentPoints,
+        equippedBattleClickSkinId,
+        equippedBattleClickCursorImagePath,
         afkSettlement,
         rewardModal,
         currentPublicPage,
@@ -2729,8 +2857,12 @@ export function usePublicPageState() {
         closeAfkSettlementModal,
         closeRewardModal,
         loadMessages,
+        loadShopItems,
         submitMessage,
         claimTask,
+        purchaseShopItem,
+        equipShopItem,
+        unequipShopItem,
         toggleAutoClick,
         clickButton,
         toggleItemEquip,

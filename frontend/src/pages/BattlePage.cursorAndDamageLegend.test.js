@@ -28,13 +28,16 @@ describe('BattlePage 光标与伤害说明', () => {
 
   it('改用局部原生事件，只在 Boss 5x5 网格内显示 PNG 光标', () => {
     expect(battleSource).toContain("ref=\"bossGridRef\"")
+    expect(battleSource).toContain('@pointerenter="handleBossGridPointerEnter"')
     expect(battleSource).toContain('@pointermove="handleBossGridPointerMove"')
     expect(battleSource).toContain('@pointerleave="handleBossGridPointerLeave"')
     expect(battleSource).toContain('https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png')
+    expect(battleSource).toContain(':src="bossSwordCursorUrl"')
+    expect(battleSource).not.toContain('bossSwordCursorUrl.value')
     expect(styleSource).toContain('.boss-part-grid-with-combo * {')
     expect(styleSource).toContain('cursor: none !important;')
-    expect(styleSource).toContain('width: 128px;')
-    expect(styleSource).toContain('height: 128px;')
+    expect(styleSource).toContain('width: 72px;')
+    expect(styleSource).toContain('height: 72px;')
     expect(battleSource).not.toContain("document.addEventListener('pointermove'")
     expect(battleSource).not.toContain("document.addEventListener('pointerdown'")
     expect(battleSource).not.toContain("document.addEventListener('click'")

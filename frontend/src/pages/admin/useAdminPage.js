@@ -11,6 +11,7 @@ import {
   emptyLootRows,
   emptyMessagePage,
   emptyPlayerPage,
+  emptyShopItemForm,
   emptyTaskCycleResults,
   emptyTaskForm,
   formatItemStats,
@@ -22,6 +23,7 @@ import {
   normalizeEquipmentPage,
   normalizeMessagePage,
   normalizePlayerPage,
+  normalizeShopItem,
   normalizeTaskArchive,
   normalizeTaskCycleResults,
   normalizeTaskDefinition,
@@ -58,7 +60,9 @@ export function useAdminPage() {
   const announcements = ref([])
   const messagePage = ref(emptyMessagePage())
   const taskDefinitions = ref([])
+  const shopItems = ref([])
   const taskForm = ref(emptyTaskForm())
+  const shopItemForm = ref(emptyShopItemForm())
   const taskArchives = ref([])
   const taskCycleResults = ref(emptyTaskCycleResults())
   const selectedTaskId = ref('')
@@ -72,6 +76,7 @@ export function useAdminPage() {
   const loadingMessages = ref(false)
   const loadingPlayers = ref(false)
   const loadingTasks = ref(false)
+  const loadingShopItems = ref(false)
   const loadingTaskArchives = ref(false)
   const loadingTaskResults = ref(false)
 
@@ -124,10 +129,11 @@ export function useAdminPage() {
     applyLootRows(findBossTemplate(nextTemplateId)?.loot ?? [])
   }
 
-  async function uploadImageToOSS(event, file, applyImage, successTip) {
+  async function uploadImageToOSS(event, file, applyImage, successTip, category = '') {
     uploadingImage.value = true
     try {
-      const policyResponse = await fetchWithTimeout('/api/admin/oss/sts', { method: 'POST' })
+      const stsURL = category ? `/api/admin/oss/sts?category=${encodeURIComponent(category)}` : '/api/admin/oss/sts'
+      const policyResponse = await fetchWithTimeout(stsURL, { method: 'POST' })
       if (!policyResponse.ok) {
         throw new Error(await readErrorMessage(policyResponse, '获取 OSS 上传凭证失败'))
       }
@@ -297,6 +303,22 @@ export function useAdminPage() {
     }
   }
 
+  async function fetchShopItems() {
+    loadingShopItems.value = true
+    try {
+      const response = await fetchWithTimeout('/api/admin/shop/items')
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '商店商品列表加载失败'))
+      }
+      const payload = await response.json()
+      shopItems.value = Array.isArray(payload) ? payload.map(normalizeShopItem) : []
+    } catch (error) {
+      errorMessage.value = error.message || '商店商品列表加载失败'
+    } finally {
+      loadingShopItems.value = false
+    }
+  }
+
   async function fetchTaskArchives(taskId = selectedTaskId.value) {
     if (!taskId) {
       taskArchives.value = []
@@ -348,6 +370,7 @@ export function useAdminPage() {
       fetchAdminState(),
       fetchPlayerPage(),
       fetchEquipmentPage(equipmentPage.value.page),
+      fetchShopItems(),
       fetchTasks(),
     ])
   }
@@ -367,6 +390,7 @@ export function useAdminPage() {
         fetchMessages(),
         fetchPlayerPage(),
         fetchEquipmentPage(),
+        fetchShopItems(),
         fetchTasks(),
       ])
     } catch {
@@ -392,7 +416,7 @@ export function useAdminPage() {
       checkingSession.value = false
       setSuccess('后台已解锁。')
       await fetchAdminState()
-      await Promise.all([fetchPlayerPage(), fetchEquipmentPage(), fetchTasks()])
+      await Promise.all([fetchPlayerPage(), fetchEquipmentPage(), fetchShopItems(), fetchTasks()])
     } catch (error) {
       errorMessage.value = error.message || '登录失败'
     } finally {
@@ -410,7 +434,9 @@ export function useAdminPage() {
     bossHistoryPage.value = emptyBossHistoryPage()
     messagePage.value = emptyMessagePage()
     taskDefinitions.value = []
+    shopItems.value = []
     taskForm.value = emptyTaskForm()
+    shopItemForm.value = emptyShopItemForm()
     taskArchives.value = []
     taskCycleResults.value = emptyTaskCycleResults()
     selectedTaskId.value = ''
@@ -470,6 +496,7 @@ export function useAdminPage() {
     emptyEquipmentPage,
     emptyMessagePage,
     emptyPlayerPage,
+    emptyShopItemForm,
     emptyTaskForm,
     equipmentForm,
     equipmentPage,
@@ -480,6 +507,7 @@ export function useAdminPage() {
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
+    fetchShopItems,
     fetchTaskArchives,
     fetchTaskCycleResults,
     fetchTasks,
@@ -503,6 +531,8 @@ export function useAdminPage() {
     normalizeMessagePage,
     normalizePlayerPage,
     playerPage,
+    shopItems,
+    shopItemForm,
     taskArchives,
     taskCycleResults,
     taskDefinitions,
@@ -519,6 +549,7 @@ export function useAdminPage() {
     syncBossTemplateEditor,
     loadingTaskArchives,
     loadingTaskResults,
+    loadingShopItems,
     loadingTasks,
     uploadImageToOSS,
   }
@@ -545,6 +576,7 @@ export function useAdminPage() {
     editBossTemplate: actions.editBossTemplate,
     editButton: actions.editButton,
     editEquipment: actions.editEquipment,
+    editShopItem: actions.editShopItem,
     equipmentPrompt,
     equipmentForm,
     equipmentOptions,
@@ -563,6 +595,7 @@ export function useAdminPage() {
     loadingHistory,
     loadingMessages,
     loadingPlayers,
+    loadingShopItems,
     loadingTaskArchives,
     loadingTaskResults,
     loadingTasks,
@@ -571,6 +604,8 @@ export function useAdminPage() {
     lootRows,
     messagePage,
     playerPage,
+    shopItems,
+    shopItemForm,
     selectedTaskCycleKey,
     selectedTaskId,
     checkSession,
@@ -580,15 +615,18 @@ export function useAdminPage() {
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
+    fetchShopItems,
     fetchTaskArchives,
     fetchTaskCycleResults,
     fetchTasks,
     fetchPlayerPage,
     login,
     logout,
+    openNewShopItem: actions.openNewShopItem,
     refreshAll,
     resetPlayerPassword,
     saving,
+    saveShopItem: actions.saveShopItem,
     selectedBossTemplate,
     selectedBossTemplateId,
     successMessage,
@@ -596,6 +634,10 @@ export function useAdminPage() {
     taskCycleResults,
     taskDefinitions,
     taskForm,
+    deleteShopItem: actions.deleteShopItem,
+    uploadShopCursorImage: actions.uploadShopCursorImage,
+    uploadShopImage: actions.uploadShopImage,
+    uploadShopPreviewImage: actions.uploadShopPreviewImage,
     uploadingImage,
   }
 }

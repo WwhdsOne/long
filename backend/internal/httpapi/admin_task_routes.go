@@ -9,22 +9,22 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 func writeTaskAdminError(c *app.RequestContext, err error, fallbackCode string) {
 	switch {
-	case errors.Is(err, vote.ErrTaskNotFound):
+	case errors.Is(err, core.ErrTaskNotFound):
 		writeJSON(c, consts.StatusNotFound, map[string]string{
 			"error":   "TASK_NOT_FOUND",
 			"message": "任务不存在。",
 		})
-	case errors.Is(err, vote.ErrTaskImmutable):
+	case errors.Is(err, core.ErrTaskImmutable):
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   fallbackCode,
 			"message": "生效中的任务核心规则不能直接修改，建议复制新任务后再上线。",
 		})
-	case errors.Is(err, vote.ErrTaskNotClaimable):
+	case errors.Is(err, core.ErrTaskNotClaimable):
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   fallbackCode,
 			"message": "任务定义不合法，请检查目标值、奖励配置和限时任务的时间窗口。",
@@ -53,7 +53,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
 			return
 		}
-		var body vote.TaskDefinition
+		var body core.TaskDefinition
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
@@ -61,7 +61,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeTaskAdminError(c, err, "TASK_SAVE_FAILED")
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "task.save",
 			TargetType:  "task",
@@ -70,7 +70,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "task.saved",
 			Payload: map[string]any{
 				"task_id":  body.TaskID,
@@ -85,7 +85,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
 			return
 		}
-		var body vote.TaskDefinition
+		var body core.TaskDefinition
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
@@ -94,7 +94,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeTaskAdminError(c, err, "TASK_SAVE_FAILED")
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "task.save",
 			TargetType:  "task",
@@ -103,7 +103,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "task.saved",
 			Payload: map[string]any{
 				"task_id":  body.TaskID,
@@ -122,7 +122,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeTaskAdminError(c, err, "TASK_ACTIVATE_FAILED")
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "task.activate",
 			TargetType:  "task",
@@ -143,7 +143,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeTaskAdminError(c, err, "TASK_DEACTIVATE_FAILED")
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "task.deactivate",
 			TargetType:  "task",
@@ -169,7 +169,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeTaskAdminError(c, err, "TASK_DUPLICATE_FAILED")
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "task.duplicate",
 			TargetType:  "task",
@@ -191,7 +191,7 @@ func registerAdminTaskRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "TASK_ARCHIVE_FAILED"})
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "task.archive_expired",
 			TargetType:  "task_cycle",

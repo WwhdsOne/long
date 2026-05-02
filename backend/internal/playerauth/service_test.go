@@ -9,7 +9,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type nicknameValidator struct {
@@ -131,13 +131,13 @@ func TestServiceRejectsInvalidNicknameAndPassword(t *testing.T) {
 		Namespace: "vote:",
 		JWTSecret: "player-secret",
 		TokenTTL:  time.Hour,
-	}, nicknameValidator{err: vote.ErrSensitiveNickname})
+	}, nicknameValidator{err: core.ErrSensitiveNickname})
 
 	if _, _, err := service.Login(context.Background(), "阿明", "   "); !errors.Is(err, ErrInvalidPassword) {
 		t.Fatalf("expected blank password to be rejected, got %v", err)
 	}
 
-	if _, _, err := service.Login(context.Background(), "阿明", "password"); !errors.Is(err, vote.ErrSensitiveNickname) {
+	if _, _, err := service.Login(context.Background(), "阿明", "password"); !errors.Is(err, core.ErrSensitiveNickname) {
 		t.Fatalf("expected nickname validator error, got %v", err)
 	}
 }

@@ -24,6 +24,17 @@ type SystemLogEntry struct {
 	CreatedAt int64
 }
 
+// AccessLogEntry 表示一条 HTTP 请求日志。
+type AccessLogEntry struct {
+	Method     string
+	Path       string
+	StatusCode int
+	LatencyMs  int64
+	ClientIP   string
+	UserAgent  string
+	CreatedAt  int64
+}
+
 var globalLogger = zap.NewNop()
 var systemLogHook func(zapcore.Entry) error
 

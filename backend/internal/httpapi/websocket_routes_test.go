@@ -8,17 +8,17 @@ import (
 
 	"github.com/bytedance/sonic"
 
+	"long/internal/core"
 	"long/internal/events"
 	"long/internal/ratelimit"
-	"long/internal/vote"
 )
 
 type dispatchingChangePublisher struct {
 	dispatcher *events.Dispatcher
-	changes    []vote.StateChange
+	changes    []core.StateChange
 }
 
-func (p *dispatchingChangePublisher) PublishChange(ctx context.Context, change vote.StateChange) error {
+func (p *dispatchingChangePublisher) PublishChange(ctx context.Context, change core.StateChange) error {
 	p.changes = append(p.changes, change)
 	if p.dispatcher == nil {
 		return nil
@@ -160,13 +160,13 @@ func assertNoHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name str
 
 func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
-			Leaderboard: []vote.LeaderboardEntry{
+		state: core.State{
+			Leaderboard: []core.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 3},
 			},
-			UserStats:   &vote.UserStats{Nickname: "阿明", ClickCount: 3},
-			Inventory:   []vote.InventoryItem{{ItemID: "wood-sword", Name: "木剑", Quantity: 1}},
-			CombatStats: vote.CombatStats{EffectiveIncrement: 2},
+			UserStats:   &core.UserStats{Nickname: "阿明", ClickCount: 3},
+			Inventory:   []core.InventoryItem{{ItemID: "wood-sword", Name: "木剑", Quantity: 1}},
+			CombatStats: core.CombatStats{EffectiveIncrement: 2},
 		},
 	}
 	session := newRealtimeSession(realtimeSessionOptions{
@@ -186,13 +186,13 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 
 	var response struct {
 		Type   string          `json:"type"`
-		Public vote.Snapshot   `json:"public"`
-		User   *vote.UserState `json:"user"`
+		Public core.Snapshot   `json:"public"`
+		User   *core.UserState `json:"user"`
 	}
 	decoded := decodeRealtimeMessage[struct {
 		Type   string          `json:"type"`
-		Public vote.Snapshot   `json:"public"`
-		User   *vote.UserState `json:"user"`
+		Public core.Snapshot   `json:"public"`
+		User   *core.UserState `json:"user"`
 	}](t, messages[0])
 	response = decoded
 
@@ -212,7 +212,7 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 
 func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{},
+		state: core.State{},
 	}
 	session := newRealtimeSession(realtimeSessionOptions{
 		stateView:             store,
@@ -232,7 +232,7 @@ func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 
 	response := decodeRealtimeMessage[struct {
 		Type string          `json:"type"`
-		User *vote.UserState `json:"user"`
+		User *core.UserState `json:"user"`
 	}](t, messages[0])
 	if response.Type != realtimeMessageTypeSnapshot {
 		t.Fatalf("expected snapshot response, got %+v", response)
@@ -247,16 +247,16 @@ func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 
 func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 	store := &mockStore{
-		snapshot: vote.Snapshot{
-			Leaderboard: []vote.LeaderboardEntry{
+		snapshot: core.Snapshot{
+			Leaderboard: []core.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 3},
 			},
 			AnnouncementVersion: "7",
 		},
-		state: vote.State{
-			UserStats:   &vote.UserStats{Nickname: "阿明", ClickCount: 3},
-			Inventory:   []vote.InventoryItem{{ItemID: "wood-sword", Name: "木剑", Quantity: 1}},
-			CombatStats: vote.CombatStats{EffectiveIncrement: 2},
+		state: core.State{
+			UserStats:   &core.UserStats{Nickname: "阿明", ClickCount: 3},
+			Inventory:   []core.InventoryItem{{ItemID: "wood-sword", Name: "木剑", Quantity: 1}},
+			CombatStats: core.CombatStats{EffectiveIncrement: 2},
 		},
 	}
 	session := newRealtimeSession(realtimeSessionOptions{
@@ -276,8 +276,8 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 
 	response := decodeRealtimeMessage[struct {
 		Type   string          `json:"type"`
-		Public vote.Snapshot   `json:"public"`
-		User   *vote.UserState `json:"user"`
+		Public core.Snapshot   `json:"public"`
+		User   *core.UserState `json:"user"`
 	}](t, messages[0])
 	if response.Public.AnnouncementVersion != "7" {
 		t.Fatalf("expected announcement version in snapshot, got %+v", response.Public)
@@ -297,19 +297,19 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 
 func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
-			Leaderboard: []vote.LeaderboardEntry{
+		state: core.State{
+			Leaderboard: []core.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 4},
 			},
-			UserStats:   &vote.UserStats{Nickname: "阿明", ClickCount: 4},
-			CombatStats: vote.CombatStats{EffectiveIncrement: 2},
+			UserStats:   &core.UserStats{Nickname: "阿明", ClickCount: 4},
+			CombatStats: core.CombatStats{EffectiveIncrement: 2},
 		},
-		result: vote.ClickResult{
+		result: core.ClickResult{
 			Delta:                1,
 			Critical:             false,
 			MyBossDamage:         61,
 			BossLeaderboardCount: 2,
-			UserStats: vote.UserStats{
+			UserStats: core.UserStats{
 				Nickname:   "阿明",
 				ClickCount: 5,
 			},
@@ -372,15 +372,15 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	assertNoHubEventByName(t, sseClient, events.UserStateEventName)
 	assertNoHubEventByName(t, wsClient, events.UserStateEventName)
 
-	if len(publisher.changes) != 1 || publisher.changes[0].Type != vote.StateChangeButtonClicked {
+	if len(publisher.changes) != 1 || publisher.changes[0].Type != core.StateChangeButtonClicked {
 		t.Fatalf("expected one click change, got %+v", publisher.changes)
 	}
 }
 
 func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
-			Boss: &vote.Boss{
+		state: core.State{
+			Boss: &core.Boss{
 				ID:        "boss-1",
 				Name:      "木桩王",
 				Status:    "active",
@@ -388,19 +388,19 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 				CurrentHP: 40,
 			},
 		},
-		result: vote.ClickResult{
+		result: core.ClickResult{
 			Delta:                1,
 			Critical:             false,
 			MyBossDamage:         61,
 			BossLeaderboardCount: 1,
-			Boss: &vote.Boss{
+			Boss: &core.Boss{
 				ID:        "boss-1",
 				Name:      "木桩王",
 				Status:    "active",
 				MaxHP:     100,
 				CurrentHP: 39,
 			},
-			MyBossStats: &vote.BossUserStats{
+			MyBossStats: &core.BossUserStats{
 				Nickname: "阿明",
 				Damage:   61,
 			},
@@ -469,7 +469,7 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	if len(publisher.changes) != 1 {
 		t.Fatalf("expected one published change, got %+v", publisher.changes)
 	}
-	if publisher.changes[0].Type != vote.StateChangeButtonClicked {
+	if publisher.changes[0].Type != core.StateChangeButtonClicked {
 		t.Fatalf("expected button_clicked, got %+v", publisher.changes[0])
 	}
 	if !publisher.changes[0].BroadcastUserAll {

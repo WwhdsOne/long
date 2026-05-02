@@ -8,7 +8,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 // RedisChangeBus 通过 Redis Pub/Sub 传播实时状态变化。
@@ -26,7 +26,7 @@ func NewRedisChangeBus(client redis.UniversalClient, channel string) *RedisChang
 }
 
 // PublishChange 发布一条状态变更。
-func (b *RedisChangeBus) PublishChange(ctx context.Context, change vote.StateChange) error {
+func (b *RedisChangeBus) PublishChange(ctx context.Context, change core.StateChange) error {
 	if b == nil || b.client == nil || b.channel == "" {
 		return nil
 	}
@@ -43,7 +43,7 @@ func (b *RedisChangeBus) PublishChange(ctx context.Context, change vote.StateCha
 }
 
 // Listen 持续消费 Pub/Sub 里的状态变更。
-func (b *RedisChangeBus) Listen(ctx context.Context, handler func(context.Context, vote.StateChange) error) error {
+func (b *RedisChangeBus) Listen(ctx context.Context, handler func(context.Context, core.StateChange) error) error {
 	if b == nil || b.client == nil || b.channel == "" {
 		return nil
 	}
@@ -65,7 +65,7 @@ func (b *RedisChangeBus) Listen(ctx context.Context, handler func(context.Contex
 				return nil
 			}
 
-			var change vote.StateChange
+			var change core.StateChange
 			if err := sonic.Unmarshal([]byte(message.Payload), &change); err != nil {
 				continue
 			}

@@ -2,6 +2,7 @@
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import PixelEffectCanvas from '../components/PixelEffectCanvas.vue'
+import {formatCompact} from '../utils/formatNumber.js'
 
 const {
   boss,
@@ -50,6 +51,7 @@ const {
   globalStatusList,
   partProgressList,
   partStatusList,
+  equippedBattleClickCursorImagePath,
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
@@ -59,7 +61,8 @@ const bossCursorVisible = ref(false)
 const bossCursorX = ref(0)
 const bossCursorY = ref(0)
 const bossCellSizePx = ref(56)
-const bossSwordCursorUrl = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
+const DEFAULT_BOSS_SWORD_CURSOR_URL = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
+const bossSwordCursorUrl = computed(() => equippedBattleClickCursorImagePath.value || DEFAULT_BOSS_SWORD_CURSOR_URL)
 
 const comboMilestoneText = ref('')
 const comboMilestoneTick = ref(0)
@@ -262,6 +265,11 @@ function doCursorAttack(e) {
 }
 
 function handleBossGridPointerMove(e) {
+  bossCursorVisible.value = true
+  updateCursorPos(e)
+}
+
+function handleBossGridPointerEnter(e) {
   bossCursorVisible.value = true
   updateCursorPos(e)
 }
@@ -742,6 +750,7 @@ const silverStormActive = computed(() => {
             <div
                 ref="bossGridRef"
                 class="boss-part-grid"
+                @pointerenter="handleBossGridPointerEnter"
                 @pointermove="handleBossGridPointerMove"
                 @pointerleave="handleBossGridPointerLeave"
                 @pointerdown="handleBossGridPointerDown"
@@ -831,23 +840,23 @@ const silverStormActive = computed(() => {
               ></span>
                     </div>
                     <div class="boss-zone-button__meta">
-                      <span>血量 : {{ zone.currentHp }}/{{ zone.maxHp }}</span><br>
-                      <span>护甲 : {{ isPartCollapsed(zone) ? 0 : zone.armor }}</span>
+                      <span>血量 : {{ formatCompact(zone.currentHp) }}/{{ formatCompact(zone.maxHp) }}</span><br>
+                      <span>护甲 : {{ isPartCollapsed(zone) ? '0' : formatCompact(zone.armor) }}</span>
                     </div>
                   </template>
                   <span v-else class="boss-part-cell__empty"></span>
                 </button>
               </div>
-              <div
+              <img
                   id="boss-sword-cursor"
                   ref="swordCursorRef"
+                  :src="bossSwordCursorUrl"
                   :style="{
                     left: `${bossCursorX}px`,
                     top: `${bossCursorY}px`,
                     opacity: bossCursorVisible ? 1 : 0,
-                    backgroundImage: `url('${bossSwordCursorUrl}')`,
                   }"
-              ></div>
+              />
             </div>
           </div>
 
@@ -962,11 +971,11 @@ const silverStormActive = computed(() => {
         </div>
         <div class="vote-stage__boss-note vote-stage__boss-note--rules">
           <strong>挂机规则</strong>
-          <span>开启条件：离开页面 60 秒后自动开始挂机。</span>
-          <span>战斗效果：每秒自动攻击 1 次，挂机效率约为手动操作四分之一。</span>
+          <span>开启条件：<strong>离开页面 60 秒后自动开始挂机。</strong></span>
+          <span>战斗效果：每秒自动攻击 1 次，无技能效果，仅仅基础伤害。</span>
           <span>奖励说明：金币和强化石获取减半，天赋点和装备正常掉落。</span>
           <span>结算方式：回到页面后自动弹出结算窗口，显示击杀数与收益。</span>
-          <span>温馨提示：挂机最多持续 8 小时；关闭页面后挂机仍会继续，服务器重启后不会丢失挂机状态。</span>
+          <span>温馨提示：挂机最多持续 8 小时；<strong>关闭页面</strong>后挂机仍会继续，服务器维护不会丢失挂机状态。</span>
         </div>
         <div v-if="talentTriggerFeed.length > 0" class="vote-stage__boss-note vote-stage__boss-note--rules">
           <strong>天赋触发</strong>

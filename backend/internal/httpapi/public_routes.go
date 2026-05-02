@@ -8,11 +8,11 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type bossResourceReader interface {
-	GetBossResources(context.Context) (vote.BossResources, error)
+	GetBossResources(context.Context) (core.BossResources, error)
 }
 
 func registerPublicRoutes(router route.IRouter, options Options, stateView StateView) {
@@ -20,6 +20,7 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 	if options.MessageStore != nil {
 		messageStore = options.MessageStore
 	}
+	registerShopRoutes(router, options)
 
 	router.GET("/api/health", func(_ context.Context, c *app.RequestContext) {
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
@@ -114,12 +115,12 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 			return
 		}
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:      vote.StateChangeMessageCreated,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:      core.StateChangeMessageCreated,
 			Nickname:  nickname,
 			Timestamp: time.Now().Unix(),
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "message.created",
 			Nickname:  nickname,
 			Payload: map[string]any{
