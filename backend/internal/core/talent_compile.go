@@ -365,8 +365,15 @@ func compileCritTalents(compiled *CompiledTalentSet) compiledCritTalents {
 		crit.OmenResonatePerOmen = critOmenResonateForLevel(compiled.Level("crit_core"))
 	}
 	if compiled.Has("crit_omen_reap") {
+		level := compiled.Level("crit_omen_reap")
 		crit.OmenReapThresholds = []int{15, 30, 60, 90, 120}
-		crit.OmenReapDamageMults = []float64{1.10, 1.20, 1.30, 1.40, 1.50}
+		crit.OmenReapDamageMults = []float64{
+			critOmenReapMultForLevel(level, 0),
+			critOmenReapMultForLevel(level, 1),
+			critOmenReapMultForLevel(level, 2),
+			critOmenReapMultForLevel(level, 3),
+			critOmenReapMultForLevel(level, 4),
+		}
 	}
 	if compiled.Has("crit_bleed") {
 		level := compiled.Level("crit_bleed")

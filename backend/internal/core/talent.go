@@ -26,7 +26,7 @@ const (
 	TalentCostTier1Main       int64 = 30
 	TalentCostTier2Main       int64 = 80
 	TalentCostTier3Main       int64 = 150
-	TalentCostTier4Main       int64 = 200
+	TalentCostTier4Main       int64 = 800
 	TalentCostTier1Filler     int64 = 15
 	TalentCostTier2Filler     int64 = 35
 	TalentCostTier3Filler     int64 = 60
@@ -418,10 +418,13 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 			dmgPerOmen = talentPercent(critOmenKillDmgPerOmenForLevel(currentFactor))
 		}
 		return fmt.Sprintf("部位血量低于 %s 时，每层死兆额外 +%s 伤害（例：47层=+47%%）。被动生效。", hpThreshold, dmgPerOmen)
-	case "omen_reap_passive":
-		thresholds := "15/30/60/90/120"
-		mults := "×1.1/×1.2/×1.3/×1.4/×1.5"
-		return fmt.Sprintf("死兆达%s层时，伤害自动提升至%s（不消耗层数）。被动生效。", thresholds, mults)
+		case "omen_reap_passive":
+			return fmt.Sprintf("死兆达15/30/60/90/120层时，伤害自动提升至×%.2f/×%.2f/×%.2f/×%.2f/×%.2f（不消耗层数）。被动生效。",
+				critOmenReapMultForLevel(currentFactor, 0),
+				critOmenReapMultForLevel(currentFactor, 1),
+				critOmenReapMultForLevel(currentFactor, 2),
+				critOmenReapMultForLevel(currentFactor, 3),
+				critOmenReapMultForLevel(currentFactor, 4))
 	case "weakspot_insight":
 		return fmt.Sprintf("对弱点部位暴击时额外乘以 ×%.2f 的独立倍率。", critWeakspotInsightMultiplierForLevel(currentFactor))
 	case "final_cut":
@@ -508,11 +511,11 @@ func normalLowHPMultiplierForLevel(level int) float64 {
 }
 
 func normalSilverStormDurationForLevel(level int) int {
-	return lerpTalentInt(level, 12, 16)
+	return lerpTalentInt(level, 15, 25)
 }
 
 func normalSilverStormDamageRatioForLevel(level int) float64 {
-	return lerpTalentValue(level, 2.50, 3.70)
+	return lerpTalentValue(level, 8.0, 20.0)
 }
 
 // 普攻系填充节点 per-level 函数
@@ -580,15 +583,15 @@ func armorPenConvertRatioForLevel(level int) float64 {
 }
 
 func armorUltimateTriggerCountForLevel(level int) int {
-	return lerpTalentInt(level, 80, 60)
+	return lerpTalentInt(level, 50, 30)
 }
 
 func armorUltimateDamageRatioForLevel(level int) float64 {
-	return lerpTalentValue(level, 6.0, 10.0)
+	return lerpTalentValue(level, 40.0, 100.0)
 }
 
 func armorUltimateCooldownForLevel(level int) int64 {
-	return int64(lerpTalentInt(level, 90, 70))
+	return int64(lerpTalentInt(level, 60, 40))
 }
 
 // 破甲系填充节点 per-level 函数
@@ -628,7 +631,7 @@ func critDoomOmenPerMarkForLevel(level int) int {
 }
 
 func critOmenResonateForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.005, 0.013)
+	return lerpTalentValue(level, 0.003, 0.007)
 }
 
 func critSkinnerChanceForLevel(level int) float64 {
@@ -664,7 +667,16 @@ func critFinalCutOmenTriggerForLevel(level int) int {
 }
 
 func critFinalCutDamageRatioForLevel(level int) float64 {
-	return lerpTalentValue(level, 15.0, 120.0)
+	return lerpTalentValue(level, 200.0, 800.0)
+}
+
+func critOmenReapMultForLevel(level int, tierIndex int) float64 {
+	// tierIndex: 0=15层, 1=30层, 2=60层, 3=90层, 4=120层
+	baseMults := []float64{1.10, 1.20, 1.30, 1.40, 1.50}
+	if tierIndex < 0 || tierIndex >= len(baseMults) {
+		return 1.0
+	}
+	return baseMults[tierIndex] + float64(level-1)*0.10
 }
 
 func critWeakspotInsightMultiplierForLevel(level int) float64 {
@@ -682,7 +694,7 @@ func critFillerT2aDmgAmpForLevel(level int) float64 {
 	return lerpTalentValue(level, 0.08, 0.24)
 }
 func critFillerT2bOmenCritDmgForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.002, 0.006)
+	return lerpTalentValue(level, 0.001, 0.003)
 }
 func critFillerT3aDmgAmpForLevel(level int) float64 {
 	return lerpTalentValue(level, 0.15, 0.35)
@@ -861,7 +873,19 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		add("触发阈值", talentPercentScaled(value["hpThreshold"], currentFactor), talentPercentScaled(value["hpThreshold"], nextLevel))
 		add("每层增伤", talentPercentScaled(value["dmgPerOmen"], currentFactor), talentPercentScaled(value["dmgPerOmen"], nextLevel))
 	case "omen_reap_passive":
-		add("档位增伤", "15层×1.1 / 30层×1.2 / 60层×1.3 / 90层×1.4 / 120层×1.5", "")
+			add("档位增伤",
+				fmt.Sprintf("15层×%.2f / 30层×%.2f / 60层×%.2f / 90层×%.2f / 120层×%.2f",
+					critOmenReapMultForLevel(currentFactor, 0),
+					critOmenReapMultForLevel(currentFactor, 1),
+					critOmenReapMultForLevel(currentFactor, 2),
+					critOmenReapMultForLevel(currentFactor, 3),
+					critOmenReapMultForLevel(currentFactor, 4)),
+				fmt.Sprintf("15层×%.2f / 30层×%.2f / 60层×%.2f / 90层×%.2f / 120层×%.2f",
+					critOmenReapMultForLevel(nextLevel, 0),
+					critOmenReapMultForLevel(nextLevel, 1),
+					critOmenReapMultForLevel(nextLevel, 2),
+					critOmenReapMultForLevel(nextLevel, 3),
+					critOmenReapMultForLevel(nextLevel, 4)))
 	case "weakspot_insight":
 		add("弱点暴击倍率", fmt.Sprintf("×%.2f", critWeakspotInsightMultiplierForLevel(currentFactor)), fmt.Sprintf("×%.2f", critWeakspotInsightMultiplierForLevel(nextLevel)))
 	case "final_cut":
@@ -1262,7 +1286,7 @@ func applyTierCompletionBonus(mods *TalentModifiers, treeStr string, tier int) {
 	case treeStr == "crit" && tier == 2:
 		mods.OmenKillThresholdRaise += 0.05
 	case treeStr == "crit" && tier == 3:
-		mods.OmenCritDmgExtra += 0.005
+		mods.OmenCritDmgExtra += 0.003
 	case treeStr == "crit" && tier == 4:
 		mods.DoomMultBoost += 2.0
 	}

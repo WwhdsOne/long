@@ -2,13 +2,16 @@ package httpapi
 
 import (
 	"context"
-	"os"
+	"io/fs"
+	"mime"
 	"path/filepath"
 	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
+
+	publicfs "long"
 )
 
 func registerRealtimeRoutes(router route.IRouter, options Options) {
@@ -20,26 +23,26 @@ func registerRealtimeRoutes(router route.IRouter, options Options) {
 	}
 }
 
-func registerStaticRoutes(engine *route.Engine, options Options) {
-	if options.PublicDir == "" {
+func registerStaticRoutes(engine *route.Engine, _ Options) {
+	publicFS, err := fs.Sub(publicfs.FS, "public")
+	if err != nil {
 		return
 	}
 
-	indexFile := filepath.Join(options.PublicDir, "index.html")
-
-	// 这些前缀请求里已经自带了目录名，所以 root 用 public 即可
-	engine.Static("/assets", options.PublicDir)
-	engine.Static("/images", options.PublicDir)
-
-	// 单文件静态资源
-	for _, name := range []string{"favicon.ico", "favicon.svg", "icons.svg"} {
-		target := filepath.Join(options.PublicDir, name)
-		if stat, err := os.Stat(target); err == nil && !stat.IsDir() {
-			engine.StaticFile("/"+name, target)
+	serveEmbedFile := func(c *app.RequestContext, path string) {
+		data, err := fs.ReadFile(publicFS, path)
+		if err != nil {
+			c.AbortWithStatus(consts.StatusNotFound)
+			return
 		}
+		ext := filepath.Ext(path)
+		if ct := mime.TypeByExtension(ext); ct != "" {
+			c.Response.Header.Set("Content-Type", ct)
+		}
+		c.Write(data)
 	}
 
-	// SPA fallback
+	// SPA fallback: 非 /api/ 路径尝试读取对应文件，不存在则回退到 index.html
 	engine.NoRoute(func(_ context.Context, c *app.RequestContext) {
 		path := string(c.Path())
 
@@ -53,16 +56,16 @@ func registerStaticRoutes(engine *route.Engine, options Options) {
 			return
 		}
 
-		cleanedPath := filepath.Clean("/" + strings.TrimPrefix(path, "/"))
-		target := filepath.Join(options.PublicDir, cleanedPath)
+		cleanedPath := strings.TrimPrefix(filepath.Clean("/"+strings.TrimPrefix(path, "/")), "/")
 
-		// 如果真有对应文件，就直接返回
-		if stat, err := os.Stat(target); err == nil && !stat.IsDir() {
-			app.ServeFile(c, target)
-			return
+		if cleanedPath != "" {
+			if _, err := fs.Stat(publicFS, cleanedPath); err == nil {
+				serveEmbedFile(c, cleanedPath)
+				return
+			}
 		}
 
-		// 否则按 SPA 路由处理，回退到 index.html
-		app.ServeFile(c, indexFile)
+		// SPA fallback
+		serveEmbedFile(c, "index.html")
 	})
 }

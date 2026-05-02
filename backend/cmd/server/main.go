@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+	hertzzap "github.com/hertz-contrib/logger/zap"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -210,6 +212,10 @@ func run() error {
 		_ = logger.Sync()
 	}()
 
+	// 将 Hertz 内部日志也接入 zap
+	hzLogger := hertzzap.NewLogger()
+	hlog.SetLogger(hzLogger)
+
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := core.NewStore(redisClient, cfg.RedisPrefix, core.StoreOptions{
 		CriticalChancePercent: 5,
@@ -271,7 +277,6 @@ func run() error {
 		PlayerAuthenticator:         playerAuthenticator,
 		Events:                      eventHandler,
 		RealtimeHub:                 hub,
-		PublicDir:                   cfg.PublicDir,
 		OSSSigner:                   ossSigner,
 		EquipmentDraftGenerator:     equipmentDraftGenerator,
 		EquipmentDraftFailureWriter: equipmentDraftFailureWriter,
@@ -378,7 +383,6 @@ func renderStartupInfo(cfg config.Config, listenAddr string) string {
 			"  Redis TLS: %t\n"+
 			"  Redis 前缀: %s\n"+
 			"  Mongo: %t (%s)\n"+
-			"  静态目录: %s\n"+
 			"  日志: level=%s format=%s\n"+
 			"  OSS: %t\n"+
 			"  LLM: %t",
@@ -390,7 +394,6 @@ func renderStartupInfo(cfg config.Config, listenAddr string) string {
 		cfg.RedisPrefix,
 		cfg.Mongo.Enabled,
 		cfg.Mongo.Database,
-		cfg.PublicDir,
 		cfg.Log.Level,
 		cfg.Log.Format,
 		cfg.OSS.Enabled(),

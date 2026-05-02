@@ -189,7 +189,6 @@ type Options struct {
 	PlayerAuthenticator         PlayerAuthenticator
 	Events                      app.HandlerFunc
 	RealtimeHub                 RealtimeHub
-	PublicDir                   string
 	AdminAuthenticator          *adminauth.Authenticator
 	OSSSigner                   OSSSigner
 	EquipmentDraftGenerator     EquipmentDraftGenerator

@@ -410,11 +410,11 @@ func TestSilverStormUsesTimeWindowInsteadOfAttackCountdown(t *testing.T) {
 	if !combatState.SilverStormActive {
 		t.Fatal("expected silver storm active after part break")
 	}
-	if combatState.SilverStormEndsAt != baseNow.Unix()+16 {
-		t.Fatalf("expected silver storm ends at %d, got %d", baseNow.Unix()+16, combatState.SilverStormEndsAt)
+	if combatState.SilverStormEndsAt != baseNow.Unix()+25 {
+		t.Fatalf("expected silver storm ends at %d, got %d", baseNow.Unix()+25, combatState.SilverStormEndsAt)
 	}
-	if combatState.SilverStormRemaining != 16 {
-		t.Fatalf("expected silver storm remaining 16, got %d", combatState.SilverStormRemaining)
+	if combatState.SilverStormRemaining != 25 {
+		t.Fatalf("expected silver storm remaining 25, got %d", combatState.SilverStormRemaining)
 	}
 
 	second, err := store.ClickBossPart(ctx, "boss-part:1-0", nickname)
@@ -428,11 +428,11 @@ func TestSilverStormUsesTimeWindowInsteadOfAttackCountdown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get combat state during silver storm: %v", err)
 	}
-	if combatState.SilverStormRemaining != 16 {
+	if combatState.SilverStormRemaining != 25 {
 		t.Fatalf("expected silver storm remaining unchanged within same second, got %d", combatState.SilverStormRemaining)
 	}
 
-	baseNow = baseNow.Add(21 * time.Second)
+	baseNow = baseNow.Add(30 * time.Second)
 	_, err = store.ClickBossPart(ctx, "boss-part:1-0", nickname)
 	if err != nil {
 		t.Fatalf("attack after silver storm expired: %v", err)

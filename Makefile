@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 GO ?= go
-NPM ?= npm
+BUN ?= ~/.bun/bin/bun
 MAKEFLAGS += --no-print-directory
 
 .DEFAULT_GOAL := help
@@ -13,16 +13,16 @@ help: ## 显示可用命令
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "%-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 deps: ## 安装前端依赖
-	$(NPM) --prefix frontend install
+	$(BUN) --cwd=frontend install
 
 deps-ci: ## 以 CI 模式安装前端依赖
-	$(NPM) --prefix frontend ci
+	$(BUN) --cwd=frontend ci
 
 dev: ## 同时启动后端和前端开发环境
 	@backend_pid=''; frontend_pid=''; status=0; \
 	trap 'test -n "$$backend_pid" && kill $$backend_pid 2>/dev/null || true; test -n "$$frontend_pid" && kill $$frontend_pid 2>/dev/null || true' INT TERM EXIT; \
 	$(GO) -C backend run ./cmd/server & backend_pid=$$!; \
-	$(NPM) --prefix frontend run dev & frontend_pid=$$!; \
+	$(BUN) --cwd=frontend run dev & frontend_pid=$$!; \
 	while :; do \
 		if ! kill -0 $$backend_pid 2>/dev/null; then \
 			wait $$backend_pid || status=$$?; \
@@ -58,16 +58,16 @@ backend-fix: ## 运行 go fix
 	$(GO) -C backend fix ./...
 
 frontend-dev: ## 单独启动前端开发服务器
-	$(NPM) --prefix frontend run dev
+	$(BUN) --cwd=frontend run dev
 
 frontend-build: ## 构建前端产物
-	$(NPM) --prefix frontend run build
+	$(BUN) --cwd=frontend run build
 
 frontend-test: ## 运行前端测试
-	$(NPM) --prefix frontend run test
+	$(BUN) --cwd=frontend run test
 
 frontend-preview: ## 预览前端产物
-	$(NPM) --prefix frontend run preview
+	$(BUN) --cwd=frontend run preview
 
 hooks-install: ## 安装 Git hooks（需要本地已安装 lefthook）
 	lefthook install

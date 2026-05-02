@@ -44,7 +44,6 @@ func TestRenderStartupInfoIncludesBannerAndSummary(t *testing.T) {
 		Mongo:       config.MongoConfig{Enabled: true, Database: "vote_wall"},
 		Log:         config.LogConfig{Level: "info", Format: "json"},
 		RedisPrefix: "vote:",
-		PublicDir:   "/app/backend/public",
 	}
 
 	info := renderStartupInfo(cfg, "127.0.0.1:2333")
@@ -54,8 +53,7 @@ func TestRenderStartupInfoIncludesBannerAndSummary(t *testing.T) {
 	assertContains(t, info, "Redis: 127.0.0.1:6379/2")
 	assertContains(t, info, "Redis TLS: true")
 	assertContains(t, info, "Mongo: true (vote_wall)")
-	assertContains(t, info, "静态目录: /app/backend/public")
-	assertContains(t, info, "日志: level=info format=json")
+assertContains(t, info, "日志: level=info format=json")
 }
 
 func assertContains(t *testing.T, got string, want string) {
