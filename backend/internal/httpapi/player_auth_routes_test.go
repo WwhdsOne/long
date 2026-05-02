@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"long/internal/admin"
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type mockPlayerAuthenticator struct {
@@ -135,15 +135,15 @@ func TestPlayerWriteRoutesRequireAuthenticatedSession(t *testing.T) {
 
 func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
-			UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 7},
-			Inventory: []vote.InventoryItem{
+		state: core.State{
+			UserStats: &core.UserStats{Nickname: "阿明", ClickCount: 7},
+			Inventory: []core.InventoryItem{
 				{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
 			},
-			Loadout: vote.Loadout{
-				Weapon: &vote.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
+			Loadout: core.Loadout{
+				Weapon: &core.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
 			},
-			CombatStats: vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
+			CombatStats: core.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
 		},
 	}
 	authenticator := &mockPlayerAuthenticator{verifyNickname: "阿明"}
@@ -181,12 +181,12 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 	}
 
 	var payload struct {
-		UserStats     *vote.UserStats         `json:"userStats"`
-		Inventory     []vote.InventoryItem    `json:"inventory"`
-		Loadout       vote.Loadout            `json:"loadout"`
-		CombatStats   vote.CombatStats        `json:"combatStats"`
-		RecentRewards []vote.Reward           `json:"recentRewards"`
-		Leaderboard   []vote.LeaderboardEntry `json:"leaderboard"`
+		UserStats     *core.UserStats         `json:"userStats"`
+		Inventory     []core.InventoryItem    `json:"inventory"`
+		Loadout       core.Loadout            `json:"loadout"`
+		CombatStats   core.CombatStats        `json:"combatStats"`
+		RecentRewards []core.Reward           `json:"recentRewards"`
+		Leaderboard   []core.LeaderboardEntry `json:"leaderboard"`
 	}
 	if err := json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&payload); err != nil {
 		t.Fatalf("decode profile response: %v", err)
@@ -204,14 +204,14 @@ func TestPlayerProfileRequiresSessionAndReturnsProfileDataset(t *testing.T) {
 
 func TestBattleStateOmitsInventoryAndLegacyRewardFields(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
-			UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 7},
-			Inventory: []vote.InventoryItem{
+		state: core.State{
+			UserStats: &core.UserStats{Nickname: "阿明", ClickCount: 7},
+			Inventory: []core.InventoryItem{
 				{ItemID: "sword-1", Name: "短剑", Slot: "weapon"},
 			},
-			Loadout:       vote.Loadout{Weapon: &vote.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"}},
-			CombatStats:   vote.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
-			RecentRewards: []vote.Reward{{ItemID: "sword-1", ItemName: "短剑"}},
+			Loadout:       core.Loadout{Weapon: &core.InventoryItem{ItemID: "sword-1", Name: "短剑", Slot: "weapon"}},
+			CombatStats:   core.CombatStats{EffectiveIncrement: 3, NormalDamage: 3, CriticalDamage: 6},
+			RecentRewards: []core.Reward{{ItemID: "sword-1", ItemName: "短剑"}},
 			Gold:          12,
 			Stones:        34,
 			TalentPoints:  56,
@@ -250,13 +250,13 @@ func TestBattleStateOmitsInventoryAndLegacyRewardFields(t *testing.T) {
 
 func TestTasksEndpointRequiresSessionAndReturnsPlayerTasks(t *testing.T) {
 	store := &mockStore{
-		tasks: []vote.PlayerTask{
+		tasks: []core.PlayerTask{
 			{
 				TaskID:      "daily-click-1",
 				Title:       "今日点击",
 				Progress:    3,
 				TargetValue: 10,
-				Status:      vote.TaskPlayerStatusInProgress,
+				Status:      core.TaskPlayerStatusInProgress,
 			},
 		},
 	}
@@ -283,7 +283,7 @@ func TestTasksEndpointRequiresSessionAndReturnsPlayerTasks(t *testing.T) {
 		t.Fatalf("expected 200 from tasks endpoint, got %d", response.Code)
 	}
 
-	var payload []vote.PlayerTask
+	var payload []core.PlayerTask
 	if err := json.NewDecoder(strings.NewReader(response.Body.String())).Decode(&payload); err != nil {
 		t.Fatalf("decode tasks response: %v", err)
 	}
@@ -355,8 +355,8 @@ func TestAdminCanResetPlayerPassword(t *testing.T) {
 	}
 }
 
-func voteStateForPlayerTests() vote.State {
-	return vote.State{
-		UserStats: &vote.UserStats{Nickname: "阿明", ClickCount: 2},
+func voteStateForPlayerTests() core.State {
+	return core.State{
+		UserStats: &core.UserStats{Nickname: "阿明", ClickCount: 2},
 	}
 }

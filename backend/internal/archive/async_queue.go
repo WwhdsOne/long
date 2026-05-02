@@ -60,7 +60,7 @@ func (q *AsyncQueue[T]) Enqueue(item T) bool {
 	case q.ch <- item:
 		return true
 	default:
-		xlog.L().Warn("async queue is full")
+		xlog.L().Error("async queue is full")
 		return false
 	}
 }
@@ -83,7 +83,7 @@ func (q *AsyncQueue[T]) worker() {
 			ctx, cancel = context.WithTimeout(ctx, q.writeTimeout)
 		}
 		if err := q.handle(ctx, item); err != nil {
-			xlog.L().Warn("async queue handle failed", xlog.Err(err))
+			xlog.L().Error("async queue handle failed", xlog.Err(err))
 		}
 		cancel()
 	}

@@ -11,35 +11,37 @@ import (
 	"github.com/bytedance/sonic"
 
 	"long/internal/admin"
+	"long/internal/core"
 	ossupload "long/internal/oss"
-	"long/internal/vote"
 )
 
 type mockStore struct {
-	state                 vote.State
-	talentState           *vote.TalentState
-	snapshot              vote.Snapshot
-	equipState            vote.State
-	adminState            vote.AdminState
-	bossResources         vote.BossResources
-	adminEquipmentPage    vote.AdminEquipmentPage
-	adminBossHistoryPage  vote.AdminBossHistoryPage
-	adminPlayerPage       vote.AdminPlayerPage
-	adminPlayer           *vote.AdminPlayerOverview
-	bossHistory           []vote.BossHistoryEntry
-	announcements         []vote.Announcement
-	latestAnnouncement    *vote.Announcement
-	messagePage           vote.MessagePage
-	tasks                 []vote.PlayerTask
-	result                vote.ClickResult
-	lastBoss              vote.BossUpsert
-	lastBossTemplate      vote.BossTemplateUpsert
-	lastEquipment         vote.EquipmentDefinition
+	state                 core.State
+	talentState           *core.TalentState
+	snapshot              core.Snapshot
+	equipState            core.State
+	adminState            core.AdminState
+	bossResources         core.BossResources
+	adminEquipmentPage    core.AdminEquipmentPage
+	adminBossHistoryPage  core.AdminBossHistoryPage
+	adminPlayerPage       core.AdminPlayerPage
+	adminPlayer           *core.AdminPlayerOverview
+	bossHistory           []core.BossHistoryEntry
+	announcements         []core.Announcement
+	latestAnnouncement    *core.Announcement
+	messagePage           core.MessagePage
+	tasks                 []core.PlayerTask
+	shopItems             []core.ShopCatalogItemView
+	result                core.ClickResult
+	lastBoss              core.BossUpsert
+	lastBossTemplate      core.BossTemplateUpsert
+	lastEquipment         core.EquipmentDefinition
+	lastShopItemID        string
 	lastClaimTaskID       string
-	lastTaskDefinition    vote.TaskDefinition
+	lastTaskDefinition    core.TaskDefinition
 	lastArchiveNow        time.Time
 	lastTemplateLootID    string
-	lastTemplateLoot      []vote.BossLootEntry
+	lastTemplateLoot      []core.BossLootEntry
 	lastCycleQueue        []string
 	lastCycleEnabled      bool
 	lastSalvageItemID     string
@@ -63,15 +65,17 @@ type mockStore struct {
 	activateBossErr       error
 	saveBossTemplateErr   error
 	setBossCycleErr       error
+	purchaseShopErr       error
+	equipShopErr          error
 }
 
-func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, error) {
+func (m *mockStore) GetState(_ context.Context, nickname string) (core.State, error) {
 	m.lastGetStateNickname = nickname
 	if m.getStateErr != nil {
-		return vote.State{}, m.getStateErr
+		return core.State{}, m.getStateErr
 	}
 	if len(m.snapshot.Leaderboard) > 0 || m.snapshot.Boss != nil || m.snapshot.AnnouncementVersion != "" {
-		return vote.ComposeState(m.snapshot, m.userStateForNickname(nickname)), nil
+		return core.ComposeState(m.snapshot, m.userStateForNickname(nickname)), nil
 	}
 	state := m.state
 	if nickname == "" {
@@ -80,31 +84,31 @@ func (m *mockStore) GetState(_ context.Context, nickname string) (vote.State, er
 	return state, nil
 }
 
-func (m *mockStore) GetSnapshot(_ context.Context) (vote.Snapshot, error) {
+func (m *mockStore) GetSnapshot(_ context.Context) (core.Snapshot, error) {
 	if len(m.snapshot.Leaderboard) > 0 || m.snapshot.Boss != nil || m.snapshot.AnnouncementVersion != "" {
 		return m.snapshot, nil
 	}
-	return vote.Snapshot{
+	return core.Snapshot{
 		Leaderboard: m.state.Leaderboard,
 	}, nil
 }
 
-func (m *mockStore) GetBossResources(_ context.Context) (vote.BossResources, error) {
+func (m *mockStore) GetBossResources(_ context.Context) (core.BossResources, error) {
 	return m.bossResources, nil
 }
 
-func (m *mockStore) GetUserState(_ context.Context, nickname string) (vote.UserState, error) {
+func (m *mockStore) GetUserState(_ context.Context, nickname string) (core.UserState, error) {
 	if m.getStateErr != nil {
-		return vote.UserState{}, m.getStateErr
+		return core.UserState{}, m.getStateErr
 	}
 	return m.userStateForNickname(nickname), nil
 }
 
-func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
-	userState := vote.UserState{
-		Inventory:   []vote.InventoryItem{},
-		Loadout:     vote.Loadout{},
-		CombatStats: vote.CombatStats{},
+func (m *mockStore) userStateForNickname(nickname string) core.UserState {
+	userState := core.UserState{
+		Inventory:   []core.InventoryItem{},
+		Loadout:     core.Loadout{},
+		CombatStats: core.CombatStats{},
 	}
 	if nickname == "" {
 		return userState
@@ -120,25 +124,87 @@ func (m *mockStore) userStateForNickname(nickname string) vote.UserState {
 	userState.TalentPoints = m.state.TalentPoints
 	userState.RecentRewards = m.state.RecentRewards
 	userState.Tasks = m.tasks
+	userState.EquippedBattleClickSkinID = m.state.EquippedBattleClickSkinID
+	userState.EquippedBattleClickCursorImagePath = m.state.EquippedBattleClickCursorImagePath
 	return userState
 }
 
-func (m *mockStore) ListTasksForPlayer(_ context.Context, _ string) ([]vote.PlayerTask, error) {
+func (m *mockStore) ListShopCatalogItemsForPlayer(_ context.Context, _ string) ([]core.ShopCatalogItemView, error) {
+	if m.shopItems == nil {
+		return []core.ShopCatalogItemView{}, nil
+	}
+	return append([]core.ShopCatalogItemView(nil), m.shopItems...), nil
+}
+
+func (m *mockStore) PurchaseShopItem(_ context.Context, _ string, itemID string) (core.UserState, error) {
+	m.lastShopItemID = itemID
+	if m.purchaseShopErr != nil {
+		return core.UserState{}, m.purchaseShopErr
+	}
+	return m.userStateForNickname("阿明"), nil
+}
+
+func (m *mockStore) EquipShopItem(_ context.Context, _ string, itemID string) (core.UserState, error) {
+	m.lastShopItemID = itemID
+	if m.equipShopErr != nil {
+		return core.UserState{}, m.equipShopErr
+	}
+	return m.userStateForNickname("阿明"), nil
+}
+
+	func (m *mockStore) UnequipShopItem(_ context.Context, _ string) (core.UserState, error) {
+		m.state.EquippedBattleClickCursorImagePath = ""
+		m.state.EquippedBattleClickSkinID = ""
+		return m.userStateForNickname("阿明"), nil
+	}
+
+func (m *mockStore) ListShopItems(_ context.Context) ([]core.ShopItem, error) {
+	result := make([]core.ShopItem, 0, len(m.shopItems))
+	for _, item := range m.shopItems {
+		result = append(result, core.ShopItem{
+			ItemID:                     item.ItemID,
+			Title:                      item.Title,
+			ItemType:                   item.ItemType,
+			PriceGold:                  item.PriceGold,
+			ImagePath:                  item.ImagePath,
+			ImageAlt:                   item.ImageAlt,
+			PreviewImagePath:           item.PreviewImagePath,
+			BattleClickCursorImagePath: item.BattleClickCursorImagePath,
+			Description:                item.Description,
+			Active:                     item.Active,
+			SortOrder:                  item.SortOrder,
+			AutoEquipOnPurchase:        item.AutoEquipOnPurchase,
+		})
+	}
+	return result, nil
+}
+
+func (m *mockStore) SaveShopItem(_ context.Context, item core.ShopItem) error {
+	m.lastShopItemID = item.ItemID
+	return nil
+}
+
+func (m *mockStore) DeleteShopItem(_ context.Context, itemID string) error {
+	m.lastShopItemID = itemID
+	return nil
+}
+
+func (m *mockStore) ListTasksForPlayer(_ context.Context, _ string) ([]core.PlayerTask, error) {
 	return m.tasks, nil
 }
 
-func (m *mockStore) ClaimTaskReward(_ context.Context, _ string, taskID string) (vote.UserState, error) {
+func (m *mockStore) ClaimTaskReward(_ context.Context, _ string, taskID string) (core.UserState, error) {
 	m.lastClaimTaskID = taskID
 	return m.userStateForNickname("阿明"), nil
 }
 
-func (m *mockStore) ListTaskDefinitions(_ context.Context) ([]vote.TaskDefinition, error) {
+func (m *mockStore) ListTaskDefinitions(_ context.Context) ([]core.TaskDefinition, error) {
 	if m.tasks == nil {
-		return []vote.TaskDefinition{}, nil
+		return []core.TaskDefinition{}, nil
 	}
-	items := make([]vote.TaskDefinition, 0, len(m.tasks))
+	items := make([]core.TaskDefinition, 0, len(m.tasks))
 	for _, item := range m.tasks {
-		items = append(items, vote.TaskDefinition{
+		items = append(items, core.TaskDefinition{
 			TaskID:        item.TaskID,
 			Title:         item.Title,
 			Description:   item.Description,
@@ -154,7 +220,7 @@ func (m *mockStore) ListTaskDefinitions(_ context.Context) ([]vote.TaskDefinitio
 	return items, nil
 }
 
-func (m *mockStore) SaveTaskDefinition(_ context.Context, item vote.TaskDefinition) error {
+func (m *mockStore) SaveTaskDefinition(_ context.Context, item core.TaskDefinition) error {
 	m.lastTaskDefinition = item
 	if m.saveTaskErr != nil {
 		return m.saveTaskErr
@@ -167,7 +233,7 @@ func (m *mockStore) ActivateTaskDefinition(_ context.Context, taskID string) err
 		return m.activateTaskErr
 	}
 	m.lastTaskDefinition.TaskID = taskID
-	m.lastTaskDefinition.Status = vote.TaskStatusActive
+	m.lastTaskDefinition.Status = core.TaskStatusActive
 	return nil
 }
 
@@ -176,15 +242,15 @@ func (m *mockStore) DeactivateTaskDefinition(_ context.Context, taskID string) e
 		return m.deactivateTaskErr
 	}
 	m.lastTaskDefinition.TaskID = taskID
-	m.lastTaskDefinition.Status = vote.TaskStatusInactive
+	m.lastTaskDefinition.Status = core.TaskStatusInactive
 	return nil
 }
 
-func (m *mockStore) DuplicateTaskDefinition(_ context.Context, taskID string, newTaskID string) (*vote.TaskDefinition, error) {
+func (m *mockStore) DuplicateTaskDefinition(_ context.Context, taskID string, newTaskID string) (*core.TaskDefinition, error) {
 	if m.duplicateTaskErr != nil {
 		return nil, m.duplicateTaskErr
 	}
-	item := &vote.TaskDefinition{TaskID: newTaskID}
+	item := &core.TaskDefinition{TaskID: newTaskID}
 	if item.TaskID == "" {
 		item.TaskID = taskID + "-copy"
 	}
@@ -193,9 +259,9 @@ func (m *mockStore) DuplicateTaskDefinition(_ context.Context, taskID string, ne
 
 func TestAdminTaskRoutesReturnReadableMessagesOnBusinessErrors(t *testing.T) {
 	store := &mockStore{
-		saveTaskErr:      vote.ErrTaskNotClaimable,
-		activateTaskErr:  vote.ErrTaskNotClaimable,
-		duplicateTaskErr: vote.ErrTaskImmutable,
+		saveTaskErr:      core.ErrTaskNotClaimable,
+		activateTaskErr:  core.ErrTaskNotClaimable,
+		duplicateTaskErr: core.ErrTaskImmutable,
 	}
 	handler := NewHandler(Options{
 		Store:       store,
@@ -252,25 +318,132 @@ func TestAdminTaskRoutesReturnReadableMessagesOnBusinessErrors(t *testing.T) {
 	}
 }
 
-func (m *mockStore) ArchiveExpiredTaskCycles(_ context.Context, now time.Time) ([]vote.TaskCycleArchive, error) {
+func TestShopRoutesReturnCatalogAndSupportAuthenticatedPurchase(t *testing.T) {
+	store := &mockStore{
+		state: core.State{
+			UserStats:                          &core.UserStats{Nickname: "阿明", ClickCount: 8},
+			Gold:                               80,
+			EquippedBattleClickSkinID:          "skin-basic",
+			EquippedBattleClickCursorImagePath: "https://example.com/basic.png",
+		},
+		shopItems: []core.ShopCatalogItemView{{
+			ShopItem: core.ShopItem{
+				ItemID:                     "skin-basic",
+				Title:                      "基础剑光",
+				ItemType:                   core.ShopItemTypeBattleClickSkin,
+				PriceGold:                  120,
+				PreviewImagePath:           "https://example.com/preview.png",
+				BattleClickCursorImagePath: "https://example.com/basic.png",
+				Active:                     true,
+			},
+			Owned:    true,
+			Equipped: true,
+		}},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "task-secret",
+		}),
+		PlayerAuthenticator: &mockPlayerAuthenticator{
+			loginToken:     "player-token",
+			loginNickname:  "阿明",
+			verifyNickname: "阿明",
+		},
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/player/auth/login", strings.NewReader(`{"nickname":"阿明","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected player login to set cookie")
+	}
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/shop/items", nil)
+	listRequest.AddCookie(cookies[0])
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, listRequest)
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from shop list, got %d", listResponse.Code)
+	}
+	if !strings.Contains(listResponse.Body.String(), `"owned":true`) || !strings.Contains(listResponse.Body.String(), `"equipped":true`) {
+		t.Fatalf("expected owned and equipped flags in shop list, got %s", listResponse.Body.String())
+	}
+
+	purchaseRequest := httptest.NewRequest(http.MethodPost, "/api/shop/items/skin-basic/purchase", nil)
+	purchaseRequest.AddCookie(cookies[0])
+	purchaseResponse := httptest.NewRecorder()
+	handler.ServeHTTP(purchaseResponse, purchaseRequest)
+	if purchaseResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from shop purchase, got %d", purchaseResponse.Code)
+	}
+	if store.lastShopItemID != "skin-basic" {
+		t.Fatalf("expected purchase to target skin-basic, got %q", store.lastShopItemID)
+	}
+	if !strings.Contains(purchaseResponse.Body.String(), `"equippedBattleClickSkinId":"skin-basic"`) {
+		t.Fatalf("expected purchase response to include equipped skin, got %s", purchaseResponse.Body.String())
+	}
+}
+
+func TestShopPurchaseRouteReturnsReadableBusinessErrors(t *testing.T) {
+	store := &mockStore{
+		purchaseShopErr: core.ErrShopInsufficientGold,
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{
+			loginToken:     "player-token",
+			loginNickname:  "阿明",
+			verifyNickname: "阿明",
+		},
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/player/auth/login", strings.NewReader(`{"nickname":"阿明","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected player login to set cookie")
+	}
+
+	purchaseRequest := httptest.NewRequest(http.MethodPost, "/api/shop/items/skin-basic/purchase", nil)
+	purchaseRequest.AddCookie(cookies[0])
+	purchaseResponse := httptest.NewRecorder()
+	handler.ServeHTTP(purchaseResponse, purchaseRequest)
+	if purchaseResponse.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 from shop purchase, got %d", purchaseResponse.Code)
+	}
+	if !strings.Contains(purchaseResponse.Body.String(), "金币不足") {
+		t.Fatalf("expected readable insufficient gold message, got %s", purchaseResponse.Body.String())
+	}
+}
+
+func (m *mockStore) ArchiveExpiredTaskCycles(_ context.Context, now time.Time) ([]core.TaskCycleArchive, error) {
 	m.lastArchiveNow = now
-	return []vote.TaskCycleArchive{{TaskID: "daily-click-1", CycleKey: "2026-05-01"}}, nil
+	return []core.TaskCycleArchive{{TaskID: "daily-click-1", CycleKey: "2026-05-01"}}, nil
 }
 
-func (m *mockStore) ListTaskCycleArchives(_ context.Context, taskID string) ([]vote.TaskCycleArchive, error) {
-	return []vote.TaskCycleArchive{{TaskID: taskID, CycleKey: "2026-05-01"}}, nil
+func (m *mockStore) ListTaskCycleArchives(_ context.Context, taskID string) ([]core.TaskCycleArchive, error) {
+	return []core.TaskCycleArchive{{TaskID: taskID, CycleKey: "2026-05-01"}}, nil
 }
 
-func (m *mockStore) GetTaskCycleResults(_ context.Context, taskID string, cycleKey string) (vote.TaskCycleResultsView, error) {
-	return vote.TaskCycleResultsView{
-		Archive: vote.TaskCycleArchive{TaskID: taskID, CycleKey: cycleKey},
-		Items:   []vote.TaskCyclePlayerResult{{TaskID: taskID, CycleKey: cycleKey, Nickname: "阿明"}},
+func (m *mockStore) GetTaskCycleResults(_ context.Context, taskID string, cycleKey string) (core.TaskCycleResultsView, error) {
+	return core.TaskCycleResultsView{
+		Archive: core.TaskCycleArchive{TaskID: taskID, CycleKey: cycleKey},
+		Items:   []core.TaskCyclePlayerResult{{TaskID: taskID, CycleKey: cycleKey, Nickname: "阿明"}},
 	}, nil
 }
 
 func TestAdminTaskRoutesListAndSave(t *testing.T) {
 	store := &mockStore{
-		tasks: []vote.PlayerTask{
+		tasks: []core.PlayerTask{
 			{TaskID: "daily-click-1", Title: "今日点击", TargetValue: 10},
 		},
 	}
@@ -317,7 +490,7 @@ func TestAdminTaskRoutesListAndSave(t *testing.T) {
 	activateRequest.AddCookie(cookies[0])
 	activateResponse := httptest.NewRecorder()
 	handler.ServeHTTP(activateResponse, activateRequest)
-	if activateResponse.Code != http.StatusOK || store.lastTaskDefinition.Status != vote.TaskStatusActive {
+	if activateResponse.Code != http.StatusOK || store.lastTaskDefinition.Status != core.TaskStatusActive {
 		t.Fatalf("expected activate to succeed, code=%d task=%+v", activateResponse.Code, store.lastTaskDefinition)
 	}
 
@@ -355,31 +528,31 @@ func TestAdminTaskRoutesListAndSave(t *testing.T) {
 	}
 }
 
-func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string, comboCount int64) (vote.ClickResult, error) {
+func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string, comboCount int64) (core.ClickResult, error) {
 	m.lastClickNickname = nickname
 	if m.clickErr != nil {
-		return vote.ClickResult{}, m.clickErr
+		return core.ClickResult{}, m.clickErr
 	}
 	if m.result.Delta == 0 && m.result.UserStats.Nickname == "" {
 		m.result.Delta = 1
-		m.result.UserStats = vote.UserStats{Nickname: nickname, ClickCount: 1}
+		m.result.UserStats = core.UserStats{Nickname: nickname, ClickCount: 1}
 	}
 	return m.result, nil
 }
 
-func (m *mockStore) AutoClickBossPart(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+func (m *mockStore) AutoClickBossPart(_ context.Context, slug string, nickname string) (core.ClickResult, error) {
 	m.lastAutoClickNickname = nickname
 	return m.ClickButton(context.Background(), slug, nickname, 0)
 }
 
-func (m *mockStore) ClickBossPart(_ context.Context, slug string, nickname string) (vote.ClickResult, error) {
+func (m *mockStore) ClickBossPart(_ context.Context, slug string, nickname string) (core.ClickResult, error) {
 	return m.ClickButton(context.Background(), slug, nickname, 0)
 }
 
-func (m *mockStore) AttackBossPartAFK(_ context.Context, nickname string) (vote.ClickResult, error) {
+func (m *mockStore) AttackBossPartAFK(_ context.Context, nickname string) (core.ClickResult, error) {
 	m.lastAutoClickNickname = nickname
-	return vote.ClickResult{
-		Boss: &vote.Boss{
+	return core.ClickResult{
+		Boss: &core.Boss{
 			ID:        "boss-1",
 			Name:      "测试 Boss",
 			Status:    "active",
@@ -393,10 +566,10 @@ func (m *mockStore) ValidateNickname(_ context.Context, _ string) error {
 	return m.validateErr
 }
 
-func (m *mockStore) EquipItem(_ context.Context, nickname string, _ string) (vote.State, error) {
+func (m *mockStore) EquipItem(_ context.Context, nickname string, _ string) (core.State, error) {
 	m.lastClickNickname = nickname
 	if m.equipErr != nil {
-		return vote.State{}, m.equipErr
+		return core.State{}, m.equipErr
 	}
 	if m.equipState.Loadout.Weapon == nil {
 		return m.state, nil
@@ -404,9 +577,9 @@ func (m *mockStore) EquipItem(_ context.Context, nickname string, _ string) (vot
 	return m.equipState, nil
 }
 
-func (m *mockStore) UnequipItem(_ context.Context, _ string, _ string) (vote.State, error) {
+func (m *mockStore) UnequipItem(_ context.Context, _ string, _ string) (core.State, error) {
 	if m.equipErr != nil {
-		return vote.State{}, m.equipErr
+		return core.State{}, m.equipErr
 	}
 	if m.equipState.Loadout.Weapon == nil {
 		return m.state, nil
@@ -414,9 +587,9 @@ func (m *mockStore) UnequipItem(_ context.Context, _ string, _ string) (vote.Sta
 	return m.equipState, nil
 }
 
-func (m *mockStore) EnhanceItem(_ context.Context, _ string, _ string) (vote.State, error) {
+func (m *mockStore) EnhanceItem(_ context.Context, _ string, _ string) (core.State, error) {
 	if m.enhanceErr != nil {
-		return vote.State{}, m.enhanceErr
+		return core.State{}, m.enhanceErr
 	}
 	if m.equipState.Loadout.Weapon == nil {
 		return m.state, nil
@@ -424,12 +597,12 @@ func (m *mockStore) EnhanceItem(_ context.Context, _ string, _ string) (vote.Sta
 	return m.equipState, nil
 }
 
-func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (vote.SalvageResult, error) {
+func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (core.SalvageResult, error) {
 	m.lastSalvageItemID = itemID
 	if m.salvageErr != nil {
-		return vote.SalvageResult{}, m.salvageErr
+		return core.SalvageResult{}, m.salvageErr
 	}
-	return vote.SalvageResult{
+	return core.SalvageResult{
 		ItemID:         itemID,
 		GoldReward:     500,
 		StoneReward:    1,
@@ -439,11 +612,11 @@ func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (vot
 	}, nil
 }
 
-func (m *mockStore) BulkSalvageUnequipped(_ context.Context, _ string) (vote.BulkSalvageResult, error) {
+func (m *mockStore) BulkSalvageUnequipped(_ context.Context, _ string) (core.BulkSalvageResult, error) {
 	if m.salvageErr != nil {
-		return vote.BulkSalvageResult{}, m.salvageErr
+		return core.BulkSalvageResult{}, m.salvageErr
 	}
-	return vote.BulkSalvageResult{
+	return core.BulkSalvageResult{
 		SalvagedCount:       3,
 		SalvagedByRarity:    map[string]int{"普通": 1, "稀有": 2},
 		GoldReward:          1200,
@@ -455,11 +628,11 @@ func (m *mockStore) BulkSalvageUnequipped(_ context.Context, _ string) (vote.Bul
 	}, nil
 }
 
-func (m *mockStore) LockItem(_ context.Context, _ string, itemID string) (vote.State, error) {
+func (m *mockStore) LockItem(_ context.Context, _ string, itemID string) (core.State, error) {
 	m.lastLockItemID = itemID
 	m.lastLockState = true
 	if m.equipErr != nil {
-		return vote.State{}, m.equipErr
+		return core.State{}, m.equipErr
 	}
 	if m.equipState.Loadout.Weapon == nil {
 		return m.state, nil
@@ -467,11 +640,11 @@ func (m *mockStore) LockItem(_ context.Context, _ string, itemID string) (vote.S
 	return m.equipState, nil
 }
 
-func (m *mockStore) UnlockItem(_ context.Context, _ string, itemID string) (vote.State, error) {
+func (m *mockStore) UnlockItem(_ context.Context, _ string, itemID string) (core.State, error) {
 	m.lastLockItemID = itemID
 	m.lastLockState = false
 	if m.equipErr != nil {
-		return vote.State{}, m.equipErr
+		return core.State{}, m.equipErr
 	}
 	if m.equipState.Loadout.Weapon == nil {
 		return m.state, nil
@@ -479,27 +652,27 @@ func (m *mockStore) UnlockItem(_ context.Context, _ string, itemID string) (vote
 	return m.equipState, nil
 }
 
-func (m *mockStore) GetAdminState(_ context.Context) (vote.AdminState, error) {
+func (m *mockStore) GetAdminState(_ context.Context) (core.AdminState, error) {
 	return m.adminState, nil
 }
 
-func (m *mockStore) ListAdminEquipmentPage(_ context.Context, _ int64, _ int64) (vote.AdminEquipmentPage, error) {
+func (m *mockStore) ListAdminEquipmentPage(_ context.Context, _ int64, _ int64) (core.AdminEquipmentPage, error) {
 	return m.adminEquipmentPage, nil
 }
 
-func (m *mockStore) ListAdminBossHistoryPage(_ context.Context, _ int64, _ int64) (vote.AdminBossHistoryPage, error) {
+func (m *mockStore) ListAdminBossHistoryPage(_ context.Context, _ int64, _ int64) (core.AdminBossHistoryPage, error) {
 	return m.adminBossHistoryPage, nil
 }
 
-func (m *mockStore) ListAdminPlayers(_ context.Context, _ string, _ int64) (vote.AdminPlayerPage, error) {
+func (m *mockStore) ListAdminPlayers(_ context.Context, _ string, _ int64) (core.AdminPlayerPage, error) {
 	return m.adminPlayerPage, nil
 }
 
-func (m *mockStore) GetAdminPlayer(_ context.Context, _ string) (*vote.AdminPlayerOverview, error) {
+func (m *mockStore) GetAdminPlayer(_ context.Context, _ string) (*core.AdminPlayerOverview, error) {
 	return m.adminPlayer, nil
 }
 
-func (m *mockStore) SaveEquipmentDefinition(_ context.Context, definition vote.EquipmentDefinition) error {
+func (m *mockStore) SaveEquipmentDefinition(_ context.Context, definition core.EquipmentDefinition) error {
 	m.lastEquipment = definition
 	return nil
 }
@@ -508,12 +681,12 @@ func (m *mockStore) DeleteEquipmentDefinition(_ context.Context, _ string) error
 	return nil
 }
 
-func (m *mockStore) ActivateBoss(_ context.Context, boss vote.BossUpsert) (*vote.Boss, error) {
+func (m *mockStore) ActivateBoss(_ context.Context, boss core.BossUpsert) (*core.Boss, error) {
 	if m.activateBossErr != nil {
 		return nil, m.activateBossErr
 	}
 	m.lastBoss = boss
-	return &vote.Boss{
+	return &core.Boss{
 		ID:        boss.ID,
 		Name:      boss.Name,
 		Status:    "active",
@@ -526,11 +699,11 @@ func (m *mockStore) DeactivateBoss(_ context.Context) error {
 	return nil
 }
 
-func (m *mockStore) SetBossLoot(_ context.Context, _ string, _ []vote.BossLootEntry) error {
+func (m *mockStore) SetBossLoot(_ context.Context, _ string, _ []core.BossLootEntry) error {
 	return nil
 }
 
-func (m *mockStore) SaveBossTemplate(_ context.Context, template vote.BossTemplateUpsert) error {
+func (m *mockStore) SaveBossTemplate(_ context.Context, template core.BossTemplateUpsert) error {
 	if m.saveBossTemplateErr != nil {
 		return m.saveBossTemplateErr
 	}
@@ -542,7 +715,7 @@ func (m *mockStore) DeleteBossTemplate(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, loot []vote.BossLootEntry) error {
+func (m *mockStore) SetBossTemplateLoot(_ context.Context, templateID string, loot []core.BossLootEntry) error {
 	m.lastTemplateLootID = templateID
 	m.lastTemplateLoot = loot
 	return nil
@@ -553,7 +726,7 @@ func (m *mockStore) SetBossCycleQueue(_ context.Context, templateIDs []string) (
 	return append([]string(nil), templateIDs...), nil
 }
 
-func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.Boss, error) {
+func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*core.Boss, error) {
 	if m.setBossCycleErr != nil {
 		return nil, m.setBossCycleErr
 	}
@@ -561,7 +734,7 @@ func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.
 	if !enabled {
 		return nil, nil
 	}
-	return &vote.Boss{
+	return &core.Boss{
 		ID:         "dragon-1",
 		TemplateID: "dragon",
 		Name:       "火龙",
@@ -571,20 +744,20 @@ func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*vote.
 	}, nil
 }
 
-func (m *mockStore) ListBossHistory(_ context.Context) ([]vote.BossHistoryEntry, error) {
+func (m *mockStore) ListBossHistory(_ context.Context) ([]core.BossHistoryEntry, error) {
 	return m.bossHistory, nil
 }
 
-func (m *mockStore) GetLatestAnnouncement(_ context.Context) (*vote.Announcement, error) {
+func (m *mockStore) GetLatestAnnouncement(_ context.Context) (*core.Announcement, error) {
 	return m.latestAnnouncement, nil
 }
 
-func (m *mockStore) ListAnnouncements(_ context.Context, includeInactive bool) ([]vote.Announcement, error) {
+func (m *mockStore) ListAnnouncements(_ context.Context, includeInactive bool) ([]core.Announcement, error) {
 	return m.announcements, nil
 }
 
-func (m *mockStore) SaveAnnouncement(_ context.Context, announcement vote.AnnouncementUpsert) (*vote.Announcement, error) {
-	return &vote.Announcement{
+func (m *mockStore) SaveAnnouncement(_ context.Context, announcement core.AnnouncementUpsert) (*core.Announcement, error) {
+	return &core.Announcement{
 		ID:          "1",
 		Title:       announcement.Title,
 		Content:     announcement.Content,
@@ -597,11 +770,11 @@ func (m *mockStore) DeleteAnnouncement(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockStore) CreateMessage(_ context.Context, nickname string, content string) (*vote.Message, error) {
+func (m *mockStore) CreateMessage(_ context.Context, nickname string, content string) (*core.Message, error) {
 	if m.messageErr != nil {
 		return nil, m.messageErr
 	}
-	return &vote.Message{
+	return &core.Message{
 		ID:        "1",
 		Nickname:  nickname,
 		Content:   content,
@@ -609,7 +782,7 @@ func (m *mockStore) CreateMessage(_ context.Context, nickname string, content st
 	}, nil
 }
 
-func (m *mockStore) ListMessages(_ context.Context, _ string, _ int64) (vote.MessagePage, error) {
+func (m *mockStore) ListMessages(_ context.Context, _ string, _ int64) (core.MessagePage, error) {
 	return m.messagePage, m.messageErr
 }
 
@@ -617,16 +790,16 @@ func (m *mockStore) DeleteMessage(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockStore) GetTalentState(_ context.Context, _ string) (*vote.TalentState, error) {
+func (m *mockStore) GetTalentState(_ context.Context, _ string) (*core.TalentState, error) {
 	if m.talentState != nil {
 		return m.talentState, nil
 	}
-	return &vote.TalentState{Talents: map[string]int{}}, nil
+	return &core.TalentState{Talents: map[string]int{}}, nil
 }
 
 func (m *mockStore) UpgradeTalent(_ context.Context, _ string, _ string, _ int) error {
 	if m.talentState == nil {
-		m.talentState = &vote.TalentState{Talents: map[string]int{}}
+		m.talentState = &core.TalentState{Talents: map[string]int{}}
 	}
 	if m.talentState.Talents == nil {
 		m.talentState.Talents = map[string]int{}
@@ -639,7 +812,7 @@ func (m *mockStore) ResetTalents(_ context.Context, _ string) error {
 	return nil
 }
 
-func (m *mockStore) ComputeTalentModifiers(_ context.Context, _ string) (*vote.TalentModifiers, error) {
+func (m *mockStore) ComputeTalentModifiers(_ context.Context, _ string) (*core.TalentModifiers, error) {
 	return nil, nil
 }
 
@@ -648,7 +821,7 @@ type mockOSSSigner struct {
 	err    error
 }
 
-func (m *mockOSSSigner) CreatePolicy(_ context.Context) (ossupload.Policy, error) {
+func (m *mockOSSSigner) CreatePolicy(_ context.Context, _ string) (ossupload.Policy, error) {
 	return m.policy, m.err
 }
 
@@ -691,28 +864,28 @@ func (m *mockAutoClickController) Close() error {
 }
 
 type mockBroadcaster struct {
-	snapshots []vote.Snapshot
+	snapshots []core.Snapshot
 }
 
-func (m *mockBroadcaster) BroadcastSnapshot(snapshot vote.Snapshot) error {
+func (m *mockBroadcaster) BroadcastSnapshot(snapshot core.Snapshot) error {
 	m.snapshots = append(m.snapshots, snapshot)
 	return nil
 }
 
 type mockChangePublisher struct {
-	changes []vote.StateChange
+	changes []core.StateChange
 }
 
-func (m *mockChangePublisher) PublishChange(_ context.Context, change vote.StateChange) error {
+func (m *mockChangePublisher) PublishChange(_ context.Context, change core.StateChange) error {
 	m.changes = append(m.changes, change)
 	return nil
 }
 
 func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 	store := &mockStore{
-		bossHistory: []vote.BossHistoryEntry{
+		bossHistory: []core.BossHistoryEntry{
 			{
-				Boss: vote.Boss{
+				Boss: core.Boss{
 					ID:         "slime-king",
 					Name:       "史莱姆王",
 					Status:     "defeated",
@@ -721,10 +894,10 @@ func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 					StartedAt:  1710000000,
 					DefeatedAt: 1710000300,
 				},
-				Loot: []vote.BossLootEntry{
+				Loot: []core.BossLootEntry{
 					{ItemID: "cloth-armor", ItemName: "布甲", Weight: 3},
 				},
-				Damage: []vote.BossLeaderboardEntry{
+				Damage: []core.BossLeaderboardEntry{
 					{Rank: 1, Nickname: "阿明", Damage: 42},
 				},
 			},
@@ -744,7 +917,7 @@ func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 		t.Fatalf("expected 200, got %d", response.Code)
 	}
 
-	var payload []vote.BossHistoryEntry
+	var payload []core.BossHistoryEntry
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -759,10 +932,10 @@ func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 
 func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
+		state: core.State{
 			TalentPoints: 345,
 		},
-		talentState: &vote.TalentState{
+		talentState: &core.TalentState{
 			Talents: map[string]int{
 				"normal_core": 2,
 			},
@@ -809,17 +982,17 @@ func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected effectDescriptions map in payload, got %+v", payload["effectDescriptions"])
 	}
-	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 22% x 18 段总伤。可无限触发。" {
+	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 68% x 18 段总伤。可无限触发。" {
 		t.Fatalf("expected dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
 	}
 }
 
 func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
 	store := &mockStore{
-		state: vote.State{
+		state: core.State{
 			TalentPoints: 338,
 		},
-		talentState: &vote.TalentState{
+		talentState: &core.TalentState{
 			Talents: map[string]int{
 				"normal_core": 1,
 			},
@@ -874,14 +1047,14 @@ func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected effectDescriptions map in payload, got %+v", payload["effectDescriptions"])
 	}
-	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 22% x 18 段总伤。可无限触发。" {
+	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 68% x 18 段总伤。可无限触发。" {
 		t.Fatalf("expected upgraded dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
 	}
 }
 
 func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 	store := &mockStore{
-		latestAnnouncement: &vote.Announcement{
+		latestAnnouncement: &core.Announcement{
 			ID:          "7",
 			Title:       "更新公告",
 			Content:     "留言墙已上线。",
@@ -903,7 +1076,7 @@ func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 		t.Fatalf("expected 200, got %d", response.Code)
 	}
 
-	var payload vote.Announcement
+	var payload core.Announcement
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -913,10 +1086,10 @@ func TestGetLatestAnnouncementReturnsPayload(t *testing.T) {
 }
 func TestEquipItemReturnsUpdatedState(t *testing.T) {
 	store := &mockStore{
-		equipState: vote.State{
+		equipState: core.State{
 
-			Loadout: vote.Loadout{
-				Weapon: &vote.InventoryItem{
+			Loadout: core.Loadout{
+				Weapon: &core.InventoryItem{
 					ItemID:   "wood-sword",
 					Name:     "木剑",
 					Slot:     "weapon",
@@ -924,7 +1097,7 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 					Equipped: true,
 				},
 			},
-			CombatStats: vote.CombatStats{
+			CombatStats: core.CombatStats{
 				EffectiveIncrement: 3,
 				NormalDamage:       3,
 				CriticalDamage:     7,
@@ -949,9 +1122,9 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 
 	var payload struct {
 		Loadout struct {
-			Weapon *vote.InventoryItem `json:"weapon"`
+			Weapon *core.InventoryItem `json:"weapon"`
 		} `json:"loadout"`
-		CombatStats vote.CombatStats `json:"combatStats"`
+		CombatStats core.CombatStats `json:"combatStats"`
 	}
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -1027,7 +1200,7 @@ func TestBulkSalvageUnequippedReturnsSummary(t *testing.T) {
 		t.Fatalf("expected 200, got %d", response.Code)
 	}
 
-	var payload vote.BulkSalvageResult
+	var payload core.BulkSalvageResult
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -1063,7 +1236,7 @@ func TestSynthesizeItemReturnsDeprecatedError(t *testing.T) {
 
 func TestPostMessageRejectsSensitiveContent(t *testing.T) {
 	store := &mockStore{
-		messageErr: vote.ErrSensitiveContent,
+		messageErr: core.ErrSensitiveContent,
 	}
 	handler := NewHandler(Options{
 		Store:       store,
@@ -1086,13 +1259,13 @@ func TestPostMessageRejectsSensitiveContent(t *testing.T) {
 
 func TestPublicMessagesPreferOptionalMessageStore(t *testing.T) {
 	store := &mockStore{
-		messagePage: vote.MessagePage{
-			Items: []vote.Message{{ID: "redis-1", Nickname: "阿明", Content: "redis"}},
+		messagePage: core.MessagePage{
+			Items: []core.Message{{ID: "redis-1", Nickname: "阿明", Content: "redis"}},
 		},
 	}
 	messageStore := &mockMessageStore{
-		page: vote.MessagePage{
-			Items: []vote.Message{{ID: "mongo-1", Nickname: "小红", Content: "mongo"}},
+		page: core.MessagePage{
+			Items: []core.Message{{ID: "mongo-1", Nickname: "小红", Content: "mongo"}},
 		},
 	}
 	handler := NewHandler(Options{
@@ -1109,7 +1282,7 @@ func TestPublicMessagesPreferOptionalMessageStore(t *testing.T) {
 		t.Fatalf("expected 200, got %d", response.Code)
 	}
 
-	var payload vote.MessagePage
+	var payload core.MessagePage
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -1120,7 +1293,7 @@ func TestPublicMessagesPreferOptionalMessageStore(t *testing.T) {
 
 func TestAdminLoginCreatesSessionAndStateRequiresAuth(t *testing.T) {
 	store := &mockStore{
-		adminState: vote.AdminState{
+		adminState: core.AdminState{
 			PlayerCount:       8,
 			RecentPlayerCount: 3,
 		},
@@ -1260,8 +1433,8 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 
 func TestAdminBossPartsRequiredReturnsBadRequest(t *testing.T) {
 	store := &mockStore{
-		activateBossErr:     vote.ErrBossPartsRequired,
-		saveBossTemplateErr: vote.ErrBossPartsRequired,
+		activateBossErr:     core.ErrBossPartsRequired,
+		saveBossTemplateErr: core.ErrBossPartsRequired,
 	}
 
 	handler := NewHandler(Options{
@@ -1362,7 +1535,7 @@ func TestAdminOSSPolicyRequiresAuthAndReturnsPayload(t *testing.T) {
 }
 func TestValidateNicknameRejectsSensitiveNickname(t *testing.T) {
 	store := &mockStore{
-		validateErr: vote.ErrSensitiveNickname,
+		validateErr: core.ErrSensitiveNickname,
 	}
 	handler := NewHandler(Options{
 		Store:       store,

@@ -10,7 +10,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 func registerAdminRoutes(router route.IRouter, options Options) {
@@ -23,6 +23,7 @@ func registerAdminRoutes(router route.IRouter, options Options) {
 	registerAdminBossRoutes(router, options)
 	registerAdminContentRoutes(router, options)
 	registerAdminTaskRoutes(router, options)
+	registerAdminShopRoutes(router, options)
 	registerAdminPlayerAuthRoutes(router, options)
 	registerAdminResourceRoutes(router, options)
 }
@@ -39,7 +40,7 @@ func registerAdminSessionRoutes(router route.IRouter, options Options) {
 
 		token, ok := options.AdminAuthenticator.Login(body.Username, body.Password)
 		if !ok {
-			writeAdminAudit(context.Background(), options.AdminAuditWriter, vote.AdminAuditLog{
+			writeAdminAudit(context.Background(), options.AdminAuditWriter, core.AdminAuditLog{
 				Operator:    strings.TrimSpace(body.Username),
 				Action:      "admin.login",
 				RequestPath: requestPath(c),
@@ -55,7 +56,7 @@ func registerAdminSessionRoutes(router route.IRouter, options Options) {
 		}
 
 		c.SetCookie(adminSessionCookieName, token, 0, "/", "", protocol.CookieSameSiteLaxMode, false, true)
-		writeAdminAudit(context.Background(), options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(context.Background(), options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "admin.login",
 			RequestPath: requestPath(c),
@@ -67,7 +68,7 @@ func registerAdminSessionRoutes(router route.IRouter, options Options) {
 
 	router.POST("/api/admin/logout", func(_ context.Context, c *app.RequestContext) {
 		c.SetCookie(adminSessionCookieName, "", -1, "/", "", protocol.CookieSameSiteLaxMode, false, true)
-		writeAdminAudit(context.Background(), options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(context.Background(), options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "admin.logout",
 			RequestPath: requestPath(c),

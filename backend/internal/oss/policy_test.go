@@ -17,7 +17,7 @@ func TestSignerCreatePolicyBuildsUploadPayload(t *testing.T) {
 		ExpireSeconds:   300,
 	})
 
-	policy, err := signer.CreatePolicy(context.Background())
+	policy, err := signer.CreatePolicy(context.Background(), "")
 	if err != nil {
 		t.Fatalf("create policy: %v", err)
 	}

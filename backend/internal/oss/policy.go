@@ -47,8 +47,8 @@ func NewSigner(config Config) *Signer {
 	return &Signer{config: config}
 }
 
-// CreatePolicy 生成一次短时上传策略。
-func (s *Signer) CreatePolicy(_ context.Context) (Policy, error) {
+// CreatePolicy 生成一次短时上传策略。category 为 "shop" 时使用 goods/cursor 目录。
+func (s *Signer) CreatePolicy(_ context.Context, category string) (Policy, error) {
 	if s == nil {
 		return Policy{}, errors.New("oss signer is nil")
 	}
@@ -67,6 +67,9 @@ func (s *Signer) CreatePolicy(_ context.Context) (Policy, error) {
 	dirPrefix := strings.Trim(strings.TrimSpace(s.config.UploadDirPrefix), "/")
 	if dirPrefix == "" {
 		dirPrefix = "equipments"
+	}
+	if strings.TrimSpace(category) == "shop" {
+		dirPrefix = "goods/cursor"
 	}
 
 	expiresAt := time.Now().UTC().Add(time.Duration(expireSeconds) * time.Second)

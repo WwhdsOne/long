@@ -12,8 +12,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
 	adminauth "long/internal/admin"
+	"long/internal/core"
 	playerauth "long/internal/playerauth"
-	"long/internal/vote"
 	"long/internal/xlog"
 )
 
@@ -30,7 +30,7 @@ func bindJSON(c *app.RequestContext, body any, invalidPayload map[string]string)
 }
 
 func writeNicknameError(c *app.RequestContext, err error) bool {
-	if errors.Is(err, vote.ErrInvalidNickname) {
+	if errors.Is(err, core.ErrInvalidNickname) {
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   "INVALID_NICKNAME",
 			"message": "昵称还没填好，先起个名字再点。",
@@ -38,7 +38,7 @@ func writeNicknameError(c *app.RequestContext, err error) bool {
 		return true
 	}
 
-	if errors.Is(err, vote.ErrSensitiveNickname) {
+	if errors.Is(err, core.ErrSensitiveNickname) {
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   "SENSITIVE_NICKNAME",
 			"message": "昵称包含敏感词，请换一个试试。",
@@ -51,19 +51,19 @@ func writeNicknameError(c *app.RequestContext, err error) bool {
 
 func writeContentError(c *app.RequestContext, err error) bool {
 	switch {
-	case errors.Is(err, vote.ErrSensitiveContent):
+	case errors.Is(err, core.ErrSensitiveContent):
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   "SENSITIVE_CONTENT",
 			"message": "内容包含敏感词，请改一下再发。",
 		})
 		return true
-	case errors.Is(err, vote.ErrMessageEmpty):
+	case errors.Is(err, core.ErrMessageEmpty):
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   "EMPTY_CONTENT",
 			"message": "内容不能为空。",
 		})
 		return true
-	case errors.Is(err, vote.ErrMessageTooLong):
+	case errors.Is(err, core.ErrMessageTooLong):
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   "CONTENT_TOO_LONG",
 			"message": "内容最多 200 个字。",
@@ -151,14 +151,14 @@ func isAdminAuthenticated(c *app.RequestContext, authenticator *adminauth.Authen
 	return authenticator.Verify(token)
 }
 
-func publishChange(ctx context.Context, publisher ChangePublisher, change vote.StateChange) {
+func publishChange(ctx context.Context, publisher ChangePublisher, change core.StateChange) {
 	if publisher == nil {
 		return
 	}
 	_ = publisher.PublishChange(ctx, change)
 }
 
-func writeAdminAudit(ctx context.Context, writer AdminAuditWriter, item vote.AdminAuditLog) {
+func writeAdminAudit(ctx context.Context, writer AdminAuditWriter, item core.AdminAuditLog) {
 	if writer == nil {
 		return
 	}
@@ -166,11 +166,11 @@ func writeAdminAudit(ctx context.Context, writer AdminAuditWriter, item vote.Adm
 		item.CreatedAt = time.Now().Unix()
 	}
 	if err := writer.WriteAdminAuditLog(ctx, item); err != nil {
-		xlog.L().Warn("write admin audit log failed", xlog.Err(err))
+		xlog.L().Error("write admin audit log failed", xlog.Err(err))
 	}
 }
 
-func writeDomainEvent(ctx context.Context, writer DomainEventWriter, item vote.DomainEvent) {
+func writeDomainEvent(ctx context.Context, writer DomainEventWriter, item core.DomainEvent) {
 	if writer == nil {
 		return
 	}
@@ -178,7 +178,7 @@ func writeDomainEvent(ctx context.Context, writer DomainEventWriter, item vote.D
 		item.CreatedAt = time.Now().Unix()
 	}
 	if err := writer.WriteDomainEvent(ctx, item); err != nil {
-		xlog.L().Warn("write domain event failed", xlog.Err(err))
+		xlog.L().Error("write domain event failed", xlog.Err(err))
 	}
 }
 

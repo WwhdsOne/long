@@ -10,21 +10,21 @@ import (
 	"github.com/bytedance/sonic"
 
 	"long/internal/admin"
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type mockBossHistoryReader struct {
-	page vote.AdminBossHistoryPage
+	page core.AdminBossHistoryPage
 	err  error
 }
 
-func (m *mockBossHistoryReader) ListAdminBossHistoryPage(_ context.Context, _ int64, _ int64) (vote.AdminBossHistoryPage, error) {
+func (m *mockBossHistoryReader) ListAdminBossHistoryPage(_ context.Context, _ int64, _ int64) (core.AdminBossHistoryPage, error) {
 	return m.page, m.err
 }
 
 type mockMessageStore struct {
-	page          vote.MessagePage
-	created       *vote.Message
+	page          core.MessagePage
+	created       *core.Message
 	deletedID     string
 	listCursor    string
 	listLimit     int64
@@ -33,7 +33,7 @@ type mockMessageStore struct {
 	err           error
 }
 
-func (m *mockMessageStore) CreateMessage(_ context.Context, nickname string, content string) (*vote.Message, error) {
+func (m *mockMessageStore) CreateMessage(_ context.Context, nickname string, content string) (*core.Message, error) {
 	m.createNick = nickname
 	m.createContent = content
 	if m.err != nil {
@@ -42,10 +42,10 @@ func (m *mockMessageStore) CreateMessage(_ context.Context, nickname string, con
 	if m.created != nil {
 		return m.created, nil
 	}
-	return &vote.Message{ID: "1", Nickname: nickname, Content: content, CreatedAt: 1}, nil
+	return &core.Message{ID: "1", Nickname: nickname, Content: content, CreatedAt: 1}, nil
 }
 
-func (m *mockMessageStore) ListMessages(_ context.Context, cursor string, limit int64) (vote.MessagePage, error) {
+func (m *mockMessageStore) ListMessages(_ context.Context, cursor string, limit int64) (core.MessagePage, error) {
 	m.listCursor = cursor
 	m.listLimit = limit
 	return m.page, m.err
@@ -58,7 +58,7 @@ func (m *mockMessageStore) DeleteMessage(_ context.Context, id string) error {
 
 func TestAdminStateReturnsLightweightSummary(t *testing.T) {
 	store := &mockStore{
-		adminState: vote.AdminState{
+		adminState: core.AdminState{
 			PlayerCount:       12,
 			RecentPlayerCount: 4,
 		},
@@ -101,9 +101,9 @@ func TestAdminStateReturnsLightweightSummary(t *testing.T) {
 
 func TestAdminBossHistoryPagePrefersOptionalReader(t *testing.T) {
 	store := &mockStore{
-		adminBossHistoryPage: vote.AdminBossHistoryPage{
-			Items: []vote.BossHistoryEntry{
-				{Boss: vote.Boss{ID: "redis-boss", Name: "Redis Boss", Status: "defeated", StartedAt: 1}},
+		adminBossHistoryPage: core.AdminBossHistoryPage{
+			Items: []core.BossHistoryEntry{
+				{Boss: core.Boss{ID: "redis-boss", Name: "Redis Boss", Status: "defeated", StartedAt: 1}},
 			},
 			Page:       1,
 			PageSize:   20,
@@ -112,9 +112,9 @@ func TestAdminBossHistoryPagePrefersOptionalReader(t *testing.T) {
 		},
 	}
 	reader := &mockBossHistoryReader{
-		page: vote.AdminBossHistoryPage{
-			Items: []vote.BossHistoryEntry{
-				{Boss: vote.Boss{ID: "mongo-boss", Name: "Mongo Boss", Status: "defeated", StartedAt: 2}},
+		page: core.AdminBossHistoryPage{
+			Items: []core.BossHistoryEntry{
+				{Boss: core.Boss{ID: "mongo-boss", Name: "Mongo Boss", Status: "defeated", StartedAt: 2}},
 			},
 			Page:       1,
 			PageSize:   20,
@@ -143,7 +143,7 @@ func TestAdminBossHistoryPagePrefersOptionalReader(t *testing.T) {
 		t.Fatalf("expected 200 from admin boss history page, got %d", response.Code)
 	}
 
-	var payload vote.AdminBossHistoryPage
+	var payload core.AdminBossHistoryPage
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode boss history page: %v", err)
 	}
@@ -154,13 +154,13 @@ func TestAdminBossHistoryPagePrefersOptionalReader(t *testing.T) {
 
 func TestAdminMessagesPreferOptionalMessageStore(t *testing.T) {
 	store := &mockStore{
-		messagePage: vote.MessagePage{
-			Items: []vote.Message{{ID: "redis-1", Nickname: "阿明", Content: "redis"}},
+		messagePage: core.MessagePage{
+			Items: []core.Message{{ID: "redis-1", Nickname: "阿明", Content: "redis"}},
 		},
 	}
 	messageStore := &mockMessageStore{
-		page: vote.MessagePage{
-			Items: []vote.Message{{ID: "mongo-1", Nickname: "小红", Content: "mongo"}},
+		page: core.MessagePage{
+			Items: []core.Message{{ID: "mongo-1", Nickname: "小红", Content: "mongo"}},
 		},
 	}
 
@@ -184,7 +184,7 @@ func TestAdminMessagesPreferOptionalMessageStore(t *testing.T) {
 		t.Fatalf("expected 200 from admin messages, got %d", response.Code)
 	}
 
-	var payload vote.MessagePage
+	var payload core.MessagePage
 	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode message page: %v", err)
 	}
@@ -198,8 +198,8 @@ func TestAdminMessagesPreferOptionalMessageStore(t *testing.T) {
 
 func TestAdminCatalogPagesRequireAuthAndReturnPagePayloads(t *testing.T) {
 	store := &mockStore{
-		adminEquipmentPage: vote.AdminEquipmentPage{
-			Items: []vote.EquipmentDefinition{
+		adminEquipmentPage: core.AdminEquipmentPage{
+			Items: []core.EquipmentDefinition{
 				{ItemID: "wood-sword", Name: "木剑", Slot: "weapon"},
 			},
 			Page:       2,
@@ -207,9 +207,9 @@ func TestAdminCatalogPagesRequireAuthAndReturnPagePayloads(t *testing.T) {
 			Total:      3,
 			TotalPages: 3,
 		},
-		adminBossHistoryPage: vote.AdminBossHistoryPage{
-			Items: []vote.BossHistoryEntry{
-				{Boss: vote.Boss{ID: "boss-2", Name: "史莱姆王", Status: "defeated", StartedAt: 2}},
+		adminBossHistoryPage: core.AdminBossHistoryPage{
+			Items: []core.BossHistoryEntry{
+				{Boss: core.Boss{ID: "boss-2", Name: "史莱姆王", Status: "defeated", StartedAt: 2}},
 			},
 			Page:       2,
 			PageSize:   1,
@@ -237,7 +237,7 @@ func TestAdminCatalogPagesRequireAuthAndReturnPagePayloads(t *testing.T) {
 		t.Fatalf("expected 200 from admin equipment page, got %d", equipmentResponse.Code)
 	}
 
-	var equipmentPayload vote.AdminEquipmentPage
+	var equipmentPayload core.AdminEquipmentPage
 	if err := sonic.Unmarshal(equipmentResponse.Body.Bytes(), &equipmentPayload); err != nil {
 		t.Fatalf("decode equipment page: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestAdminCatalogPagesRequireAuthAndReturnPagePayloads(t *testing.T) {
 		t.Fatalf("expected 200 from admin boss history page, got %d", historyResponse.Code)
 	}
 
-	var historyPayload vote.AdminBossHistoryPage
+	var historyPayload core.AdminBossHistoryPage
 	if err := sonic.Unmarshal(historyResponse.Body.Bytes(), &historyPayload); err != nil {
 		t.Fatalf("decode boss history page: %v", err)
 	}

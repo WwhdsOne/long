@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const bossHistoryCollectionName = "boss_history"
@@ -24,11 +24,11 @@ type bossHistoryDocument struct {
 	GoldOnKill         int64                       `bson:"gold_on_kill"`
 	StoneOnKill        int64                       `bson:"stone_on_kill"`
 	TalentPointsOnKill int64                       `bson:"talent_points_on_kill"`
-	Parts              []vote.BossPart             `bson:"parts,omitempty"`
+	Parts              []core.BossPart             `bson:"parts,omitempty"`
 	StartedAt          int64                       `bson:"started_at"`
 	DefeatedAt         int64                       `bson:"defeated_at,omitempty"`
-	Loot               []vote.BossLootEntry        `bson:"loot,omitempty"`
-	Damage             []vote.BossLeaderboardEntry `bson:"damage,omitempty"`
+	Loot               []core.BossLootEntry        `bson:"loot,omitempty"`
+	Damage             []core.BossLeaderboardEntry `bson:"damage,omitempty"`
 	ArchivedAt         int64                       `bson:"archived_at"`
 }
 
@@ -72,7 +72,7 @@ func (s *BossHistoryStore) EnsureIndexes(ctx context.Context) error {
 }
 
 // SaveBossHistory 写入或覆盖一条 Boss 历史。
-func (s *BossHistoryStore) SaveBossHistory(ctx context.Context, entry vote.BossHistoryEntry) error {
+func (s *BossHistoryStore) SaveBossHistory(ctx context.Context, entry core.BossHistoryEntry) error {
 	if s == nil || s.collection == nil {
 		return nil
 	}
@@ -111,9 +111,9 @@ func (s *BossHistoryStore) SaveBossHistory(ctx context.Context, entry vote.BossH
 }
 
 // ListAdminBossHistoryPage 返回后台 Boss 历史分页。
-func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page int64, pageSize int64) (vote.AdminBossHistoryPage, error) {
+func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page int64, pageSize int64) (core.AdminBossHistoryPage, error) {
 	if s == nil || s.collection == nil {
-		return vote.AdminBossHistoryPage{}, nil
+		return core.AdminBossHistoryPage{}, nil
 	}
 
 	page, pageSize = normalizePage(page, pageSize)
@@ -122,7 +122,7 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 
 	total, err := s.collection.CountDocuments(readCtx, bson.D{})
 	if err != nil {
-		return vote.AdminBossHistoryPage{}, err
+		return core.AdminBossHistoryPage{}, err
 	}
 
 	findOptions := options.Find().
@@ -132,18 +132,18 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 
 	cursor, err := s.collection.Find(readCtx, bson.D{}, findOptions)
 	if err != nil {
-		return vote.AdminBossHistoryPage{}, err
+		return core.AdminBossHistoryPage{}, err
 	}
 	defer cursor.Close(readCtx)
 
-	items := make([]vote.BossHistoryEntry, 0)
+	items := make([]core.BossHistoryEntry, 0)
 	for cursor.Next(readCtx) {
 		var doc bossHistoryDocument
 		if err := cursor.Decode(&doc); err != nil {
-			return vote.AdminBossHistoryPage{}, err
+			return core.AdminBossHistoryPage{}, err
 		}
-		items = append(items, vote.BossHistoryEntry{
-			Boss: vote.Boss{
+		items = append(items, core.BossHistoryEntry{
+			Boss: core.Boss{
 				ID:                 doc.BossID,
 				TemplateID:         doc.TemplateID,
 				Name:               doc.Name,
@@ -162,7 +162,7 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 		})
 	}
 	if err := cursor.Err(); err != nil {
-		return vote.AdminBossHistoryPage{}, err
+		return core.AdminBossHistoryPage{}, err
 	}
 
 	totalPages := int64(0)
@@ -170,7 +170,7 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 		totalPages = int64(math.Ceil(float64(total) / float64(pageSize)))
 	}
 
-	return vote.AdminBossHistoryPage{
+	return core.AdminBossHistoryPage{
 		Items:      items,
 		Page:       page,
 		PageSize:   pageSize,
@@ -180,7 +180,7 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 }
 
 // ListBossHistory 返回全部 Boss 历史倒序列表。
-func (s *BossHistoryStore) ListBossHistory(ctx context.Context) ([]vote.BossHistoryEntry, error) {
+func (s *BossHistoryStore) ListBossHistory(ctx context.Context) ([]core.BossHistoryEntry, error) {
 	page, err := s.ListAdminBossHistoryPage(ctx, 1, 1000000)
 	if err != nil {
 		return nil, err

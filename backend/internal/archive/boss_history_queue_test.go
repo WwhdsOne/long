@@ -6,25 +6,25 @@ import (
 	"testing"
 	"time"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type recordingBossHistoryWriter struct {
 	mu      sync.Mutex
-	entries []vote.BossHistoryEntry
+	entries []core.BossHistoryEntry
 }
 
-func (w *recordingBossHistoryWriter) SaveBossHistory(_ context.Context, entry vote.BossHistoryEntry) error {
+func (w *recordingBossHistoryWriter) SaveBossHistory(_ context.Context, entry core.BossHistoryEntry) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.entries = append(w.entries, entry)
 	return nil
 }
 
-func (w *recordingBossHistoryWriter) snapshot() []vote.BossHistoryEntry {
+func (w *recordingBossHistoryWriter) snapshot() []core.BossHistoryEntry {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	return append([]vote.BossHistoryEntry(nil), w.entries...)
+	return append([]core.BossHistoryEntry(nil), w.entries...)
 }
 
 func TestBossHistoryQueueConsumesSubmittedEntries(t *testing.T) {
@@ -38,8 +38,8 @@ func TestBossHistoryQueueConsumesSubmittedEntries(t *testing.T) {
 	queue.Start()
 	defer queue.Close()
 
-	ok := queue.Enqueue(vote.BossHistoryEntry{
-		Boss: vote.Boss{
+	ok := queue.Enqueue(core.BossHistoryEntry{
+		Boss: core.Boss{
 			ID:        "boss-1",
 			Name:      "测试 Boss",
 			Status:    "defeated",
@@ -71,10 +71,10 @@ func TestBossHistoryQueueReturnsFalseWhenBufferFull(t *testing.T) {
 	}, writer)
 	defer queue.Close()
 
-	if !queue.Enqueue(vote.BossHistoryEntry{Boss: vote.Boss{ID: "boss-1"}}) {
+	if !queue.Enqueue(core.BossHistoryEntry{Boss: core.Boss{ID: "boss-1"}}) {
 		t.Fatal("expected first enqueue to succeed")
 	}
-	if queue.Enqueue(vote.BossHistoryEntry{Boss: vote.Boss{ID: "boss-2"}}) {
+	if queue.Enqueue(core.BossHistoryEntry{Boss: core.Boss{ID: "boss-2"}}) {
 		t.Fatal("expected second enqueue to fail when buffer is full")
 	}
 }

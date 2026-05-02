@@ -10,8 +10,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/hertz-contrib/websocket"
 
+	"long/internal/core"
 	"long/internal/events"
-	"long/internal/vote"
 )
 
 const (
@@ -43,7 +43,7 @@ type realtimeClientMessage struct {
 
 type realtimeSnapshotMessage struct {
 	Type   string        `json:"type"`
-	Public vote.Snapshot `json:"public"`
+	Public core.Snapshot `json:"public"`
 	User   any           `json:"user"`
 }
 
@@ -53,14 +53,16 @@ type realtimeDeltaMessage struct {
 }
 
 type realtimeSnapshotUser struct {
-	UserStats     *vote.UserStats     `json:"userStats,omitempty"`
-	MyBossStats   *vote.BossUserStats `json:"myBossStats,omitempty"`
-	Loadout       vote.Loadout        `json:"loadout"`
-	CombatStats   vote.CombatStats    `json:"combatStats"`
-	Gold          int64               `json:"gold"`
-	Stones        int64               `json:"stones"`
-	TalentPoints  int64               `json:"talentPoints"`
-	RecentRewards []vote.Reward       `json:"recentRewards,omitempty"`
+	UserStats                          *core.UserStats     `json:"userStats,omitempty"`
+	MyBossStats                        *core.BossUserStats `json:"myBossStats,omitempty"`
+	Loadout                            core.Loadout        `json:"loadout"`
+	CombatStats                        core.CombatStats    `json:"combatStats"`
+	Gold                               int64               `json:"gold"`
+	Stones                             int64               `json:"stones"`
+	TalentPoints                       int64               `json:"talentPoints"`
+	RecentRewards                      []core.Reward       `json:"recentRewards,omitempty"`
+	EquippedBattleClickSkinID          string              `json:"equippedBattleClickSkinId,omitempty"`
+	EquippedBattleClickCursorImagePath string              `json:"equippedBattleClickCursorImagePath,omitempty"`
 }
 
 type realtimeClickAckPayload struct {
@@ -70,9 +72,9 @@ type realtimeClickAckPayload struct {
 	MyBossDamage         int64                     `json:"myBossDamage,omitempty"`
 	BossLeaderboardCount int                       `json:"bossLeaderboardCount,omitempty"`
 	DamageType           string                    `json:"damageType,omitempty"`
-	TalentEvents         []vote.TalentTriggerEvent `json:"talentEvents,omitempty"`
-	PartStateDeltas      []vote.BossPartStateDelta `json:"partStateDeltas,omitempty"`
-	TalentCombatState    *vote.TalentCombatState   `json:"talentCombatState,omitempty"`
+	TalentEvents         []core.TalentTriggerEvent `json:"talentEvents,omitempty"`
+	PartStateDeltas      []core.BossPartStateDelta `json:"partStateDeltas,omitempty"`
+	TalentCombatState    *core.TalentCombatState   `json:"talentCombatState,omitempty"`
 	UserDelta            *realtimeUserDelta        `json:"userDelta,omitempty"`
 	Button               struct {
 		Key string `json:"key"`
@@ -258,8 +260,8 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 
 		s.setNickname(resolveRealtimeReadNickname(s.authenticatorEnabled, nickname, nickname))
 
-		change := vote.StateChange{
-			Type:      vote.StateChangeButtonClicked,
+		change := core.StateChange{
+			Type:      core.StateChangeButtonClicked,
 			Nickname:  nickname,
 			Timestamp: time.Now().Unix(),
 		}
@@ -329,16 +331,18 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(any) error
 	})
 }
 
-func buildRealtimeSnapshotUser(state vote.UserState) realtimeSnapshotUser {
+func buildRealtimeSnapshotUser(state core.UserState) realtimeSnapshotUser {
 	return realtimeSnapshotUser{
-		UserStats:     state.UserStats,
-		MyBossStats:   state.MyBossStats,
-		Loadout:       state.Loadout,
-		CombatStats:   state.CombatStats,
-		Gold:          state.Gold,
-		Stones:        state.Stones,
-		TalentPoints:  state.TalentPoints,
-		RecentRewards: state.RecentRewards,
+		UserStats:                          state.UserStats,
+		MyBossStats:                        state.MyBossStats,
+		Loadout:                            state.Loadout,
+		CombatStats:                        state.CombatStats,
+		Gold:                               state.Gold,
+		Stones:                             state.Stones,
+		TalentPoints:                       state.TalentPoints,
+		RecentRewards:                      state.RecentRewards,
+		EquippedBattleClickSkinID:          state.EquippedBattleClickSkinID,
+		EquippedBattleClickCursorImagePath: state.EquippedBattleClickCursorImagePath,
 	}
 }
 

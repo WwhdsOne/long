@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const taskClaimLogsCollectionName = "task_claim_logs"
@@ -46,7 +46,7 @@ func (s *TaskClaimLogStore) EnsureIndexes(ctx context.Context) error {
 	return err
 }
 
-func (s *TaskClaimLogStore) WriteTaskClaimLog(ctx context.Context, item vote.TaskClaimLog) error {
+func (s *TaskClaimLogStore) WriteTaskClaimLog(ctx context.Context, item core.TaskClaimLog) error {
 	if s == nil || s.collection == nil {
 		return nil
 	}
@@ -91,9 +91,9 @@ func (s *TaskClaimLogStore) HasTaskClaimed(ctx context.Context, taskID string, c
 	return count > 0, nil
 }
 
-func (s *TaskClaimLogStore) ListTaskClaimLogs(ctx context.Context, taskID string, cycleKey string) ([]vote.TaskClaimLog, error) {
+func (s *TaskClaimLogStore) ListTaskClaimLogs(ctx context.Context, taskID string, cycleKey string) ([]core.TaskClaimLog, error) {
 	if s == nil || s.collection == nil {
-		return []vote.TaskClaimLog{}, nil
+		return []core.TaskClaimLog{}, nil
 	}
 	readCtx, cancel := withTimeout(ctx, s.readTimeout)
 	defer cancel()
@@ -105,20 +105,20 @@ func (s *TaskClaimLogStore) ListTaskClaimLogs(ctx context.Context, taskID string
 		return nil, err
 	}
 	defer cursor.Close(readCtx)
-	items := make([]vote.TaskClaimLog, 0)
+	items := make([]core.TaskClaimLog, 0)
 	for cursor.Next(readCtx) {
 		var doc struct {
 			TaskID     string           `bson:"task_id"`
 			CycleKey   string           `bson:"cycle_key"`
 			Nickname   string           `bson:"nickname"`
-			Rewards    vote.TaskRewards `bson:"rewards"`
+			Rewards    core.TaskRewards `bson:"rewards"`
 			ClaimedAt  int64            `bson:"claimed_at"`
 			ArchivedAt int64            `bson:"archived_at"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, err
 		}
-		items = append(items, vote.TaskClaimLog{
+		items = append(items, core.TaskClaimLog{
 			TaskID:     doc.TaskID,
 			CycleKey:   doc.CycleKey,
 			Nickname:   doc.Nickname,

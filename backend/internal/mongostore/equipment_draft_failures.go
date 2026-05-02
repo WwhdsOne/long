@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const equipmentDraftFailuresCollectionName = "equipment_draft_failures"
@@ -37,7 +37,7 @@ func (s *EquipmentDraftFailureStore) EnsureIndexes(ctx context.Context) error {
 	return err
 }
 
-func (s *EquipmentDraftFailureStore) WriteEquipmentDraftFailure(ctx context.Context, item vote.EquipmentDraftFailureLog) error {
+func (s *EquipmentDraftFailureStore) WriteEquipmentDraftFailure(ctx context.Context, item core.EquipmentDraftFailureLog) error {
 	if s == nil || s.collection == nil {
 		return nil
 	}

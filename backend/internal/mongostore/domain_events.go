@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const domainEventsCollectionName = "domain_events"
@@ -39,7 +39,7 @@ func (s *DomainEventStore) EnsureIndexes(ctx context.Context) error {
 	return err
 }
 
-func (s *DomainEventStore) WriteDomainEvent(ctx context.Context, item vote.DomainEvent) error {
+func (s *DomainEventStore) WriteDomainEvent(ctx context.Context, item core.DomainEvent) error {
 	if s == nil || s.collection == nil {
 		return nil
 	}

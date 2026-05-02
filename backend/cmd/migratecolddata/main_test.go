@@ -10,8 +10,8 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/config"
+	"long/internal/core"
 	"long/internal/nickname"
-	"long/internal/vote"
 )
 
 func TestCollectCleanupKeys包含历史Boss残留键且不误删当前Boss(t *testing.T) {
@@ -26,12 +26,12 @@ func TestCollectCleanupKeys包含历史Boss残留键且不误删当前Boss(t *te
 	client := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
 	defer client.Close()
 
-	store := vote.NewStore(client, "vote:", vote.StoreOptions{
+	store := core.NewStore(client, "vote:", core.StoreOptions{
 		CriticalChancePercent: 5,
 	}, nickname.NewSensitiveLexiconValidator())
 
 	ctx := context.Background()
-	historyBoss := &vote.Boss{
+	historyBoss := &core.Boss{
 		ID:         "history-1",
 		Name:       "历史 Boss",
 		Status:     "dead",

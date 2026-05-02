@@ -1,13 +1,12 @@
-import ossUrlMap from '../../../pixel-assets/oss-url-map.json'
 import { assetUrl } from './assets'
+import { effectAssetMap } from './effectAssetMap'
 
 export function effectAssetUrl(filename) {
   const key = String(filename || '').trim()
   if (!key) return ''
-  const remote = ossUrlMap[key]
+  const remote = effectAssetMap[key]
   if (typeof remote === 'string' && remote.trim()) {
     return remote.trim()
   }
   return assetUrl(`effects/${key}`)
 }
-

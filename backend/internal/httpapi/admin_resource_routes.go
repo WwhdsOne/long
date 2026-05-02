@@ -10,7 +10,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 	"long/internal/xlog"
 )
 
@@ -40,7 +40,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 		if err != nil {
 			writeEquipmentDraftFailureLog(ctx, options.EquipmentDraftFailureWriter, body.Prompt, err)
 			if errors.Is(err, ErrInvalidEquipmentDraft) {
-				xlog.L().Warn("invalid equipment draft", xlog.Err(err))
+				xlog.L().Error("invalid equipment draft", xlog.Err(err))
 				writeJSON(c, consts.StatusUnprocessableEntity, map[string]string{"error": "INVALID_EQUIPMENT_DRAFT"})
 				return
 			}
@@ -48,7 +48,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		writeJSON(c, consts.StatusOK, map[string]vote.EquipmentDefinition{"draft": draft})
+		writeJSON(c, consts.StatusOK, map[string]core.EquipmentDefinition{"draft": draft})
 	})
 
 	router.POST("/api/admin/equipment", func(ctx context.Context, c *app.RequestContext) {
@@ -57,7 +57,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body vote.EquipmentDefinition
+		var body core.EquipmentDefinition
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
@@ -66,7 +66,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SAVE_FAILED"})
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "equipment.create",
 			TargetType:  "equipment",
@@ -75,7 +75,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.created",
 			ItemID:    body.ItemID,
 			Payload: map[string]any{
@@ -84,8 +84,8 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			},
 		})
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeEquipmentMetaChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeEquipmentMetaChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
@@ -98,7 +98,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body vote.EquipmentDefinition
+		var body core.EquipmentDefinition
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
@@ -108,7 +108,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_SAVE_FAILED"})
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "equipment.update",
 			TargetType:  "equipment",
@@ -117,7 +117,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.updated",
 			ItemID:    body.ItemID,
 			Payload: map[string]any{
@@ -126,8 +126,8 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			},
 		})
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeEquipmentMetaChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeEquipmentMetaChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
@@ -144,7 +144,7 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_DELETE_FAILED"})
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "equipment.delete",
 			TargetType:  "equipment",
@@ -153,13 +153,13 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "equipment.deleted",
 			ItemID:    c.Param("itemId"),
 		})
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeEquipmentMetaChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeEquipmentMetaChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
@@ -172,7 +172,7 @@ func writeEquipmentDraftFailureLog(ctx context.Context, writer EquipmentDraftFai
 		return
 	}
 
-	item := vote.EquipmentDraftFailureLog{
+	item := core.EquipmentDraftFailureLog{
 		Prompt:       prompt,
 		ErrorMessage: err.Error(),
 		CreatedAt:    time.Now().Unix(),
@@ -191,6 +191,6 @@ func writeEquipmentDraftFailureLog(ctx context.Context, writer EquipmentDraftFai
 	}
 
 	if writeErr := writer.WriteEquipmentDraftFailure(ctx, item); writeErr != nil {
-		xlog.L().Warn("write equipment draft failure log failed", xlog.Err(writeErr))
+		xlog.L().Error("write equipment draft failure log failed", xlog.Err(writeErr))
 	}
 }

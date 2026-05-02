@@ -11,8 +11,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
+	"long/internal/core"
 	"long/internal/ratelimit"
-	"long/internal/vote"
 )
 
 type apiResponseError struct {
@@ -110,25 +110,25 @@ func enforceClickRateLimitForClient(guard ClickGuard, clientID string, nickname 
 
 func clickRequestError(err error) *apiResponseError {
 	switch {
-	case errors.Is(err, vote.ErrBossPartNotFound):
+	case errors.Is(err, core.ErrBossPartNotFound):
 		return &apiResponseError{
 			Status:  consts.StatusNotFound,
 			Code:    "BOSS_PART_NOT_FOUND",
 			Message: "Boss 部位不存在或当前不可攻击。",
 		}
-	case errors.Is(err, vote.ErrBossPartAlreadyDead):
+	case errors.Is(err, core.ErrBossPartAlreadyDead):
 		return &apiResponseError{
 			Status:  consts.StatusConflict,
 			Code:    "BOSS_PART_ALREADY_DEAD",
 			Message: "Boss 部位已被击碎，请选择其他部位。",
 		}
-	case errors.Is(err, vote.ErrInvalidNickname):
+	case errors.Is(err, core.ErrInvalidNickname):
 		return &apiResponseError{
 			Status:  consts.StatusBadRequest,
 			Code:    "INVALID_NICKNAME",
 			Message: "昵称还没填好，先起个名字再点。",
 		}
-	case errors.Is(err, vote.ErrSensitiveNickname):
+	case errors.Is(err, core.ErrSensitiveNickname):
 		return &apiResponseError{
 			Status:  consts.StatusBadRequest,
 			Code:    "SENSITIVE_NICKNAME",
@@ -143,19 +143,19 @@ func clickRequestError(err error) *apiResponseError {
 	}
 }
 
-func executeButtonClick(ctx context.Context, options Options, request clickRequestContext) (string, vote.ClickResult, *apiResponseError) {
+func executeButtonClick(ctx context.Context, options Options, request clickRequestContext) (string, core.ClickResult, *apiResponseError) {
 	nickname, apiErr := resolveClickNickname(request)
 	if apiErr != nil {
-		return "", vote.ClickResult{}, apiErr
+		return "", core.ClickResult{}, apiErr
 	}
 
 	if apiErr := enforceClickRateLimitForClient(options.ClickGuard, request.ClientID, nickname); apiErr != nil {
-		return "", vote.ClickResult{}, apiErr
+		return "", core.ClickResult{}, apiErr
 	}
 
 	result, err := options.Store.ClickButton(ctx, request.Slug, nickname, request.ComboCount)
 	if err != nil {
-		return "", vote.ClickResult{}, clickRequestError(err)
+		return "", core.ClickResult{}, clickRequestError(err)
 	}
 
 	return nickname, result, nil

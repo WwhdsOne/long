@@ -451,7 +451,7 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 	for {
 		_, nextIndex, err := fetchConfigPayload(context.Background(), consulAddr, configKey, lastIndex)
 		if err != nil {
-			xlog.L().Warn("watch consul config failed", xlog.Err(err))
+			xlog.L().Error("watch consul config failed", xlog.Err(err))
 			time.Sleep(10 * time.Second)
 			continue
 		}

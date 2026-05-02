@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const taskDefinitionsCollectionName = "task_definitions"
@@ -18,13 +18,13 @@ type taskDefinitionDocument struct {
 	TaskID        string                 `bson:"task_id"`
 	Title         string                 `bson:"title"`
 	Description   string                 `bson:"description"`
-	TaskType      vote.TaskType          `bson:"task_type"`
-	EventKind     vote.TaskEventKind     `bson:"event_kind"`
-	WindowKind    vote.TaskWindowKind    `bson:"window_kind"`
-	Status        vote.TaskStatus        `bson:"status"`
-	ConditionKind vote.TaskConditionKind `bson:"condition_kind"`
+	TaskType      core.TaskType          `bson:"task_type"`
+	EventKind     core.TaskEventKind     `bson:"event_kind"`
+	WindowKind    core.TaskWindowKind    `bson:"window_kind"`
+	Status        core.TaskStatus        `bson:"status"`
+	ConditionKind core.TaskConditionKind `bson:"condition_kind"`
 	TargetValue   int64                  `bson:"target_value"`
-	Rewards       vote.TaskRewards       `bson:"rewards"`
+	Rewards       core.TaskRewards       `bson:"rewards"`
 	DisplayOrder  int64                  `bson:"display_order"`
 	StartAt       int64                  `bson:"start_at"`
 	EndAt         int64                  `bson:"end_at"`
@@ -68,11 +68,11 @@ func (s *TaskDefinitionStore) EnsureIndexes(ctx context.Context) error {
 	return err
 }
 
-func (s *TaskDefinitionStore) UpsertTaskDefinition(ctx context.Context, item vote.TaskDefinition) error {
+func (s *TaskDefinitionStore) UpsertTaskDefinition(ctx context.Context, item core.TaskDefinition) error {
 	if s == nil || s.collection == nil {
 		return nil
 	}
-	item = vote.NormalizeTaskDefinitionModel(item)
+	item = core.NormalizeTaskDefinitionModel(item)
 	taskID := strings.TrimSpace(item.TaskID)
 	if taskID == "" {
 		return nil
@@ -104,7 +104,7 @@ func (s *TaskDefinitionStore) UpsertTaskDefinition(ctx context.Context, item vot
 	return err
 }
 
-func (s *TaskDefinitionStore) GetTaskDefinition(ctx context.Context, taskID string) (*vote.TaskDefinition, error) {
+func (s *TaskDefinitionStore) GetTaskDefinition(ctx context.Context, taskID string) (*core.TaskDefinition, error) {
 	if s == nil || s.collection == nil {
 		return nil, nil
 	}
@@ -122,7 +122,7 @@ func (s *TaskDefinitionStore) GetTaskDefinition(ctx context.Context, taskID stri
 		}
 		return nil, err
 	}
-	item := vote.NormalizeTaskDefinitionModel(vote.TaskDefinition{
+	item := core.NormalizeTaskDefinitionModel(core.TaskDefinition{
 		TaskID:        doc.TaskID,
 		Title:         doc.Title,
 		Description:   doc.Description,
@@ -142,14 +142,14 @@ func (s *TaskDefinitionStore) GetTaskDefinition(ctx context.Context, taskID stri
 	return &item, nil
 }
 
-func (s *TaskDefinitionStore) ListActiveTaskDefinitions(ctx context.Context, nowUnix int64) ([]vote.TaskDefinition, error) {
+func (s *TaskDefinitionStore) ListActiveTaskDefinitions(ctx context.Context, nowUnix int64) ([]core.TaskDefinition, error) {
 	if s == nil || s.collection == nil {
-		return []vote.TaskDefinition{}, nil
+		return []core.TaskDefinition{}, nil
 	}
 	readCtx, cancel := withTimeout(ctx, s.readTimeout)
 	defer cancel()
 	cursor, err := s.collection.Find(readCtx, bson.M{
-		"status": vote.TaskStatusActive,
+		"status": core.TaskStatusActive,
 		"$and": []bson.M{
 			{
 				"$or": []bson.M{
@@ -175,13 +175,13 @@ func (s *TaskDefinitionStore) ListActiveTaskDefinitions(ctx context.Context, now
 	}
 	defer cursor.Close(readCtx)
 
-	items := make([]vote.TaskDefinition, 0)
+	items := make([]core.TaskDefinition, 0)
 	for cursor.Next(readCtx) {
 		var doc taskDefinitionDocument
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, err
 		}
-		items = append(items, vote.NormalizeTaskDefinitionModel(vote.TaskDefinition{
+		items = append(items, core.NormalizeTaskDefinitionModel(core.TaskDefinition{
 			TaskID:        doc.TaskID,
 			Title:         doc.Title,
 			Description:   doc.Description,
@@ -205,9 +205,9 @@ func (s *TaskDefinitionStore) ListActiveTaskDefinitions(ctx context.Context, now
 	return items, nil
 }
 
-func (s *TaskDefinitionStore) ListTaskDefinitions(ctx context.Context) ([]vote.TaskDefinition, error) {
+func (s *TaskDefinitionStore) ListTaskDefinitions(ctx context.Context) ([]core.TaskDefinition, error) {
 	if s == nil || s.collection == nil {
-		return []vote.TaskDefinition{}, nil
+		return []core.TaskDefinition{}, nil
 	}
 	readCtx, cancel := withTimeout(ctx, s.readTimeout)
 	defer cancel()
@@ -220,13 +220,13 @@ func (s *TaskDefinitionStore) ListTaskDefinitions(ctx context.Context) ([]vote.T
 	}
 	defer cursor.Close(readCtx)
 
-	items := make([]vote.TaskDefinition, 0)
+	items := make([]core.TaskDefinition, 0)
 	for cursor.Next(readCtx) {
 		var doc taskDefinitionDocument
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, err
 		}
-		items = append(items, vote.NormalizeTaskDefinitionModel(vote.TaskDefinition{
+		items = append(items, core.NormalizeTaskDefinitionModel(core.TaskDefinition{
 			TaskID:        doc.TaskID,
 			Title:         doc.Title,
 			Description:   doc.Description,

@@ -9,22 +9,22 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
 	"long/internal/admin"
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type fakeEquipmentDraftGenerator struct {
-	draft        vote.EquipmentDefinition
+	draft        core.EquipmentDefinition
 	err          error
 	lastPrompt   string
 	rawResponse  string
 	returnDetail bool
 }
 
-func (f *fakeEquipmentDraftGenerator) GenerateEquipmentDraft(_ context.Context, prompt string) (vote.EquipmentDefinition, error) {
+func (f *fakeEquipmentDraftGenerator) GenerateEquipmentDraft(_ context.Context, prompt string) (core.EquipmentDefinition, error) {
 	f.lastPrompt = prompt
 	if f.err != nil {
 		if f.returnDetail {
-			return vote.EquipmentDefinition{}, &EquipmentDraftGenerateError{
+			return core.EquipmentDefinition{}, &EquipmentDraftGenerateError{
 				Message:     f.err.Error(),
 				Prompt:      prompt,
 				Draft:       f.draft,
@@ -32,17 +32,17 @@ func (f *fakeEquipmentDraftGenerator) GenerateEquipmentDraft(_ context.Context, 
 				Cause:       f.err,
 			}
 		}
-		return vote.EquipmentDefinition{}, f.err
+		return core.EquipmentDefinition{}, f.err
 	}
 	return f.draft, nil
 }
 
 type fakeEquipmentDraftFailureWriter struct {
-	items []vote.EquipmentDraftFailureLog
+	items []core.EquipmentDraftFailureLog
 	err   error
 }
 
-func (f *fakeEquipmentDraftFailureWriter) WriteEquipmentDraftFailure(ctx context.Context, item vote.EquipmentDraftFailureLog) error {
+func (f *fakeEquipmentDraftFailureWriter) WriteEquipmentDraftFailure(ctx context.Context, item core.EquipmentDraftFailureLog) error {
 	f.items = append(f.items, item)
 	return f.err
 }
@@ -67,7 +67,7 @@ func TestAdminEquipmentGenerateRequiresLogin(t *testing.T) {
 func TestAdminEquipmentGenerateReturnsDraftWithoutSaving(t *testing.T) {
 	store := &mockStore{}
 	generator := &fakeEquipmentDraftGenerator{
-		draft: vote.EquipmentDefinition{
+		draft: core.EquipmentDefinition{
 			ItemID:               "soft-blade",
 			Name:                 "软组织切割刃",
 			Slot:                 "weapon",
@@ -111,7 +111,7 @@ func TestAdminEquipmentGenerateReturnsDraftWithoutSaving(t *testing.T) {
 	}
 
 	payload := decodeJSONResponse[struct {
-		Draft vote.EquipmentDefinition `json:"draft"`
+		Draft core.EquipmentDefinition `json:"draft"`
 	}](t, response)
 	if payload.Draft.ItemID != "soft-blade" || payload.Draft.TalentAffinity != "normal" {
 		t.Fatalf("unexpected draft payload: %+v", payload.Draft)
@@ -121,7 +121,7 @@ func TestAdminEquipmentGenerateReturnsDraftWithoutSaving(t *testing.T) {
 func TestAdminEquipmentGenerateRejectsInvalidDraft(t *testing.T) {
 	writer := &fakeEquipmentDraftFailureWriter{}
 	generator := &fakeEquipmentDraftGenerator{
-		draft: vote.EquipmentDefinition{
+		draft: core.EquipmentDefinition{
 			ItemID: "bad-weapon",
 			Name:   "坏掉的草稿",
 			Slot:   "weapon",

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 // Dispatcher 将业务变更转换成公共态和个人态推送。
@@ -33,7 +33,7 @@ func NewDispatcher(cache *Cache, hub *Hub, debounceMs ...int) *Dispatcher {
 }
 
 // HandleChange 刷新受影响的缓存并推送到对应订阅者。
-func (d *Dispatcher) HandleChange(ctx context.Context, change vote.StateChange) error {
+func (d *Dispatcher) HandleChange(ctx context.Context, change core.StateChange) error {
 	if d == nil || d.cache == nil || d.hub == nil {
 		return nil
 	}
@@ -103,23 +103,23 @@ func (d *Dispatcher) BroadcastLeaderboard(ctx context.Context) error {
 	return d.hub.BroadcastPublic(snapshot, true)
 }
 
-func affectsPublicState(changeType vote.StateChangeType) bool {
+func affectsPublicState(changeType core.StateChangeType) bool {
 	switch changeType {
-	case vote.StateChangeButtonClicked,
-		vote.StateChangeBossChanged,
-		vote.StateChangeAnnouncementChanged,
-		vote.StateChangeEquipmentMetaChanged:
+	case core.StateChangeButtonClicked,
+		core.StateChangeBossChanged,
+		core.StateChangeAnnouncementChanged,
+		core.StateChangeEquipmentMetaChanged:
 		return true
 	default:
 		return false
 	}
 }
 
-func userTargetsForChange(change vote.StateChange, activeNicknames []string) []string {
+func userTargetsForChange(change core.StateChange, activeNicknames []string) []string {
 	if change.BroadcastUserAll {
 		return activeNicknames
 	}
-	if change.Type == vote.StateChangeButtonClicked {
+	if change.Type == core.StateChangeButtonClicked {
 		return nil
 	}
 	if change.Nickname == "" {

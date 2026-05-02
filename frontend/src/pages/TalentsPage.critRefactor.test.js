@@ -4,8 +4,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const talentSource = readFileSync(path.resolve(currentDir, '../../../backend/internal/vote/talent.go'), 'utf8')
-const ossMapSource = readFileSync(path.resolve(currentDir, '../../../pixel-assets/oss-url-map.json'), 'utf8')
+const talentSource = readFileSync(path.resolve(currentDir, '../../../backend/internal/core/talent.go'), 'utf8')
+const effectMapSource = readFileSync(path.resolve(currentDir, '../utils/effectAssetMap.js'), 'utf8')
 
 describe('暴击树死兆重构', () => {
   it('删除死兆共鸣节点并移除单节点前置', () => {
@@ -14,8 +14,8 @@ describe('暴击树死兆重构', () => {
     expect(talentSource).not.toContain('Prerequisite:')
   })
 
-  it('末日审判图标复用死兆共鸣资源地址', () => {
-    expect(ossMapSource).toContain('"talent-crit_doom_judgment.png"')
-    expect(ossMapSource).toContain('talent-crit_omen_resonate.png')
+  it('末日审判图标复用前端集中映射里的死兆共鸣资源地址', () => {
+    expect(effectMapSource).toContain("'talent-crit_doom_judgment.png'")
+    expect(effectMapSource).toContain('talent-crit_omen_resonate.png')
   })
 })

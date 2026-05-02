@@ -46,6 +46,23 @@ export function emptyEquipmentForm() {
   }
 }
 
+export function emptyShopItemForm() {
+  return {
+    itemId: '',
+    title: '',
+    itemType: 'battle_click_skin',
+    priceGold: 0,
+    imagePath: '',
+    imageAlt: '',
+    previewImagePath: '',
+    battleClickCursorImagePath: '',
+    description: '',
+    active: true,
+    sortOrder: 0,
+    autoEquipOnPurchase: true,
+  }
+}
+
 export function emptyButtonForm() {
   return {
     slug: '',
@@ -270,6 +287,26 @@ export function normalizeEquipmentPage(payload) {
     pageSize: Number(payload?.pageSize ?? 20),
     total: Number(payload?.total ?? 0),
     totalPages: Number(payload?.totalPages ?? 0),
+  }
+}
+
+export function normalizeShopItem(payload) {
+  return {
+    ...emptyShopItemForm(),
+    itemId: payload?.itemId || '',
+    title: payload?.title || '',
+    itemType: payload?.itemType || 'battle_click_skin',
+    priceGold: Number(payload?.priceGold ?? 0),
+    imagePath: payload?.imagePath || '',
+    imageAlt: payload?.imageAlt || '',
+    previewImagePath: payload?.previewImagePath || '',
+    battleClickCursorImagePath: payload?.battleClickCursorImagePath || '',
+    description: payload?.description || '',
+    active: Boolean(payload?.active),
+    sortOrder: Number(payload?.sortOrder ?? 0),
+    autoEquipOnPurchase: payload?.autoEquipOnPurchase !== false,
+    createdAt: Number(payload?.createdAt ?? 0),
+    updatedAt: Number(payload?.updatedAt ?? 0),
   }
 }
 

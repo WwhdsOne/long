@@ -3,6 +3,7 @@ import {ref} from 'vue'
 import BattlePage from './BattlePage.vue'
 import ArmoryPage from './ArmoryPage.vue'
 import MessagesPage from './MessagesPage.vue'
+import ShopPage from './ShopPage.vue'
 import TaskPage from './TaskPage.vue'
 import TalentsPage from './TalentsPage.vue'
 import {usePublicPageState} from './publicPageState'
@@ -145,6 +146,7 @@ async function handleLoginSubmit() {
     </section>
 
     <BattlePage v-if="currentPublicPage === 'battle'" />
+    <ShopPage v-else-if="currentPublicPage === 'shop'" />
     <TalentsPage v-else-if="currentPublicPage === 'talents'" />
     <TaskPage v-else-if="currentPublicPage === 'tasks'" />
     <ArmoryPage v-else-if="isArmoryPage(currentPublicPage)" :focus-section="currentPublicPage" />

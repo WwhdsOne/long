@@ -5,33 +5,33 @@ import (
 	"strings"
 	"testing"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type dispatcherTestReader struct {
-	snapshot vote.Snapshot
+	snapshot core.Snapshot
 }
 
-func (r *dispatcherTestReader) GetSnapshot(context.Context) (vote.Snapshot, error) {
+func (r *dispatcherTestReader) GetSnapshot(context.Context) (core.Snapshot, error) {
 	return r.snapshot, nil
 }
 
-func (r *dispatcherTestReader) GetUserState(context.Context, string) (vote.UserState, error) {
-	return vote.UserState{}, nil
+func (r *dispatcherTestReader) GetUserState(context.Context, string) (core.UserState, error) {
+	return core.UserState{}, nil
 }
 
-func (r *dispatcherTestReader) GetBossResources(context.Context) (vote.BossResources, error) {
-	return vote.BossResources{}, nil
+func (r *dispatcherTestReader) GetBossResources(context.Context) (core.BossResources, error) {
+	return core.BossResources{}, nil
 }
 
 func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 	reader := &dispatcherTestReader{
-		snapshot: vote.Snapshot{
+		snapshot: core.Snapshot{
 			TotalVotes: 12,
-			Leaderboard: []vote.LeaderboardEntry{
+			Leaderboard: []core.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 12},
 			},
-			BossLeaderboard: []vote.BossLeaderboardEntry{
+			BossLeaderboard: []core.BossLeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", Damage: 88},
 			},
 		},
@@ -44,7 +44,7 @@ func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 	defer unsubscribe()
 	_ = readEventByName(t, client, OnlineCountEventName)
 
-	if err := dispatcher.HandleChange(context.Background(), vote.StateChange{Type: vote.StateChangeButtonClicked}); err != nil {
+	if err := dispatcher.HandleChange(context.Background(), core.StateChange{Type: core.StateChangeButtonClicked}); err != nil {
 		t.Fatalf("handle change: %v", err)
 	}
 
@@ -60,9 +60,9 @@ func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 
 func TestDispatcherBroadcastLeaderboardIncludesLeaderboard(t *testing.T) {
 	reader := &dispatcherTestReader{
-		snapshot: vote.Snapshot{
+		snapshot: core.Snapshot{
 			TotalVotes: 12,
-			Leaderboard: []vote.LeaderboardEntry{
+			Leaderboard: []core.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 12},
 			},
 		},

@@ -10,7 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const (
@@ -78,7 +78,7 @@ func (s *MessageStore) EnsureIndexes(ctx context.Context) error {
 }
 
 // CreateMessage 创建一条留言。
-func (s *MessageStore) CreateMessage(ctx context.Context, nickname string, content string) (*vote.Message, error) {
+func (s *MessageStore) CreateMessage(ctx context.Context, nickname string, content string) (*core.Message, error) {
 	writeCtx, cancel := withTimeout(ctx, s.writeTimeout)
 	defer cancel()
 
@@ -87,7 +87,7 @@ func (s *MessageStore) CreateMessage(ctx context.Context, nickname string, conte
 		return nil, err
 	}
 
-	item := &vote.Message{
+	item := &core.Message{
 		ID:        strconv.FormatInt(seq, 10),
 		Nickname:  strings.TrimSpace(nickname),
 		Content:   strings.TrimSpace(content),
@@ -109,7 +109,7 @@ func (s *MessageStore) CreateMessage(ctx context.Context, nickname string, conte
 }
 
 // ListMessages 返回留言分页。
-func (s *MessageStore) ListMessages(ctx context.Context, cursor string, limit int64) (vote.MessagePage, error) {
+func (s *MessageStore) ListMessages(ctx context.Context, cursor string, limit int64) (core.MessagePage, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -118,7 +118,7 @@ func (s *MessageStore) ListMessages(ctx context.Context, cursor string, limit in
 	if trimmed := strings.TrimSpace(cursor); trimmed != "" {
 		seq, err := strconv.ParseInt(trimmed, 10, 64)
 		if err != nil {
-			return vote.MessagePage{}, err
+			return core.MessagePage{}, err
 		}
 		filter["seq"] = bson.M{"$lt": seq}
 	}
@@ -132,17 +132,17 @@ func (s *MessageStore) ListMessages(ctx context.Context, cursor string, limit in
 
 	cursorResult, err := s.messages.Find(readCtx, filter, findOptions)
 	if err != nil {
-		return vote.MessagePage{}, err
+		return core.MessagePage{}, err
 	}
 	defer cursorResult.Close(readCtx)
 
-	page := vote.MessagePage{
-		Items: make([]vote.Message, 0, limit),
+	page := core.MessagePage{
+		Items: make([]core.Message, 0, limit),
 	}
 	for cursorResult.Next(readCtx) {
 		var doc messageDocument
 		if err := cursorResult.Decode(&doc); err != nil {
-			return vote.MessagePage{}, err
+			return core.MessagePage{}, err
 		}
 
 		if int64(len(page.Items)) >= limit {
@@ -150,7 +150,7 @@ func (s *MessageStore) ListMessages(ctx context.Context, cursor string, limit in
 			break
 		}
 
-		page.Items = append(page.Items, vote.Message{
+		page.Items = append(page.Items, core.Message{
 			ID:        doc.MessageID,
 			Nickname:  doc.Nickname,
 			Content:   doc.Content,
@@ -158,7 +158,7 @@ func (s *MessageStore) ListMessages(ctx context.Context, cursor string, limit in
 		})
 	}
 	if err := cursorResult.Err(); err != nil {
-		return vote.MessagePage{}, err
+		return core.MessagePage{}, err
 	}
 	return page, nil
 }
@@ -177,7 +177,7 @@ func (s *MessageStore) DeleteMessage(ctx context.Context, id string) error {
 }
 
 // UpsertMessage 用于迁移和补数据。
-func (s *MessageStore) UpsertMessage(ctx context.Context, item vote.Message) error {
+func (s *MessageStore) UpsertMessage(ctx context.Context, item core.Message) error {
 	writeCtx, cancel := withTimeout(ctx, s.writeTimeout)
 	defer cancel()
 

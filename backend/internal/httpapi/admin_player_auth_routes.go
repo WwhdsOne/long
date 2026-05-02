@@ -7,7 +7,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 func registerAdminPlayerAuthRoutes(router route.IRouter, options Options) {
@@ -39,7 +39,7 @@ func registerAdminPlayerAuthRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "player.password.reset",
 			TargetType:  "player",
@@ -48,7 +48,7 @@ func registerAdminPlayerAuthRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "player.password.reset",
 			Nickname:  c.Param("nickname"),
 			Payload: map[string]any{

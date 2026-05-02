@@ -9,7 +9,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 func registerAdminBossRoutes(router route.IRouter, options Options) {
@@ -19,14 +19,14 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body vote.BossUpsert
+		var body core.BossUpsert
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
 
 		boss, err := options.Store.ActivateBoss(ctx, body)
 		if err != nil {
-			if errors.Is(err, vote.ErrBossPartsRequired) {
+			if errors.Is(err, core.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_PARTS_REQUIRED",
 					"message": "Boss 必须配置至少一个部位。",
@@ -37,12 +37,12 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeBossChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeBossChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.activate",
 			TargetType:  "boss",
@@ -51,7 +51,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "boss.activated",
 			BossID:    boss.ID,
 			Payload: map[string]any{
@@ -72,12 +72,12 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeBossChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeBossChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.deactivate",
 			TargetType:  "boss",
@@ -85,7 +85,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			RequestIP:   requestIP(c),
 			Result:      "success",
 		})
-		writeDomainEvent(ctx, options.DomainEventWriter, vote.DomainEvent{
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "boss.deactivated",
 			Payload: map[string]any{
 				"operator": options.AdminAuthenticator.Username(),
@@ -102,7 +102,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		var body struct {
 			BossID string               `json:"bossId"`
-			Loot   []vote.BossLootEntry `json:"loot"`
+			Loot   []core.BossLootEntry `json:"loot"`
 		}
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
@@ -113,8 +113,8 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeBossChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeBossChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
@@ -127,13 +127,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body vote.BossTemplateUpsert
+		var body core.BossTemplateUpsert
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
 
 		if err := options.Store.SaveBossTemplate(ctx, body); err != nil {
-			if errors.Is(err, vote.ErrBossPartsRequired) {
+			if errors.Is(err, core.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_PARTS_REQUIRED",
 					"message": "Boss 模板必须配置至少一个部位。",
@@ -144,7 +144,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.template.create",
 			TargetType:  "boss_template",
@@ -163,14 +163,14 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body vote.BossTemplateUpsert
+		var body core.BossTemplateUpsert
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
 		body.ID = c.Param("templateId")
 
 		if err := options.Store.SaveBossTemplate(ctx, body); err != nil {
-			if errors.Is(err, vote.ErrBossPartsRequired) {
+			if errors.Is(err, core.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_PARTS_REQUIRED",
 					"message": "Boss 模板必须配置至少一个部位。",
@@ -181,7 +181,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.template.update",
 			TargetType:  "boss_template",
@@ -204,7 +204,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_POOL_DELETE_FAILED"})
 			return
 		}
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.template.delete",
 			TargetType:  "boss_template",
@@ -224,7 +224,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 		}
 
 		var body struct {
-			Loot []vote.BossLootEntry `json:"loot"`
+			Loot []core.BossLootEntry `json:"loot"`
 		}
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
@@ -246,21 +246,21 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		boss, err := options.Store.SetBossCycleEnabled(ctx, true)
 		if err != nil {
-			if errors.Is(err, vote.ErrBossPoolEmpty) {
+			if errors.Is(err, core.ErrBossPoolEmpty) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_POOL_EMPTY",
 					"message": "Boss 池还是空的，先加模板再开启循环。",
 				})
 				return
 			}
-			if errors.Is(err, vote.ErrBossCycleQueueEmpty) {
+			if errors.Is(err, core.ErrBossCycleQueueEmpty) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_CYCLE_QUEUE_EMPTY",
 					"message": "请先在 Boss 池里配置循环队列。",
 				})
 				return
 			}
-			if errors.Is(err, vote.ErrBossPartsRequired) {
+			if errors.Is(err, core.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_PARTS_REQUIRED",
 					"message": "Boss 模板缺少部位，请先修正模板。",
@@ -271,12 +271,12 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeBossChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeBossChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.cycle.enable",
 			RequestPath: requestPath(c),
@@ -301,7 +301,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		queue, err := options.Store.SetBossCycleQueue(ctx, body.TemplateIDs)
 		if err != nil {
-			if errors.Is(err, vote.ErrBossTemplateNotFound) {
+			if errors.Is(err, core.ErrBossTemplateNotFound) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_TEMPLATE_NOT_FOUND",
 					"message": "循环队列里包含不存在的 Boss 模板。",
@@ -330,12 +330,12 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		publishChange(ctx, options.ChangePublisher, vote.StateChange{
-			Type:             vote.StateChangeBossChanged,
+		publishChange(ctx, options.ChangePublisher, core.StateChange{
+			Type:             core.StateChangeBossChanged,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
-		writeAdminAudit(ctx, options.AdminAuditWriter, vote.AdminAuditLog{
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.cycle.disable",
 			RequestPath: requestPath(c),

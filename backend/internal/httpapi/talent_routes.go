@@ -8,7 +8,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 type talentLearnRequest struct {
@@ -58,10 +58,10 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	allTrees := map[string][]vote.TalentDef{
-		"normal": vote.GetTreeTalents(vote.TalentTreeNormal),
-		"armor":  vote.GetTreeTalents(vote.TalentTreeArmor),
-		"crit":   vote.GetTreeTalents(vote.TalentTreeCrit),
+	allTrees := map[string][]core.TalentDef{
+		"normal": core.GetTreeTalents(core.TalentTreeNormal),
+		"armor":  core.GetTreeTalents(core.TalentTreeArmor),
+		"crit":   core.GetTreeTalents(core.TalentTreeCrit),
 	}
 
 	userState, err := h.store.GetUserState(ctx, nickStr)
@@ -74,8 +74,8 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 		"trees":              allTrees,
 		"talents":            state.Talents,
 		"talentPoints":       userState.TalentPoints,
-		"effectLines":        vote.BuildTalentEffectLineMap(state),
-		"effectDescriptions": vote.BuildTalentEffectDescriptionMap(state),
+		"effectLines":        core.BuildTalentEffectLineMap(state),
+		"effectDescriptions": core.BuildTalentEffectDescriptionMap(state),
 	})
 }
 
@@ -112,8 +112,8 @@ func (h *talentAPI) upgrade(ctx context.Context, c *app.RequestContext) {
 		"status":             "ok",
 		"talents":            state.Talents,
 		"talentPoints":       userState.TalentPoints,
-		"effectLines":        vote.BuildTalentEffectLineMap(state),
-		"effectDescriptions": vote.BuildTalentEffectDescriptionMap(state),
+		"effectLines":        core.BuildTalentEffectLineMap(state),
+		"effectDescriptions": core.BuildTalentEffectDescriptionMap(state),
 	})
 }
 
@@ -145,25 +145,25 @@ func (h *talentAPI) getDefs(ctx context.Context, c *app.RequestContext) {
 		"trees": map[string]any{
 			"normal": map[string]any{
 				"name":                  "均衡攻势",
-				"talents":               defsToMap(vote.GetTreeTalents(vote.TalentTreeNormal)),
-				"tierCompletionBonuses": vote.TalentTierCompletionBonusLabels(vote.TalentTreeNormal),
+				"talents":               defsToMap(core.GetTreeTalents(core.TalentTreeNormal)),
+				"tierCompletionBonuses": core.TalentTierCompletionBonusLabels(core.TalentTreeNormal),
 			},
 			"armor": map[string]any{
 				"name":                  "碎盾攻坚",
-				"talents":               defsToMap(vote.GetTreeTalents(vote.TalentTreeArmor)),
-				"tierCompletionBonuses": vote.TalentTierCompletionBonusLabels(vote.TalentTreeArmor),
+				"talents":               defsToMap(core.GetTreeTalents(core.TalentTreeArmor)),
+				"tierCompletionBonuses": core.TalentTierCompletionBonusLabels(core.TalentTreeArmor),
 			},
 			"crit": map[string]any{
 				"name":                  "致命洞察",
-				"talents":               defsToMap(vote.GetTreeTalents(vote.TalentTreeCrit)),
-				"tierCompletionBonuses": vote.TalentTierCompletionBonusLabels(vote.TalentTreeCrit),
+				"talents":               defsToMap(core.GetTreeTalents(core.TalentTreeCrit)),
+				"tierCompletionBonuses": core.TalentTierCompletionBonusLabels(core.TalentTreeCrit),
 			},
 		},
 	}
 	c.JSON(consts.StatusOK, result)
 }
 
-func defsToMap(defs []vote.TalentDef) []map[string]any {
+func defsToMap(defs []core.TalentDef) []map[string]any {
 	result := make([]map[string]any, 0, len(defs))
 	for _, d := range defs {
 		result = append(result, map[string]any{
@@ -173,7 +173,7 @@ func defsToMap(defs []vote.TalentDef) []map[string]any {
 			"name":              d.Name,
 			"effectType":        d.EffectType,
 			"effectValue":       d.EffectValue,
-			"effectDescription": vote.TalentEffectDescription(d),
+			"effectDescription": core.TalentEffectDescription(d),
 			"maxLevel":          d.MaxLevel,
 			"cost":              d.Cost,
 		})
@@ -183,15 +183,15 @@ func defsToMap(defs []vote.TalentDef) []map[string]any {
 
 func talentErrorStatus(err error) int {
 	switch {
-	case errors.Is(err, vote.ErrTalentNotFound):
+	case errors.Is(err, core.ErrTalentNotFound):
 		return consts.StatusNotFound
-	case errors.Is(err, vote.ErrTalentPointsInsufficient),
-		errors.Is(err, vote.ErrTalentTierLocked),
-		errors.Is(err, vote.ErrTalentAlreadyLearned),
-		errors.Is(err, vote.ErrTalentInvalidCost),
-		errors.Is(err, vote.ErrTalentMaxLevel),
-		errors.Is(err, vote.ErrTalentInvalidLevel),
-		errors.Is(err, vote.ErrInvalidTalentTree):
+	case errors.Is(err, core.ErrTalentPointsInsufficient),
+		errors.Is(err, core.ErrTalentTierLocked),
+		errors.Is(err, core.ErrTalentAlreadyLearned),
+		errors.Is(err, core.ErrTalentInvalidCost),
+		errors.Is(err, core.ErrTalentMaxLevel),
+		errors.Is(err, core.ErrTalentInvalidLevel),
+		errors.Is(err, core.ErrInvalidTalentTree):
 		return consts.StatusBadRequest
 	default:
 		return consts.StatusInternalServerError
@@ -200,21 +200,21 @@ func talentErrorStatus(err error) int {
 
 func talentErrorCode(err error) string {
 	switch {
-	case errors.Is(err, vote.ErrTalentPointsInsufficient):
+	case errors.Is(err, core.ErrTalentPointsInsufficient):
 		return "TALENT_POINTS_INSUFFICIENT"
-	case errors.Is(err, vote.ErrTalentInvalidCost):
+	case errors.Is(err, core.ErrTalentInvalidCost):
 		return "TALENT_INVALID_COST"
-	case errors.Is(err, vote.ErrTalentTierLocked):
+	case errors.Is(err, core.ErrTalentTierLocked):
 		return "TALENT_TIER_LOCKED"
-	case errors.Is(err, vote.ErrTalentAlreadyLearned):
+	case errors.Is(err, core.ErrTalentAlreadyLearned):
 		return "TALENT_ALREADY_LEARNED"
-	case errors.Is(err, vote.ErrInvalidTalentTree):
+	case errors.Is(err, core.ErrInvalidTalentTree):
 		return "INVALID_TALENT_TREE"
-	case errors.Is(err, vote.ErrTalentNotFound):
+	case errors.Is(err, core.ErrTalentNotFound):
 		return "TALENT_NOT_FOUND"
-	case errors.Is(err, vote.ErrTalentMaxLevel):
+	case errors.Is(err, core.ErrTalentMaxLevel):
 		return "TALENT_MAX_LEVEL"
-	case errors.Is(err, vote.ErrTalentInvalidLevel):
+	case errors.Is(err, core.ErrTalentInvalidLevel):
 		return "TALENT_INVALID_LEVEL"
 	default:
 		return "TALENT_OPERATION_FAILED"
@@ -223,21 +223,21 @@ func talentErrorCode(err error) string {
 
 func talentErrorMessage(err error) string {
 	switch {
-	case errors.Is(err, vote.ErrTalentPointsInsufficient):
+	case errors.Is(err, core.ErrTalentPointsInsufficient):
 		return "天赋点不足，无法学习该节点。"
-	case errors.Is(err, vote.ErrTalentInvalidCost):
+	case errors.Is(err, core.ErrTalentInvalidCost):
 		return "天赋配置异常，节点成本无效。"
-	case errors.Is(err, vote.ErrTalentTierLocked):
+	case errors.Is(err, core.ErrTalentTierLocked):
 		return "上一层天赋尚未点满。"
-	case errors.Is(err, vote.ErrTalentAlreadyLearned):
+	case errors.Is(err, core.ErrTalentAlreadyLearned):
 		return "该天赋已学习。"
-	case errors.Is(err, vote.ErrInvalidTalentTree):
+	case errors.Is(err, core.ErrInvalidTalentTree):
 		return "天赋树选择无效。"
-	case errors.Is(err, vote.ErrTalentNotFound):
+	case errors.Is(err, core.ErrTalentNotFound):
 		return "未找到该天赋节点。"
-	case errors.Is(err, vote.ErrTalentMaxLevel):
+	case errors.Is(err, core.ErrTalentMaxLevel):
 		return "已达到最大等级。"
-	case errors.Is(err, vote.ErrTalentInvalidLevel):
+	case errors.Is(err, core.ErrTalentInvalidLevel):
 		return "无效的等级参数。"
 	default:
 		return "天赋操作失败，请稍后重试。"

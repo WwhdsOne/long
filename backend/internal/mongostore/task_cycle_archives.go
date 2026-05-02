@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"long/internal/vote"
+	"long/internal/core"
 )
 
 const (
@@ -20,10 +20,10 @@ const (
 type taskCycleArchiveDocument struct {
 	TaskID                string                 `bson:"task_id"`
 	CycleKey              string                 `bson:"cycle_key"`
-	TaskType              vote.TaskType          `bson:"task_type"`
-	EventKind             vote.TaskEventKind     `bson:"event_kind"`
-	WindowKind            vote.TaskWindowKind    `bson:"window_kind"`
-	ConditionKind         vote.TaskConditionKind `bson:"condition_kind"`
+	TaskType              core.TaskType          `bson:"task_type"`
+	EventKind             core.TaskEventKind     `bson:"event_kind"`
+	WindowKind            core.TaskWindowKind    `bson:"window_kind"`
+	ConditionKind         core.TaskConditionKind `bson:"condition_kind"`
 	TargetValue           int64                  `bson:"target_value"`
 	StartAt               int64                  `bson:"start_at"`
 	EndAt                 int64                  `bson:"end_at"`
@@ -80,11 +80,11 @@ func (s *TaskCycleArchiveStore) EnsureIndexes(ctx context.Context) error {
 	return err
 }
 
-func (s *TaskCycleArchiveStore) UpsertTaskCycleArchive(ctx context.Context, item vote.TaskCycleArchive) error {
+func (s *TaskCycleArchiveStore) UpsertTaskCycleArchive(ctx context.Context, item core.TaskCycleArchive) error {
 	if s == nil || s.archives == nil {
 		return nil
 	}
-	item = vote.NormalizeTaskArchiveModel(item)
+	item = core.NormalizeTaskArchiveModel(item)
 	taskID := strings.TrimSpace(item.TaskID)
 	cycleKey := strings.TrimSpace(item.CycleKey)
 	if taskID == "" || cycleKey == "" {
@@ -118,7 +118,7 @@ func (s *TaskCycleArchiveStore) UpsertTaskCycleArchive(ctx context.Context, item
 	return err
 }
 
-func (s *TaskCycleArchiveStore) UpsertTaskCyclePlayerResults(ctx context.Context, items []vote.TaskCyclePlayerResult) error {
+func (s *TaskCycleArchiveStore) UpsertTaskCyclePlayerResults(ctx context.Context, items []core.TaskCyclePlayerResult) error {
 	if s == nil || s.playerResults == nil || len(items) == 0 {
 		return nil
 	}
@@ -154,9 +154,9 @@ func (s *TaskCycleArchiveStore) UpsertTaskCyclePlayerResults(ctx context.Context
 	return err
 }
 
-func (s *TaskCycleArchiveStore) ListTaskCycleArchives(ctx context.Context, taskID string) ([]vote.TaskCycleArchive, error) {
+func (s *TaskCycleArchiveStore) ListTaskCycleArchives(ctx context.Context, taskID string) ([]core.TaskCycleArchive, error) {
 	if s == nil || s.archives == nil {
-		return []vote.TaskCycleArchive{}, nil
+		return []core.TaskCycleArchive{}, nil
 	}
 	readCtx, cancel := withTimeout(ctx, s.writeTimeout)
 	defer cancel()
@@ -167,13 +167,13 @@ func (s *TaskCycleArchiveStore) ListTaskCycleArchives(ctx context.Context, taskI
 		return nil, err
 	}
 	defer cursor.Close(readCtx)
-	items := make([]vote.TaskCycleArchive, 0)
+	items := make([]core.TaskCycleArchive, 0)
 	for cursor.Next(readCtx) {
 		var doc taskCycleArchiveDocument
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, err
 		}
-		items = append(items, vote.NormalizeTaskArchiveModel(vote.TaskCycleArchive{
+		items = append(items, core.NormalizeTaskArchiveModel(core.TaskCycleArchive{
 			TaskID:                doc.TaskID,
 			CycleKey:              doc.CycleKey,
 			TaskType:              doc.TaskType,
@@ -198,9 +198,9 @@ func (s *TaskCycleArchiveStore) ListTaskCycleArchives(ctx context.Context, taskI
 	return items, nil
 }
 
-func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID string, cycleKey string) (vote.TaskCycleResultsView, error) {
+func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID string, cycleKey string) (core.TaskCycleResultsView, error) {
 	if s == nil || s.archives == nil || s.playerResults == nil {
-		return vote.TaskCycleResultsView{}, nil
+		return core.TaskCycleResultsView{}, nil
 	}
 	readCtx, cancel := withTimeout(ctx, s.writeTimeout)
 	defer cancel()
@@ -210,9 +210,9 @@ func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID 
 		"cycle_key": strings.TrimSpace(cycleKey),
 	}).Decode(&archiveDoc); err != nil {
 		if err == mongo.ErrNoDocuments {
-			return vote.TaskCycleResultsView{}, nil
+			return core.TaskCycleResultsView{}, nil
 		}
-		return vote.TaskCycleResultsView{}, err
+		return core.TaskCycleResultsView{}, err
 	}
 	cursor, err := s.playerResults.Find(readCtx, bson.M{
 		"task_id":   strings.TrimSpace(taskID),
@@ -222,10 +222,10 @@ func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID 
 		{Key: "nickname", Value: 1},
 	}))
 	if err != nil {
-		return vote.TaskCycleResultsView{}, err
+		return core.TaskCycleResultsView{}, err
 	}
 	defer cursor.Close(readCtx)
-	items := make([]vote.TaskCyclePlayerResult, 0)
+	items := make([]core.TaskCyclePlayerResult, 0)
 	for cursor.Next(readCtx) {
 		var doc struct {
 			TaskID      string                `bson:"task_id"`
@@ -233,15 +233,15 @@ func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID 
 			Nickname    string                `bson:"nickname"`
 			Progress    int64                 `bson:"progress"`
 			TargetValue int64                 `bson:"target_value"`
-			Status      vote.TaskPlayerStatus `bson:"status"`
+			Status      core.TaskPlayerStatus `bson:"status"`
 			CompletedAt int64                 `bson:"completed_at"`
 			ClaimedAt   int64                 `bson:"claimed_at"`
 			ArchivedAt  int64                 `bson:"archived_at"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
-			return vote.TaskCycleResultsView{}, err
+			return core.TaskCycleResultsView{}, err
 		}
-		items = append(items, vote.TaskCyclePlayerResult{
+		items = append(items, core.TaskCyclePlayerResult{
 			TaskID:      doc.TaskID,
 			CycleKey:    doc.CycleKey,
 			Nickname:    doc.Nickname,
@@ -254,10 +254,10 @@ func (s *TaskCycleArchiveStore) GetTaskCycleResults(ctx context.Context, taskID 
 		})
 	}
 	if err := cursor.Err(); err != nil {
-		return vote.TaskCycleResultsView{}, err
+		return core.TaskCycleResultsView{}, err
 	}
-	return vote.TaskCycleResultsView{
-		Archive: vote.NormalizeTaskArchiveModel(vote.TaskCycleArchive{
+	return core.TaskCycleResultsView{
+		Archive: core.NormalizeTaskArchiveModel(core.TaskCycleArchive{
 			TaskID:                archiveDoc.TaskID,
 			CycleKey:              archiveDoc.CycleKey,
 			TaskType:              archiveDoc.TaskType,

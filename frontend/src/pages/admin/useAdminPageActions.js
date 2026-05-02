@@ -13,6 +13,7 @@ export function createAdminPageActions(state) {
     emptyAnnouncementForm,
     emptyButtonForm,
     emptyEquipmentForm,
+    emptyShopItemForm,
     emptyTaskForm,
     equipmentForm,
     equipmentPage,
@@ -23,6 +24,7 @@ export function createAdminPageActions(state) {
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
+    fetchShopItems,
     fetchTaskArchives,
     fetchTaskCycleResults,
     fetchTasks,
@@ -36,6 +38,8 @@ export function createAdminPageActions(state) {
     selectedTaskId,
     setSuccess,
     showEquipmentEditor,
+    shopItemForm,
+    shopItems,
     uploadImageToOSS,
     taskDefinitions,
     taskForm,
@@ -396,13 +400,13 @@ export function createAdminPageActions(state) {
     await deleteByID(`/api/admin/messages/${encodeURIComponent(id)}`, '留言已删除。', '删除留言失败', fetchMessages)
   }
 
-  async function uploadImageInner(event, applyImage, successTip) {
+  async function uploadImageInner(event, applyImage, successTip, category = '') {
     const file = event.target?.files?.[0]
     if (!file) {
       return
     }
 
-    await uploadImageToOSS(event, file, applyImage, successTip)
+    await uploadImageToOSS(event, file, applyImage, successTip, category)
   }
 
   async function uploadButtonImage(event) {
@@ -421,6 +425,27 @@ export function createAdminPageActions(state) {
         equipmentForm.value.imageAlt = file.name.replace(/\.[^.]+$/, '')
       }
     }, '装备图片已上传到 OSS。')
+  }
+
+  async function uploadShopImage(event) {
+    await uploadImageInner(event, (finalURL, file) => {
+      shopItemForm.value.imagePath = finalURL
+      if (!shopItemForm.value.imageAlt) {
+        shopItemForm.value.imageAlt = file.name.replace(/\.[^.]+$/, '')
+      }
+    }, '商店主图已上传到 OSS。', 'shop')
+  }
+
+  async function uploadShopPreviewImage(event) {
+    await uploadImageInner(event, (finalURL) => {
+      shopItemForm.value.previewImagePath = finalURL
+    }, '商店预览图已上传到 OSS。', 'shop')
+  }
+
+  async function uploadShopCursorImage(event) {
+    await uploadImageInner(event, (finalURL) => {
+      shopItemForm.value.battleClickCursorImagePath = finalURL
+    }, '战斗点击图标已上传到 OSS。', 'shop')
   }
 
   async function saveLoot(lootRowsOverride = null) {
@@ -502,6 +527,68 @@ export function createAdminPageActions(state) {
     } finally {
       saving.value = false
     }
+  }
+
+  async function saveShopItem() {
+    const itemId = String(shopItemForm.value.itemId || '').trim()
+    const title = String(shopItemForm.value.title || '').trim()
+    if (!itemId) {
+      errorMessage.value = '先填写商品 ID。'
+      return
+    }
+    if (!title) {
+      errorMessage.value = '先填写商品标题。'
+      return
+    }
+
+    saving.value = true
+    try {
+      const exists = shopItems.value.some((entry) => entry.itemId === itemId)
+      const method = exists ? 'PUT' : 'POST'
+      const url = exists ? `/api/admin/shop/items/${encodeURIComponent(itemId)}` : '/api/admin/shop/items'
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...shopItemForm.value,
+          itemId,
+          title,
+          priceGold: Number(shopItemForm.value.priceGold || 0),
+          sortOrder: Number(shopItemForm.value.sortOrder || 0),
+          active: Boolean(shopItemForm.value.active),
+          autoEquipOnPurchase: shopItemForm.value.autoEquipOnPurchase !== false,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '保存商店商品失败'))
+      }
+      setSuccess('商店商品已保存。')
+      shopItemForm.value = emptyShopItemForm()
+      await fetchShopItems()
+    } catch (error) {
+      errorMessage.value = error.message || '保存商店商品失败'
+    } finally {
+      saving.value = false
+    }
+  }
+
+  async function deleteShopItem(itemId) {
+    await deleteByID(
+      `/api/admin/shop/items/${encodeURIComponent(itemId)}`,
+      '商店商品已删除。',
+      '删除商店商品失败',
+      fetchShopItems,
+    )
+  }
+
+  function editShopItem(entry) {
+    shopItemForm.value = { ...entry }
+    activeTab.value = 'shop'
+  }
+
+  function openNewShopItem() {
+    shopItemForm.value = emptyShopItemForm()
+    activeTab.value = 'shop'
   }
 
   async function activateTaskDefinition(taskId) {
@@ -692,6 +779,7 @@ export function createAdminPageActions(state) {
     editTaskDefinition,
     editButton,
     editEquipment,
+    editShopItem,
     enableBossCycle,
     archiveExpiredTasks,
     activateTaskDefinition,
@@ -699,6 +787,7 @@ export function createAdminPageActions(state) {
     deactivateTaskDefinition,
     duplicateTaskDefinition,
     openNewTask,
+    openNewShopItem,
     generateEquipmentDraft,
     openNewEquipment,
     removeLootRow,
@@ -709,10 +798,15 @@ export function createAdminPageActions(state) {
     saveButton,
     saveEquipment,
     saveLoot,
+    saveShopItem,
     saveTaskDefinition,
     selectBossTemplate,
     updateEquipmentPrompt,
     uploadButtonImage,
     uploadEquipmentImage,
+    uploadShopCursorImage,
+    uploadShopImage,
+    uploadShopPreviewImage,
+    deleteShopItem,
   }
 }

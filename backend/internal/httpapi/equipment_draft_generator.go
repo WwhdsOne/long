@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"long/internal/vote"
+	"long/internal/core"
 
 	"github.com/bytedance/sonic"
 )
@@ -22,7 +22,7 @@ var ErrInvalidEquipmentDraft = errors.New("invalid equipment draft")
 type EquipmentDraftGenerateError struct {
 	Message     string
 	Prompt      string
-	Draft       vote.EquipmentDefinition
+	Draft       core.EquipmentDefinition
 	RawResponse string
 	Cause       error
 }
@@ -82,9 +82,9 @@ func NewOpenAIEquipmentDraftGenerator(config EquipmentDraftGeneratorConfig) *Ope
 // 核心流程：先定稀有度，再生成装备
 // ============================================================================
 
-func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Context, prompt string) (vote.EquipmentDefinition, error) {
+func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Context, prompt string) (core.EquipmentDefinition, error) {
 	if strings.TrimSpace(prompt) == "" {
-		return vote.EquipmentDefinition{}, &EquipmentDraftGenerateError{
+		return core.EquipmentDefinition{}, &EquipmentDraftGenerateError{
 			Prompt:  prompt,
 			Message: fmt.Sprintf("%v: prompt is required", ErrInvalidEquipmentDraft),
 			Cause:   fmt.Errorf("%w: prompt is required", ErrInvalidEquipmentDraft),
@@ -94,7 +94,7 @@ func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Conte
 	// 第一步：由 AI 决定稀有度
 	rarity, err := g.determineRarity(ctx, prompt)
 	if err != nil {
-		return vote.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(prompt, vote.EquipmentDefinition{}, "", fmt.Errorf("determine rarity: %w", err))
+		return core.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(prompt, core.EquipmentDefinition{}, "", fmt.Errorf("determine rarity: %w", err))
 	}
 
 	// 第二步：根据稀有度拼接详细规则，生成装备草稿
@@ -114,16 +114,16 @@ func (g *OpenAIEquipmentDraftGenerator) GenerateEquipmentDraft(ctx context.Conte
 		},
 	})
 	if err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("encode llm request: %w", err)
+		return core.EquipmentDefinition{}, fmt.Errorf("encode llm request: %w", err)
 	}
 
 	result, err := g.chatOnce(ctx, body)
 	if err != nil {
-		return vote.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(prompt, vote.EquipmentDefinition{}, "", err)
+		return core.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(prompt, core.EquipmentDefinition{}, "", err)
 	}
 	draft, parseErr := parseEquipmentDraftJSON([]byte(result.Content))
 	if parseErr != nil {
-		return vote.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(
+		return core.EquipmentDefinition{}, wrapEquipmentDraftGenerateError(
 			prompt,
 			bestEffortDecodeEquipmentDraft([]byte(result.Content)),
 			result.RawResponse,
@@ -277,10 +277,10 @@ type jsonObjectFormat struct {
 // 解析与校验
 // ============================================================================
 
-func parseEquipmentDraftJSON(raw []byte) (vote.EquipmentDefinition, error) {
+func parseEquipmentDraftJSON(raw []byte) (core.EquipmentDefinition, error) {
 	var fields map[string]json.RawMessage
 	if err := sonic.Unmarshal(raw, &fields); err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("%w: draft is not valid json", ErrInvalidEquipmentDraft)
+		return core.EquipmentDefinition{}, fmt.Errorf("%w: draft is not valid json", ErrInvalidEquipmentDraft)
 	}
 
 	requiredFields := map[string]struct{}{
@@ -321,37 +321,37 @@ func parseEquipmentDraftJSON(raw []byte) (vote.EquipmentDefinition, error) {
 
 	for key := range fields {
 		if _, ok := requiredFields[key]; !ok {
-			return vote.EquipmentDefinition{}, fmt.Errorf("%w: unsupported field %s", ErrInvalidEquipmentDraft, key)
+			return core.EquipmentDefinition{}, fmt.Errorf("%w: unsupported field %s", ErrInvalidEquipmentDraft, key)
 		}
 	}
 	for key := range requiredFields {
 		if _, ok := fields[key]; !ok {
-			return vote.EquipmentDefinition{}, fmt.Errorf("%w: missing field %s", ErrInvalidEquipmentDraft, key)
+			return core.EquipmentDefinition{}, fmt.Errorf("%w: missing field %s", ErrInvalidEquipmentDraft, key)
 		}
 	}
 
-	var draft vote.EquipmentDefinition
+	var draft core.EquipmentDefinition
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&draft); err != nil {
-		return vote.EquipmentDefinition{}, fmt.Errorf("%w: decode draft", ErrInvalidEquipmentDraft)
+		return core.EquipmentDefinition{}, fmt.Errorf("%w: decode draft", ErrInvalidEquipmentDraft)
 	}
 
 	fmt.Printf("draft parsed: %+v\n", draft)
 
 	if err := validateEquipmentDraft(draft); err != nil {
-		return vote.EquipmentDefinition{}, err
+		return core.EquipmentDefinition{}, err
 	}
 	return draft, nil
 }
 
-func bestEffortDecodeEquipmentDraft(raw []byte) vote.EquipmentDefinition {
-	var draft vote.EquipmentDefinition
+func bestEffortDecodeEquipmentDraft(raw []byte) core.EquipmentDefinition {
+	var draft core.EquipmentDefinition
 	_ = sonic.Unmarshal(raw, &draft)
 	return draft
 }
 
-func wrapEquipmentDraftGenerateError(prompt string, draft vote.EquipmentDefinition, rawResponse string, err error) error {
+func wrapEquipmentDraftGenerateError(prompt string, draft core.EquipmentDefinition, rawResponse string, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -443,7 +443,7 @@ func getSlotBounds(rarity string, slot string) (rarityBounds, error) {
 // 校验函数
 // ============================================================================
 
-func validateEquipmentDraft(draft vote.EquipmentDefinition) error {
+func validateEquipmentDraft(draft core.EquipmentDefinition) error {
 	if strings.TrimSpace(draft.ItemID) == "" || strings.TrimSpace(draft.Name) == "" {
 		return fmt.Errorf("%w: itemId and name are required", ErrInvalidEquipmentDraft)
 	}
