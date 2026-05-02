@@ -5,7 +5,7 @@
 > 本文保留“如何落地”的执行步骤与历史提交语义，但当前正式数值与成本模型以设计文档和成本总结为准：
 >
 > - `docs/superpowers/specs/2026-04-28-talent-system-rework-design.md`
-> - `docs/2026-04-28-天赋成本调整总结.md`
+> - `docs/reports/2026-04-28-天赋成本调整总结.md`
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -8,7 +8,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
 const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
-const docsPath = path.resolve(currentDir, '../../../docs/2026-04-29-伤害动画解析优先级.md')
+const docsPath = path.resolve(currentDir, '../../../docs/implementation/2026-04-29-伤害动画解析优先级.md')
 
 describe('BattlePage 光标与伤害说明', () => {
   it('死兆改到左侧统一全局状态面板，并按 150 层显示进度', () => {

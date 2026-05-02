@@ -267,7 +267,7 @@ Run: `npm --prefix frontend run test`
 ### Task 7: 回归测试与文档同步
 
 **Files:**
-- Modify: `docs/developer-reference/2026-04-27-致命洞察工作原理.md`
+- Modify: `docs/archive/developer-reference/2026-04-27-致命洞察工作原理.md`
 - Modify: `docs/README.md`
 
 - [ ] **Step 1: 运行后端全量测试**

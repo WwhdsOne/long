@@ -1,86 +1,84 @@
-# docs 文档索引与分类（2026-04-26）
+# docs 文档索引
 
-## 快速导航
+`docs/` 只放一次性任务文档、设计说明、实施计划、开发参考、阶段总结和历史归档。
 
-- 新增策划文档：
-  - [designs/2026-04-26-Boss血量设计草案](./designs/2026-04-26-Boss血量设计草案.md)
-  - [designs/2026-04-26-金币与强化石获取系统策划案](./designs/2026-04-26-金币与强化石获取系统策划案.md)
-  - [designs/2026-04-26-装备实例化与强化背包系统策划案](./designs/2026-04-26-装备实例化与强化背包系统策划案.md)
-- 天赋系统当前正式文档：
-  - [designs/2026-04-30-天赋系统数值策划案-V2.0](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
-  - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
-  - [superpowers/specs/2026-04-28-talent-system-rework-design](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
-  - [2026-04-28-天赋成本调整总结](./2026-04-28-天赋成本调整总结.md)
-- 天赋系统当前开发参考：
-  - [developer-reference/2026-04-26-天赋系统开发参考](./developer-reference/2026-04-26-天赋系统开发参考.md)
-  - [developer-reference/2026-04-27-均衡攻势工作原理](./developer-reference/2026-04-27-均衡攻势工作原理.md)
-  - [developer-reference/2026-04-27-碎盾攻坚工作原理](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
-  - [developer-reference/2026-04-27-致命洞察工作原理（已失效，仅作快照）](./developer-reference/2026-04-27-致命洞察工作原理.md)
-  - [developer-reference/2026-04-30-V2伤害计算链路总览](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
-- 相关设计与实施：
-  - [designs/2026-04-25-Boss分区基础视觉与点击口径设计](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
-  - [reports/2026-04-25-Boss分区改造实施记录](./reports/2026-04-25-Boss分区改造实施记录.md)
-  - [implementation/2026-04-25-Boss总血量改为部位合计](./implementation/2026-04-25-Boss总血量改为部位合计.md)
-  - [implementation/2026-04-25-Boss部位点击扣血持久化修复](./implementation/2026-04-25-Boss部位点击扣血持久化修复.md)
+长期稳定的协作规则放在仓库根目录的 `AGENTS.md` / `CLAUDE.md`，不要回写到这里。
 
-## 分类整理
+## 当前目录分层
 
-### 1) 战斗系统策划与数值
+- `announcements/`
+  - 版本公告、变更播报。
+- `architecture/`
+  - 跨模块架构、存储、迁移、演进方案。
+- `designs/`
+  - 仍有参考价值的策划案、页面设计、系统草案。
+- `developer-reference/`
+  - 当前实现的开发参考、链路说明、调参说明。
+- `effects/`
+  - 像素特效资源和约束说明。
+- `implementation/`
+  - 具体实施计划、落地说明、修复记录。
+- `reports/`
+  - 阶段总结、优化总结、实施复盘。
+- `specs/`
+  - 当前仍有效的规则和规范。
+- `superpowers/`
+  - 历史 spec / plan 工作流产物。
+- `demos/`
+  - 本地静态 demo 和视觉试验稿。
+- `archive/`
+  - 已废弃、失效、仅保留快照价值的历史文档。
 
-- [designs/2026-04-26-Boss血量设计草案](./designs/2026-04-26-Boss血量设计草案.md)
-- [designs/2026-04-26-金币与强化石获取系统策划案](./designs/2026-04-26-金币与强化石获取系统策划案.md)
-- [designs/2026-04-25-Boss多部位战斗与装备系统总策划案](./designs/2026-04-25-Boss多部位战斗与装备系统总策划案.md)
-- [designs/2026-04-25-Boss分区基础视觉与点击口径设计](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
+## 推荐入口
 
-### 2) Boss 分区改造链路
+### 当前主线
 
-- [reports/2026-04-25-Boss分区改造实施记录](./reports/2026-04-25-Boss分区改造实施记录.md)
-- [implementation/2026-04-25-Boss总血量改为部位合计](./implementation/2026-04-25-Boss总血量改为部位合计.md)
-- [implementation/2026-04-25-Boss部位点击扣血持久化修复](./implementation/2026-04-25-Boss部位点击扣血持久化修复.md)
+- Mongo/任务系统演进：
+  - [architecture/2026-05-01-任务系统与Mongo整合方案.md](./architecture/2026-05-01-任务系统与Mongo整合方案.md)
+  - [architecture/2026-05-01-冷数据迁移与Mongo主存方案.md](./architecture/2026-05-01-冷数据迁移与Mongo主存方案.md)
+  - [architecture/2026-05-01-日志与MongoDB演进方案.md](./architecture/2026-05-01-日志与MongoDB演进方案.md)
+- 任务系统实施：
+  - [implementation/2026-05-02-任务模型升级实施计划.md](./implementation/2026-05-02-任务模型升级实施计划.md)
+  - [implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md](./implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md)
+  - [implementation/2026-05-02-资料页装备栏与生成失败日志实施计划.md](./implementation/2026-05-02-资料页装备栏与生成失败日志实施计划.md)
 
-### 3) 前台/交互改造
-
-- [reports/2026-04-24-前台三页拆分总结](./reports/2026-04-24-前台三页拆分总结.md)
-- [implementation/2026-04-24-删除星光前台分页筛选与商店](./implementation/2026-04-24-删除星光前台分页筛选与商店.md)
-- [implementation/2026-04-24-单体版点击反脚本与官方挂机改造](./implementation/2026-04-24-单体版点击反脚本与官方挂机改造.md)
-- [reports/2026-04-25-官方挂机与资料页标签实装核验](./reports/2026-04-25-官方挂机与资料页标签实装核验.md)
-
-### 4) 后台与生成能力
-
-- [implementation/2026-04-25-自然语言生成装备草稿](./implementation/2026-04-25-自然语言生成装备草稿.md)
-- [implementation/](./implementation)
-- [developer-reference/](./developer-reference)
-
-### 5) 规范与报告
-
-- [specs/](./specs)
-- [reports/](./reports)
-- [superpowers/](./superpowers)
-
-### 6) 天赋系统文档分层
+### 天赋与伤害链路
 
 - 正式口径：
-  - [designs/2026-04-30-天赋系统数值策划案-V2.0](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
-  - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
-  - [superpowers/specs/2026-04-28-talent-system-rework-design](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
-  - [2026-04-28-天赋成本调整总结](./2026-04-28-天赋成本调整总结.md)
-- 实施记录：
-  - [superpowers/plans/2026-04-28-talent-system-rework-plan](./superpowers/plans/2026-04-28-talent-system-rework-plan.md)
-  - [superpowers/plans/2026-04-30-talent-v2-buff-and-damage-rework-plan](./superpowers/plans/2026-04-30-talent-v2-buff-and-damage-rework-plan.md)
-- 当前开发参考：
-  - [developer-reference/2026-04-26-天赋系统开发参考](./developer-reference/2026-04-26-天赋系统开发参考.md)
-  - [developer-reference/2026-04-27-均衡攻势工作原理](./developer-reference/2026-04-27-均衡攻势工作原理.md)
-  - [developer-reference/2026-04-27-碎盾攻坚工作原理](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
-  - [developer-reference/2026-04-27-致命洞察工作原理（已失效，仅作快照）](./developer-reference/2026-04-27-致命洞察工作原理.md)
-  - [developer-reference/2026-04-30-V2伤害计算链路总览](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
-- 历史草案：
-  - [designs/2026-04-23-玩家技能树系统策划案](./designs/2026-04-23-玩家技能树系统策划案.md)
-  - [designs/2026-04-25-Boss多部位战斗与装备系统总策划案](./designs/2026-04-25-Boss多部位战斗与装备系统总策划案.md)
-  - [designs/2026-04-27-天赋树大型改造方案](./designs/2026-04-27-天赋树大型改造方案.md)
-  - [designs/2026-04-27-天赋树改造案](./designs/2026-04-27-天赋树改造案.md)
+  - [designs/2026-04-30-天赋系统数值策划案-V2.0.md](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
+  - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
+  - [reports/2026-04-28-天赋成本调整总结.md](./reports/2026-04-28-天赋成本调整总结.md)
+  - [superpowers/specs/2026-04-28-talent-system-rework-design.md](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
+- 开发参考：
+  - [developer-reference/2026-04-26-天赋系统开发参考.md](./developer-reference/2026-04-26-天赋系统开发参考.md)
+  - [developer-reference/2026-04-27-均衡攻势工作原理.md](./developer-reference/2026-04-27-均衡攻势工作原理.md)
+  - [developer-reference/2026-04-27-碎盾攻坚工作原理.md](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
+  - [developer-reference/2026-04-30-V2伤害计算链路总览.md](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
+  - [developer-reference/2026-04-30-天赋技能数值总览.md](./developer-reference/2026-04-30-天赋技能数值总览.md)
 
-## 维护约定
+### Boss 与战斗表现
 
-- 新文档优先按目录归档（`designs/`、`implementation/`、`specs/`、`reports/` 等）。
-- 顶层 `docs/` 仅放“跨模块主线文档”和“阶段汇总文档”。
-- 新增主线文档时，请在文档开头添加“关联文档导航”，并更新本索引。
+- [designs/2026-04-25-Boss分区基础视觉与点击口径设计.md](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
+- [reports/2026-04-25-Boss分区改造实施记录.md](./reports/2026-04-25-Boss分区改造实施记录.md)
+- [implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md](./implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md)
+- [implementation/2026-04-29-伤害动画解析优先级.md](./implementation/2026-04-29-伤害动画解析优先级.md)
+- [demos/](./demos/)
+
+## 归档约定
+
+- `archive/` 下的文档不再作为当前实现依据。
+- 文件名带 `已废弃`，或被移入 `archive/`，都表示只保留历史快照价值。
+- 当前仓库中：
+  - `archive/developer-reference/2026-04-27-致命洞察工作原理.md`
+  - `archive/designs/2026-04-27-天赋树大型改造方案.md`
+  - `archive/designs/2026-04-27-天赋树改造案.md`
+  都属于历史参考，不应作为现行规则。
+
+## 维护规则
+
+- 新文档优先放入已有分类目录，不要继续把大量文件直接堆在 `docs/` 顶层。
+- 顶层 `docs/` 除 `README.md` 外，原则上不再新增新文件。
+- 新增正式文档时，补一条到本索引的“推荐入口”或“当前主线”。
+- 如果文档失效：
+  - 明确标注为失效，并移入 `archive/`
+  - 或在文件名上追加 `-已废弃`

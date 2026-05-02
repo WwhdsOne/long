@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 删除三套 Boss 主题变体，统一为默认金属暗色风格（参照 `docs/demo-sword-cursor.html`），加入像素剑光标、命中闪光、屏幕震击等视觉特效。
+**Goal:** 删除三套 Boss 主题变体，统一为默认金属暗色风格（参照 `docs/demos/demo-sword-cursor.html`），加入像素剑光标、命中闪光、屏幕震击等视觉特效。
 
 **Architecture:** 仅修改前端 CSS 和少量 JS。不改变 HTML 结构、格子尺寸、左侧 buff 面板。所有视觉改动集中在 `style.css`（主题删除 + 格子重绘 + 特效动画）和 `BattlePage.vue`（移除主题绑定）。
 
