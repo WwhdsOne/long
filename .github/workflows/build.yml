@@ -141,21 +141,21 @@ jobs:
             i=1
 
             while [ "$i" -le "$attempts" ]; do
-              status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container_name" 2>/dev/null || true)"
+              health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container_name" 2>/dev/null || true)"
 
-              if [ "$status" = "healthy" ]; then
+              if [ "$health_status" = "healthy" ]; then
                 echo "容器健康检查已通过"
                 exit 0
               fi
 
-              if [ "$status" = "unhealthy" ] || [ "$status" = "no-healthcheck" ] || [ -z "$status" ]; then
-                echo "容器健康检查失败，当前状态: ${status:-missing}"
+              if [ "$health_status" = "unhealthy" ] || [ "$health_status" = "no-healthcheck" ] || [ -z "$health_status" ]; then
+                echo "容器健康检查失败，当前状态: ${health_status:-missing}"
                 docker compose ps || true
                 docker logs "$container_name" --tail 200 || true
                 exit 1
               fi
 
-              echo "等待容器健康检查通过 (${i}/${attempts})，当前状态: $status"
+              echo "等待容器健康检查通过 (${i}/${attempts})，当前状态: $health_status"
               sleep "$interval"
               i=$((i + 1))
             done
