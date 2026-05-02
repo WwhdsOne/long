@@ -46,6 +46,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	listenAddr := serverAddress(cfg.Port)
+	printStartupInfo(cfg, listenAddr)
 	if !cfg.Mongo.Enabled {
 		return errors.New("mongo.enabled 必须为 true，冷数据已固定切换到 MongoDB")
 	}
@@ -235,7 +237,7 @@ func run() error {
 			Timeout: cfg.LLM.Timeout,
 		})
 	}
-	httpServer := httpapi.NewHertzServer(serverAddress(cfg.Port), httpapi.Options{
+	httpServer := httpapi.NewHertzServer(listenAddr, httpapi.Options{
 		Store:                       store,
 		StateView:                   stateCache,
 		ChangePublisher:             changeBus,
@@ -259,7 +261,6 @@ func run() error {
 	})
 
 	errCh := make(chan error, 1)
-	listenAddr := serverAddress(cfg.Port)
 	go func() {
 		xlog.L().Info("vote wall listening", zap.String("listen_addr", listenAddr))
 		if err := httpServer.Run(); err != nil {
@@ -336,6 +337,64 @@ func run() error {
 	}
 
 	return nil
+}
+
+func printStartupInfo(cfg config.Config, listenAddr string) {
+	displayGodAnimal()
+	fmt.Println(renderStartupInfo(cfg, listenAddr))
+}
+
+func renderStartupInfo(cfg config.Config, listenAddr string) string {
+	return fmt.Sprintf(
+		"启动信息\n"+
+			"  监听地址: %s\n"+
+			"  Redis: %s:%d/%d\n"+
+			"  Redis TLS: %t\n"+
+			"  Redis 前缀: %s\n"+
+			"  Mongo: %t (%s)\n"+
+			"  静态目录: %s\n"+
+			"  日志: level=%s format=%s\n"+
+			"  OSS: %t\n"+
+			"  LLM: %t",
+		listenAddr,
+		cfg.Redis.Host,
+		cfg.Redis.Port,
+		cfg.Redis.DB,
+		cfg.Redis.TLSEnabled,
+		cfg.RedisPrefix,
+		cfg.Mongo.Enabled,
+		cfg.Mongo.Database,
+		cfg.PublicDir,
+		cfg.Log.Level,
+		cfg.Log.Format,
+		cfg.OSS.Enabled(),
+		cfg.LLM.Enabled,
+	)
+}
+
+func displayGodAnimal() {
+	fmt.Println(godAnimalArt())
+}
+
+func godAnimalArt() string {
+	return `
+                           ┏━┓     ┏━┓
+                          ┏┛ ┻━━━━━┛ ┻┓
+                          ┃　　　　　　 ┃
+                          ┃　　　━　　　┃
+                          ┃　┳┛　  ┗┳　┃
+                          ┃　　　　　　 ┃
+                          ┃　　　┻　　　┃
+                          ┃　　　　　　 ┃
+                          ┗━┓　　　┏━━━┛
+                            ┃　　　┃   神兽保佑
+                            ┃　　　┃   代码无BUG！
+                            ┃　　　┗━━━━━━━━━┓
+                            ┃　　　　　　　    ┣┓
+                            ┃　　　　         ┏┛
+                            ┗━┓ ┓ ┏━━━┳ ┓ ┏━┛
+                              ┃ ┫ ┫   ┃ ┫ ┫
+                              ┗━┻━┛   ┗━┻━┛`
 }
 
 func broadcastLeaderboardOnMinute(ctx context.Context, dispatcher *events.Dispatcher) error {

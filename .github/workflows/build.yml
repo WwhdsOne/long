@@ -52,7 +52,7 @@ jobs:
       - name: Build backend release binary
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go -C backend build -trimpath -ldflags "-w -s" -o long ./cmd/server
+            go -C backend build -trimpath -buildvcs=false -ldflags "-w -s -buildid=" -o long ./cmd/server
 
       - name: Prepare release bundle
         run: |
