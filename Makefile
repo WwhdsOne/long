@@ -7,7 +7,7 @@ MAKEFLAGS += --no-print-directory
 
 .PHONY: help deps deps-ci dev build test check \
 	backend-run backend-test backend-vet backend-fix \
-	frontend-dev frontend-build frontend-preview frontend-test
+	frontend-dev frontend-build frontend-preview frontend-test hooks-install
 
 help: ## 显示可用命令
 	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "%-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -68,3 +68,6 @@ frontend-test: ## 运行前端测试
 
 frontend-preview: ## 预览前端产物
 	$(NPM) --prefix frontend run preview
+
+hooks-install: ## 安装 Git hooks（需要本地已安装 lefthook）
+	lefthook install

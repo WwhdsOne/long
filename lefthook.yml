@@ -1,0 +1,11 @@
+pre-commit:
+  parallel: false
+  commands:
+    backend-fix:
+      run: go -C backend fix ./...
+    backend-test:
+      run: go -C backend test ./...
+    backend-vet:
+      run: go -C backend vet ./...
+    frontend-test:
+      run: npm --prefix frontend run test

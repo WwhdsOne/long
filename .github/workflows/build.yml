@@ -46,11 +46,8 @@ jobs:
       - name: Install dependencies
         run: make deps-ci
 
-      - name: Run CI checks
-        run: make check
-
-      - name: Run backend go fix
-        run: make backend-fix
+      - name: Build frontend release assets
+        run: make build
 
       - name: Build backend release binary
         run: |
