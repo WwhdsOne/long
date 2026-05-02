@@ -36,18 +36,16 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
 
-      - name: Set up Node 24
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          bun-version: latest
 
       - name: Install dependencies
-        run: make deps-ci
+        run: bun --cwd=frontend install --frozen-lockfile
 
       - name: Build frontend release assets
-        run: make build
+        run: bun --cwd=frontend run build
 
       - name: Build backend release binary
         run: |
@@ -57,13 +55,10 @@ jobs:
       - name: Prepare release bundle
         run: |
           rm -rf release release.tar.gz
-          mkdir -p release/backend release/deploy
+          mkdir -p release/backend
 
           cp Dockerfile .dockerignore release/
-          cp deploy/entrypoint.sh release/deploy/entrypoint.sh
-          cp deploy/nginx.container.conf release/deploy/nginx.container.conf
           cp backend/long release/backend/long
-          cp -R backend/public release/backend/public
 
           cat > release/docker-compose.yml <<EOF
           services:
@@ -81,86 +76,3 @@ jobs:
           EOF
 
           tar -C release -czf release.tar.gz .
-
-      - name: Prepare remote deploy directory
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.SERVER_IP }}
-          username: ${{ env.SSH_USER }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SERVER_PORT }}
-          script: |
-            set -e
-            mkdir -p "${{ env.DEPLOY_PATH }}/release"
-            find "${{ env.DEPLOY_PATH }}/release" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-
-      - name: Upload release bundle to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ env.SERVER_IP }}
-          username: ${{ env.SSH_USER }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SERVER_PORT }}
-          source: "release.tar.gz"
-          target: ${{ env.DEPLOY_PATH }}
-
-      - name: Check base image on server
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.SERVER_IP }}
-          username: ${{ env.SSH_USER }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SERVER_PORT }}
-          script: |
-            set -e
-            docker image inspect "${{ env.BASE_IMAGE }}" >/dev/null 2>&1 || {
-              echo "缺少基础镜像：${{ env.BASE_IMAGE }}"
-              exit 1
-            }
-
-      - name: Build image and restart container on server
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.SERVER_IP }}
-          username: ${{ env.SSH_USER }}
-          password: ${{ env.SSH_PASSWORD }}
-          port: ${{ env.SERVER_PORT }}
-          script: |
-            set -e
-            mkdir -p "${{ env.DEPLOY_PATH }}/release"
-            tar -xzf "${{ env.DEPLOY_PATH }}/release.tar.gz" -C "${{ env.DEPLOY_PATH }}/release"
-            cd "${{ env.DEPLOY_PATH }}/release"
-
-            docker compose build
-            docker compose down --remove-orphans || true
-            docker compose up -d --force-recreate
-
-            container_name="${{ env.CONTAINER_NAME }}"
-            attempts=24
-            interval=5
-            i=1
-
-            while [ "$i" -le "$attempts" ]; do
-              health_status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$container_name" 2>/dev/null || true)"
-
-              if [ "$health_status" = "healthy" ]; then
-                echo "容器健康检查已通过"
-                exit 0
-              fi
-
-              if [ "$health_status" = "unhealthy" ] || [ "$health_status" = "no-healthcheck" ] || [ -z "$health_status" ]; then
-                echo "容器健康检查失败，当前状态: ${health_status:-missing}"
-                docker compose ps || true
-                docker logs "$container_name" --tail 200 || true
-                exit 1
-              fi
-
-              echo "等待容器健康检查通过 (${i}/${attempts})，当前状态: $health_status"
-              sleep "$interval"
-              i=$((i + 1))
-            done
-
-            echo "等待容器健康检查超时"
-            docker compose ps || true
-            docker logs "$container_name" --tail 200 || true
-            exit 1

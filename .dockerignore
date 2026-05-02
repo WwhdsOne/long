@@ -14,9 +14,5 @@ AGENTS.md
 CLAUDE.md
 backend/*
 !backend/long
-!backend/public
-!backend/public/**
-deploy/*
-!deploy/entrypoint.sh
-!deploy/nginx.container.conf
+deploy
 npm-debug.log*
