@@ -5,11 +5,16 @@ on:
     branches:
       - main
 
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: long
+      BASE_IMAGE: long-basic:latest
       CONTAINER_NAME: long
       NETWORK_NAME: docker-compose_app-net
       DEPLOY_PATH: /home/docker-images/long
@@ -41,28 +46,46 @@ jobs:
       - name: Install dependencies
         run: make deps-ci
 
-      - name: Run backend tests and vet
+      - name: Run CI checks
+        run: make check
+
+      - name: Run backend go fix
+        run: make backend-fix
+
+      - name: Build backend release binary
         run: |
-          make test
-          make backend-vet
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go -C backend build -trimpath -ldflags "-w -s" -o long ./cmd/server
 
-      - name: Build frontend
-        run: make build
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image artifact in GitHub Actions
+      - name: Prepare release bundle
         run: |
-          mkdir -p deploy-artifacts
-          docker buildx build \
-            --platform linux/amd64 \
-            -t "${IMAGE_NAME}:latest" \
-            --output "type=docker,dest=deploy-artifacts/${IMAGE_NAME}-image.tar" \
-            .
-          gzip -f "deploy-artifacts/${IMAGE_NAME}-image.tar"
+          rm -rf release release.tar.gz
+          mkdir -p release/backend release/deploy
 
-      - name: Prepare remote deploy directory and clean old container/image
+          cp Dockerfile .dockerignore release/
+          cp deploy/entrypoint.sh release/deploy/entrypoint.sh
+          cp deploy/nginx.container.conf release/deploy/nginx.container.conf
+          cp backend/long release/backend/long
+          cp -R backend/public release/backend/public
+
+          cat > release/docker-compose.yml <<EOF
+          services:
+            ${IMAGE_NAME}:
+              image: ${IMAGE_NAME}:latest
+              build:
+                context: .
+                dockerfile: Dockerfile
+              container_name: ${CONTAINER_NAME}
+              restart: unless-stopped
+              environment:
+                CONSUL_ADDR: ${CONSUL_ADDR}
+                CONSUL_CONFIG_KEY: ${CONSUL_CONFIG_KEY}
+              network_mode: ${NETWORK_NAME}
+          EOF
+
+          tar -C release -czf release.tar.gz .
+
+      - name: Prepare remote deploy directory
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ env.SERVER_IP }}
@@ -71,30 +94,20 @@ jobs:
           port: ${{ env.SERVER_PORT }}
           script: |
             set -e
-            mkdir -p "${{ env.DEPLOY_PATH }}"
-            rm -rf "${{ env.DEPLOY_PATH }}"/*
+            mkdir -p "${{ env.DEPLOY_PATH }}/release"
+            rm -rf "${{ env.DEPLOY_PATH }}/release"/*
 
-            CONTAINER_ID=$(docker ps -a -q --filter "name=^/${{ env.CONTAINER_NAME }}$")
-            if [ -n "$CONTAINER_ID" ]; then
-              docker rm -f "$CONTAINER_ID" || true
-            fi
-
-            IMAGE_ID=$(docker images -q ${{ env.IMAGE_NAME }}:latest)
-            if [ -n "$IMAGE_ID" ]; then
-              docker rmi -f "$IMAGE_ID" || true
-            fi
-
-      - name: Upload image artifact to server
+      - name: Upload release bundle to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ env.SERVER_IP }}
           username: ${{ env.SSH_USER }}
           password: ${{ env.SSH_PASSWORD }}
           port: ${{ env.SERVER_PORT }}
-          source: "deploy-artifacts/${{ env.IMAGE_NAME }}-image.tar.gz"
+          source: "release.tar.gz"
           target: ${{ env.DEPLOY_PATH }}
 
-      - name: Load image and start container
+      - name: Check base image on server
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ env.SERVER_IP }}
@@ -103,17 +116,24 @@ jobs:
           port: ${{ env.SERVER_PORT }}
           script: |
             set -e
-            cd "${{ env.DEPLOY_PATH }}/deploy-artifacts"
+            docker image inspect "${{ env.BASE_IMAGE }}" >/dev/null 2>&1 || {
+              echo "缺少基础镜像：${{ env.BASE_IMAGE }}"
+              exit 1
+            }
 
-            docker network inspect "${{ env.NETWORK_NAME }}" >/dev/null 2>&1 || \
-              docker network create "${{ env.NETWORK_NAME }}"
+      - name: Build image and restart container on server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.SERVER_IP }}
+          username: ${{ env.SSH_USER }}
+          password: ${{ env.SSH_PASSWORD }}
+          port: ${{ env.SERVER_PORT }}
+          script: |
+            set -e
+            mkdir -p "${{ env.DEPLOY_PATH }}/release"
+            tar -xzf "${{ env.DEPLOY_PATH }}/release.tar.gz" -C "${{ env.DEPLOY_PATH }}/release"
+            cd "${{ env.DEPLOY_PATH }}/release"
 
-            gunzip -c "${{ env.IMAGE_NAME }}-image.tar.gz" | docker load
-
-            docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
-              --network "${{ env.NETWORK_NAME }}" \
-              --restart unless-stopped \
-              -e CONSUL_ADDR="${{ env.CONSUL_ADDR }}" \
-              -e CONSUL_CONFIG_KEY="${{ env.CONSUL_CONFIG_KEY }}" \
-              ${{ env.IMAGE_NAME }}:latest
+            docker compose build
+            docker compose down --remove-orphans || true
+            docker compose up -d --force-recreate

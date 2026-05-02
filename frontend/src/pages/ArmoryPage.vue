@@ -380,20 +380,13 @@ onBeforeUnmount(() => {
                   <span v-else class="loadout-slot__placeholder">{{ slot.label }}</span>
                 </div>
                 <div class="loadout-slot__main">
-                  <template v-if="loadout[slot.value]">
-
                   <strong v-if="loadout[slot.value]" class="loadout-slot__name">
-                      <span :class="equipmentNameClass(loadout[slot.value])">{{
-                          formatRarityLabel(loadout[slot.value].rarity)
-                        }} · {{ equipmentNameParts(loadout[slot.value]).text }}</span>
+                    <span :class="['loadout-slot__rarity', equipmentNameClass(loadout[slot.value])]">{{ formatRarityLabel(loadout[slot.value].rarity) }}</span>
+                    <span :class="equipmentNameClass(loadout[slot.value])"> · {{ equipmentNameParts(loadout[slot.value]).text }}</span>
                     <br>
                     <span class="loadout-slot__meta"> 强化 +{{ loadout[slot.value].enhanceLevel || 0 }}</span>
                   </strong>
-                  </template>
-
                   <strong v-else class="loadout-slot__empty">未穿戴</strong>
-
-
                 </div>
                 <article v-if="loadout[slot.value]" class="armory-item-tooltip" aria-label="装备属性">
                   <p class="vote-stage__eyebrow">装备属性</p>
@@ -478,15 +471,11 @@ onBeforeUnmount(() => {
               <p v-else>暂无词条</p>
             </article>
             <div class="armory-backpack-cell__meta">
-              <template v-if="item">
-                <strong>
-                  <span :class="['armory-backpack-cell__rarity', equipmentNameClass(item)]">{{
-                      formatRarityLabel(item.rarity)
-                    }} </span>
-                  <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
-                  <span :class="equipmentNameClass(item)">·{{ equipmentNameParts(item).text }}</span>
-                </strong>
-              </template>
+              <strong>
+                <span :class="['armory-backpack-cell__rarity', equipmentNameClass(item)]">{{ formatRarityLabel(item.rarity) }} </span>
+                <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>
+                <span :class="equipmentNameClass(item)">·{{ equipmentNameParts(item).text }}</span>
+              </strong>
               <span>{{ item.slot || '未分类' }}</span>
               <span>强化 +{{ item.enhanceLevel || 0 }} · {{ item.equipped ? '已装备' : '点击穿戴' }}</span>
               <span>{{ item.locked ? '已锁定（不参与一键分解）' : '未锁定' }}</span>
