@@ -5514,3 +5514,52 @@ select {
   margin-bottom: 3.65px;
 }
 
+.vote-stage__boss-note strong {
+  font-weight: bold;
+  color: #f39c12; /* Gold color for emphasis */
+  font-size: 1.2em; /* Larger text size */
+}
+
+/* ===== 移动端 Boss 战斗区域 ===== */
+@media (max-width: 640px) {
+  .boss-part-grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px;
+  }
+
+  .boss-left-panels {
+    position: static;
+    width: 100%;
+    left: auto;
+    top: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .boss-right-panel {
+    position: static;
+    width: 100%;
+    right: auto;
+    top: auto;
+  }
+
+  .boss-part-grid {
+    max-width: 100%;
+    margin: 4px auto;
+    gap: 3px;
+    padding: 4px;
+  }
+
+  .boss-part-grid__row {
+    gap: 3px;
+  }
+
+  .boss-part-cell {
+    padding: 2px;
+    border-width: 1.5px;
+  }
+}
+
