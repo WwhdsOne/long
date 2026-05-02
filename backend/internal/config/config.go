@@ -106,7 +106,6 @@ type Config struct {
 	Mongo       MongoConfig
 	Archive     ArchiveConfig
 	RedisPrefix string
-	PublicDir   string
 }
 
 type fileConfig struct {
@@ -273,7 +272,6 @@ func loadFromConsul() (Config, consulSource, error) {
 		},
 		Archive:     ArchiveConfig{},
 		RedisPrefix: parsed.RedisPrefix,
-		PublicDir:   resolvePublicDir(),
 	}
 	if config.Realtime.DebounceMs <= 0 {
 		config.Realtime.DebounceMs = 50
@@ -465,6 +463,3 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 	}
 }
 
-func resolvePublicDir() string {
-	return "public"
-}
