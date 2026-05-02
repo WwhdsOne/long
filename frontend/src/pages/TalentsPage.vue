@@ -205,6 +205,10 @@ function stateReason(def) {
 
 function talentCostForLevel(def, targetLevel) {
   if (!def?.cost || !targetLevel || targetLevel < 1) return 0
+  // Tier 0 基石使用指数增长公式，与后端一致
+  if (def.tier === 0) {
+    return Math.round(def.cost * talentCostMultiplier * Math.pow(3.0, targetLevel - 1))
+  }
   return Math.round(def.cost * Math.pow(targetLevel, talentCostLevelExponent) * talentCostMultiplier)
 }
 
