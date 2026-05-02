@@ -6,7 +6,7 @@ redis:
   password: "123456"
   db: 0
   tls_enabled: false
-redis_prefix: "vote:button:"
+redis_prefix: "hai-world"
 rate_limit:
   limit: 42
   window_ms: 2000
