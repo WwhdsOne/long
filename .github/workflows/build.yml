@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: long
-      BASE_IMAGE: long-basic:latest
+      BASE_IMAGE: go-app-runtime:latest
       CONTAINER_NAME: long
       NETWORK_NAME: docker-compose_app-net
       DEPLOY_PATH: /home/docker-images/long
