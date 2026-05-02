@@ -41,7 +41,7 @@ const {
   bossProgress,
   formatDropRate,
   formatRarityLabel,
-  formatItemStats,
+  formatItemStatLines,
   equipmentNameParts,
   equipmentNameClass,
   rewardModal,
@@ -1025,7 +1025,8 @@ const silverStormActive = computed(() => {
                 <li>掉落概率：{{ formatDropRate(item.dropRatePercent) }}</li>
                 <li>稀有度：{{ formatRarityLabel(item.rarity) }}</li>
                 <li>部位：{{ item.slot || '未分类' }}</li>
-                <li>{{ formatItemStats(item) }}</li>
+                <li v-for="line in formatItemStatLines(item)" :key="line">{{ line }}</li>
+                <li v-if="formatItemStatLines(item).length === 0">暂无词条</li>
               </ul>
             </article>
           </div>

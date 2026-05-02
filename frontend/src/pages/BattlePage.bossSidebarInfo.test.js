@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
 
 describe('BattlePage Boss 右侧整合信息', () => {
@@ -30,5 +31,15 @@ describe('BattlePage Boss 右侧整合信息', () => {
     expect(styleSource).toContain('.boss-right-summary {')
     expect(styleSource).toContain('.boss-right-summary__stats {')
     expect(styleSource).toContain('.boss-right-summary__drop {')
+  })
+
+  it('Boss 掉落池复用背包多行属性格式，并补齐三种部位增伤', () => {
+    expect(battleSource).toContain('v-for="line in formatItemStatLines(item)"')
+    expect(battleSource).not.toContain('{{ formatItemStats(item) }}')
+    expect(stateSource).toContain('function normalizeDisplayPercent(value) {')
+    expect(stateSource).toContain('if (item?.partTypeDamageSoft) lines.push(`软组织伤害 ${formatDisplayPercent(item.partTypeDamageSoft)}%`)')
+    expect(stateSource).toContain('if (item?.partTypeDamageHeavy) lines.push(`重甲伤害 ${formatDisplayPercent(item.partTypeDamageHeavy)}%`)')
+    expect(stateSource).toContain('if (item?.partTypeDamageWeak) lines.push(`弱点伤害 ${formatDisplayPercent(item.partTypeDamageWeak)}%`)')
+    expect(stateSource).toContain('lines.push(`护甲穿透 ${formatDisplayPercent(item.armorPenPercent)}%`)')
   })
 })
