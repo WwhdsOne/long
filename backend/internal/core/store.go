@@ -913,7 +913,8 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	userState.EquippedBattleClickSkinID = equippedBattleClickSkinID
 	userState.EquippedBattleClickCursorImagePath = equippedBattleClickCursorImagePath
 
-	boss, err := s.currentBossForRoom(ctx, roomID)
+	combatRoomID := s.combatRoomID(roomID)
+	boss, err := s.currentBossForRoom(ctx, combatRoomID)
 	if err != nil {
 		return UserState{}, err
 	}
@@ -1501,7 +1502,7 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 	if err != nil {
 		return ClickResult{}, err
 	}
-	return s.AttackBossPartAFKInRoom(ctx, nickname, roomID)
+	return s.AttackBossPartAFKInRoom(ctx, nickname, s.combatRoomID(roomID))
 }
 
 // AttackBossPartAFKInRoom 在指定房间执行一次挂机攻击。
@@ -1625,6 +1626,7 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
+	roomID = s.combatRoomID(roomID)
 	boss, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return ClickResult{}, err

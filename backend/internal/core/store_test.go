@@ -272,6 +272,39 @@ func TestClickBossPartUsesPlayerRoom(t *testing.T) {
 	}
 }
 
+func TestClickBossPartFallsBackToDefaultCombatRoomWhenPlayerInHall(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 10,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 10, CurrentHP: 10, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+
+	roomID, err := store.ResolvePlayerRoom(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("resolve player room: %v", err)
+	}
+	if roomID != hallRoomID {
+		t.Fatalf("expected unresolved player room to stay hall, got %q", roomID)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click boss part from hall fallback: %v", err)
+	}
+	if result.RoomID != "1" {
+		t.Fatalf("expected combat fallback room 1, got %q", result.RoomID)
+	}
+}
+
 func TestBossKillAccumulatesPlayerAndGlobalCounts(t *testing.T) {
 	store, cleanup := newTestRoomStore(t)
 	defer cleanup()

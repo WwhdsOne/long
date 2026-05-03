@@ -150,6 +150,13 @@ func (s *Store) queueIDForRoom(roomID string) string {
 	return s.normalizeRoomID(roomID)
 }
 
+func (s *Store) combatRoomID(roomID string) string {
+	if isHallRoomID(roomID) {
+		return s.defaultRoomID()
+	}
+	return s.normalizeRoomID(roomID)
+}
+
 func (s *Store) ResolvePlayerRoom(ctx context.Context, nickname string) (string, error) {
 	normalizedNickname, ok := normalizeNickname(nickname)
 	if !ok {
