@@ -1,5 +1,5 @@
 <script setup>
-import {ref} from 'vue'
+import {computed, ref} from 'vue'
 import BattlePage from './BattlePage.vue'
 import ArmoryPage from './ArmoryPage.vue'
 import MessagesPage from './MessagesPage.vue'
@@ -34,6 +34,7 @@ registerPublicPageLifecycle()
 
 const loginModalOpen = ref(false)
 const armoryPageIDs = new Set(['resources', 'inventory', 'stats', 'loadout'])
+const isBattlePage = computed(() => currentPublicPage.value === 'battle')
 
 function isArmoryPage(pageID) {
   return armoryPageIDs.has(pageID)
@@ -58,7 +59,7 @@ async function handleLoginSubmit() {
 </script>
 
 <template>
-  <nav class="public-nav" aria-label="前台导航">
+  <nav class="public-nav" :class="{ 'public-nav--battle': isBattlePage }" aria-label="前台导航">
     <button
         v-for="page in publicPages"
         :key="page.id"
@@ -78,7 +79,7 @@ async function handleLoginSubmit() {
       {{ isLoggedIn ? '退出登录' : '登录/注册' }}
     </button>
   </nav>
-  <main class="page-shell">
+  <main class="page-shell" :class="{ 'page-shell--battle': isBattlePage }">
 
     <div class="page-shell__glow page-shell__glow--pink"></div>
     <div class="page-shell__glow page-shell__glow--blue"></div>

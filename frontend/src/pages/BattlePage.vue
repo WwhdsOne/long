@@ -13,6 +13,7 @@ const {
   bossStoneRange,
   bossTalentPointsOnKill,
   currentRoomId,
+  currentRoom,
   rooms,
   roomSwitching,
   roomError,
@@ -69,6 +70,8 @@ const bossCursorY = ref(0)
 const bossCellSizePx = ref(56)
 const DEFAULT_BOSS_SWORD_CURSOR_URL = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
 const bossSwordCursorUrl = computed(() => equippedBattleClickCursorImagePath.value || DEFAULT_BOSS_SWORD_CURSOR_URL)
+const currentRoomDisplay = computed(() => `房间 ${currentRoom.value?.id || currentRoomId.value || '1'}`)
+const currentRoomSeal = computed(() => String(currentRoom.value?.id || currentRoomId.value || '1').padStart(2, '0'))
 
 const comboMilestoneText = ref('')
 const comboMilestoneTick = ref(0)
@@ -567,6 +570,7 @@ const silverStormActive = computed(() => {
 </script>
 
 <template>
+  <div class="battle-page-hud">
   <section class="stats-band stats-band--wide" aria-label="实时统计">
     <article class="stats-band__card">
       <span class="stats-band__label">Boss 部位</span>
@@ -623,18 +627,27 @@ const silverStormActive = computed(() => {
           }"
       >
         <div class="vote-stage__boss-hud-head">
-          <div>
+          <div class="boss-hud__title-block">
             <div class="vote-stage__head">
               <div>
                 <p class="vote-stage__eyebrow">当前世界 Boss</p>
                 <h2>{{ boss?.name || '等待 Boss 登场' }}</h2>
               </div>
             </div>
+            <div class="boss-hud__chips">
+              <span>{{ currentRoomDisplay }}</span>
+              <span>Boss 榜 {{ bossLeaderboardCount }} 人</span>
+              <span>掉落 {{ bossDropPool.length }} 件</span>
+            </div>
           </div>
           <div class="boss-stage__meta">
             <span class="boss-stage__pill">{{ bossStatusLabel }}</span>
             <strong v-if="boss">HP {{ boss.currentHp }} / {{ boss.maxHp }}</strong>
             <strong v-else>我的伤害 {{ myBossDamage }}</strong>
+          </div>
+          <div class="boss-hud__seal" aria-hidden="true">
+            <strong>{{ currentRoomSeal }}</strong>
+            <span>ROOM</span>
           </div>
         </div>
         <div v-if="boss" class="boss-stage__bar boss-stage__bar--compact">
@@ -1184,4 +1197,5 @@ const silverStormActive = computed(() => {
     </aside>
 
   </section>
+  </div>
 </template>
