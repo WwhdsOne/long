@@ -18,8 +18,6 @@ import (
 	_ "golang.org/x/crypto/x509roots/fallback" // Mozilla 根证书（嵌入 Go 二进制）
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/common/hlog"
-	hertzzap "github.com/hertz-contrib/logger/zap"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -226,10 +224,6 @@ func run() error {
 	defer func() {
 		_ = logger.Sync()
 	}()
-
-	// 将 Hertz 内部日志也接入 zap
-	hzLogger := hertzzap.NewLogger()
-	hlog.SetLogger(hzLogger)
 
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := core.NewStore(redisClient, cfg.RedisPrefix, core.StoreOptions{

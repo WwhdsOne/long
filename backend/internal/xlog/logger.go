@@ -2,11 +2,12 @@ package xlog
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
+	"io"
 	"strings"
 	"time"
 
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -31,6 +32,8 @@ type SystemLogEntry struct {
 type AccessLogEntry struct {
 	Method     string
 	Path       string
+	Nickname   string
+	Body       string
 	StatusCode int
 	LatencyMs  int64
 	ClientIP   string
@@ -66,9 +69,7 @@ func Init(cfg Config) (*zap.Logger, error) {
 	}
 
 	// 包装 uuidCore，为每条日志添加唯一 UUID
-	logger = logger.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
-		return &uuidCore{Core: c}
-	}))
+	logger = logger.WithOptions(CoreWithUUID())
 
 	globalLogger = logger
 	zap.ReplaceGlobals(logger)
@@ -128,22 +129,90 @@ func parseLevel(level string) zapcore.Level {
 	}
 }
 
-// generateUUID 生成一个简单的 UUID v4。
-func generateUUID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	b[6] = (b[6] & 0x0f) | 0x40 // version 4
-	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+// uuidCore 包装 zapcore.Core，为每条日志添加唯一 UUID。
+// CoreWithUUID 返回一个 zap.Option，为每条日志添加唯一 log_id 字段。
+func CoreWithUUID() zap.Option {
+	return zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+		return &uuidCore{Core: c}
+	})
 }
 
-// uuidCore 包装 zapcore.Core，为每条日志添加唯一 UUID。
 type uuidCore struct {
 	zapcore.Core
 }
 
 func (c *uuidCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
-	// 在日志写入前添加 UUID 字段
-	fields = append(fields, zap.String("log_id", generateUUID()))
+	fields = append(fields, zap.String("log_id", uuid.NewString()))
 	return c.Core.Write(entry, fields)
+}
+
+// HertzLogger 实现 hlog.FullLogger，代理到全局 zap.Logger，统一日志实例。
+type HertzLogger struct {
+	sugar *zap.SugaredLogger
+}
+
+// NewHertzLogger 返回一个代理到全局 zap.Logger 的 hlog.FullLogger。
+func NewHertzLogger() *HertzLogger {
+	return &HertzLogger{sugar: globalLogger.Sugar()}
+}
+
+// refreshSugar 确保 sugar 指向当前全局 logger（SetLevel/SetOutput 后 logger 可能被替换）。
+func (h *HertzLogger) refreshSugar() {
+	h.sugar = globalLogger.Sugar()
+}
+
+// — Logger —
+
+func (h *HertzLogger) Trace(v ...interface{})            { h.sugar.Debug(v...) }
+func (h *HertzLogger) Debug(v ...interface{})            { h.sugar.Debug(v...) }
+func (h *HertzLogger) Info(v ...interface{})             { h.sugar.Info(v...) }
+func (h *HertzLogger) Notice(v ...interface{})           { h.sugar.Warn(v...) }
+func (h *HertzLogger) Warn(v ...interface{})             { h.sugar.Warn(v...) }
+func (h *HertzLogger) Error(v ...interface{})            { h.sugar.Error(v...) }
+func (h *HertzLogger) Fatal(v ...interface{})            { h.sugar.Fatal(v...) }
+
+// — FormatLogger —
+
+func (h *HertzLogger) Tracef(f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) Debugf(f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) Infof(f string, v ...interface{})   { h.sugar.Infof(f, v...) }
+func (h *HertzLogger) Noticef(f string, v ...interface{}) { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) Warnf(f string, v ...interface{})   { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) Errorf(f string, v ...interface{})  { h.sugar.Errorf(f, v...) }
+func (h *HertzLogger) Fatalf(f string, v ...interface{})  { h.sugar.Fatalf(f, v...) }
+
+// — CtxLogger —
+
+func (h *HertzLogger) CtxTracef(_ context.Context, f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) CtxDebugf(_ context.Context, f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) CtxInfof(_ context.Context, f string, v ...interface{})   { h.sugar.Infof(f, v...) }
+func (h *HertzLogger) CtxNoticef(_ context.Context, f string, v ...interface{}) { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) CtxWarnf(_ context.Context, f string, v ...interface{})   { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) CtxErrorf(_ context.Context, f string, v ...interface{})  { h.sugar.Errorf(f, v...) }
+func (h *HertzLogger) CtxFatalf(_ context.Context, f string, v ...interface{})  { h.sugar.Fatalf(f, v...) }
+
+// — Control —
+
+func (h *HertzLogger) SetLevel(level hlog.Level) {
+	var lvl zapcore.Level
+	switch level {
+	case hlog.LevelTrace, hlog.LevelDebug:
+		lvl = zapcore.DebugLevel
+	case hlog.LevelInfo:
+		lvl = zapcore.InfoLevel
+	case hlog.LevelNotice, hlog.LevelWarn:
+		lvl = zapcore.WarnLevel
+	case hlog.LevelError:
+		lvl = zapcore.ErrorLevel
+	case hlog.LevelFatal:
+		lvl = zapcore.FatalLevel
+	default:
+		lvl = zapcore.InfoLevel
+	}
+	_ = globalLogger.Core().Enabled(lvl)
+	// 全局 logger 的级别在 Init 时已设定，此处记录但不实际变更以保持统一。
+}
+
+func (h *HertzLogger) SetOutput(w io.Writer) {
+	// 输出目标由 Config.Format 决定（stdout），不在此处变更。
 }

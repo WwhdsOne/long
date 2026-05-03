@@ -50,6 +50,8 @@ func (s *AccessLogStore) WriteAccessLog(ctx context.Context, item xlog.AccessLog
 	_, err := s.collection.InsertOne(writeCtx, bson.M{
 		"method":      item.Method,
 		"path":        item.Path,
+			"nickname":    item.Nickname,
+			"body":        item.Body,
 		"status_code": item.StatusCode,
 		"latency_ms":  item.LatencyMs,
 		"client_ip":   item.ClientIP,
