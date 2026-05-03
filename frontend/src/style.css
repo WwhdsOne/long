@@ -5579,9 +5579,9 @@ select {
 }
 
 /* ===== 战斗页房间分线 HUD 视觉 ===== */
-html:has(.page-shell--battle),
-body:has(.page-shell--battle),
-#app:has(.page-shell--battle) {
+html:has(.battle-page-hud),
+body:has(.battle-page-hud),
+#app:has(.battle-page-hud) {
   min-height: 100%;
   background: #08101a;
 }
@@ -5601,8 +5601,20 @@ body:has(.page-shell--battle),
   background: linear-gradient(180deg, #fff5cf, #78d8ff);
 }
 
-.page-shell--battle {
+.battle-page-hud {
+  --battle-panel: rgba(12, 21, 35, 0.78);
+  --battle-panel-strong: rgba(10, 18, 31, 0.94);
+  --battle-line: rgba(132, 166, 214, 0.18);
+  --battle-line-strong: rgba(132, 166, 214, 0.3);
+  --battle-muted: #8ca1c0;
+  --battle-muted-strong: #bed0ea;
+  --battle-gold: #ffd46b;
+  --battle-cyan: #78d8ff;
+  --battle-emerald: #69e7b0;
+  --battle-red: #ff8577;
   isolation: isolate;
+  display: grid;
+  gap: 18px;
   color: #eef4ff;
   background:
     radial-gradient(circle at 8% 0%, rgba(120, 216, 255, 0.16), transparent 28%),
@@ -5611,7 +5623,7 @@ body:has(.page-shell--battle),
     linear-gradient(180deg, #060c14 0%, #09111b 34%, #08101a 100%);
 }
 
-.page-shell--battle::before {
+.battle-page-hud::before {
   content: '';
   position: fixed;
   inset: 0;
@@ -5624,13 +5636,14 @@ body:has(.page-shell--battle),
   opacity: 0.18;
 }
 
-.page-shell--battle .page-shell__glow {
-  display: none;
-}
-
-.page-shell--battle .hero {
+.battle-page-hud__hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 22px;
   align-items: stretch;
-  margin-bottom: 18px;
+  width: min(1380px, 100%);
+  margin: 0 auto;
   padding: 28px 30px 24px;
   border: 1px solid rgba(132, 166, 214, 0.16);
   border-radius: 24px;
@@ -5642,13 +5655,12 @@ body:has(.page-shell--battle),
   overflow: hidden;
 }
 
-.page-shell--battle .hero__eyebrow,
 .battle-page-hud .vote-stage__eyebrow {
   color: #ffd46b;
   letter-spacing: 0;
 }
 
-.page-shell--battle .hero h1,
+.battle-page-hud__hero h1,
 .battle-page-hud .vote-stage h2 {
   color: #eef4ff;
   font-family: 'Rajdhani', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -5656,45 +5668,47 @@ body:has(.page-shell--battle),
   text-transform: uppercase;
 }
 
-.page-shell--battle .hero h1 {
+.battle-page-hud__hero h1 {
+  margin: 8px 0 0;
   max-width: 12ch;
   font-size: 4rem;
   line-height: 0.92;
 }
 
-.page-shell--battle .hero__status {
+.battle-page-hud__status {
+  display: grid;
   align-content: start;
+  justify-items: end;
+  gap: 10px;
 }
 
-.page-shell--battle .live-pill,
-.page-shell--battle .hero__time,
-.page-shell--battle .hero__admin-link {
+.battle-page-hud .live-pill,
+.battle-page-hud__time,
+.battle-page-hud__admin-link {
   border: 1px solid rgba(255, 255, 255, 0.09);
   color: #dce6f7;
   background: rgba(255, 255, 255, 0.045);
   box-shadow: none;
 }
 
-.page-shell--battle .live-pill {
+.battle-page-hud .live-pill {
   color: #caffe2;
 }
 
-.page-shell--battle .hero__admin-link {
-  color: #fff3c8;
+.battle-page-hud__time,
+.battle-page-hud__admin-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
 }
 
-.battle-page-hud {
-  --battle-panel: rgba(12, 21, 35, 0.78);
-  --battle-panel-strong: rgba(10, 18, 31, 0.94);
-  --battle-line: rgba(132, 166, 214, 0.18);
-  --battle-line-strong: rgba(132, 166, 214, 0.3);
-  --battle-muted: #8ca1c0;
-  --battle-muted-strong: #bed0ea;
-  --battle-gold: #ffd46b;
-  --battle-cyan: #78d8ff;
-  --battle-emerald: #69e7b0;
-  --battle-red: #ff8577;
-  color: #eef4ff;
+.battle-page-hud__admin-link {
+  color: #fff3c8;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .battle-page-hud .stats-band {
@@ -6072,6 +6086,14 @@ body:has(.page-shell--battle),
 }
 
 @media (max-width: 1080px) {
+  .battle-page-hud__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .battle-page-hud__status {
+    justify-items: start;
+  }
+
   .battle-page-hud .stage-layout--battle,
   .battle-page-hud .vote-stage__boss-hud-head {
     grid-template-columns: 1fr;
@@ -6113,11 +6135,11 @@ body:has(.page-shell--battle),
     margin-inline-start: 0;
   }
 
-  .page-shell--battle {
+  body:has(.battle-page-hud) .page-shell {
     padding: 14px 14px 28px;
   }
 
-  .page-shell--battle .hero,
+  .battle-page-hud__hero,
   .battle-page-hud .vote-stage__boss-hud,
   .battle-page-hud .social-card {
     border-radius: 20px;
@@ -6125,7 +6147,7 @@ body:has(.page-shell--battle),
     padding-right: 16px;
   }
 
-  .page-shell--battle .hero h1 {
+  .battle-page-hud__hero h1 {
     font-size: 2.65rem;
   }
 

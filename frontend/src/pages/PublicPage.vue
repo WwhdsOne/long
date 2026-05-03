@@ -79,26 +79,28 @@ async function handleLoginSubmit() {
       {{ isLoggedIn ? '退出登录' : '登录/注册' }}
     </button>
   </nav>
-  <main class="page-shell" :class="{ 'page-shell--battle': isBattlePage }">
+  <main class="page-shell">
 
-    <div class="page-shell__glow page-shell__glow--pink"></div>
-    <div class="page-shell__glow page-shell__glow--blue"></div>
-    <div class="page-shell__glow page-shell__glow--yellow"></div>
-    <section class="hero">
-      <div class="hero__copy">
-        <p class="hero__eyebrow">Hai-World</p>
-        <h1>狠狠干一票。</h1>
-      </div>
+    <template v-if="!isBattlePage">
+      <div class="page-shell__glow page-shell__glow--pink"></div>
+      <div class="page-shell__glow page-shell__glow--blue"></div>
+      <div class="page-shell__glow page-shell__glow--yellow"></div>
+      <section class="hero">
+        <div class="hero__copy">
+          <p class="hero__eyebrow">Hai-World</p>
+          <h1>狠狠干一票。</h1>
+        </div>
 
-      <div class="hero__status">
-        <span class="live-pill" :class="{ 'live-pill--syncing': syncing }">
-          <span class="live-pill__dot"></span>
-          {{ syncLabel }}
-        </span>
-        <span class="hero__time">最近刷新 {{ lastUpdatedAt || '--:--:--' }}</span>
-        <a class="hero__admin-link" href="/admin">管理后台</a>
-      </div>
-    </section>
+        <div class="hero__status">
+          <span class="live-pill" :class="{ 'live-pill--syncing': syncing }">
+            <span class="live-pill__dot"></span>
+            {{ syncLabel }}
+          </span>
+          <span class="hero__time">最近刷新 {{ lastUpdatedAt || '--:--:--' }}</span>
+          <a class="hero__admin-link" href="/admin">管理后台</a>
+        </div>
+      </section>
+    </template>
 
 
     <section v-if="announcementModalOpen && latestAnnouncement" class="announcement-modal" aria-label="更新公告">

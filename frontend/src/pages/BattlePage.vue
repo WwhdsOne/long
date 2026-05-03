@@ -20,6 +20,9 @@ const {
   leaderboard,
   nickname,
   loading,
+  syncing,
+  syncLabel,
+  lastUpdatedAt,
   errorMessage,
   pendingKeys,
   damageBursts,
@@ -571,6 +574,27 @@ const silverStormActive = computed(() => {
 
 <template>
   <div class="battle-page-hud">
+  <section class="battle-page-hud__hero" aria-label="战斗状态">
+    <div class="battle-page-hud__copy">
+      <p class="vote-stage__eyebrow">Room Combat HUD</p>
+      <h1>战斗指挥中枢</h1>
+      <div class="boss-hud__chips">
+        <span>{{ currentRoomDisplay }}</span>
+        <span>在线同步</span>
+        <span>房间战线</span>
+      </div>
+    </div>
+
+    <div class="battle-page-hud__status">
+      <span class="live-pill" :class="{ 'live-pill--syncing': syncing }">
+        <span class="live-pill__dot"></span>
+        {{ syncLabel }}
+      </span>
+      <span class="battle-page-hud__time">最近刷新 {{ lastUpdatedAt || '--:--:--' }}</span>
+      <a class="battle-page-hud__admin-link" href="/admin">管理后台</a>
+    </div>
+  </section>
+
   <section class="stats-band stats-band--wide" aria-label="实时统计">
     <article class="stats-band__card">
       <span class="stats-band__label">Boss 部位</span>
