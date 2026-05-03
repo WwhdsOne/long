@@ -76,3 +76,25 @@ jobs:
           EOF
 
           tar -C release -czf release.tar.gz .
+
+      - name: Upload to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "release.tar.gz"
+          target: ${{ env.DEPLOY_PATH }}
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            cd ${{ env.DEPLOY_PATH }}
+            tar -xzf release.tar.gz
+            docker-compose up -d --build
