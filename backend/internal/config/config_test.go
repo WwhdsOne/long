@@ -63,6 +63,11 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               connect_timeout_ms: 3000
               write_timeout_ms: 2000
               read_timeout_ms: 4000
+            room:
+              enabled: true
+              ids: ["1", "2", "2", " "]
+              default_room: "2"
+              switch_cooldown_seconds: 300
         `))
 
 		w.Header().Set("X-Consul-Index", "7")
@@ -148,6 +153,18 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.Mongo.ReadTimeout != 4*time.Second {
 		t.Fatalf("expected mongo read timeout 4s, got %s", cfg.Mongo.ReadTimeout)
+	}
+	if !cfg.Room.Enabled {
+		t.Fatal("expected room enabled")
+	}
+	if len(cfg.Room.IDs) != 2 || cfg.Room.IDs[0] != "1" || cfg.Room.IDs[1] != "2" {
+		t.Fatalf("expected normalized room ids [1 2], got %+v", cfg.Room.IDs)
+	}
+	if cfg.Room.DefaultRoom != "2" {
+		t.Fatalf("expected default room 2, got %q", cfg.Room.DefaultRoom)
+	}
+	if cfg.Room.SwitchCooldown != 5*time.Minute {
+		t.Fatalf("expected room switch cooldown 5m, got %s", cfg.Room.SwitchCooldown)
 	}
 }
 

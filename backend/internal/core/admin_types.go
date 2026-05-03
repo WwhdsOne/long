@@ -2,6 +2,8 @@ package core
 
 // AdminState 管理后台聚合状态
 type AdminState struct {
+	RoomID            string                 `json:"roomId,omitempty"`
+	QueueID           string                 `json:"queueId,omitempty"`
 	Boss              *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard   []BossLeaderboardEntry `json:"bossLeaderboard"`
 	Equipment         []EquipmentDefinition  `json:"equipment,omitempty"`
@@ -32,6 +34,7 @@ type AdminPlayerPage struct {
 // BossUpsert 管理后台 Boss 启动载荷
 type BossUpsert struct {
 	ID                 string     `json:"id"`
+	RoomID             string     `json:"roomId,omitempty"`
 	Name               string     `json:"name"`
 	MaxHP              int64      `json:"maxHp"`
 	GoldOnKill         int64      `json:"goldOnKill"`

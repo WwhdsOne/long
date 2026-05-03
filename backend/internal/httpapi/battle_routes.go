@@ -6,6 +6,8 @@ import (
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/hertz/pkg/route"
+
+	"long/internal/core"
 )
 
 func registerBattleRoutes(router route.IRouter, options Options) {
@@ -23,6 +25,7 @@ func registerBattleRoutes(router route.IRouter, options Options) {
 		payload := map[string]any{
 			"totalVotes":          state.TotalVotes,
 			"leaderboard":         state.Leaderboard,
+			"roomId":              state.RoomID,
 			"boss":                state.Boss,
 			"bossLeaderboard":     state.BossLeaderboard,
 			"bossLoot":            state.BossLoot,
@@ -37,7 +40,13 @@ func registerBattleRoutes(router route.IRouter, options Options) {
 			"talentPoints":        state.TalentPoints,
 			"recentRewards":       state.RecentRewards,
 		}
-		if resources, err := options.Store.GetBossResources(ctx); err == nil {
+		resources, err := options.Store.GetBossResources(ctx)
+		if reader, ok := options.Store.(interface {
+			GetBossResourcesForNickname(context.Context, string) (core.BossResources, error)
+		}); ok {
+			resources, err = reader.GetBossResourcesForNickname(ctx, nickname)
+		}
+		if err == nil {
 			payload["bossLoot"] = resources.BossLoot
 			payload["bossGoldRange"] = resources.GoldRange
 			payload["bossStoneRange"] = resources.StoneRange

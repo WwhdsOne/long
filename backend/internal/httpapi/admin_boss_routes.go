@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -24,7 +25,16 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		boss, err := options.Store.ActivateBoss(ctx, body)
+		roomID := strings.TrimSpace(firstNonEmptyString(body.RoomID, c.Query("roomId")))
+		var boss *core.Boss
+		var err error
+		if store, ok := options.Store.(interface {
+			ActivateBossInRoom(context.Context, string, core.BossUpsert) (*core.Boss, error)
+		}); ok {
+			boss, err = store.ActivateBossInRoom(ctx, roomID, body)
+		} else {
+			boss, err = options.Store.ActivateBoss(ctx, body)
+		}
 		if err != nil {
 			if errors.Is(err, core.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
@@ -39,12 +49,16 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		publishChange(ctx, options.ChangePublisher, core.StateChange{
 			Type:             core.StateChangeBossChanged,
+			RoomID:           boss.RoomID,
+			QueueID:          boss.QueueID,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
 		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.activate",
+			RoomID:      boss.RoomID,
+			QueueID:     boss.QueueID,
 			TargetType:  "boss",
 			TargetID:    boss.ID,
 			RequestPath: requestPath(c),
@@ -54,6 +68,8 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "boss.activated",
 			BossID:    boss.ID,
+			RoomID:    boss.RoomID,
+			QueueID:   boss.QueueID,
 			Payload: map[string]any{
 				"name": boss.Name,
 			},
@@ -67,19 +83,30 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		if err := options.Store.DeactivateBoss(ctx); err != nil {
+		roomID := strings.TrimSpace(c.Query("roomId"))
+		var err error
+		if store, ok := options.Store.(interface {
+			DeactivateBossInRoom(context.Context, string) error
+		}); ok {
+			err = store.DeactivateBossInRoom(ctx, roomID)
+		} else {
+			err = options.Store.DeactivateBoss(ctx)
+		}
+		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_DEACTIVATE_FAILED"})
 			return
 		}
 
 		publishChange(ctx, options.ChangePublisher, core.StateChange{
 			Type:             core.StateChangeBossChanged,
+			RoomID:           roomID,
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
 		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.deactivate",
+			RoomID:      roomID,
 			TargetType:  "boss",
 			RequestPath: requestPath(c),
 			RequestIP:   requestIP(c),
@@ -87,6 +114,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 		})
 		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
 			EventType: "boss.deactivated",
+			RoomID:    roomID,
 			Payload: map[string]any{
 				"operator": options.AdminAuthenticator.Username(),
 			},
@@ -244,7 +272,16 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		boss, err := options.Store.SetBossCycleEnabled(ctx, true)
+		roomID := strings.TrimSpace(c.Query("roomId"))
+		var boss *core.Boss
+		var err error
+		if store, ok := options.Store.(interface {
+			SetBossCycleEnabledForRoom(context.Context, string, bool) (*core.Boss, error)
+		}); ok {
+			boss, err = store.SetBossCycleEnabledForRoom(ctx, roomID, true)
+		} else {
+			boss, err = options.Store.SetBossCycleEnabled(ctx, true)
+		}
 		if err != nil {
 			if errors.Is(err, core.ErrBossPoolEmpty) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
@@ -273,12 +310,14 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		publishChange(ctx, options.ChangePublisher, core.StateChange{
 			Type:             core.StateChangeBossChanged,
+			RoomID:           roomIDFromBossOrRequest(boss, roomID),
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
 		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.cycle.enable",
+			RoomID:      roomIDFromBossOrRequest(boss, roomID),
 			RequestPath: requestPath(c),
 			RequestIP:   requestIP(c),
 			Result:      "success",
@@ -293,13 +332,23 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 		}
 
 		var body struct {
+			RoomID      string   `json:"roomId"`
 			TemplateIDs []string `json:"templateIds"`
 		}
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
 
-		queue, err := options.Store.SetBossCycleQueue(ctx, body.TemplateIDs)
+		roomID := strings.TrimSpace(firstNonEmptyString(body.RoomID, c.Query("roomId")))
+		var queue []string
+		var err error
+		if store, ok := options.Store.(interface {
+			SetBossCycleQueueForRoom(context.Context, string, []string) ([]string, error)
+		}); ok {
+			queue, err = store.SetBossCycleQueueForRoom(ctx, roomID, body.TemplateIDs)
+		} else {
+			queue, err = options.Store.SetBossCycleQueue(ctx, body.TemplateIDs)
+		}
 		if err != nil {
 			if errors.Is(err, core.ErrBossTemplateNotFound) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
@@ -314,6 +363,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		writeJSON(c, consts.StatusOK, map[string]any{
 			"ok":          true,
+			"roomId":      roomID,
 			"templateIds": queue,
 		})
 	})
@@ -324,7 +374,16 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		boss, err := options.Store.SetBossCycleEnabled(ctx, false)
+		roomID := strings.TrimSpace(c.Query("roomId"))
+		var boss *core.Boss
+		var err error
+		if store, ok := options.Store.(interface {
+			SetBossCycleEnabledForRoom(context.Context, string, bool) (*core.Boss, error)
+		}); ok {
+			boss, err = store.SetBossCycleEnabledForRoom(ctx, roomID, false)
+		} else {
+			boss, err = options.Store.SetBossCycleEnabled(ctx, false)
+		}
 		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_CYCLE_DISABLE_FAILED"})
 			return
@@ -332,12 +391,14 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		publishChange(ctx, options.ChangePublisher, core.StateChange{
 			Type:             core.StateChangeBossChanged,
+			RoomID:           roomIDFromBossOrRequest(boss, roomID),
 			BroadcastUserAll: true,
 			Timestamp:        time.Now().Unix(),
 		})
 		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.cycle.disable",
+			RoomID:      roomIDFromBossOrRequest(boss, roomID),
 			RequestPath: requestPath(c),
 			RequestIP:   requestIP(c),
 			Result:      "success",
@@ -369,4 +430,21 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 
 		writeJSON(c, consts.StatusOK, history)
 	})
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func roomIDFromBossOrRequest(boss *core.Boss, fallback string) string {
+	if boss != nil && strings.TrimSpace(boss.RoomID) != "" {
+		return strings.TrimSpace(boss.RoomID)
+	}
+	return strings.TrimSpace(fallback)
 }

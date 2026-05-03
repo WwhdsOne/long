@@ -95,6 +95,11 @@ func registerAdminOverviewRoutes(router route.IRouter, options Options) {
 		}
 
 		state, err := options.Store.GetAdminState(ctx)
+		if store, ok := options.Store.(interface {
+			GetAdminStateForRoom(context.Context, string) (core.AdminState, error)
+		}); ok {
+			state, err = store.GetAdminStateForRoom(ctx, c.Query("roomId"))
+		}
 		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ADMIN_STATE_FAILED"})
 			return

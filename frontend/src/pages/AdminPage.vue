@@ -64,6 +64,15 @@ const admin = reactive(useAdminPage())
         </div>
 
         <div class="admin-toolbar__actions">
+          <label class="admin-room-select">
+            <span>房间</span>
+            <select class="nickname-form__input" :value="admin.adminRoomId" @change="admin.switchAdminRoom($event.target.value)">
+              <option v-if="!admin.adminRooms.length" :value="admin.adminRoomId">房间 {{ admin.adminRoomId }}</option>
+              <option v-for="room in admin.adminRooms" :key="room.id" :value="room.id">
+                房间 {{ room.id }}{{ room.cycleEnabled ? ' · 循环中' : '' }}
+              </option>
+            </select>
+          </label>
           <button class="nickname-form__ghost" type="button" @click="admin.refreshAll">刷新数据</button>
           <button class="nickname-form__ghost" type="button" @click="admin.logout">退出后台</button>
         </div>

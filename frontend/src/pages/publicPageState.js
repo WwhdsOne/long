@@ -122,6 +122,10 @@ const publicPages = [
 const buttonTotalVotes = ref(0)
 const leaderboard = ref([])
 const boss = ref(null)
+const currentRoomId = ref('1')
+const rooms = ref([])
+const roomSwitching = ref(false)
+const roomError = ref('')
 
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
@@ -137,6 +141,7 @@ const bossLeaderboardCountValue = ref(-1)
 const inventory = ref([])
 const tasks = ref([])
 const hasClaimableTasks = computed(() => tasks.value.some((item) => Boolean(item?.canClaim)))
+const currentRoom = computed(() => rooms.value.find((item) => item.id === currentRoomId.value) || null)
 const loadout = ref(emptyLoadout())
 const combatStats = ref(defaultCombatStats())
 const recentRewards = ref([])
@@ -1201,7 +1206,8 @@ async function loadBossResources(force = false) {
 
     loadingBossResources.value = true
     try {
-        const response = await fetch('/api/boss/resources')
+        const resourcesUrl = nickname.value ? `/api/boss/resources?nickname=${encodeURIComponent(nickname.value)}` : '/api/boss/resources'
+        const response = await fetch(resourcesUrl)
         if (!response.ok) {
             throw new Error(await readErrorMessage(response, 'Boss 掉落池加载失败'))
         }
@@ -1418,6 +1424,9 @@ function applyPublicState(payload) {
     if ('leaderboard' in payload) {
         leaderboard.value = Array.isArray(payload.leaderboard) ? payload.leaderboard : []
     }
+    if ('roomId' in payload) {
+        currentRoomId.value = String(payload.roomId || currentRoomId.value || '1')
+    }
     const previousBoss = boss.value
     if ('boss' in payload) {
         boss.value = mergeBossState(boss.value, payload.boss)
@@ -1484,6 +1493,9 @@ function applyBattleUserState(payload) {
         return
     }
     const hasGold = 'gold' in payload
+    if ('roomId' in payload) {
+        currentRoomId.value = String(payload.roomId || currentRoomId.value || '1')
+    }
     const hasStones = 'stones' in payload
     const hasTalentPoints = 'talentPoints' in payload
     const nextGold = hasGold ? Number(payload.gold ?? 0) : gold.value
@@ -2292,7 +2304,8 @@ async function loadState() {
     syncing.value = true
 
     try {
-        const response = await fetch('/api/battle/state')
+        const stateUrl = nickname.value ? `/api/battle/state?nickname=${encodeURIComponent(nickname.value)}` : '/api/battle/state'
+        const response = await fetch(stateUrl)
         if (!response.ok) {
             throw new Error('战斗状态加载失败')
         }
@@ -2304,6 +2317,68 @@ async function loadState() {
     } finally {
         loading.value = false
         syncing.value = false
+    }
+}
+
+async function loadRooms() {
+    try {
+        const roomsUrl = nickname.value ? `/api/rooms?nickname=${encodeURIComponent(nickname.value)}` : '/api/rooms'
+        const response = await fetch(roomsUrl)
+        if (!response.ok) {
+            throw new Error('房间列表加载失败')
+        }
+        const payload = await response.json()
+        currentRoomId.value = String(payload?.currentRoomId || currentRoomId.value || '1')
+        rooms.value = Array.isArray(payload?.rooms) ? payload.rooms : []
+        roomError.value = ''
+    } catch (error) {
+        roomError.value = error.message || '房间列表加载失败。'
+    }
+}
+
+async function joinRoom(roomId) {
+    const targetRoomId = String(roomId || '').trim()
+    if (!nickname.value) {
+        roomError.value = '请先登录后再切换房间。'
+        return {ok: false, message: roomError.value}
+    }
+    if (!targetRoomId || targetRoomId === currentRoomId.value) {
+        return {ok: true}
+    }
+    const targetRoom = rooms.value.find((item) => item.id === targetRoomId)
+    if (targetRoom && targetRoom.joinable === false) {
+        roomError.value = '这个房间暂时不可加入。'
+        return {ok: false, message: roomError.value}
+    }
+
+    roomSwitching.value = true
+    roomError.value = ''
+    try {
+        const response = await fetch('/api/rooms/join', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                nickname: nickname.value,
+                roomId: targetRoomId,
+            }),
+        })
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}))
+            const message = payload?.message || (payload?.error === 'ROOM_SWITCH_COOLDOWN' ? '切房冷却中。' : '切换房间失败。')
+            throw new Error(message)
+        }
+        const payload = await response.json()
+        currentRoomId.value = String(payload?.currentRoomId || targetRoomId)
+        rooms.value = Array.isArray(payload?.rooms) ? payload.rooms : rooms.value
+        connectRealtime(nickname.value)
+        await loadState()
+        await loadRooms()
+        return {ok: true}
+    } catch (error) {
+        roomError.value = error.message || '切换房间失败。'
+        return {ok: false, message: roomError.value}
+    } finally {
+        roomSwitching.value = false
     }
 }
 
@@ -2537,6 +2612,7 @@ async function submitNickname() {
         }
         startPresenceHeartbeat()
         startTaskPolling()
+        await loadRooms()
         connectRealtime(resolvedNickname)
     } catch (error) {
         errorMessage.value = error.message || '登录失败，请稍后重试。'
@@ -2558,6 +2634,7 @@ async function resetNickname() {
     if (currentPublicPage.value === 'shop') {
         void loadShopItems()
     }
+    void loadRooms()
     connectRealtime('')
 }
 
@@ -2703,6 +2780,7 @@ function registerPublicPageLifecycle() {
          startTalentTick()
          await loadPlayerSession()
         await loadState()
+        await loadRooms()
         await activatePublicPage(currentPublicPage.value)
         connectRealtime(nickname.value)
         document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -2742,6 +2820,11 @@ export function usePublicPageState() {
         buttonTotalVotes,
         leaderboard,
         boss,
+        currentRoomId,
+        currentRoom,
+        rooms,
+        roomSwitching,
+        roomError,
         bossLeaderboard,
         bossLoot,
         bossGoldRange,
@@ -2864,6 +2947,8 @@ export function usePublicPageState() {
         equipShopItem,
         unequipShopItem,
         toggleAutoClick,
+        loadRooms,
+        joinRoom,
         clickButton,
         toggleItemEquip,
         salvageItem,

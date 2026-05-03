@@ -34,6 +34,9 @@ func (s *DomainEventStore) EnsureIndexes(ctx context.Context) error {
 		{Keys: bson.D{{Key: "created_at", Value: -1}}, Options: options.Index().SetName("created_at_desc")},
 		{Keys: bson.D{{Key: "event_type", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("event_type_created_at_desc")},
 		{Keys: bson.D{{Key: "boss_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("boss_id_created_at_desc")},
+		{Keys: bson.D{{Key: "room_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("room_id_created_at_desc")},
+		{Keys: bson.D{{Key: "queue_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("queue_id_created_at_desc")},
+		{Keys: bson.D{{Key: "room_id", Value: 1}, {Key: "queue_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("room_queue_created_at_desc")},
 		{Keys: bson.D{{Key: "nickname", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("nickname_created_at_desc")},
 	})
 	return err
@@ -49,6 +52,8 @@ func (s *DomainEventStore) WriteDomainEvent(ctx context.Context, item core.Domai
 		"event_type": item.EventType,
 		"nickname":   item.Nickname,
 		"boss_id":    item.BossID,
+		"room_id":    item.RoomID,
+		"queue_id":   item.QueueID,
 		"item_id":    item.ItemID,
 		"payload":    item.Payload,
 		"created_at": item.CreatedAt,

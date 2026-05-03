@@ -3,6 +3,7 @@ export function createAdminPageActions(state) {
     activeTab,
     addLootRow,
     adminState,
+    adminRoomId,
     announcementForm,
     applyLootRows,
     bossCycleEnabled,
@@ -44,6 +45,15 @@ export function createAdminPageActions(state) {
     taskDefinitions,
     taskForm,
   } = state
+
+  function currentAdminRoomId() {
+    return String(adminRoomId?.value || adminState.value?.roomId || '1').trim() || '1'
+  }
+
+  function withAdminRoom(url) {
+    const joiner = url.includes('?') ? '&' : '?'
+    return `${url}${joiner}roomId=${encodeURIComponent(currentAdminRoomId())}`
+  }
 
   async function postAction(url, successTip, fallback) {
     saving.value = true
@@ -223,24 +233,24 @@ export function createAdminPageActions(state) {
   }
 
   async function deactivateBoss() {
-    await postAction('/api/admin/boss/deactivate', bossCycleEnabled.value ? '当前 Boss 已跳过，循环会继续补位。' : '当前 Boss 已关闭。', '关闭 Boss 失败')
+    await postAction(withAdminRoom('/api/admin/boss/deactivate'), bossCycleEnabled.value ? '当前 Boss 已跳过，循环会继续补位。' : '当前 Boss 已关闭。', '关闭 Boss 失败')
   }
 
   async function enableBossCycle() {
-    await postAction('/api/admin/boss/cycle/enable', 'Boss 循环已开启。', '开启 Boss 循环失败')
+    await postAction(withAdminRoom('/api/admin/boss/cycle/enable'), 'Boss 循环已开启。', '开启 Boss 循环失败')
   }
 
   async function disableBossCycle() {
-    await postAction('/api/admin/boss/cycle/disable', 'Boss 循环已停止，当前 Boss 不会自动续上。', '停止 Boss 循环失败')
+    await postAction(withAdminRoom('/api/admin/boss/cycle/disable'), 'Boss 循环已停止，当前 Boss 不会自动续上。', '停止 Boss 循环失败')
   }
 
   async function saveBossCycleQueue(templateIds) {
     saving.value = true
     try {
-      const response = await fetch('/api/admin/boss/cycle/queue', {
+      const response = await fetch(withAdminRoom('/api/admin/boss/cycle/queue'), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateIds }),
+        body: JSON.stringify({ roomId: currentAdminRoomId(), templateIds }),
       })
       if (!response.ok) {
         throw new Error(await readErrorMessage(response, '保存 Boss 循环队列失败'))

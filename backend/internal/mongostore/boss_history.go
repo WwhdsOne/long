@@ -17,6 +17,8 @@ const bossHistoryCollectionName = "boss_history"
 type bossHistoryDocument struct {
 	BossID             string                      `bson:"boss_id"`
 	TemplateID         string                      `bson:"template_id,omitempty"`
+	RoomID             string                      `bson:"room_id,omitempty"`
+	QueueID            string                      `bson:"queue_id,omitempty"`
 	Name               string                      `bson:"name"`
 	Status             string                      `bson:"status"`
 	MaxHP              int64                       `bson:"max_hp"`
@@ -67,6 +69,18 @@ func (s *BossHistoryStore) EnsureIndexes(ctx context.Context) error {
 			Keys:    bson.D{{Key: "template_id", Value: 1}, {Key: "started_at", Value: -1}},
 			Options: options.Index().SetName("template_started_at_desc"),
 		},
+		{
+			Keys:    bson.D{{Key: "room_id", Value: 1}, {Key: "started_at", Value: -1}},
+			Options: options.Index().SetName("room_started_at_desc"),
+		},
+		{
+			Keys:    bson.D{{Key: "queue_id", Value: 1}, {Key: "started_at", Value: -1}},
+			Options: options.Index().SetName("queue_started_at_desc"),
+		},
+		{
+			Keys:    bson.D{{Key: "room_id", Value: 1}, {Key: "queue_id", Value: 1}, {Key: "started_at", Value: -1}},
+			Options: options.Index().SetName("room_queue_started_at_desc"),
+		},
 	})
 	return err
 }
@@ -86,6 +100,8 @@ func (s *BossHistoryStore) SaveBossHistory(ctx context.Context, entry core.BossH
 	doc := bossHistoryDocument{
 		BossID:             entry.ID,
 		TemplateID:         entry.TemplateID,
+		RoomID:             entry.RoomID,
+		QueueID:            entry.QueueID,
 		Name:               entry.Name,
 		Status:             entry.Status,
 		MaxHP:              entry.MaxHP,
@@ -146,6 +162,8 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 			Boss: core.Boss{
 				ID:                 doc.BossID,
 				TemplateID:         doc.TemplateID,
+				RoomID:             doc.RoomID,
+				QueueID:            doc.QueueID,
 				Name:               doc.Name,
 				Status:             doc.Status,
 				MaxHP:              doc.MaxHP,

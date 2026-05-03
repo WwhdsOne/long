@@ -5,6 +5,8 @@ export { EQUIPMENT_SLOTS }
 
 export function emptyAdminState() {
   return {
+    roomId: '1',
+    queueId: '1',
     boss: null,
     bossLeaderboard: [],
     loot: [],
@@ -253,6 +255,8 @@ export function normalizeBossTemplate(entry) {
 
 export function normalizeAdminState(payload) {
   return {
+    roomId: String(payload?.roomId || '1'),
+    queueId: String(payload?.queueId || payload?.roomId || '1'),
     boss: payload?.boss ?? null,
     bossLeaderboard: Array.isArray(payload?.bossLeaderboard) ? payload.bossLeaderboard : [],
     loot: Array.isArray(payload?.loot) ? payload.loot.map(normalizeLootEntry) : [],

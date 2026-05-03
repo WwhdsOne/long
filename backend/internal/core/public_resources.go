@@ -8,7 +8,21 @@ import (
 
 // GetBossResources 返回当前 Boss 的低频公共资源。
 func (s *Store) GetBossResources(ctx context.Context) (BossResources, error) {
-	boss, err := s.currentBoss(ctx)
+	return s.GetBossResourcesForRoom(ctx, s.defaultRoomID())
+}
+
+// GetBossResourcesForNickname 返回玩家当前房间的低频公共资源。
+func (s *Store) GetBossResourcesForNickname(ctx context.Context, nickname string) (BossResources, error) {
+	roomID, err := s.ResolvePlayerRoom(ctx, nickname)
+	if err != nil {
+		return BossResources{}, err
+	}
+	return s.GetBossResourcesForRoom(ctx, roomID)
+}
+
+// GetBossResourcesForRoom 返回指定房间当前 Boss 的低频公共资源。
+func (s *Store) GetBossResourcesForRoom(ctx context.Context, roomID string) (BossResources, error) {
+	boss, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return BossResources{}, err
 	}
@@ -28,6 +42,7 @@ func (s *Store) GetBossResources(ctx context.Context) (BossResources, error) {
 	return BossResources{
 		BossID:     boss.ID,
 		TemplateID: boss.TemplateID,
+		RoomID:     boss.RoomID,
 		Status:     boss.Status,
 		GoldRange: ResourceRange{
 			Min: int64(math.Floor(float64(maxInt64(0, boss.GoldOnKill)) * 0.75)),

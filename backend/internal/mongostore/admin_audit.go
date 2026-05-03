@@ -34,6 +34,9 @@ func (s *AdminAuditStore) EnsureIndexes(ctx context.Context) error {
 		{Keys: bson.D{{Key: "created_at", Value: -1}}, Options: options.Index().SetName("created_at_desc")},
 		{Keys: bson.D{{Key: "operator", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("operator_created_at_desc")},
 		{Keys: bson.D{{Key: "action", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("action_created_at_desc")},
+		{Keys: bson.D{{Key: "room_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("room_id_created_at_desc")},
+		{Keys: bson.D{{Key: "queue_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("queue_id_created_at_desc")},
+		{Keys: bson.D{{Key: "room_id", Value: 1}, {Key: "queue_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("room_queue_created_at_desc")},
 	})
 	return err
 }
@@ -47,6 +50,8 @@ func (s *AdminAuditStore) WriteAdminAuditLog(ctx context.Context, item core.Admi
 	_, err := s.collection.InsertOne(writeCtx, bson.M{
 		"operator":        item.Operator,
 		"action":          item.Action,
+		"room_id":         item.RoomID,
+		"queue_id":        item.QueueID,
 		"target_type":     item.TargetType,
 		"target_id":       item.TargetID,
 		"request_path":    item.RequestPath,

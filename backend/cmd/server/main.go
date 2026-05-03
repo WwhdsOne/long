@@ -14,8 +14,8 @@ import (
 	"syscall"
 	"time"
 
-	_ "time/tzdata"                            // 时区数据库（嵌入 Go 二进制）
 	_ "golang.org/x/crypto/x509roots/fallback" // Mozilla 根证书（嵌入 Go 二进制）
+	_ "time/tzdata"                            // 时区数据库（嵌入 Go 二进制）
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/redis/go-redis/v9"
@@ -228,6 +228,12 @@ func run() error {
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := core.NewStore(redisClient, cfg.RedisPrefix, core.StoreOptions{
 		CriticalChancePercent: 5,
+		Room: core.RoomConfig{
+			Enabled:        cfg.Room.Enabled,
+			IDs:            cfg.Room.IDs,
+			DefaultRoom:    cfg.Room.DefaultRoom,
+			SwitchCooldown: cfg.Room.SwitchCooldown,
+		},
 		BossHistoryStore:      bossHistoryStore,
 		BossHistoryArchiver:   bossHistoryQueue,
 		MessageStore:          mongoMessageStore,

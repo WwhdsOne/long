@@ -77,14 +77,7 @@ func (d *Dispatcher) flushPublic() {
 	d.mu.Unlock()
 
 	ctx := context.Background()
-	snapshot, err := d.cache.RefreshSnapshot(ctx)
-	if err != nil {
-		return
-	}
-	if snapshot.Boss != nil {
-		_, _ = d.cache.RefreshBossResources(ctx)
-	}
-	_ = d.hub.BroadcastPublic(snapshot, false)
+	_ = d.broadcastPublic(ctx, false)
 }
 
 // BroadcastLeaderboard 主动广播一份带点击总榜的公共态。
@@ -93,6 +86,10 @@ func (d *Dispatcher) BroadcastLeaderboard(ctx context.Context) error {
 		return nil
 	}
 
+	return d.broadcastPublic(ctx, true)
+}
+
+func (d *Dispatcher) broadcastPublic(ctx context.Context, includeLeaderboard bool) error {
 	snapshot, err := d.cache.RefreshSnapshot(ctx)
 	if err != nil {
 		return err
@@ -100,7 +97,20 @@ func (d *Dispatcher) BroadcastLeaderboard(ctx context.Context) error {
 	if snapshot.Boss != nil {
 		_, _ = d.cache.RefreshBossResources(ctx)
 	}
-	return d.hub.BroadcastPublic(snapshot, true)
+	if err := d.hub.BroadcastPublic(snapshot, includeLeaderboard); err != nil {
+		return err
+	}
+
+	for _, nickname := range d.hub.ActiveNicknames() {
+		snapshot, err := d.cache.GetSnapshotForNickname(ctx, nickname)
+		if err != nil {
+			return err
+		}
+		if err := d.hub.BroadcastPublicTo(nickname, snapshot, includeLeaderboard); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func affectsPublicState(changeType core.StateChangeType) bool {

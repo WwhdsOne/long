@@ -21,6 +21,8 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 	values := map[string]any{
 		"id":                    boss.ID,
 		"name":                  boss.Name,
+		"room_id":               boss.RoomID,
+		"queue_id":              boss.QueueID,
 		"status":                boss.Status,
 		"max_hp":                strconv.FormatInt(boss.MaxHP, 10),
 		"current_hp":            strconv.FormatInt(boss.CurrentHP, 10),
@@ -44,6 +46,8 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 		Boss: Boss{
 			ID:                 boss.ID,
 			TemplateID:         boss.TemplateID,
+			RoomID:             boss.RoomID,
+			QueueID:            boss.QueueID,
 			Name:               boss.Name,
 			Status:             boss.Status,
 			MaxHP:              boss.MaxHP,

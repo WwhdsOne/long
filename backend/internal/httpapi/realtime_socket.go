@@ -55,6 +55,7 @@ type realtimeDeltaMessage struct {
 type realtimeSnapshotUser struct {
 	UserStats                          *core.UserStats     `json:"userStats,omitempty"`
 	MyBossStats                        *core.BossUserStats `json:"myBossStats,omitempty"`
+	RoomID                             string              `json:"roomId,omitempty"`
 	Loadout                            core.Loadout        `json:"loadout"`
 	CombatStats                        core.CombatStats    `json:"combatStats"`
 	Gold                               int64               `json:"gold"`
@@ -263,6 +264,7 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 		change := core.StateChange{
 			Type:      core.StateChangeButtonClicked,
 			Nickname:  nickname,
+			RoomID:    result.RoomID,
 			Timestamp: time.Now().Unix(),
 		}
 		if result.BroadcastUserAll {
@@ -310,6 +312,13 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(any) error
 	}
 
 	snapshot, err := s.stateView.GetSnapshot(ctx)
+	if s.nickname != "" {
+		if reader, ok := s.stateView.(interface {
+			GetSnapshotForNickname(context.Context, string) (core.Snapshot, error)
+		}); ok {
+			snapshot, err = reader.GetSnapshotForNickname(ctx, s.nickname)
+		}
+	}
 	if err != nil {
 		return send(s.protocolError(realtimeErrorCodeStateFetchFail, "实时状态同步失败，请稍后重试。"))
 	}
@@ -335,6 +344,7 @@ func buildRealtimeSnapshotUser(state core.UserState) realtimeSnapshotUser {
 	return realtimeSnapshotUser{
 		UserStats:                          state.UserStats,
 		MyBossStats:                        state.MyBossStats,
+		RoomID:                             state.RoomID,
 		Loadout:                            state.Loadout,
 		CombatStats:                        state.CombatStats,
 		Gold:                               state.Gold,

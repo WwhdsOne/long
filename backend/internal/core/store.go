@@ -116,6 +116,8 @@ type BossPart struct {
 type Boss struct {
 	ID                 string     `json:"id"`
 	TemplateID         string     `json:"templateId,omitempty"`
+	RoomID             string     `json:"roomId,omitempty"`
+	QueueID            string     `json:"queueId,omitempty"`
 	Name               string     `json:"name"`
 	Status             string     `json:"status"`
 	MaxHP              int64      `json:"maxHp"`
@@ -295,6 +297,7 @@ type BossLootEntry struct {
 type BossResources struct {
 	BossID             string          `json:"bossId,omitempty"`
 	TemplateID         string          `json:"templateId,omitempty"`
+	RoomID             string          `json:"roomId,omitempty"`
 	Status             string          `json:"status,omitempty"`
 	GoldRange          ResourceRange   `json:"goldRange"`
 	StoneRange         ResourceRange   `json:"stoneRange"`
@@ -312,6 +315,7 @@ type ResourceRange struct {
 type Snapshot struct {
 	TotalVotes          int64                  `json:"totalVotes"`
 	Leaderboard         []LeaderboardEntry     `json:"leaderboard"`
+	RoomID              string                 `json:"roomId,omitempty"`
 	Boss                *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard     []BossLeaderboardEntry `json:"bossLeaderboard"`
 	AnnouncementVersion string                 `json:"announcementVersion,omitempty"`
@@ -321,6 +325,7 @@ type Snapshot struct {
 type UserState struct {
 	UserStats                          *UserStats           `json:"userStats,omitempty"`
 	MyBossStats                        *BossUserStats       `json:"myBossStats,omitempty"`
+	RoomID                             string               `json:"roomId,omitempty"`
 	Inventory                          []InventoryItem      `json:"inventory"`
 	Loadout                            Loadout              `json:"loadout"`
 	CombatStats                        CombatStats          `json:"combatStats"`
@@ -340,6 +345,7 @@ type State struct {
 	TotalVotes                         int64                  `json:"totalVotes"`
 	Leaderboard                        []LeaderboardEntry     `json:"leaderboard"`
 	UserStats                          *UserStats             `json:"userStats,omitempty"`
+	RoomID                             string                 `json:"roomId,omitempty"`
 	Boss                               *Boss                  `json:"boss,omitempty"`
 	BossLeaderboard                    []BossLeaderboardEntry `json:"bossLeaderboard"`
 	BossLoot                           []BossLootEntry        `json:"bossLoot,omitempty"`
@@ -395,6 +401,7 @@ type BulkSalvageResult struct {
 // ClickResult 点击结果，包含更新后的增量与状态摘要
 type ClickResult struct {
 	Delta                int64                  `json:"delta"`
+	RoomID               string                 `json:"roomId,omitempty"`
 	BossDamage           int64                  `json:"bossDamage,omitempty"`
 	MyBossDamage         int64                  `json:"myBossDamage,omitempty"`
 	BossLeaderboardCount int                    `json:"bossLeaderboardCount,omitempty"`
@@ -449,6 +456,8 @@ const (
 type StateChange struct {
 	Type             StateChangeType `json:"type"`
 	Nickname         string          `json:"nickname,omitempty"`
+	RoomID           string          `json:"roomId,omitempty"`
+	QueueID          string          `json:"queueId,omitempty"`
 	BroadcastUserAll bool            `json:"broadcastUserAll,omitempty"`
 	Timestamp        int64           `json:"timestamp"`
 }
@@ -456,6 +465,7 @@ type StateChange struct {
 // StoreOptions 暴击机制配置
 type StoreOptions struct {
 	CriticalChancePercent int
+	Room                  RoomConfig
 	BossHistoryArchiver   interface{ Enqueue(BossHistoryEntry) bool }
 	BossHistoryStore      interface {
 		SaveBossHistory(context.Context, BossHistoryEntry) error
@@ -513,6 +523,8 @@ type Store struct {
 	bossTemplatePrefix            string
 	bossCycleKey                  string
 	bossInstanceSeqKey            string
+	playerRoomPrefix              string
+	playerRoomCooldownPrefix      string
 	announcementSeqKey            string
 	announcementKey               string
 	announcementPrefix            string
@@ -533,6 +545,7 @@ type Store struct {
 	taskProgressPrefix            string
 	taskParticipantsPrefix        string
 	critical                      StoreOptions
+	roomConfig                    RoomConfig
 	luaRunner                     luaScriptRunner
 	clickCountScript              *cachedLuaScript
 	bossClickScript               *cachedLuaScript
@@ -589,6 +602,7 @@ type Store struct {
 // NewStore 创建 Redis 投票存储实例
 func NewStore(client redis.UniversalClient, namespace string, options StoreOptions, validator interface{ Validate(string) error }) *Store {
 	luaCache := newLuaScriptCache()
+	roomConfig := normalizeRoomConfig(options.Room)
 
 	return &Store{
 		client:                        client,
@@ -605,6 +619,8 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		bossTemplatePrefix:            namespace + "boss:pool:",
 		bossCycleKey:                  namespace + "boss:cycle",
 		bossInstanceSeqKey:            namespace + "boss:instance:seq",
+		playerRoomPrefix:              namespace + "player:room:",
+		playerRoomCooldownPrefix:      namespace + "player:room:cd:",
 		announcementSeqKey:            namespace + "announcement:seq",
 		announcementKey:               namespace + "announcements",
 		announcementPrefix:            namespace + "announcement:",
@@ -625,6 +641,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		taskProgressPrefix:            namespace + "task:progress:",
 		taskParticipantsPrefix:        namespace + "task:participants:",
 		critical:                      options,
+		roomConfig:                    roomConfig,
 		luaRunner: redisLuaRunner{
 			client: client,
 		},
@@ -712,6 +729,21 @@ func (s *Store) ValidateNickname(_ context.Context, nickname string) error {
 
 // GetSnapshot 获取公共快照（公共排行榜 + Boss 状态）
 func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
+	return s.GetSnapshotForRoom(ctx, s.defaultRoomID())
+}
+
+// GetSnapshotForNickname 获取玩家当前房间的公共快照。
+func (s *Store) GetSnapshotForNickname(ctx context.Context, nickname string) (Snapshot, error) {
+	roomID, err := s.ResolvePlayerRoom(ctx, nickname)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return s.GetSnapshotForRoom(ctx, roomID)
+}
+
+// GetSnapshotForRoom 获取指定房间的公共快照。
+func (s *Store) GetSnapshotForRoom(ctx context.Context, roomID string) (Snapshot, error) {
+	roomID = s.normalizeRoomID(roomID)
 	totalVotes, err := s.totalClickCount(ctx)
 	if err != nil {
 		return Snapshot{}, err
@@ -722,7 +754,7 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 
-	boss, err := s.currentBoss(ctx)
+	boss, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -743,6 +775,7 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 	return Snapshot{
 		TotalVotes:          totalVotes,
 		Leaderboard:         leaderboard,
+		RoomID:              roomID,
 		Boss:                boss,
 		BossLeaderboard:     bossLeaderboard,
 		AnnouncementVersion: announcementVersion,
@@ -751,7 +784,7 @@ func (s *Store) GetSnapshot(ctx context.Context) (Snapshot, error) {
 
 // GetState 获取完整状态（公共快照 + 个人统计）
 func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
-	snapshot, err := s.GetSnapshot(ctx)
+	snapshot, err := s.GetSnapshotForNickname(ctx, nickname)
 	if err != nil {
 		return State{}, err
 	}
@@ -773,6 +806,7 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		RecentRewards: []Reward{},
 		Tasks:         []PlayerTask{},
 	}
+	userState.RoomID = s.defaultRoomID()
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
 	if !hasNickname {
@@ -783,6 +817,11 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	if err != nil {
 		return UserState{}, err
 	}
+	roomID, err := s.ResolvePlayerRoom(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.RoomID = roomID
 
 	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
 	if err != nil {
@@ -835,7 +874,7 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	userState.EquippedBattleClickSkinID = equippedBattleClickSkinID
 	userState.EquippedBattleClickCursorImagePath = equippedBattleClickCursorImagePath
 
-	boss, err := s.currentBoss(ctx)
+	boss, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return UserState{}, err
 	}
@@ -1238,6 +1277,11 @@ func (s *Store) GetCurrentBoss(ctx context.Context) (*Boss, error) {
 	return s.currentBoss(ctx)
 }
 
+// GetCurrentBossForRoom 返回指定房间当前 Boss。
+func (s *Store) GetCurrentBossForRoom(ctx context.Context, roomID string) (*Boss, error) {
+	return s.currentBossForRoom(ctx, roomID)
+}
+
 // ListBossLeaderboard 获取指定 Boss 的伤害榜。
 func (s *Store) ListBossLeaderboard(ctx context.Context, bossID string, limit int64) ([]BossLeaderboardEntry, error) {
 	if strings.TrimSpace(bossID) == "" {
@@ -1357,6 +1401,7 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		TotalVotes:                         snapshot.TotalVotes,
 		Leaderboard:                        snapshot.Leaderboard,
 		UserStats:                          userState.UserStats,
+		RoomID:                             firstNonEmpty(userState.RoomID, snapshot.RoomID),
 		Boss:                               snapshot.Boss,
 		BossLeaderboard:                    snapshot.BossLeaderboard,
 		AnnouncementVersion:                snapshot.AnnouncementVersion,
@@ -1411,11 +1456,21 @@ func (s *Store) AutoClickBossPart(ctx context.Context, _ string, nickname string
 
 // AttackBossPartAFK 执行一次挂机攻击，不增加点击数，伤害按攻击力*0.5 向下取整。
 func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickResult, error) {
+	roomID, err := s.ResolvePlayerRoom(ctx, nickname)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	return s.AttackBossPartAFKInRoom(ctx, nickname, roomID)
+}
+
+// AttackBossPartAFKInRoom 在指定房间执行一次挂机攻击。
+func (s *Store) AttackBossPartAFKInRoom(ctx context.Context, nickname string, roomID string) (ClickResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return ClickResult{}, err
 	}
-	boss, err := s.currentBoss(ctx)
+	roomID = s.normalizeRoomID(roomID)
+	boss, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return ClickResult{}, err
 	}
@@ -1469,7 +1524,7 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 	}
 
 	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
+	pipe.HSet(ctx, s.bossCurrentKeyForRoom(roomID), bossValues)
 	if actualDamage > 0 {
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(actualDamage), normalizedNickname)
 	}
@@ -1479,6 +1534,7 @@ func (s *Store) AttackBossPartAFK(ctx context.Context, nickname string) (ClickRe
 
 	result := ClickResult{
 		Delta:      0,
+		RoomID:     roomID,
 		Boss:       boss,
 		BossDamage: actualDamage,
 		DamageType: resolveBossDamageType(resolveBossDamageTypeInput{
@@ -1524,7 +1580,11 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 		return ClickResult{}, ErrBossPartNotFound
 	}
 
-	boss, err := s.currentBoss(ctx)
+	roomID, err := s.ResolvePlayerRoom(ctx, nickname)
+	if err != nil {
+		return ClickResult{}, err
+	}
+	boss, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return ClickResult{}, err
 	}
@@ -1549,6 +1609,7 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if err != nil {
 		return ClickResult{}, err
 	}
+	result.RoomID = roomID
 	result, err = s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx, comboCount)
 	if err != nil {
 		return ClickResult{}, err
@@ -1834,7 +1895,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
+	pipe.HSet(ctx, s.bossCurrentKeyForRoom(boss.RoomID), bossValues)
 	if totalDamage > 0 {
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
@@ -2085,7 +2146,7 @@ func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname
 	}
 
 	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.bossCurrentKey, bossValues)
+	pipe.HSet(ctx, s.bossCurrentKeyForRoom(boss.RoomID), bossValues)
 	if totalDamage > 0 {
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
@@ -2276,7 +2337,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 		return nil, nil, err
 	}
 	if !acquired {
-		current, currentErr := s.currentBoss(ctx)
+		current, currentErr := s.currentBossForRoom(ctx, boss.RoomID)
 		return current, nil, currentErr
 	}
 
@@ -2367,12 +2428,12 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 		return nil, nil, err
 	}
 
-	enabled, err := s.bossCycleEnabled(ctx)
+	enabled, err := s.bossCycleEnabledForRoom(ctx, boss.RoomID)
 	if err != nil {
 		return nil, nil, err
 	}
 	if enabled {
-		nextBoss, err := s.activateNextBossFromCycle(ctx, boss.TemplateID)
+		nextBoss, err := s.activateNextBossFromCycleForRoom(ctx, boss.RoomID, boss.TemplateID)
 		if err != nil && !errors.Is(err, ErrBossPoolEmpty) && !errors.Is(err, ErrBossCycleQueueEmpty) {
 			return nil, nil, err
 		}
@@ -2381,7 +2442,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 		}
 	}
 
-	current, currentErr := s.currentBoss(ctx)
+	current, currentErr := s.currentBossForRoom(ctx, boss.RoomID)
 	return current, rewardForNickname, currentErr
 }
 
@@ -2626,13 +2687,20 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 }
 
 func (s *Store) currentBoss(ctx context.Context) (*Boss, error) {
-	return s.currentBossFromCmdable(ctx, s.client)
+	return s.currentBossForRoom(ctx, s.defaultRoomID())
 }
 
-func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable) (*Boss, error) {
-	values, err := client.HMGet(ctx, s.bossCurrentKey,
+func (s *Store) currentBossForRoom(ctx context.Context, roomID string) (*Boss, error) {
+	return s.currentBossFromCmdable(ctx, s.client, roomID)
+}
+
+func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable, roomID string) (*Boss, error) {
+	roomID = s.normalizeRoomID(roomID)
+	values, err := client.HMGet(ctx, s.bossCurrentKeyForRoom(roomID),
 		"id",
 		"template_id",
+		"room_id",
+		"queue_id",
 		"name",
 		"status",
 		"max_hp",
@@ -2648,29 +2716,31 @@ func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable
 		return nil, err
 	}
 	id := strings.TrimSpace(stringValue(values, 0))
-	name := strings.TrimSpace(stringValue(values, 2))
+	name := strings.TrimSpace(stringValue(values, 4))
 	if id == "" && name == "" {
 		return nil, nil
 	}
 
 	var parts []BossPart
-	if partsRaw := strings.TrimSpace(stringValue(values, 9)); partsRaw != "" {
+	if partsRaw := strings.TrimSpace(stringValue(values, 11)); partsRaw != "" {
 		_ = sonic.Unmarshal([]byte(partsRaw), &parts)
 	}
 
 	return &Boss{
 		ID:                 id,
 		TemplateID:         strings.TrimSpace(stringValue(values, 1)),
+		RoomID:             firstNonEmpty(strings.TrimSpace(stringValue(values, 2)), roomID),
+		QueueID:            firstNonEmpty(strings.TrimSpace(stringValue(values, 3)), s.queueIDForRoom(roomID)),
 		Name:               name,
-		Status:             strings.TrimSpace(stringValue(values, 3)),
-		MaxHP:              int64Value(values, 4),
-		CurrentHP:          int64Value(values, 5),
-		GoldOnKill:         int64Value(values, 6),
-		StoneOnKill:        int64Value(values, 7),
-		TalentPointsOnKill: int64Value(values, 8),
+		Status:             strings.TrimSpace(stringValue(values, 5)),
+		MaxHP:              int64Value(values, 6),
+		CurrentHP:          int64Value(values, 7),
+		GoldOnKill:         int64Value(values, 8),
+		StoneOnKill:        int64Value(values, 9),
+		TalentPointsOnKill: int64Value(values, 10),
 		Parts:              parts,
-		StartedAt:          int64Value(values, 10),
-		DefeatedAt:         int64Value(values, 11),
+		StartedAt:          int64Value(values, 12),
+		DefeatedAt:         int64Value(values, 13),
 	}, nil
 }
 
@@ -2689,6 +2759,8 @@ func normalizeBoss(values map[string]string) *Boss {
 	return &Boss{
 		ID:                 id,
 		TemplateID:         strings.TrimSpace(values["template_id"]),
+		RoomID:             strings.TrimSpace(values["room_id"]),
+		QueueID:            strings.TrimSpace(values["queue_id"]),
 		Name:               name,
 		Status:             strings.TrimSpace(values["status"]),
 		MaxHP:              int64FromString(values["max_hp"]),

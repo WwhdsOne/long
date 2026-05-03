@@ -118,22 +118,26 @@ func (s *Store) DeleteBossTemplate(ctx context.Context, templateID string) error
 		return err
 	}
 
-	queue, queueErr := s.GetBossCycleQueue(ctx)
-	if queueErr != nil {
-		return queueErr
-	}
-	nextQueue := make([]string, 0, len(queue))
-	for _, id := range queue {
-		if id == templateID {
+	for _, roomID := range s.configuredRoomIDs() {
+		queue, queueErr := s.GetBossCycleQueueForRoom(ctx, roomID)
+		if queueErr != nil {
+			return queueErr
+		}
+		nextQueue := make([]string, 0, len(queue))
+		for _, id := range queue {
+			if id == templateID {
+				continue
+			}
+			nextQueue = append(nextQueue, id)
+		}
+		if len(nextQueue) == len(queue) {
 			continue
 		}
-		nextQueue = append(nextQueue, id)
+		if _, err := s.SetBossCycleQueueForRoom(ctx, roomID, nextQueue); err != nil {
+			return err
+		}
 	}
-	if len(nextQueue) == len(queue) {
-		return nil
-	}
-	_, err = s.SetBossCycleQueue(ctx, nextQueue)
-	return err
+	return nil
 }
 
 // SetBossTemplateLoot 保存 Boss 模板掉落池。
@@ -143,17 +147,26 @@ func (s *Store) SetBossTemplateLoot(ctx context.Context, templateID string, loot
 
 // SetBossCycleEnabled 设置 Boss 循环开关；开启时如果当前没有活动 Boss 会立即补位。
 func (s *Store) SetBossCycleEnabled(ctx context.Context, enabled bool) (*Boss, error) {
+	return s.SetBossCycleEnabledForRoom(ctx, s.defaultRoomID(), enabled)
+}
+
+// SetBossCycleEnabledForRoom 设置指定房间 Boss 循环开关。
+func (s *Store) SetBossCycleEnabledForRoom(ctx context.Context, roomID string, enabled bool) (*Boss, error) {
+	roomID = s.normalizeRoomID(roomID)
 	if enabled {
-		if _, err := s.loadBossTemplateQueue(ctx); err != nil {
+		if _, err := s.loadBossTemplateQueueForRoom(ctx, roomID); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := s.client.HSet(ctx, s.bossCycleKey, "enabled", boolToRedis(enabled)).Err(); err != nil {
+	if err := s.client.HSet(ctx, s.bossCycleKeyForRoom(roomID),
+		"enabled", boolToRedis(enabled),
+		"queue_id", s.queueIDForRoom(roomID),
+	).Err(); err != nil {
 		return nil, err
 	}
 
-	current, err := s.currentBoss(ctx)
+	current, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
@@ -167,11 +180,15 @@ func (s *Store) SetBossCycleEnabled(ctx context.Context, enabled bool) (*Boss, e
 		_ = s.SaveBossToHistory(ctx, current)
 	}
 
-	return s.activateNextBossFromCycle(ctx, "")
+	return s.activateNextBossFromCycleForRoom(ctx, roomID, "")
 }
 
 func (s *Store) bossCycleEnabled(ctx context.Context) (bool, error) {
-	value, err := s.client.HGet(ctx, s.bossCycleKey, "enabled").Result()
+	return s.bossCycleEnabledForRoom(ctx, s.defaultRoomID())
+}
+
+func (s *Store) bossCycleEnabledForRoom(ctx context.Context, roomID string) (bool, error) {
+	value, err := s.client.HGet(ctx, s.bossCycleKeyForRoom(roomID), "enabled").Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return false, nil
@@ -204,13 +221,22 @@ func (s *Store) activateRandomBossFromPool(ctx context.Context) (*Boss, error) {
 
 // SetBossCycleQueue 保存后台配置的 Boss 循环队列。
 func (s *Store) SetBossCycleQueue(ctx context.Context, templateIDs []string) ([]string, error) {
+	return s.SetBossCycleQueueForRoom(ctx, s.defaultRoomID(), templateIDs)
+}
+
+// SetBossCycleQueueForRoom 保存指定房间的 Boss 循环队列。
+func (s *Store) SetBossCycleQueueForRoom(ctx context.Context, roomID string, templateIDs []string) ([]string, error) {
+	roomID = s.normalizeRoomID(roomID)
 	queue, err := s.normalizeBossCycleQueue(ctx, templateIDs)
 	if err != nil {
 		return nil, err
 	}
 
 	queueRaw, _ := sonic.Marshal(queue)
-	if err := s.client.HSet(ctx, s.bossCycleKey, bossCycleQueueField, string(queueRaw)).Err(); err != nil {
+	if err := s.client.HSet(ctx, s.bossCycleKeyForRoom(roomID),
+		bossCycleQueueField, string(queueRaw),
+		"queue_id", s.queueIDForRoom(roomID),
+	).Err(); err != nil {
 		return nil, err
 	}
 
@@ -219,7 +245,12 @@ func (s *Store) SetBossCycleQueue(ctx context.Context, templateIDs []string) ([]
 
 // GetBossCycleQueue 返回后台配置的 Boss 循环队列。
 func (s *Store) GetBossCycleQueue(ctx context.Context) ([]string, error) {
-	queueRaw, err := s.client.HGet(ctx, s.bossCycleKey, bossCycleQueueField).Result()
+	return s.GetBossCycleQueueForRoom(ctx, s.defaultRoomID())
+}
+
+// GetBossCycleQueueForRoom 返回指定房间的 Boss 循环队列。
+func (s *Store) GetBossCycleQueueForRoom(ctx context.Context, roomID string) ([]string, error) {
+	queueRaw, err := s.client.HGet(ctx, s.bossCycleKeyForRoom(roomID), bossCycleQueueField).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return []string{}, nil
@@ -283,7 +314,11 @@ func (s *Store) normalizeBossCycleQueue(ctx context.Context, templateIDs []strin
 }
 
 func (s *Store) loadBossTemplateQueue(ctx context.Context) ([]BossTemplate, error) {
-	queueIDs, err := s.GetBossCycleQueue(ctx)
+	return s.loadBossTemplateQueueForRoom(ctx, s.defaultRoomID())
+}
+
+func (s *Store) loadBossTemplateQueueForRoom(ctx context.Context, roomID string) ([]BossTemplate, error) {
+	queueIDs, err := s.GetBossCycleQueueForRoom(ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +355,12 @@ func (s *Store) loadBossTemplateQueue(ctx context.Context) ([]BossTemplate, erro
 }
 
 func (s *Store) activateNextBossFromCycle(ctx context.Context, defeatedTemplateID string) (*Boss, error) {
-	queue, err := s.loadBossTemplateQueue(ctx)
+	return s.activateNextBossFromCycleForRoom(ctx, s.defaultRoomID(), defeatedTemplateID)
+}
+
+func (s *Store) activateNextBossFromCycleForRoom(ctx context.Context, roomID string, defeatedTemplateID string) (*Boss, error) {
+	roomID = s.normalizeRoomID(roomID)
+	queue, err := s.loadBossTemplateQueueForRoom(ctx, roomID)
 	if err != nil {
 		return nil, err
 	}
@@ -337,14 +377,19 @@ func (s *Store) activateNextBossFromCycle(ctx context.Context, defeatedTemplateI
 		}
 	}
 
-	return s.activateBossTemplateInstance(ctx, queue[nextIndex])
+	return s.activateBossTemplateInstanceForRoom(ctx, roomID, queue[nextIndex])
 }
 
 func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossTemplate) (*Boss, error) {
+	return s.activateBossTemplateInstanceForRoom(ctx, s.defaultRoomID(), template)
+}
+
+func (s *Store) activateBossTemplateInstanceForRoom(ctx context.Context, roomID string, template BossTemplate) (*Boss, error) {
 	instanceID, err := s.nextBossInstanceID(ctx, template.ID)
 	if err != nil {
 		return nil, err
 	}
+	roomID = s.normalizeRoomID(roomID)
 	parts := normalizeBossPartLayout(template.Layout)
 	if len(parts) == 0 {
 		return nil, ErrBossPartsRequired
@@ -355,6 +400,8 @@ func (s *Store) activateBossTemplateInstance(ctx context.Context, template BossT
 	current := &Boss{
 		ID:                 instanceID,
 		TemplateID:         template.ID,
+		RoomID:             roomID,
+		QueueID:            s.queueIDForRoom(roomID),
 		Name:               firstNonEmpty(strings.TrimSpace(template.Name), template.ID),
 		Status:             bossStatusActive,
 		MaxHP:              maxHP,
@@ -394,10 +441,16 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	if len(boss.Parts) == 0 {
 		return ErrBossPartsRequired
 	}
+	roomID := s.normalizeRoomID(boss.RoomID)
+	queueID := firstNonEmpty(strings.TrimSpace(boss.QueueID), s.queueIDForRoom(roomID))
+	boss.RoomID = roomID
+	boss.QueueID = queueID
 
 	values := map[string]any{
 		"id":                    boss.ID,
 		"name":                  boss.Name,
+		"room_id":               roomID,
+		"queue_id":              queueID,
 		"status":                boss.Status,
 		"max_hp":                strconv.FormatInt(boss.MaxHP, 10),
 		"current_hp":            strconv.FormatInt(boss.CurrentHP, 10),
@@ -416,8 +469,8 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 	values["parts"] = string(partsRaw)
 
 	pipe := s.client.TxPipeline()
-	pipe.Del(ctx, s.bossCurrentKey)
-	pipe.HSet(ctx, s.bossCurrentKey, values)
+	pipe.Del(ctx, s.bossCurrentKeyForRoom(roomID))
+	pipe.HSet(ctx, s.bossCurrentKeyForRoom(roomID), values)
 	pipe.Del(ctx, s.bossLootKey(boss.ID))
 
 	entries := make([]redis.Z, 0, len(loot))

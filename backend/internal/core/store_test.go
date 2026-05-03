@@ -92,6 +92,32 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 	}
 }
 
+func newTestRoomStore(t *testing.T) (*Store, func()) {
+	t.Helper()
+
+	server, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+
+	client := redis.NewClient(&redis.Options{
+		Addr: server.Addr(),
+	})
+
+	return NewStore(client, "vote:", StoreOptions{
+			CriticalChancePercent: 5,
+			Room: RoomConfig{
+				Enabled:        true,
+				IDs:            []string{"1", "2"},
+				DefaultRoom:    "1",
+				SwitchCooldown: 5 * time.Minute,
+			},
+		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
+			_ = client.Close()
+			server.Close()
+		}
+}
+
 func TestGetUserStateReadsResourceKeyWithoutGems(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -145,6 +171,104 @@ func TestGetUserStateIgnoresLegacyGemKey(t *testing.T) {
 	}
 	if exists != 1 {
 		t.Fatalf("expected legacy key to remain untouched, exists=%d", exists)
+	}
+}
+
+func TestSwitchPlayerRoomRejectsInactiveRoom(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 20,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 20, CurrentHP: 20, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+
+	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "2"); !errors.Is(err, ErrRoomNotJoinable) {
+		t.Fatalf("expected inactive room to be rejected, got %v", err)
+	}
+
+	rooms, err := store.ListRooms(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("list rooms: %v", err)
+	}
+	for _, room := range rooms.Rooms {
+		if room.ID == "2" && room.Joinable {
+			t.Fatalf("expected room 2 to be marked not joinable, got %+v", room)
+		}
+	}
+}
+
+func TestClickBossPartUsesPlayerRoom(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	room1Boss, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	})
+	if err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+	room2Boss, err := store.ActivateBossInRoom(ctx, "2", BossUpsert{
+		ID:    "room-2-boss",
+		Name:  "二线 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	})
+	if err != nil {
+		t.Fatalf("activate room 2 boss: %v", err)
+	}
+	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "2"); err != nil {
+		t.Fatalf("switch room: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明")
+	if err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+	if result.RoomID != "2" {
+		t.Fatalf("expected click result room 2, got %q", result.RoomID)
+	}
+
+	room1After, err := store.GetCurrentBossForRoom(ctx, "1")
+	if err != nil {
+		t.Fatalf("get room 1 boss: %v", err)
+	}
+	room2After, err := store.GetCurrentBossForRoom(ctx, "2")
+	if err != nil {
+		t.Fatalf("get room 2 boss: %v", err)
+	}
+	if room1After.CurrentHP != room1Boss.CurrentHP {
+		t.Fatalf("expected room 1 boss hp unchanged, got %d", room1After.CurrentHP)
+	}
+	if room2After.CurrentHP >= room2Boss.CurrentHP {
+		t.Fatalf("expected room 2 boss hp to decrease, before=%d after=%d", room2Boss.CurrentHP, room2After.CurrentHP)
+	}
+
+	room1Damage, err := store.client.ZCard(ctx, store.bossDamageKey(room1Boss.ID)).Result()
+	if err != nil {
+		t.Fatalf("get room 1 damage count: %v", err)
+	}
+	room2Damage, err := store.client.ZCard(ctx, store.bossDamageKey(room2Boss.ID)).Result()
+	if err != nil {
+		t.Fatalf("get room 2 damage count: %v", err)
+	}
+	if room1Damage != 0 || room2Damage != 1 {
+		t.Fatalf("expected damage only in room 2, got room1=%d room2=%d", room1Damage, room2Damage)
 	}
 }
 
@@ -1176,6 +1300,41 @@ func TestBossCycleQueueDynamicUpdateAppliesOnCurrentBossDefeat(t *testing.T) {
 	}
 	if result.Boss == nil || result.Boss.TemplateID != "b" {
 		t.Fatalf("expected next boss template b after c, got %+v", result.Boss)
+	}
+}
+
+func TestDeleteBossTemplateRemovesItFromAllRoomQueues(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "a", "新手木桩")
+	mustSaveBossTemplateForCycleTest(t, store, ctx, "b", "史莱姆王")
+
+	if _, err := store.SetBossCycleQueueForRoom(ctx, "1", []string{"a", "b"}); err != nil {
+		t.Fatalf("set room 1 queue: %v", err)
+	}
+	if _, err := store.SetBossCycleQueueForRoom(ctx, "2", []string{"b", "a"}); err != nil {
+		t.Fatalf("set room 2 queue: %v", err)
+	}
+
+	if err := store.DeleteBossTemplate(ctx, "a"); err != nil {
+		t.Fatalf("delete boss template: %v", err)
+	}
+
+	room1Queue, err := store.GetBossCycleQueueForRoom(ctx, "1")
+	if err != nil {
+		t.Fatalf("get room 1 queue: %v", err)
+	}
+	room2Queue, err := store.GetBossCycleQueueForRoom(ctx, "2")
+	if err != nil {
+		t.Fatalf("get room 2 queue: %v", err)
+	}
+	if len(room1Queue) != 1 || room1Queue[0] != "b" {
+		t.Fatalf("expected room 1 queue to remove deleted template, got %+v", room1Queue)
+	}
+	if len(room2Queue) != 1 || room2Queue[0] != "b" {
+		t.Fatalf("expected room 2 queue to remove deleted template, got %+v", room2Queue)
 	}
 }
 

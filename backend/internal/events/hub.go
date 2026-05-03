@@ -27,6 +27,7 @@ type onlineCountPayload struct {
 type realtimeUserStatePayload struct {
 	UserStats                          *core.UserStats           `json:"userStats,omitempty"`
 	MyBossStats                        *core.BossUserStats       `json:"myBossStats,omitempty"`
+	RoomID                             string                    `json:"roomId,omitempty"`
 	Loadout                            core.Loadout              `json:"loadout"`
 	CombatStats                        core.CombatStats          `json:"combatStats"`
 	Gold                               int64                     `json:"gold"`
@@ -42,6 +43,7 @@ type realtimeUserStatePayload struct {
 type publicStatePayload struct {
 	TotalVotes          int64                       `json:"totalVotes"`
 	Leaderboard         *[]core.LeaderboardEntry    `json:"leaderboard,omitempty"`
+	RoomID              string                      `json:"roomId,omitempty"`
 	Boss                *core.Boss                  `json:"boss,omitempty"`
 	BossLeaderboard     []core.BossLeaderboardEntry `json:"bossLeaderboard"`
 	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
@@ -108,6 +110,31 @@ func (h *Hub) BroadcastPublic(snapshot core.Snapshot, includeLeaderboard bool) e
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for client := range h.clients {
+		if client.nickname != "" {
+			continue
+		}
+		deliverEvent(client.ch, ServerEvent{Name: PublicStateEventName, Payload: payload})
+	}
+
+	return nil
+}
+
+func (h *Hub) BroadcastPublicTo(nickname string, snapshot core.Snapshot, includeLeaderboard bool) error {
+	normalizedNickname := strings.TrimSpace(nickname)
+	if normalizedNickname == "" {
+		return nil
+	}
+	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot, includeLeaderboard))
+	if err != nil {
+		return err
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for client := range h.clients {
+		if client.nickname != normalizedNickname {
+			continue
+		}
 		deliverEvent(client.ch, ServerEvent{Name: PublicStateEventName, Payload: payload})
 	}
 
@@ -117,6 +144,7 @@ func (h *Hub) BroadcastPublic(snapshot core.Snapshot, includeLeaderboard bool) e
 func buildPublicStatePayload(snapshot core.Snapshot, includeLeaderboard bool) publicStatePayload {
 	payload := publicStatePayload{
 		TotalVotes:          snapshot.TotalVotes,
+		RoomID:              snapshot.RoomID,
 		Boss:                snapshot.Boss,
 		BossLeaderboard:     snapshot.BossLeaderboard,
 		AnnouncementVersion: snapshot.AnnouncementVersion,
@@ -161,6 +189,7 @@ func buildRealtimeUserStatePayload(state core.UserState) realtimeUserStatePayloa
 	return realtimeUserStatePayload{
 		UserStats:                          state.UserStats,
 		MyBossStats:                        state.MyBossStats,
+		RoomID:                             state.RoomID,
 		Loadout:                            state.Loadout,
 		CombatStats:                        state.CombatStats,
 		Gold:                               state.Gold,
@@ -218,6 +247,13 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 		}
 
 		snapshot, err := reader.GetSnapshot(ctx)
+		if nickname != "" {
+			if roomReader, ok := reader.(interface {
+				GetSnapshotForNickname(context.Context, string) (core.Snapshot, error)
+			}); ok {
+				snapshot, err = roomReader.GetSnapshotForNickname(ctx, nickname)
+			}
+		}
 		if err != nil {
 			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 			return

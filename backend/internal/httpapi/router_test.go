@@ -16,57 +16,68 @@ import (
 )
 
 type mockStore struct {
-	state                 core.State
-	talentState           *core.TalentState
-	snapshot              core.Snapshot
-	equipState            core.State
-	adminState            core.AdminState
-	bossResources         core.BossResources
-	adminEquipmentPage    core.AdminEquipmentPage
-	adminBossHistoryPage  core.AdminBossHistoryPage
-	adminPlayerPage       core.AdminPlayerPage
-	adminPlayer           *core.AdminPlayerOverview
-	bossHistory           []core.BossHistoryEntry
-	announcements         []core.Announcement
-	latestAnnouncement    *core.Announcement
-	messagePage           core.MessagePage
-	tasks                 []core.PlayerTask
-	shopItems             []core.ShopCatalogItemView
-	result                core.ClickResult
-	lastBoss              core.BossUpsert
-	lastBossTemplate      core.BossTemplateUpsert
-	lastEquipment         core.EquipmentDefinition
-	lastShopItemID        string
-	lastClaimTaskID       string
-	lastTaskDefinition    core.TaskDefinition
-	lastArchiveNow        time.Time
-	lastTemplateLootID    string
-	lastTemplateLoot      []core.BossLootEntry
-	lastCycleQueue        []string
-	lastCycleEnabled      bool
-	lastSalvageItemID     string
-	lastSalvageQuantity   int64
-	lastLockItemID        string
-	lastLockState         bool
-	lastClickNickname     string
-	lastAutoClickNickname string
-	lastGetStateNickname  string
-	saveTaskErr           error
-	activateTaskErr       error
-	deactivateTaskErr     error
-	duplicateTaskErr      error
-	getStateErr           error
-	clickErr              error
-	equipErr              error
-	enhanceErr            error
-	validateErr           error
-	messageErr            error
-	salvageErr            error
-	activateBossErr       error
-	saveBossTemplateErr   error
-	setBossCycleErr       error
-	purchaseShopErr       error
-	equipShopErr          error
+	state                     core.State
+	talentState               *core.TalentState
+	snapshot                  core.Snapshot
+	equipState                core.State
+	adminState                core.AdminState
+	bossResources             core.BossResources
+	adminEquipmentPage        core.AdminEquipmentPage
+	adminBossHistoryPage      core.AdminBossHistoryPage
+	adminPlayerPage           core.AdminPlayerPage
+	adminPlayer               *core.AdminPlayerOverview
+	bossHistory               []core.BossHistoryEntry
+	announcements             []core.Announcement
+	latestAnnouncement        *core.Announcement
+	messagePage               core.MessagePage
+	bossResourcesByNickname   map[string]core.BossResources
+	roomList                  core.RoomList
+	roomSwitchResult          core.RoomSwitchResult
+	tasks                     []core.PlayerTask
+	shopItems                 []core.ShopCatalogItemView
+	result                    core.ClickResult
+	lastBoss                  core.BossUpsert
+	lastBossRoomID            string
+	lastBossTemplate          core.BossTemplateUpsert
+	lastEquipment             core.EquipmentDefinition
+	lastShopItemID            string
+	lastClaimTaskID           string
+	lastTaskDefinition        core.TaskDefinition
+	lastArchiveNow            time.Time
+	lastTemplateLootID        string
+	lastTemplateLoot          []core.BossLootEntry
+	lastCycleQueue            []string
+	lastCycleEnabled          bool
+	lastCycleRoomID           string
+	lastDeactivateRoomID      string
+	lastBossResourcesNickname string
+	lastListRoomsNickname     string
+	lastSwitchRoomNickname    string
+	lastSwitchRoomID          string
+	lastSalvageItemID         string
+	lastSalvageQuantity       int64
+	lastLockItemID            string
+	lastLockState             bool
+	lastClickNickname         string
+	lastAutoClickNickname     string
+	lastGetStateNickname      string
+	saveTaskErr               error
+	activateTaskErr           error
+	deactivateTaskErr         error
+	duplicateTaskErr          error
+	getStateErr               error
+	clickErr                  error
+	equipErr                  error
+	enhanceErr                error
+	validateErr               error
+	messageErr                error
+	salvageErr                error
+	activateBossErr           error
+	saveBossTemplateErr       error
+	setBossCycleErr           error
+	purchaseShopErr           error
+	equipShopErr              error
+	roomSwitchErr             error
 }
 
 func (m *mockStore) GetState(_ context.Context, nickname string) (core.State, error) {
@@ -95,6 +106,30 @@ func (m *mockStore) GetSnapshot(_ context.Context) (core.Snapshot, error) {
 
 func (m *mockStore) GetBossResources(_ context.Context) (core.BossResources, error) {
 	return m.bossResources, nil
+}
+
+func (m *mockStore) GetBossResourcesForNickname(_ context.Context, nickname string) (core.BossResources, error) {
+	m.lastBossResourcesNickname = nickname
+	if m.bossResourcesByNickname != nil {
+		if resources, ok := m.bossResourcesByNickname[nickname]; ok {
+			return resources, nil
+		}
+	}
+	return m.bossResources, nil
+}
+
+func (m *mockStore) ListRooms(_ context.Context, nickname string) (core.RoomList, error) {
+	m.lastListRoomsNickname = nickname
+	return m.roomList, nil
+}
+
+func (m *mockStore) SwitchPlayerRoom(_ context.Context, nickname string, roomID string) (core.RoomSwitchResult, error) {
+	m.lastSwitchRoomNickname = nickname
+	m.lastSwitchRoomID = roomID
+	if m.roomSwitchErr != nil {
+		return core.RoomSwitchResult{}, m.roomSwitchErr
+	}
+	return m.roomSwitchResult, nil
 }
 
 func (m *mockStore) GetUserState(_ context.Context, nickname string) (core.UserState, error) {
@@ -152,11 +187,11 @@ func (m *mockStore) EquipShopItem(_ context.Context, _ string, itemID string) (c
 	return m.userStateForNickname("阿明"), nil
 }
 
-	func (m *mockStore) UnequipShopItem(_ context.Context, _ string) (core.UserState, error) {
-		m.state.EquippedBattleClickCursorImagePath = ""
-		m.state.EquippedBattleClickSkinID = ""
-		return m.userStateForNickname("阿明"), nil
-	}
+func (m *mockStore) UnequipShopItem(_ context.Context, _ string) (core.UserState, error) {
+	m.state.EquippedBattleClickCursorImagePath = ""
+	m.state.EquippedBattleClickSkinID = ""
+	return m.userStateForNickname("阿明"), nil
+}
 
 func (m *mockStore) ListShopItems(_ context.Context) ([]core.ShopItem, error) {
 	result := make([]core.ShopItem, 0, len(m.shopItems))
@@ -695,7 +730,18 @@ func (m *mockStore) ActivateBoss(_ context.Context, boss core.BossUpsert) (*core
 	}, nil
 }
 
+func (m *mockStore) ActivateBossInRoom(ctx context.Context, roomID string, boss core.BossUpsert) (*core.Boss, error) {
+	m.lastBossRoomID = roomID
+	boss.RoomID = roomID
+	return m.ActivateBoss(ctx, boss)
+}
+
 func (m *mockStore) DeactivateBoss(_ context.Context) error {
+	return nil
+}
+
+func (m *mockStore) DeactivateBossInRoom(_ context.Context, roomID string) error {
+	m.lastDeactivateRoomID = roomID
 	return nil
 }
 
@@ -726,6 +772,11 @@ func (m *mockStore) SetBossCycleQueue(_ context.Context, templateIDs []string) (
 	return append([]string(nil), templateIDs...), nil
 }
 
+func (m *mockStore) SetBossCycleQueueForRoom(ctx context.Context, roomID string, templateIDs []string) ([]string, error) {
+	m.lastCycleRoomID = roomID
+	return m.SetBossCycleQueue(ctx, templateIDs)
+}
+
 func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*core.Boss, error) {
 	if m.setBossCycleErr != nil {
 		return nil, m.setBossCycleErr
@@ -742,6 +793,15 @@ func (m *mockStore) SetBossCycleEnabled(_ context.Context, enabled bool) (*core.
 		MaxHP:      80,
 		CurrentHP:  80,
 	}, nil
+}
+
+func (m *mockStore) SetBossCycleEnabledForRoom(ctx context.Context, roomID string, enabled bool) (*core.Boss, error) {
+	m.lastCycleRoomID = roomID
+	boss, err := m.SetBossCycleEnabled(ctx, enabled)
+	if boss != nil {
+		boss.RoomID = roomID
+	}
+	return boss, err
 }
 
 func (m *mockStore) ListBossHistory(_ context.Context) ([]core.BossHistoryEntry, error) {
@@ -927,6 +987,71 @@ func TestGetBossHistoryReturnsPublicHistory(t *testing.T) {
 	}
 	if len(payload[0].Damage) != 1 || payload[0].Damage[0].Nickname != "阿明" {
 		t.Fatalf("unexpected history damage payload: %+v", payload[0].Damage)
+	}
+}
+
+func TestGetBossResourcesUsesReadNicknameRoom(t *testing.T) {
+	store := &mockStore{
+		bossResources: core.BossResources{
+			BossID: "room-1-boss",
+			RoomID: "1",
+		},
+		bossResourcesByNickname: map[string]core.BossResources{
+			"阿明": {
+				BossID: "room-2-boss",
+				RoomID: "2",
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/boss/resources?nickname=%E9%98%BF%E6%98%8E", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastBossResourcesNickname != "阿明" {
+		t.Fatalf("expected resources to use read nickname, got %q", store.lastBossResourcesNickname)
+	}
+
+	var payload core.BossResources
+	if err := sonic.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.RoomID != "2" || payload.BossID != "room-2-boss" {
+		t.Fatalf("expected room 2 resources, got %+v", payload)
+	}
+}
+
+func TestJoinRoomRejectsNotJoinableRoom(t *testing.T) {
+	store := &mockStore{
+		roomSwitchErr: core.ErrRoomNotJoinable,
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/rooms/join", strings.NewReader(`{"nickname":"阿明","roomId":"2"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", response.Code)
+	}
+	if store.lastSwitchRoomNickname != "阿明" || store.lastSwitchRoomID != "2" {
+		t.Fatalf("expected join request to reach store, got nickname=%q room=%q", store.lastSwitchRoomNickname, store.lastSwitchRoomID)
+	}
+	if !strings.Contains(response.Body.String(), "ROOM_NOT_JOINABLE") {
+		t.Fatalf("expected ROOM_NOT_JOINABLE response, got %s", response.Body.String())
 	}
 }
 
@@ -1428,6 +1553,30 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	}
 	if !store.lastCycleEnabled {
 		t.Fatal("expected cycle enable to be forwarded to store")
+	}
+
+	saveRoomQueueRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/cycle/queue?roomId=2", strings.NewReader(`{"roomId":"2","templateIds":["dragon"]}`))
+	saveRoomQueueRequest.Header.Set("Content-Type", "application/json")
+	saveRoomQueueRequest.AddCookie(cookies[0])
+	saveRoomQueueResponse := httptest.NewRecorder()
+	handler.ServeHTTP(saveRoomQueueResponse, saveRoomQueueRequest)
+	if saveRoomQueueResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from room cycle queue save, got %d", saveRoomQueueResponse.Code)
+	}
+	if store.lastCycleRoomID != "2" || len(store.lastCycleQueue) != 1 || store.lastCycleQueue[0] != "dragon" {
+		t.Fatalf("expected room cycle queue to be forwarded, room=%q queue=%+v", store.lastCycleRoomID, store.lastCycleQueue)
+	}
+
+	activateRoomBossRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/activate?roomId=2", strings.NewReader(`{"id":"room-boss","name":"二线 Boss","maxHp":80,"parts":[{"x":0,"y":0,"type":"soft","maxHp":80}]}`))
+	activateRoomBossRequest.Header.Set("Content-Type", "application/json")
+	activateRoomBossRequest.AddCookie(cookies[0])
+	activateRoomBossResponse := httptest.NewRecorder()
+	handler.ServeHTTP(activateRoomBossResponse, activateRoomBossRequest)
+	if activateRoomBossResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from room boss activate, got %d", activateRoomBossResponse.Code)
+	}
+	if store.lastBossRoomID != "2" || store.lastBoss.RoomID != "2" || store.lastBoss.ID != "room-boss" {
+		t.Fatalf("expected room boss activate to be forwarded, room=%q boss=%+v", store.lastBossRoomID, store.lastBoss)
 	}
 }
 

@@ -51,6 +51,8 @@ export function useAdminPage() {
   const announcementForm = ref(emptyAnnouncementForm())
   const lootRows = ref(emptyLootRows())
   const selectedBossTemplateId = ref('')
+  const adminRoomId = ref('1')
+  const adminRooms = ref([])
 
   const adminState = ref(emptyAdminState())
   const buttonPage = ref(emptyButtonPage())
@@ -107,6 +109,31 @@ export function useAdminPage() {
     return bossTemplates.value.find((entry) => entry.id === templateId) ?? null
   }
 
+  async function fetchAdminRooms() {
+    try {
+      const response = await fetchWithTimeout('/api/rooms')
+      if (!response.ok) {
+        return
+      }
+      const payload = await response.json()
+      adminRooms.value = Array.isArray(payload?.rooms) ? payload.rooms : []
+      if (!adminRoomId.value && payload?.currentRoomId) {
+        adminRoomId.value = String(payload.currentRoomId)
+      }
+    } catch {
+      adminRooms.value = []
+    }
+  }
+
+  async function switchAdminRoom(roomId) {
+    const nextRoomId = String(roomId || '').trim()
+    if (!nextRoomId || nextRoomId === adminRoomId.value) {
+      return
+    }
+    adminRoomId.value = nextRoomId
+    await fetchAdminState()
+  }
+
 
 
   function applyLootRows(loot) {
@@ -160,12 +187,14 @@ export function useAdminPage() {
   async function fetchAdminState() {
     loading.value = true
     try {
-      const response = await fetchWithTimeout('/api/admin/state')
+      const query = adminRoomId.value ? `?roomId=${encodeURIComponent(adminRoomId.value)}` : ''
+      const response = await fetchWithTimeout(`/api/admin/state${query}`)
       if (!response.ok) {
         throw new Error(await readErrorMessage(response, '后台状态加载失败'))
       }
 
       adminState.value = normalizeAdminState(await response.json())
+      adminRoomId.value = adminState.value.roomId || adminRoomId.value || '1'
       syncBossTemplateEditor()
     } catch (error) {
       errorMessage.value = error.message || '后台状态加载失败'
@@ -367,6 +396,7 @@ export function useAdminPage() {
 
   async function refreshAll() {
     await Promise.all([
+      fetchAdminRooms(),
       fetchAdminState(),
       fetchPlayerPage(),
       fetchEquipmentPage(equipmentPage.value.page),
@@ -384,6 +414,7 @@ export function useAdminPage() {
         return
       }
 
+      await fetchAdminRooms()
       await fetchAdminState()
       await Promise.all([
         fetchAnnouncements(),
@@ -415,6 +446,7 @@ export function useAdminPage() {
       authenticated.value = true
       checkingSession.value = false
       setSuccess('后台已解锁。')
+      await fetchAdminRooms()
       await fetchAdminState()
       await Promise.all([fetchPlayerPage(), fetchEquipmentPage(), fetchShopItems(), fetchTasks()])
     } catch (error) {
@@ -428,6 +460,8 @@ export function useAdminPage() {
     await fetchWithTimeout('/api/admin/logout', { method: 'POST' })
     authenticated.value = false
     adminState.value = emptyAdminState()
+    adminRoomId.value = '1'
+    adminRooms.value = []
     buttonPage.value = emptyButtonPage()
     equipmentPage.value = emptyEquipmentPage()
     playerPage.value = emptyPlayerPage()
@@ -476,6 +510,8 @@ export function useAdminPage() {
     activeTab,
     addLootRow,
     adminState,
+    adminRoomId,
+    adminRooms,
     announcementForm,
     announcements,
     applyLootRows,
@@ -503,6 +539,7 @@ export function useAdminPage() {
     equipmentPrompt,
     errorMessage,
     fetchAdminState,
+    fetchAdminRooms,
     fetchAnnouncements,
     fetchButtonPage,
     fetchEquipmentPage,
@@ -544,6 +581,7 @@ export function useAdminPage() {
     selectedTaskCycleKey,
     selectedTaskId,
     setSuccess,
+    switchAdminRoom,
     showEquipmentEditor,
     successMessage,
     syncBossTemplateEditor,
@@ -563,6 +601,8 @@ export function useAdminPage() {
     activeTab,
     addLootRow,
     adminState,
+    adminRoomId,
+    adminRooms,
     announcementForm,
     announcements,
     authenticated,
@@ -610,6 +650,7 @@ export function useAdminPage() {
     selectedTaskId,
     checkSession,
     fetchAdminState,
+    fetchAdminRooms,
     fetchAnnouncements,
     fetchBossHistory,
     fetchButtonPage,
@@ -630,6 +671,7 @@ export function useAdminPage() {
     selectedBossTemplate,
     selectedBossTemplateId,
     successMessage,
+    switchAdminRoom,
     taskArchives,
     taskCycleResults,
     taskDefinitions,

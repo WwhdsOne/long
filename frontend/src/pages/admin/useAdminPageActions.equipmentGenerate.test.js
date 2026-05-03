@@ -14,7 +14,8 @@ function makeState() {
   return {
     activeTab: ref('equipment'),
     addLootRow: vi.fn(),
-    adminState: ref({}),
+    adminRoomId: ref('2'),
+    adminState: ref({ roomId: '2' }),
     announcementForm: ref({}),
     applyLootRows: vi.fn(),
     bossCycleEnabled: ref(false),
@@ -61,6 +62,28 @@ function makeState() {
 }
 
 describe('装备草稿生成动作', () => {
+  it('Boss 房间操作会提交当前后台房间', async () => {
+    const state = makeState()
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({}),
+    }))
+
+    const actions = createAdminPageActions(state)
+    await actions.enableBossCycle()
+    await actions.saveBossCycleQueue(['dragon'])
+
+    expect(global.fetch).toHaveBeenNthCalledWith(1, '/api/admin/boss/cycle/enable?roomId=2', { method: 'POST' })
+    expect(global.fetch).toHaveBeenNthCalledWith(2, '/api/admin/boss/cycle/queue?roomId=2', expect.objectContaining({
+      method: 'PUT',
+      body: expect.any(String),
+    }))
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
+      roomId: '2',
+      templateIds: ['dragon'],
+    })
+  })
+
   it('生成后只填充表单，不刷新列表也不保存', async () => {
     const state = makeState()
     global.fetch = vi.fn(async () => ({

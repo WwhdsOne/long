@@ -11,24 +11,40 @@ import (
 func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	hub := NewHub()
 
+	anonymous, unsubscribeAnonymous := hub.Subscribe("")
+	defer unsubscribeAnonymous()
 	aming, unsubscribeAming := hub.Subscribe("阿明")
 	defer unsubscribeAming()
 	xiaohong, unsubscribeXiaohong := hub.Subscribe("小红")
 	defer unsubscribeXiaohong()
 
+	_ = readEventByName(t, anonymous, OnlineCountEventName)
+	_ = readEventByName(t, aming, OnlineCountEventName)
+	_ = readEventByName(t, xiaohong, OnlineCountEventName)
+	drainEvents(anonymous)
+	drainEvents(aming)
+	drainEvents(xiaohong)
+
 	if err := hub.BroadcastPublic(core.Snapshot{}, true); err != nil {
 		t.Fatalf("broadcast public snapshot: %v", err)
 	}
 
-	amingEvent := readEventByName(t, aming, PublicStateEventName)
-	if amingEvent.Name != PublicStateEventName {
-		t.Fatalf("expected public_state for 阿明, got %+v", amingEvent)
+	anonymousEvent := readEventByName(t, anonymous, PublicStateEventName)
+	if anonymousEvent.Name != PublicStateEventName {
+		t.Fatalf("expected public_state for anonymous client, got %+v", anonymousEvent)
+	}
+	assertNoEvent(t, aming, "阿明")
+	assertNoEvent(t, xiaohong, "小红")
+
+	if err := hub.BroadcastPublicTo("阿明", core.Snapshot{RoomID: "2"}, true); err != nil {
+		t.Fatalf("broadcast public snapshot to 阿明: %v", err)
 	}
 
-	xiaohongEvent := readEventByName(t, xiaohong, PublicStateEventName)
-	if xiaohongEvent.Name != PublicStateEventName {
-		t.Fatalf("expected public_state for 小红, got %+v", xiaohongEvent)
+	amingEvent := readEventByName(t, aming, PublicStateEventName)
+	if !strings.Contains(string(amingEvent.Payload), `"roomId":"2"`) {
+		t.Fatalf("expected room 2 public state for 阿明, got %s", string(amingEvent.Payload))
 	}
+	assertNoEvent(t, xiaohong, "小红")
 
 	if err := hub.BroadcastUser("阿明", core.UserState{
 		UserStats:                          &core.UserStats{Nickname: "阿明", ClickCount: 8},
@@ -61,6 +77,26 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	case unexpected := <-xiaohong:
 		t.Fatalf("expected no user event for 小红, got %+v", unexpected)
 	default:
+	}
+}
+
+func assertNoEvent(t *testing.T, ch <-chan ServerEvent, label string) {
+	t.Helper()
+
+	select {
+	case unexpected := <-ch:
+		t.Fatalf("expected no event for %s, got %+v", label, unexpected)
+	default:
+	}
+}
+
+func drainEvents(ch <-chan ServerEvent) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
+		}
 	}
 }
 

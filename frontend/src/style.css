@@ -1918,7 +1918,21 @@ select {
 .admin-toolbar__actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
+}
+
+.admin-room-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.admin-room-select .nickname-form__input {
+  min-width: 150px;
 }
 
 .admin-tabs {
@@ -5562,4 +5576,3 @@ select {
     border-width: 1.5px;
   }
 }
-

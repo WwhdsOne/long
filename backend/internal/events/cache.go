@@ -40,6 +40,20 @@ func (c *Cache) GetSnapshot(ctx context.Context) (core.Snapshot, error) {
 	return c.RefreshSnapshot(ctx)
 }
 
+// GetSnapshotForNickname 返回指定玩家当前房间的公共快照。
+func (c *Cache) GetSnapshotForNickname(ctx context.Context, nickname string) (core.Snapshot, error) {
+	normalizedNickname := strings.TrimSpace(nickname)
+	if normalizedNickname == "" {
+		return c.GetSnapshot(ctx)
+	}
+	if reader, ok := c.reader.(interface {
+		GetSnapshotForNickname(context.Context, string) (core.Snapshot, error)
+	}); ok {
+		return reader.GetSnapshotForNickname(ctx, normalizedNickname)
+	}
+	return c.GetSnapshot(ctx)
+}
+
 // RefreshSnapshot 强制回源刷新公共快照。
 func (c *Cache) RefreshSnapshot(ctx context.Context) (core.Snapshot, error) {
 	snapshot, err := c.reader.GetSnapshot(ctx)
@@ -76,6 +90,20 @@ func (c *Cache) GetBossResources(ctx context.Context) (core.BossResources, error
 	return c.RefreshBossResources(ctx)
 }
 
+// GetBossResourcesForNickname 返回指定玩家当前房间的 Boss 低频资源。
+func (c *Cache) GetBossResourcesForNickname(ctx context.Context, nickname string) (core.BossResources, error) {
+	normalizedNickname := strings.TrimSpace(nickname)
+	if normalizedNickname == "" {
+		return c.GetBossResources(ctx)
+	}
+	if reader, ok := c.reader.(interface {
+		GetBossResourcesForNickname(context.Context, string) (core.BossResources, error)
+	}); ok {
+		return reader.GetBossResourcesForNickname(ctx, normalizedNickname)
+	}
+	return c.GetBossResources(ctx)
+}
+
 // RefreshBossResources 强制回源刷新 Boss 低频资源。
 func (c *Cache) RefreshBossResources(ctx context.Context) (core.BossResources, error) {
 	resources, err := c.reader.GetBossResources(ctx)
@@ -97,14 +125,6 @@ func (c *Cache) GetUserState(ctx context.Context, nickname string) (core.UserSta
 	if normalizedNickname == "" {
 		return c.reader.GetUserState(ctx, "")
 	}
-
-	c.mu.RLock()
-	userState, ok := c.users[normalizedNickname]
-	c.mu.RUnlock()
-	if ok {
-		return userState, nil
-	}
-
 	return c.RefreshUser(ctx, normalizedNickname)
 }
 
@@ -153,7 +173,7 @@ func (c *Cache) RefreshUsers(ctx context.Context, nicknames []string) (map[strin
 
 // GetState 返回公共快照与个人态组合后的完整状态。
 func (c *Cache) GetState(ctx context.Context, nickname string) (core.State, error) {
-	snapshot, err := c.GetSnapshot(ctx)
+	snapshot, err := c.GetSnapshotForNickname(ctx, nickname)
 	if err != nil {
 		return core.State{}, err
 	}

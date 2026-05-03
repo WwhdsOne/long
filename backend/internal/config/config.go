@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -92,6 +93,14 @@ type MongoConfig struct {
 // ArchiveConfig 控制冷数据归档与读源切换。
 type ArchiveConfig struct{}
 
+// RoomConfig 控制房间分线配置。
+type RoomConfig struct {
+	Enabled        bool
+	IDs            []string
+	DefaultRoom    string
+	SwitchCooldown time.Duration
+}
+
 // Config 运行时配置集合
 type Config struct {
 	Port        int
@@ -105,6 +114,7 @@ type Config struct {
 	Log         LogConfig
 	Mongo       MongoConfig
 	Archive     ArchiveConfig
+	Room        RoomConfig
 	RedisPrefix string
 }
 
@@ -152,6 +162,12 @@ type fileConfig struct {
 	Realtime struct {
 		DebounceMs int `yaml:"debounce_ms"`
 	} `yaml:"realtime"`
+	Room struct {
+		Enabled               bool     `yaml:"enabled"`
+		IDs                   []string `yaml:"ids"`
+		DefaultRoom           string   `yaml:"default_room"`
+		SwitchCooldownSeconds int      `yaml:"switch_cooldown_seconds"`
+	} `yaml:"room"`
 	Log struct {
 		Level         string `yaml:"level"`
 		Format        string `yaml:"format"`
@@ -270,12 +286,19 @@ func loadFromConsul() (Config, consulSource, error) {
 			WriteTimeout:   time.Duration(parsed.Mongo.WriteTimeoutMS) * time.Millisecond,
 			ReadTimeout:    time.Duration(parsed.Mongo.ReadTimeoutMS) * time.Millisecond,
 		},
+		Room: RoomConfig{
+			Enabled:        parsed.Room.Enabled,
+			IDs:            normalizeRoomIDs(parsed.Room.IDs),
+			DefaultRoom:    strings.TrimSpace(parsed.Room.DefaultRoom),
+			SwitchCooldown: time.Duration(parsed.Room.SwitchCooldownSeconds) * time.Second,
+		},
 		Archive:     ArchiveConfig{},
 		RedisPrefix: parsed.RedisPrefix,
 	}
 	if config.Realtime.DebounceMs <= 0 {
 		config.Realtime.DebounceMs = 50
 	}
+	config.Room = normalizeRoomConfig(config.Room)
 
 	if err := validate(config); err != nil {
 		return Config{}, consulSource{}, fmt.Errorf("validate consul config: %w", err)
@@ -343,6 +366,43 @@ func validate(config Config) error {
 	}
 
 	return nil
+}
+
+func normalizeRoomConfig(cfg RoomConfig) RoomConfig {
+	cfg.IDs = normalizeRoomIDs(cfg.IDs)
+	if len(cfg.IDs) == 0 {
+		cfg.IDs = []string{"1"}
+	}
+	defaultRoom := strings.TrimSpace(cfg.DefaultRoom)
+	if defaultRoom == "" {
+		defaultRoom = cfg.IDs[0]
+	}
+	found := slices.Contains(cfg.IDs, defaultRoom)
+	if !found {
+		defaultRoom = cfg.IDs[0]
+	}
+	if cfg.SwitchCooldown < 0 {
+		cfg.SwitchCooldown = 0
+	}
+	cfg.DefaultRoom = defaultRoom
+	return cfg
+}
+
+func normalizeRoomIDs(ids []string) []string {
+	cleaned := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		cleaned = append(cleaned, id)
+	}
+	return cleaned
 }
 
 func normalizeLLMBaseURL(baseURL string) string {
@@ -462,4 +522,3 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 		exitProcess(0)
 	}
 }
-

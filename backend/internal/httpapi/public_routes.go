@@ -15,12 +15,17 @@ type bossResourceReader interface {
 	GetBossResources(context.Context) (core.BossResources, error)
 }
 
+type nicknameBossResourceReader interface {
+	GetBossResourcesForNickname(context.Context, string) (core.BossResources, error)
+}
+
 func registerPublicRoutes(router route.IRouter, options Options, stateView StateView) {
 	messageStore := MessageStore(options.Store)
 	if options.MessageStore != nil {
 		messageStore = options.MessageStore
 	}
 	registerShopRoutes(router, options)
+	registerRoomRoutes(router, options)
 
 	router.GET("/api/health", func(_ context.Context, c *app.RequestContext) {
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
@@ -45,12 +50,16 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 	})
 
 	router.GET("/api/boss/resources", func(ctx context.Context, c *app.RequestContext) {
+		nickname := resolvedPlayerNicknameForRead(ctx, c, options.PlayerAuthenticator)
 		reader := bossResourceReader(options.Store)
 		if cachedReader, ok := stateView.(bossResourceReader); ok {
 			reader = cachedReader
 		}
 
 		resources, err := reader.GetBossResources(ctx)
+		if nicknameReader, ok := reader.(nicknameBossResourceReader); ok {
+			resources, err = nicknameReader.GetBossResourcesForNickname(ctx, nickname)
+		}
 		if err != nil {
 			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "BOSS_RESOURCES_FETCH_FAILED"})
 			return

@@ -23,6 +23,7 @@ type afkPlayerState struct {
 	HiddenSince    int64
 	AfkActive      bool
 	AfkStartedAt   int64
+	AfkRoomID      string
 	BaselineGold   int64
 	BaselineStones int64
 	Kills          int64
@@ -211,6 +212,13 @@ func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix
 	}
 
 	result, err := s.store.AttackBossPartAFK(ctx, nickname)
+	if state.AfkRoomID != "" {
+		if roomAttacker, ok := s.store.(interface {
+			AttackBossPartAFKInRoom(context.Context, string, string) (core.ClickResult, error)
+		}); ok {
+			result, err = roomAttacker.AttackBossPartAFKInRoom(ctx, nickname, state.AfkRoomID)
+		}
+	}
 	if err != nil {
 		if errors.Is(err, core.ErrInvalidNickname) || errors.Is(err, core.ErrSensitiveNickname) {
 			return
@@ -238,6 +246,7 @@ func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix
 	if result.Boss != nil {
 		publishChange(ctx, s.changePublisher, core.StateChange{
 			Type:      core.StateChangeBossChanged,
+			RoomID:    result.RoomID,
 			Timestamp: nowUnix,
 		})
 	}
@@ -250,6 +259,7 @@ func (s *AfkService) startAfk(ctx context.Context, nickname string, state *afkPl
 	}
 	state.AfkActive = true
 	state.AfkStartedAt = nowUnix
+	state.AfkRoomID = userState.RoomID
 	state.BaselineGold = userState.Gold
 	state.BaselineStones = userState.Stones
 	state.Kills = 0
@@ -318,6 +328,7 @@ func (s *AfkService) loadPlayerState(ctx context.Context, nickname string) (afkP
 		HiddenSince:    parseInt64(values["hidden_since"]),
 		AfkActive:      parseBool(values["afk_active"]),
 		AfkStartedAt:   parseInt64(values["afk_started_at"]),
+		AfkRoomID:      strings.TrimSpace(values["afk_room_id"]),
 		BaselineGold:   parseInt64(values["baseline_gold"]),
 		BaselineStones: parseInt64(values["baseline_stones"]),
 		Kills:          parseInt64(values["kills"]),
@@ -335,6 +346,7 @@ func (s *AfkService) savePlayerState(ctx context.Context, nickname string, state
 		"hidden_since":    strconv.FormatInt(state.HiddenSince, 10),
 		"afk_active":      boolToInt(state.AfkActive),
 		"afk_started_at":  strconv.FormatInt(state.AfkStartedAt, 10),
+		"afk_room_id":     state.AfkRoomID,
 		"baseline_gold":   strconv.FormatInt(state.BaselineGold, 10),
 		"baseline_stones": strconv.FormatInt(state.BaselineStones, 10),
 		"kills":           strconv.FormatInt(state.Kills, 10),

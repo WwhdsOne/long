@@ -11,12 +11,18 @@ import (
 
 // GetAdminState 返回后台页面所需的聚合数据。
 func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
-	boss, err := s.currentBoss(ctx)
+	return s.GetAdminStateForRoom(ctx, s.defaultRoomID())
+}
+
+// GetAdminStateForRoom 返回指定房间后台页面所需的聚合数据。
+func (s *Store) GetAdminStateForRoom(ctx context.Context, roomID string) (AdminState, error) {
+	roomID = s.normalizeRoomID(roomID)
+	boss, err := s.currentBossForRoom(ctx, roomID)
 	if err != nil {
 		return AdminState{}, err
 	}
 
-	bossCycleEnabled, err := s.bossCycleEnabled(ctx)
+	bossCycleEnabled, err := s.bossCycleEnabledForRoom(ctx, roomID)
 	if err != nil {
 		return AdminState{}, err
 	}
@@ -24,7 +30,7 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	if err != nil {
 		return AdminState{}, err
 	}
-	bossCycleQueue, err := s.GetBossCycleQueue(ctx)
+	bossCycleQueue, err := s.GetBossCycleQueueForRoom(ctx, roomID)
 	if err != nil {
 		return AdminState{}, err
 	}
@@ -49,6 +55,8 @@ func (s *Store) GetAdminState(ctx context.Context) (AdminState, error) {
 	}
 
 	return AdminState{
+		RoomID:            roomID,
+		QueueID:           s.queueIDForRoom(roomID),
 		Boss:              boss,
 		BossLeaderboard:   bossLeaderboard,
 		Equipment:         []EquipmentDefinition{},
@@ -143,8 +151,14 @@ func (s *Store) DeleteEquipmentDefinition(ctx context.Context, itemID string) er
 
 // ActivateBoss 覆盖当前活动 Boss。
 func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error) {
+	return s.ActivateBossInRoom(ctx, s.defaultRoomID(), boss)
+}
+
+// ActivateBossInRoom 覆盖指定房间当前活动 Boss。
+func (s *Store) ActivateBossInRoom(ctx context.Context, roomID string, boss BossUpsert) (*Boss, error) {
+	roomID = s.normalizeRoomID(firstNonEmpty(boss.RoomID, roomID))
 	// 保存旧 Boss 到历史
-	if old, err := s.currentBoss(ctx); err == nil && old != nil {
+	if old, err := s.currentBossForRoom(ctx, roomID); err == nil && old != nil {
 		_ = s.SaveBossToHistory(ctx, old)
 	}
 
@@ -161,6 +175,8 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 
 	current := &Boss{
 		ID:                 bossID,
+		RoomID:             roomID,
+		QueueID:            s.queueIDForRoom(roomID),
 		Name:               firstNonEmpty(strings.TrimSpace(boss.Name), bossID),
 		Status:             bossStatusActive,
 		MaxHP:              maxHP,
@@ -181,11 +197,17 @@ func (s *Store) ActivateBoss(ctx context.Context, boss BossUpsert) (*Boss, error
 
 // DeactivateBoss 清空当前 Boss。
 func (s *Store) DeactivateBoss(ctx context.Context) error {
-	old, err := s.currentBoss(ctx)
+	return s.DeactivateBossInRoom(ctx, s.defaultRoomID())
+}
+
+// DeactivateBossInRoom 清空指定房间当前 Boss。
+func (s *Store) DeactivateBossInRoom(ctx context.Context, roomID string) error {
+	roomID = s.normalizeRoomID(roomID)
+	old, err := s.currentBossForRoom(ctx, roomID)
 	if err == nil && old != nil {
 		_ = s.SaveBossToHistory(ctx, old)
 	}
-	enabled, cycleErr := s.bossCycleEnabled(ctx)
+	enabled, cycleErr := s.bossCycleEnabledForRoom(ctx, roomID)
 	if cycleErr != nil {
 		return cycleErr
 	}
@@ -194,15 +216,15 @@ func (s *Store) DeactivateBoss(ctx context.Context) error {
 		if old != nil {
 			nextTemplateID = old.TemplateID
 		}
-		if _, err := s.activateNextBossFromCycle(ctx, nextTemplateID); err != nil {
+		if _, err := s.activateNextBossFromCycleForRoom(ctx, roomID, nextTemplateID); err != nil {
 			if !errors.Is(err, ErrBossPoolEmpty) && !errors.Is(err, ErrBossCycleQueueEmpty) {
 				return err
 			}
-			return s.client.Del(ctx, s.bossCurrentKey).Err()
+			return s.client.Del(ctx, s.bossCurrentKeyForRoom(roomID)).Err()
 		}
 		return nil
 	}
-	return s.client.Del(ctx, s.bossCurrentKey).Err()
+	return s.client.Del(ctx, s.bossCurrentKeyForRoom(roomID)).Err()
 }
 
 // SetBossLoot 覆盖指定 Boss 的掉落池。

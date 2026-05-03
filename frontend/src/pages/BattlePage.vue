@@ -2,6 +2,7 @@
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import PixelEffectCanvas from '../components/PixelEffectCanvas.vue'
+import RoomSelector from '../components/RoomSelector.vue'
 import {formatCompact} from '../utils/formatNumber.js'
 
 const {
@@ -11,6 +12,10 @@ const {
   bossGoldRange,
   bossStoneRange,
   bossTalentPointsOnKill,
+  currentRoomId,
+  rooms,
+  roomSwitching,
+  roomError,
   leaderboard,
   nickname,
   loading,
@@ -47,6 +52,7 @@ const {
   equipmentNameClass,
   rewardModal,
   closeRewardModal,
+  joinRoom,
   clickButton,
   globalStatusList,
   partProgressList,
@@ -592,6 +598,15 @@ const silverStormActive = computed(() => {
     <section class="vote-stage">
 
       <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
+
+      <RoomSelector
+          :rooms="rooms"
+          :current-room-id="currentRoomId"
+          :switching="roomSwitching"
+          :error="roomError"
+          :logged-in="isLoggedIn"
+          @join="joinRoom"
+      />
 
       <section
           class="vote-stage__boss-hud vote-stage__boss-hud--merged"
