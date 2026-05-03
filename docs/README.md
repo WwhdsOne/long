@@ -61,6 +61,10 @@
 - [architecture/2026-05-03-房间分线方案.md](./architecture/2026-05-03-房间分线方案.md)
 - [demos/room-battle-preview.html](./demos/room-battle-preview.html)
 
+### 反滥用
+
+- [superpowers/specs/2026-05-03-script-detection-design.md](./superpowers/specs/2026-05-03-script-detection-design.md)
+
 ### Boss 与战斗表现
 
 - [designs/2026-04-25-Boss分区基础视觉与点击口径设计.md](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
