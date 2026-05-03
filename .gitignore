@@ -11,8 +11,8 @@ node_modules/
 long.tar.gz
 *.tar.gz
 /scripts/__pycache__
-server
 backend/reports
+backend/server
 # 依赖
 vendor/
 
