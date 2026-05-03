@@ -163,33 +163,33 @@ func (h *HertzLogger) refreshSugar() {
 
 // — Logger —
 
-func (h *HertzLogger) Trace(v ...interface{})            { h.sugar.Debug(v...) }
-func (h *HertzLogger) Debug(v ...interface{})            { h.sugar.Debug(v...) }
-func (h *HertzLogger) Info(v ...interface{})             { h.sugar.Info(v...) }
-func (h *HertzLogger) Notice(v ...interface{})           { h.sugar.Warn(v...) }
-func (h *HertzLogger) Warn(v ...interface{})             { h.sugar.Warn(v...) }
-func (h *HertzLogger) Error(v ...interface{})            { h.sugar.Error(v...) }
-func (h *HertzLogger) Fatal(v ...interface{})            { h.sugar.Fatal(v...) }
+func (h *HertzLogger) Trace(v ...any)  { h.sugar.Debug(v...) }
+func (h *HertzLogger) Debug(v ...any)  { h.sugar.Debug(v...) }
+func (h *HertzLogger) Info(v ...any)   { h.sugar.Info(v...) }
+func (h *HertzLogger) Notice(v ...any) { h.sugar.Warn(v...) }
+func (h *HertzLogger) Warn(v ...any)   { h.sugar.Warn(v...) }
+func (h *HertzLogger) Error(v ...any)  { h.sugar.Error(v...) }
+func (h *HertzLogger) Fatal(v ...any)  { h.sugar.Fatal(v...) }
 
 // — FormatLogger —
 
-func (h *HertzLogger) Tracef(f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
-func (h *HertzLogger) Debugf(f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
-func (h *HertzLogger) Infof(f string, v ...interface{})   { h.sugar.Infof(f, v...) }
-func (h *HertzLogger) Noticef(f string, v ...interface{}) { h.sugar.Warnf(f, v...) }
-func (h *HertzLogger) Warnf(f string, v ...interface{})   { h.sugar.Warnf(f, v...) }
-func (h *HertzLogger) Errorf(f string, v ...interface{})  { h.sugar.Errorf(f, v...) }
-func (h *HertzLogger) Fatalf(f string, v ...interface{})  { h.sugar.Fatalf(f, v...) }
+func (h *HertzLogger) Tracef(f string, v ...any)  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) Debugf(f string, v ...any)  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) Infof(f string, v ...any)   { h.sugar.Infof(f, v...) }
+func (h *HertzLogger) Noticef(f string, v ...any) { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) Warnf(f string, v ...any)   { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) Errorf(f string, v ...any)  { h.sugar.Errorf(f, v...) }
+func (h *HertzLogger) Fatalf(f string, v ...any)  { h.sugar.Fatalf(f, v...) }
 
 // — CtxLogger —
 
-func (h *HertzLogger) CtxTracef(_ context.Context, f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
-func (h *HertzLogger) CtxDebugf(_ context.Context, f string, v ...interface{})  { h.sugar.Debugf(f, v...) }
-func (h *HertzLogger) CtxInfof(_ context.Context, f string, v ...interface{})   { h.sugar.Infof(f, v...) }
-func (h *HertzLogger) CtxNoticef(_ context.Context, f string, v ...interface{}) { h.sugar.Warnf(f, v...) }
-func (h *HertzLogger) CtxWarnf(_ context.Context, f string, v ...interface{})   { h.sugar.Warnf(f, v...) }
-func (h *HertzLogger) CtxErrorf(_ context.Context, f string, v ...interface{})  { h.sugar.Errorf(f, v...) }
-func (h *HertzLogger) CtxFatalf(_ context.Context, f string, v ...interface{})  { h.sugar.Fatalf(f, v...) }
+func (h *HertzLogger) CtxTracef(_ context.Context, f string, v ...any)  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) CtxDebugf(_ context.Context, f string, v ...any)  { h.sugar.Debugf(f, v...) }
+func (h *HertzLogger) CtxInfof(_ context.Context, f string, v ...any)   { h.sugar.Infof(f, v...) }
+func (h *HertzLogger) CtxNoticef(_ context.Context, f string, v ...any) { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) CtxWarnf(_ context.Context, f string, v ...any)   { h.sugar.Warnf(f, v...) }
+func (h *HertzLogger) CtxErrorf(_ context.Context, f string, v ...any)  { h.sugar.Errorf(f, v...) }
+func (h *HertzLogger) CtxFatalf(_ context.Context, f string, v ...any)  { h.sugar.Fatalf(f, v...) }
 
 // — Control —
 
