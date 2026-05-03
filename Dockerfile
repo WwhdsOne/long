@@ -10,6 +10,6 @@ COPY backend/long ./long
 EXPOSE 16002
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:16002/api/health || exit 1
+  CMD ["./long", "healthcheck"]
 
 ENTRYPOINT ["./long"]

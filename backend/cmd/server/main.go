@@ -6,12 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	_ "time/tzdata"                            // 时区数据库（嵌入 Go 二进制）
+	_ "golang.org/x/crypto/x509roots/fallback" // Mozilla 根证书（嵌入 Go 二进制）
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
@@ -36,6 +40,17 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		port := os.Getenv("LONG_LISTEN_PORT")
+		if port == "" {
+			port = "16002"
+		}
+		resp, err := http.Get("http://localhost:" + port + "/api/health")
+		if err != nil || resp.StatusCode != 200 {
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
