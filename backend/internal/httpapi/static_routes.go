@@ -29,43 +29,55 @@ func registerStaticRoutes(engine *route.Engine, _ Options) {
 		return
 	}
 
-	serveEmbedFile := func(c *app.RequestContext, path string) {
-		data, err := fs.ReadFile(publicFS, path)
-		if err != nil {
-			c.AbortWithStatus(consts.StatusNotFound)
-			return
-		}
-		ext := filepath.Ext(path)
-		if ct := mime.TypeByExtension(ext); ct != "" {
-			c.Response.Header.Set("Content-Type", ct)
-		}
-		c.Write(data)
-	}
-
-	// SPA fallback: 非 /api/ 路径尝试读取对应文件，不存在则回退到 index.html
-	engine.NoRoute(func(_ context.Context, c *app.RequestContext) {
-		path := string(c.Path())
+	// 显式 GET 通配路由，优先于 NoRoute，避免走 notFound 链路
+	engine.GET("/*filepath", func(_ context.Context, c *app.RequestContext) {
+		path := string(c.Param("filepath"))
 
 		if strings.HasPrefix(path, "/api/") || path == "/api" {
 			c.AbortWithStatus(consts.StatusNotFound)
 			return
 		}
 
-		if !c.IsGet() && !c.IsHead() {
+		cleanedPath := strings.TrimPrefix(filepath.Clean(path), "/")
+		if cleanedPath == "" {
+			cleanedPath = "index.html"
+		}
+
+		// 先尝试读取对应文件
+		if data, err := fs.ReadFile(publicFS, cleanedPath); err == nil {
+			ext := filepath.Ext(cleanedPath)
+			if ct := mime.TypeByExtension(ext); ct != "" {
+				c.Response.Header.Set("Content-Type", ct)
+			}
+			c.Write(data)
+			return
+		}
+
+		// SPA fallback：非 API 路径回退到 index.html
+		if data, err := fs.ReadFile(publicFS, "index.html"); err == nil {
+			c.Response.Header.Set("Content-Type", "text/html; charset=utf-8")
+			c.Write(data)
+			return
+		}
+
+		c.AbortWithStatus(consts.StatusNotFound)
+	})
+
+	// NoRoute 兜底：非 GET 请求或无匹配时
+	engine.NoRoute(func(_ context.Context, c *app.RequestContext) {
+		path := string(c.Path())
+
+		if strings.HasPrefix(path, "/api") && path != "/api" {
 			c.AbortWithStatus(consts.StatusNotFound)
 			return
 		}
 
-		cleanedPath := strings.TrimPrefix(filepath.Clean("/"+strings.TrimPrefix(path, "/")), "/")
-
-		if cleanedPath != "" {
-			if _, err := fs.Stat(publicFS, cleanedPath); err == nil {
-				serveEmbedFile(c, cleanedPath)
-				return
-			}
+		if data, err := fs.ReadFile(publicFS, "index.html"); err == nil {
+			c.Response.Header.Set("Content-Type", "text/html; charset=utf-8")
+			c.Write(data)
+			return
 		}
 
-		// SPA fallback
-		serveEmbedFile(c, "index.html")
+		c.AbortWithStatus(consts.StatusNotFound)
 	})
 }
