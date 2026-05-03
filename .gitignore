@@ -13,6 +13,7 @@ long.tar.gz
 /scripts/__pycache__
 backend/reports
 backend/server
+backend/long
 # 依赖
 vendor/
 

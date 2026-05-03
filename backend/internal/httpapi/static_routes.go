@@ -29,7 +29,36 @@ func registerStaticRoutes(engine *route.Engine, _ Options) {
 		return
 	}
 
-	// 显式 GET 通配路由，优先于 NoRoute，避免走 notFound 链路
+	// 显式为内嵌的静态文件注册路由，确保不走 NoRoute 链路
+	serveFile := func(path string) app.HandlerFunc {
+		return func(_ context.Context, c *app.RequestContext) {
+			data, err := fs.ReadFile(publicFS, path)
+			if err != nil {
+				c.AbortWithStatus(consts.StatusNotFound)
+				return
+			}
+			ext := filepath.Ext(path)
+			if ct := mime.TypeByExtension(ext); ct != "" {
+				c.Response.Header.Set("Content-Type", ct)
+			}
+			c.Write(data)
+		}
+	}
+
+	// 根路径和独立文件用精确路由
+	engine.GET("/", func(_ context.Context, c *app.RequestContext) {
+		data, err := fs.ReadFile(publicFS, "index.html")
+		if err != nil {
+			c.AbortWithStatus(consts.StatusNotFound)
+			return
+		}
+		c.Response.Header.Set("Content-Type", "text/html; charset=utf-8")
+		c.Write(data)
+	})
+	engine.GET("/favicon.svg", serveFile("favicon.svg"))
+	engine.GET("/icons.svg", serveFile("icons.svg"))
+
+	// /assets、/images、/effects 等目录用通配路由
 	engine.GET("/*filepath", func(_ context.Context, c *app.RequestContext) {
 		path := string(c.Param("filepath"))
 
@@ -40,10 +69,10 @@ func registerStaticRoutes(engine *route.Engine, _ Options) {
 
 		cleanedPath := strings.TrimPrefix(filepath.Clean(path), "/")
 		if cleanedPath == "" {
-			cleanedPath = "index.html"
+			c.Redirect(consts.StatusMovedPermanently, []byte("/"))
+			return
 		}
 
-		// 先尝试读取对应文件
 		if data, err := fs.ReadFile(publicFS, cleanedPath); err == nil {
 			ext := filepath.Ext(cleanedPath)
 			if ct := mime.TypeByExtension(ext); ct != "" {
@@ -53,7 +82,7 @@ func registerStaticRoutes(engine *route.Engine, _ Options) {
 			return
 		}
 
-		// SPA fallback：非 API 路径回退到 index.html
+		// SPA fallback
 		if data, err := fs.ReadFile(publicFS, "index.html"); err == nil {
 			c.Response.Header.Set("Content-Type", "text/html; charset=utf-8")
 			c.Write(data)
