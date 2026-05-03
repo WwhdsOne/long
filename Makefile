@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 GO ?= go
-BUN ?= bun
+BUN ?= ~/.bun/bin/bun
 MAKEFLAGS += --no-print-directory
 
 .DEFAULT_GOAL := help

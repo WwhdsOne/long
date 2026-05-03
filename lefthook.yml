@@ -8,4 +8,4 @@ pre-commit:
     backend-vet:
       run: go -C backend vet ./...
     frontend-test:
-      run: bun --cwd=frontend run test
+      run: ~/.bun/bin/bun --cwd=frontend run test
