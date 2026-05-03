@@ -2,7 +2,10 @@ package xlog
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -42,7 +45,9 @@ var systemLogHook func(zapcore.Entry) error
 func Init(cfg Config) (*zap.Logger, error) {
 	loggerConfig := zap.NewProductionConfig()
 	loggerConfig.Level = zap.NewAtomicLevelAt(parseLevel(cfg.Level))
-	loggerConfig.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	loggerConfig.EncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString(t.Format("2006-01-02 15:04:05"))
+	}
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.LowercaseLevelEncoder
 	loggerConfig.DisableCaller = !cfg.IncludeCaller
 
@@ -59,6 +64,11 @@ func Init(cfg Config) (*zap.Logger, error) {
 	if systemLogHook != nil {
 		logger = logger.WithOptions(zap.Hooks(systemLogHook))
 	}
+
+	// 包装 uuidCore，为每条日志添加唯一 UUID
+	logger = logger.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+		return &uuidCore{Core: c}
+	}))
 
 	globalLogger = logger
 	zap.ReplaceGlobals(logger)
@@ -116,4 +126,24 @@ func parseLevel(level string) zapcore.Level {
 	default:
 		return zapcore.InfoLevel
 	}
+}
+
+// generateUUID 生成一个简单的 UUID v4。
+func generateUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant 10
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+// uuidCore 包装 zapcore.Core，为每条日志添加唯一 UUID。
+type uuidCore struct {
+	zapcore.Core
+}
+
+func (c *uuidCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
+	// 在日志写入前添加 UUID 字段
+	fields = append(fields, zap.String("log_id", generateUUID()))
+	return c.Core.Write(entry, fields)
 }
