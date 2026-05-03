@@ -596,7 +596,7 @@ watch(isLoggedIn, (val) => {
                 alt=""
             />
             <span class="talent-dot__name">{{ item.name }}</span>
-            <span class="talent-dot__meta">{{ tierLabels[item.tier] || '' }} · {{ item.cost }}点</span>
+            <span class="talent-dot__meta">{{ tierLabels[item.tier] || '' }} · {{ talentCostForLevel(item, 1) }}点</span>
           </button>
 
           <div v-if="selectedNode" class="talent-float" :style="detailFloatStyle()">
