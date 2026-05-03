@@ -27,6 +27,8 @@ type onlineCountPayload struct {
 type realtimeUserStatePayload struct {
 	UserStats                          *core.UserStats           `json:"userStats,omitempty"`
 	MyBossStats                        *core.BossUserStats       `json:"myBossStats,omitempty"`
+	MyBossKills                        int64                     `json:"myBossKills"`
+	TotalBossKills                     int64                     `json:"totalBossKills"`
 	RoomID                             string                    `json:"roomId,omitempty"`
 	Loadout                            core.Loadout              `json:"loadout"`
 	CombatStats                        core.CombatStats          `json:"combatStats"`
@@ -189,6 +191,8 @@ func buildRealtimeUserStatePayload(state core.UserState) realtimeUserStatePayloa
 	return realtimeUserStatePayload{
 		UserStats:                          state.UserStats,
 		MyBossStats:                        state.MyBossStats,
+		MyBossKills:                        state.MyBossKills,
+		TotalBossKills:                     state.TotalBossKills,
 		RoomID:                             state.RoomID,
 		Loadout:                            state.Loadout,
 		CombatStats:                        state.CombatStats,

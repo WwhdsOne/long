@@ -126,6 +126,7 @@ const currentRoomId = ref('1')
 const rooms = ref([])
 const roomSwitching = ref(false)
 const roomError = ref('')
+const roomSwitchCooldownEndsAt = ref(0)
 
 const bossLeaderboard = ref([])
 const bossLoot = ref([])
@@ -137,6 +138,8 @@ const latestAnnouncement = ref(null)
 const announcements = ref([])
 const myBossStats = ref(null)
 const myBossDamageValue = ref(0)
+const myBossKills = ref(0)
+const totalBossKills = ref(0)
 const bossLeaderboardCountValue = ref(-1)
 const inventory = ref([])
 const tasks = ref([])
@@ -710,6 +713,12 @@ const myBossRank = computed(() => {
 const effectiveIncrement = computed(() => combatStats.value?.effectiveIncrement ?? 1)
 const normalDamage = computed(() => combatStats.value?.normalDamage ?? effectiveIncrement.value)
 const criticalDamage = computed(() => combatStats.value?.criticalDamage ?? normalDamage.value)
+
+function setRoomSwitchCooldown(remainingSeconds) {
+    const seconds = Math.max(0, Number(remainingSeconds ?? 0))
+    roomSwitchCooldownEndsAt.value = seconds > 0 ? Date.now() + seconds * 1000 : 0
+}
+
 const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetKey.value))
 const autoClickStatus = computed(() => {
     void autoClickEnabled.value
@@ -1504,6 +1513,12 @@ function applyBattleUserState(payload) {
 
     if ('userStats' in payload) {
         userStats.value = payload.userStats ?? null
+    }
+    if ('myBossKills' in payload) {
+        myBossKills.value = Math.max(0, Number(payload.myBossKills ?? 0))
+    }
+    if ('totalBossKills' in payload) {
+        totalBossKills.value = Math.max(0, Number(payload.totalBossKills ?? 0))
     }
     if ('myBossStats' in payload) {
         myBossStats.value = payload.myBossStats ?? null
@@ -2330,6 +2345,7 @@ async function loadRooms() {
         const payload = await response.json()
         currentRoomId.value = String(payload?.currentRoomId || currentRoomId.value || '1')
         rooms.value = Array.isArray(payload?.rooms) ? payload.rooms : []
+        setRoomSwitchCooldown(payload?.switchCooldownRemainingSeconds ?? 0)
         roomError.value = ''
     } catch (error) {
         roomError.value = error.message || '房间列表加载失败。'
@@ -2370,6 +2386,7 @@ async function joinRoom(roomId) {
         const payload = await response.json()
         currentRoomId.value = String(payload?.currentRoomId || targetRoomId)
         rooms.value = Array.isArray(payload?.rooms) ? payload.rooms : rooms.value
+        setRoomSwitchCooldown(payload?.cooldownRemainingSeconds ?? payload?.switchCooldownRemainingSeconds ?? 0)
         connectRealtime(nickname.value)
         await loadState()
         await loadRooms()
@@ -2825,6 +2842,7 @@ export function usePublicPageState() {
         rooms,
         roomSwitching,
         roomError,
+        roomSwitchCooldownEndsAt,
         bossLeaderboard,
         bossLoot,
         bossGoldRange,
@@ -2908,6 +2926,8 @@ export function usePublicPageState() {
         onlineCount,
         isLoggedIn,
         myClicks,
+        myBossKills,
+        totalBossKills,
         myRank,
         myBossDamage,
         bossLeaderboardCount,

@@ -325,6 +325,8 @@ type Snapshot struct {
 type UserState struct {
 	UserStats                          *UserStats           `json:"userStats,omitempty"`
 	MyBossStats                        *BossUserStats       `json:"myBossStats,omitempty"`
+	MyBossKills                        int64                `json:"myBossKills"`
+	TotalBossKills                     int64                `json:"totalBossKills"`
 	RoomID                             string               `json:"roomId,omitempty"`
 	Inventory                          []InventoryItem      `json:"inventory"`
 	Loadout                            Loadout              `json:"loadout"`
@@ -352,6 +354,8 @@ type State struct {
 	AnnouncementVersion                string                 `json:"announcementVersion,omitempty"`
 	LatestAnnouncement                 *Announcement          `json:"latestAnnouncement,omitempty"`
 	MyBossStats                        *BossUserStats         `json:"myBossStats,omitempty"`
+	MyBossKills                        int64                  `json:"myBossKills"`
+	TotalBossKills                     int64                  `json:"totalBossKills"`
 	Inventory                          []InventoryItem        `json:"inventory"`
 	Loadout                            Loadout                `json:"loadout"`
 	CombatStats                        CombatStats            `json:"combatStats"`
@@ -743,6 +747,28 @@ func (s *Store) GetSnapshotForNickname(ctx context.Context, nickname string) (Sn
 
 // GetSnapshotForRoom 获取指定房间的公共快照。
 func (s *Store) GetSnapshotForRoom(ctx context.Context, roomID string) (Snapshot, error) {
+	if isHallRoomID(roomID) {
+		totalVotes, err := s.totalClickCount(ctx)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		leaderboard, err := s.ListLeaderboard(ctx, 10)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		announcementVersion, err := s.GetLatestAnnouncementVersion(ctx)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		return Snapshot{
+			TotalVotes:          totalVotes,
+			Leaderboard:         leaderboard,
+			RoomID:              hallRoomID,
+			Boss:                nil,
+			BossLeaderboard:     []BossLeaderboardEntry{},
+			AnnouncementVersion: announcementVersion,
+		}, nil
+	}
 	roomID = s.normalizeRoomID(roomID)
 	totalVotes, err := s.totalClickCount(ctx)
 	if err != nil {
@@ -806,7 +832,12 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 		RecentRewards: []Reward{},
 		Tasks:         []PlayerTask{},
 	}
-	userState.RoomID = s.defaultRoomID()
+	userState.RoomID = hallRoomID
+	totalBossKills, err := s.totalBossKills(ctx)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.TotalBossKills = totalBossKills
 
 	trimmedNickname, hasNickname := normalizeNickname(nickname)
 	if !hasNickname {
@@ -830,6 +861,14 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	userState.Gold = resources.Gold
 	userState.Stones = resources.Stones
 	userState.TalentPoints = resources.TalentPoints
+	userState.MyBossKills = resources.BossKills
+	if userState.MyBossKills <= 0 {
+		fallbackKills, fallbackErr := s.historyBossKillsForNickname(ctx, normalizedNickname)
+		if fallbackErr != nil {
+			return UserState{}, fallbackErr
+		}
+		userState.MyBossKills = fallbackKills
+	}
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
 	if err != nil {
@@ -1406,6 +1445,8 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		BossLeaderboard:                    snapshot.BossLeaderboard,
 		AnnouncementVersion:                snapshot.AnnouncementVersion,
 		MyBossStats:                        userState.MyBossStats,
+		MyBossKills:                        userState.MyBossKills,
+		TotalBossKills:                     userState.TotalBossKills,
 		Inventory:                          userState.Inventory,
 		Loadout:                            userState.Loadout,
 		CombatStats:                        userState.CombatStats,
@@ -2351,6 +2392,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 	}
 
 	pipe := s.client.Pipeline()
+	pipe.Incr(ctx, s.totalBossKillsKey())
 	now := s.now().Unix()
 	minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
 	goldBase := boss.GoldOnKill
@@ -2380,6 +2422,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 		if talentPointBase > 0 {
 			pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", talentPointBase)
 		}
+		pipe.HIncrBy(ctx, s.resourceKey(nickname), "boss_kills", 1)
 
 		if len(lootEntries) == 0 {
 			continue
@@ -2691,10 +2734,16 @@ func (s *Store) currentBoss(ctx context.Context) (*Boss, error) {
 }
 
 func (s *Store) currentBossForRoom(ctx context.Context, roomID string) (*Boss, error) {
+	if isHallRoomID(roomID) {
+		return nil, nil
+	}
 	return s.currentBossFromCmdable(ctx, s.client, roomID)
 }
 
 func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable, roomID string) (*Boss, error) {
+	if isHallRoomID(roomID) {
+		return nil, nil
+	}
 	roomID = s.normalizeRoomID(roomID)
 	values, err := client.HMGet(ctx, s.bossCurrentKeyForRoom(roomID),
 		"id",
@@ -3391,11 +3440,17 @@ type playerResources struct {
 	Gold         int64
 	Stones       int64
 	TalentPoints int64
+	BossKills    int64
+}
+
+type BossKillBackfillStats struct {
+	HistoryBosses int64
+	PlayerCount   int64
 }
 
 func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
 	resourceKey := s.resourceKey(nickname)
-	values, err := s.client.HMGet(ctx, resourceKey, "gold", "stones", "talent_points").Result()
+	values, err := s.client.HMGet(ctx, resourceKey, "gold", "stones", "talent_points", "boss_kills").Result()
 	if err != nil {
 		return playerResources{}, err
 	}
@@ -3404,6 +3459,7 @@ func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (play
 		Gold:         int64Value(values, 0),
 		Stones:       int64Value(values, 1),
 		TalentPoints: int64Value(values, 2),
+		BossKills:    int64Value(values, 3),
 	}, nil
 }
 
@@ -3437,6 +3493,125 @@ func (s *Store) bossDamageKey(bossID string) string {
 
 func (s *Store) bossLootKey(bossID string) string {
 	return s.namespace + "boss:" + bossID + ":loot"
+}
+
+func (s *Store) totalBossKillsKey() string {
+	return s.namespace + "total:boss:kills"
+}
+
+func (s *Store) totalBossKills(ctx context.Context) (int64, error) {
+	value, err := s.client.Get(ctx, s.totalBossKillsKey()).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			if s.bossHistoryStore != nil {
+				items, listErr := s.bossHistoryStore.ListBossHistory(ctx)
+				if listErr != nil {
+					return 0, listErr
+				}
+				return int64(len(items)), nil
+			}
+			count, countErr := s.client.ZCard(ctx, s.bossHistoryKey).Result()
+			if countErr != nil {
+				return 0, countErr
+			}
+			return count, nil
+		}
+		return 0, err
+	}
+	return int64FromString(value), nil
+}
+
+func (s *Store) historyBossKillsForNickname(ctx context.Context, nickname string) (int64, error) {
+	entries, err := s.ListBossHistory(ctx)
+	if err != nil {
+		return 0, err
+	}
+	normalizedNickname := strings.TrimSpace(nickname)
+	if normalizedNickname == "" {
+		return 0, nil
+	}
+	var total int64
+	for _, entry := range entries {
+		counted := false
+		if score, scoreErr := s.client.ZScore(ctx, s.bossDamageKey(entry.Boss.ID), normalizedNickname).Result(); scoreErr == nil && score > 0 {
+			total++
+			continue
+		}
+		for _, item := range entry.Damage {
+			if item.Nickname == normalizedNickname && item.Damage > 0 {
+				counted = true
+				break
+			}
+		}
+		if counted {
+			total++
+		}
+	}
+	return total, nil
+}
+
+func (s *Store) RebuildBossKillCounters(ctx context.Context) (BossKillBackfillStats, error) {
+	entries, err := s.ListBossHistory(ctx)
+	if err != nil {
+		return BossKillBackfillStats{}, err
+	}
+
+	perPlayer := make(map[string]int64)
+	for _, entry := range entries {
+		seen := make(map[string]struct{})
+		damageEntries, damageErr := s.client.ZRangeWithScores(ctx, s.bossDamageKey(entry.ID), 0, -1).Result()
+		if damageErr == nil && len(damageEntries) > 0 {
+			for _, item := range damageEntries {
+				nickname, ok := item.Member.(string)
+				if !ok || strings.TrimSpace(nickname) == "" || item.Score <= 0 {
+					continue
+				}
+				seen[strings.TrimSpace(nickname)] = struct{}{}
+			}
+		} else {
+			for _, item := range entry.Damage {
+				if strings.TrimSpace(item.Nickname) == "" || item.Damage <= 0 {
+					continue
+				}
+				seen[strings.TrimSpace(item.Nickname)] = struct{}{}
+			}
+		}
+		for nickname := range seen {
+			perPlayer[nickname]++
+		}
+	}
+
+	allNicknames, err := s.listPlayerNicknames(ctx)
+	if err != nil {
+		return BossKillBackfillStats{}, err
+	}
+	for nickname := range perPlayer {
+		if !slices.Contains(allNicknames, nickname) {
+			allNicknames = append(allNicknames, nickname)
+		}
+	}
+
+	pipe := s.client.TxPipeline()
+	for _, nickname := range allNicknames {
+		trimmedNickname := strings.TrimSpace(nickname)
+		if trimmedNickname == "" {
+			continue
+		}
+		if count, ok := perPlayer[trimmedNickname]; ok && count > 0 {
+			pipe.HSet(ctx, s.resourceKey(trimmedNickname), "boss_kills", strconv.FormatInt(count, 10))
+			continue
+		}
+		pipe.HDel(ctx, s.resourceKey(trimmedNickname), "boss_kills")
+	}
+	pipe.Set(ctx, s.totalBossKillsKey(), strconv.FormatInt(int64(len(entries)), 10), 0)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return BossKillBackfillStats{}, err
+	}
+
+	return BossKillBackfillStats{
+		HistoryBosses: int64(len(entries)),
+		PlayerCount:   int64(len(perPlayer)),
+	}, nil
 }
 
 func (s *Store) bossTemplateKey(templateID string) string {

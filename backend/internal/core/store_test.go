@@ -272,6 +272,225 @@ func TestClickBossPartUsesPlayerRoom(t *testing.T) {
 	}
 }
 
+func TestBossKillAccumulatesPlayerAndGlobalCounts(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 1,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1, CurrentHP: 1, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+
+	if _, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明"); err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state: %v", err)
+	}
+	if state.MyBossKills != 1 {
+		t.Fatalf("expected my boss kills to be 1, got %d", state.MyBossKills)
+	}
+	if state.TotalBossKills != 1 {
+		t.Fatalf("expected total boss kills to be 1, got %d", state.TotalBossKills)
+	}
+}
+
+func TestTotalBossKillsCountsBossDefeatsNotParticipants(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 100,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+
+	if _, err := store.client.ZAdd(ctx, store.bossDamageKey("room-1-boss"),
+		redis.Z{Score: 80, Member: "阿明"},
+		redis.Z{Score: 20, Member: "小红"},
+	).Result(); err != nil {
+		t.Fatalf("seed boss damage leaderboard: %v", err)
+	}
+
+	boss, err := store.GetCurrentBossForRoom(ctx, "1")
+	if err != nil {
+		t.Fatalf("get current boss: %v", err)
+	}
+
+	if _, _, err := store.finalizeBossKill(ctx, boss, false, ""); err != nil {
+		t.Fatalf("finalize boss kill: %v", err)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state: %v", err)
+	}
+	if state.TotalBossKills != 1 {
+		t.Fatalf("expected total boss defeats to be 1, got %d", state.TotalBossKills)
+	}
+}
+
+func TestTotalBossKillsFallsBackToBossHistoryWhenCounterMissing(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossToHistory(ctx, &Boss{
+		ID:         "history-boss-1",
+		Name:       "历史 Boss",
+		RoomID:     "1",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  time.Now().Unix(),
+		DefeatedAt: time.Now().Unix(),
+	}); err != nil {
+		t.Fatalf("save boss history: %v", err)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state: %v", err)
+	}
+	if state.TotalBossKills != 1 {
+		t.Fatalf("expected total boss defeats fallback to history count 1, got %d", state.TotalBossKills)
+	}
+}
+
+func TestHistoryBossKillsFallbackForPlayer(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossToHistory(ctx, &Boss{
+		ID:         "history-boss-2",
+		Name:       "历史 Boss 2",
+		RoomID:     "1",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  time.Now().Unix(),
+		DefeatedAt: time.Now().Unix(),
+	}); err != nil {
+		t.Fatalf("save boss history: %v", err)
+	}
+	if _, err := store.client.ZAdd(ctx, store.bossDamageKey("history-boss-2"), redis.Z{Score: 12, Member: "阿明"}).Result(); err != nil {
+		t.Fatalf("seed history boss damage: %v", err)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state: %v", err)
+	}
+	if state.MyBossKills != 1 {
+		t.Fatalf("expected my boss kills fallback to be 1, got %d", state.MyBossKills)
+	}
+}
+
+func TestSwitchPlayerRoomAllowsHall(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 20,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 20, CurrentHP: 20, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "1"); err != nil {
+		t.Fatalf("switch into room 1: %v", err)
+	}
+	result, err := store.SwitchPlayerRoom(ctx, "阿明", "hall")
+	if err != nil {
+		t.Fatalf("switch to hall: %v", err)
+	}
+	if result.CurrentRoomID != "hall" {
+		t.Fatalf("expected current room to be hall, got %q", result.CurrentRoomID)
+	}
+}
+
+func TestRebuildBossKillCountersWritesRedis(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if err := store.SaveBossToHistory(ctx, &Boss{
+		ID:         "history-boss-a",
+		Name:       "历史 Boss A",
+		RoomID:     "1",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  now,
+		DefeatedAt: now,
+	}); err != nil {
+		t.Fatalf("save boss history a: %v", err)
+	}
+	if err := store.SaveBossToHistory(ctx, &Boss{
+		ID:         "history-boss-b",
+		Name:       "历史 Boss B",
+		RoomID:     "1",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  now + 1,
+		DefeatedAt: now + 1,
+	}); err != nil {
+		t.Fatalf("save boss history b: %v", err)
+	}
+	if _, err := store.client.ZAdd(ctx, store.bossDamageKey("history-boss-a"),
+		redis.Z{Score: 10, Member: "阿明"},
+		redis.Z{Score: 5, Member: "小红"},
+	).Result(); err != nil {
+		t.Fatalf("seed boss damage a: %v", err)
+	}
+	if _, err := store.client.ZAdd(ctx, store.bossDamageKey("history-boss-b"),
+		redis.Z{Score: 9, Member: "阿明"},
+	).Result(); err != nil {
+		t.Fatalf("seed boss damage b: %v", err)
+	}
+
+	stats, err := store.RebuildBossKillCounters(ctx)
+	if err != nil {
+		t.Fatalf("rebuild boss kill counters: %v", err)
+	}
+	if stats.HistoryBosses != 2 || stats.PlayerCount != 2 {
+		t.Fatalf("unexpected backfill stats: %+v", stats)
+	}
+
+	state, err := store.GetState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get state: %v", err)
+	}
+	if state.MyBossKills != 2 {
+		t.Fatalf("expected my boss kills 2, got %d", state.MyBossKills)
+	}
+	if state.TotalBossKills != 2 {
+		t.Fatalf("expected total boss kills 2, got %d", state.TotalBossKills)
+	}
+}
+
 func TestLearnTalentConsumesTalentPointsAndResetRefunds(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

@@ -13,6 +13,7 @@ import (
 )
 
 const fallbackRoomID = "1"
+const hallRoomID = "hall"
 
 var ErrRoomNotFound = errors.New("room not found")
 var ErrRoomSwitchCooldown = errors.New("room switch cooldown")
@@ -39,6 +40,7 @@ type RoomInfo struct {
 	CurrentBossStatus  string `json:"currentBossStatus,omitempty"`
 	CurrentBossHP      int64  `json:"currentBossHp,omitempty"`
 	CurrentBossMaxHP   int64  `json:"currentBossMaxHp,omitempty"`
+	CurrentBossAvgHP   int64  `json:"currentBossAvgHp,omitempty"`
 	CooldownRemainingS int64  `json:"cooldownRemainingSeconds,omitempty"`
 }
 
@@ -113,8 +115,15 @@ func (s *Store) isKnownRoom(roomID string) bool {
 	return slices.Contains(s.configuredRoomIDs(), roomID)
 }
 
+func isHallRoomID(roomID string) bool {
+	return strings.EqualFold(strings.TrimSpace(roomID), hallRoomID)
+}
+
 func (s *Store) normalizeRoomID(roomID string) string {
 	roomID = strings.TrimSpace(roomID)
+	if isHallRoomID(roomID) {
+		return hallRoomID
+	}
 	if s.isKnownRoom(roomID) {
 		return roomID
 	}
@@ -144,12 +153,12 @@ func (s *Store) queueIDForRoom(roomID string) string {
 func (s *Store) ResolvePlayerRoom(ctx context.Context, nickname string) (string, error) {
 	normalizedNickname, ok := normalizeNickname(nickname)
 	if !ok {
-		return s.defaultRoomID(), nil
+		return hallRoomID, nil
 	}
 	value, err := s.client.Get(ctx, s.playerRoomKey(normalizedNickname)).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return s.defaultRoomID(), nil
+			return hallRoomID, nil
 		}
 		return "", err
 	}
@@ -182,7 +191,7 @@ func (s *Store) SwitchPlayerRoom(ctx context.Context, nickname string, targetRoo
 		return RoomSwitchResult{}, err
 	}
 	targetRoomID = strings.TrimSpace(targetRoomID)
-	if !s.isKnownRoom(targetRoomID) {
+	if !isHallRoomID(targetRoomID) && !s.isKnownRoom(targetRoomID) {
 		return RoomSwitchResult{}, ErrRoomNotFound
 	}
 
@@ -195,10 +204,10 @@ func (s *Store) SwitchPlayerRoom(ctx context.Context, nickname string, targetRoo
 	if err != nil {
 		return RoomSwitchResult{}, err
 	}
-	if targetRoomID != currentRoomID && cooldownUntil > nowUnix {
+	if !isHallRoomID(targetRoomID) && targetRoomID != currentRoomID && cooldownUntil > nowUnix {
 		return RoomSwitchResult{}, ErrRoomSwitchCooldown
 	}
-	if targetRoomID != currentRoomID {
+	if !isHallRoomID(targetRoomID) && targetRoomID != currentRoomID {
 		joinable, err := s.roomJoinable(ctx, targetRoomID)
 		if err != nil {
 			return RoomSwitchResult{}, err
@@ -211,7 +220,7 @@ func (s *Store) SwitchPlayerRoom(ctx context.Context, nickname string, targetRoo
 	nextCooldownUntil := int64(0)
 	pipe := s.client.TxPipeline()
 	pipe.Set(ctx, s.playerRoomKey(normalizedNickname), targetRoomID, 0)
-	if targetRoomID != currentRoomID && s.roomConfig.SwitchCooldown > 0 {
+	if !isHallRoomID(targetRoomID) && targetRoomID != currentRoomID && s.roomConfig.SwitchCooldown > 0 {
 		nextCooldownUntil = nowUnix + int64(s.roomConfig.SwitchCooldown.Seconds())
 		pipe.Set(ctx, s.playerRoomCooldownKey(normalizedNickname), strconv.FormatInt(nextCooldownUntil, 10), s.roomConfig.SwitchCooldown)
 	}
@@ -291,6 +300,9 @@ func (s *Store) roomInfos(ctx context.Context, currentRoomID string, cooldownRem
 			info.CurrentBossStatus = boss.Status
 			info.CurrentBossHP = boss.CurrentHP
 			info.CurrentBossMaxHP = boss.MaxHP
+			if len(boss.Parts) > 0 {
+				info.CurrentBossAvgHP = boss.CurrentHP / int64(len(boss.Parts))
+			}
 		}
 		rooms = append(rooms, info)
 	}

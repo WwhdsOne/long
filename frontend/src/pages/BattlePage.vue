@@ -17,6 +17,7 @@ const {
   rooms,
   roomSwitching,
   roomError,
+  roomSwitchCooldownEndsAt,
   leaderboard,
   nickname,
   loading,
@@ -41,12 +42,11 @@ const {
   totalVotes,
   isLoggedIn,
   myClicks,
-  myRank,
+  myBossKills,
+  totalBossKills,
   myBossDamage,
   bossLeaderboardCount,
-  talentPoints,
-  myBossRank,
-  effectiveIncrement,
+  combatStats,
   bossStatusLabel,
   bossProgress,
   formatDropRate,
@@ -72,9 +72,23 @@ const bossCursorX = ref(0)
 const bossCursorY = ref(0)
 const bossCellSizePx = ref(56)
 const DEFAULT_BOSS_SWORD_CURSOR_URL = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
+const HALL_ROOM_ID = 'hall'
 const bossSwordCursorUrl = computed(() => equippedBattleClickCursorImagePath.value || DEFAULT_BOSS_SWORD_CURSOR_URL)
-const currentRoomDisplay = computed(() => `房间 ${currentRoom.value?.id || currentRoomId.value || '1'}`)
-const currentRoomSeal = computed(() => String(currentRoom.value?.id || currentRoomId.value || '1').padStart(2, '0'))
+const isHallRoom = computed(() => String(currentRoomId.value || '') === HALL_ROOM_ID)
+const currentRoomDisplay = computed(() => isHallRoom.value ? '大厅' : `房间 ${currentRoom.value?.id || currentRoomId.value || '1'}`)
+const currentRoomSeal = computed(() => isHallRoom.value ? 'HL' : String(currentRoom.value?.id || currentRoomId.value || '1').padStart(2, '0'))
+const myBattlePower = computed(() => (
+  Math.max(0, Number(combatStats.value?.attackPower || 0)) +
+  Math.max(0, Number(combatStats.value?.normalDamage || 0)) +
+  Math.max(0, Number(combatStats.value?.criticalDamage || 0))
+))
+const bossBattlePower = computed(() => {
+  if (!boss.value) return 0
+  const armorPower = Array.isArray(boss.value.parts)
+    ? boss.value.parts.reduce((sum, part) => sum + Math.max(0, Number(part?.armor || 0)), 0)
+    : 0
+  return Math.max(0, Number(boss.value.maxHp || 0)) + armorPower
+})
 
 const comboMilestoneText = ref('')
 const comboMilestoneTick = ref(0)
@@ -102,6 +116,27 @@ let tickTimer = 0
 let recoverTimer = 0
 let lastAttackTime = 0
 let lastPointerDown = 0
+
+const roomExitCooldownRemainingSeconds = computed(() => {
+  void nowTick.value
+  if (isHallRoom.value) return 0
+  const endsAt = Number(roomSwitchCooldownEndsAt.value || 0)
+  if (!Number.isFinite(endsAt) || endsAt <= 0) return 0
+  return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+})
+const roomExitLocked = computed(() => roomExitCooldownRemainingSeconds.value > 0)
+
+function formatRoomExitCooldown(seconds) {
+  const totalSeconds = Math.max(0, Number(seconds || 0))
+  const minutes = Math.floor(totalSeconds / 60)
+  const remainSeconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(remainSeconds).padStart(2, '0')}`
+}
+
+function exitCurrentRoom() {
+  if (roomExitLocked.value || roomSwitching.value) return
+  joinRoom(HALL_ROOM_ID)
+}
 
 function updateCursorPos(e) {
   const grid = bossGridRef.value
@@ -341,11 +376,6 @@ const bossZones = computed(() => {
   return grid
 })
 
-const bossPartCount = computed(() => {
-  if (!boss.value?.parts || !Array.isArray(boss.value.parts)) return 0
-  return boss.value.parts.length
-})
-
 const partTypeLabels = {
   soft: '软组织',
   heavy: '重甲',
@@ -580,8 +610,9 @@ const silverStormActive = computed(() => {
       <h1>战斗指挥中枢</h1>
       <div class="boss-hud__chips">
         <span>{{ currentRoomDisplay }}</span>
-        <span>在线同步</span>
-        <span>房间战线</span>
+        <span>我的战力 {{ formatCompact(myBattlePower) }}</span>
+        <span v-if="!isHallRoom">Boss战力 {{ formatCompact(bossBattlePower) }}</span>
+        <span v-else>选择房间后进入 Boss 战斗</span>
       </div>
     </div>
 
@@ -597,28 +628,20 @@ const silverStormActive = computed(() => {
 
   <section class="stats-band stats-band--wide" aria-label="实时统计">
     <article class="stats-band__card">
-      <span class="stats-band__label">Boss 部位</span>
-      <strong>{{ bossPartCount }}</strong>
-    </article>
-    <article class="stats-band__card">
-      <span class="stats-band__label">累计点击</span>
-      <strong>{{ totalVotes }}</strong>
-    </article>
-    <article class="stats-band__card">
       <span class="stats-band__label">我的点击</span>
       <strong>{{ isLoggedIn ? myClicks : '先登录' }}</strong>
     </article>
     <article class="stats-band__card">
-      <span class="stats-band__label">我的排名</span>
-      <strong>{{ isLoggedIn ? `#${myRank ?? '--'}` : '--' }}</strong>
+      <span class="stats-band__label">总点击</span>
+      <strong>{{ totalVotes }}</strong>
     </article>
     <article class="stats-band__card">
-      <span class="stats-band__label">Boss 排名</span>
-      <strong>{{ isLoggedIn ? (myBossRank ? `#${myBossRank}` : '未上榜') : '先登录' }}</strong>
+      <span class="stats-band__label">我的Boss击杀数</span>
+      <strong>{{ isLoggedIn ? myBossKills : '先登录' }}</strong>
     </article>
     <article class="stats-band__card">
-      <span class="stats-band__label">天赋点</span>
-      <strong>{{ isLoggedIn ? talentPoints : '--' }}</strong>
+      <span class="stats-band__label">总Boss击杀数</span>
+      <strong>{{ totalBossKills }}</strong>
     </article>
   </section>
 
@@ -628,6 +651,7 @@ const silverStormActive = computed(() => {
       <p v-if="errorMessage" class="feedback feedback--error">{{ errorMessage }}</p>
 
       <RoomSelector
+          v-if="isHallRoom"
           :rooms="rooms"
           :current-room-id="currentRoomId"
           :switching="roomSwitching"
@@ -637,6 +661,7 @@ const silverStormActive = computed(() => {
       />
 
       <section
+          v-if="!isHallRoom"
           class="vote-stage__boss-hud vote-stage__boss-hud--merged"
           :class="{
             'damage-stage--shake': damageStageFx.shake,
@@ -1039,6 +1064,45 @@ const silverStormActive = computed(() => {
         </div>
       </section>
 
+      <section v-if="isHallRoom" class="feedback-panel feedback-panel--compact">
+        <p>当前处于大厅。这里只显示战线分流和点击总榜，不显示 Boss 战斗区与 Boss 伤害榜。</p>
+      </section>
+
+      <section v-else class="feedback-panel feedback-panel--compact">
+        <p>当前战线：{{ currentRoomDisplay }}。我的战力 {{ formatCompact(myBattlePower) }}，Boss战力 {{ formatCompact(bossBattlePower) }}。</p>
+        <button
+            class="nickname-form__submit nickname-form__submit--ghost"
+            type="button"
+            :disabled="roomExitLocked || roomSwitching"
+            :style="{
+              position: 'relative',
+              overflow: 'hidden',
+              minWidth: '172px',
+              color: roomExitLocked ? 'rgba(255,255,255,0.24)' : undefined,
+            }"
+            @click="exitCurrentRoom"
+        >
+          <span :style="{ opacity: roomExitLocked ? 0.2 : 1 }">退出当前房间</span>
+          <span
+              v-if="roomExitLocked"
+              :style="{
+                position: 'absolute',
+                inset: '0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(7, 12, 20, 0.78)',
+                color: '#f8fafc',
+                fontWeight: '800',
+                letterSpacing: '0.08em',
+                backdropFilter: 'blur(3px)',
+              }"
+          >
+            {{ formatRoomExitCooldown(roomExitCooldownRemainingSeconds) }}
+          </span>
+        </button>
+      </section>
+
     </section>
 
     <section
@@ -1171,7 +1235,7 @@ const silverStormActive = computed(() => {
 
     <aside class="social-panel social-panel--ranking">
       <section class="social-card leaderboard-card leaderboard-card--stacked">
-        <section class="leaderboard-card__section">
+        <section v-if="!isHallRoom" class="leaderboard-card__section">
           <div class="social-card__head">
             <p class="vote-stage__eyebrow">Boss 伤害榜</p>
             <strong>{{ bossLeaderboard.length || 0 }} 人</strong>
@@ -1194,7 +1258,7 @@ const silverStormActive = computed(() => {
           </div>
         </section>
 
-        <section class="leaderboard-card__section">
+        <section v-if="isHallRoom" class="leaderboard-card__section">
           <div class="social-card__head">
             <p class="vote-stage__eyebrow">点击总榜</p>
             <strong>前 {{ leaderboard.length || 0 }} 名</strong>

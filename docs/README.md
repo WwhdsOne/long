@@ -59,6 +59,7 @@
 ### 房间分线
 
 - [architecture/2026-05-03-房间分线方案.md](./architecture/2026-05-03-房间分线方案.md)
+- [implementation/2026-05-04-房间分线数据迁移上线预备文档.md](./implementation/2026-05-04-房间分线数据迁移上线预备文档.md)
 - [demos/room-battle-preview.html](./demos/room-battle-preview.html)
 
 ### 反滥用

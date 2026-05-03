@@ -33,6 +33,8 @@ func registerBattleRoutes(router route.IRouter, options Options) {
 			"latestAnnouncement":  state.LatestAnnouncement,
 			"userStats":           state.UserStats,
 			"myBossStats":         state.MyBossStats,
+			"myBossKills":         state.MyBossKills,
+			"totalBossKills":      state.TotalBossKills,
 			"loadout":             state.Loadout,
 			"combatStats":         state.CombatStats,
 			"gold":                state.Gold,

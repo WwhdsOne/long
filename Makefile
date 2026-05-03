@@ -6,7 +6,7 @@ MAKEFLAGS += --no-print-directory
 .DEFAULT_GOAL := help
 
 .PHONY: help deps deps-ci dev build test check \
-	backend-run backend-test backend-vet backend-fix \
+	backend-run backend-test backend-vet backend-fix backend-backfill-boss-kills backend-check-boss-kills \
 	frontend-dev frontend-build frontend-preview frontend-test hooks-install
 
 help: ## 显示可用命令
@@ -56,6 +56,12 @@ backend-vet: ## 运行 go vet
 
 backend-fix: ## 运行 go fix
 	$(GO) -C backend fix ./...
+
+backend-backfill-boss-kills: ## 回填 Boss 击杀统计到 Redis
+	$(GO) -C backend run ./cmd/backfillbosskills
+
+backend-check-boss-kills: ## 检查 Redis 中的 Boss 击杀统计
+	$(GO) -C backend run ./cmd/checkbosskills
 
 frontend-dev: ## 单独启动前端开发服务器
 	$(BUN) --cwd=frontend run dev

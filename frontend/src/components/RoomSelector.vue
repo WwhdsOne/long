@@ -35,6 +35,13 @@ function roomLabel(room) {
   return `房间 ${room?.id || '1'}`
 }
 
+function currentRoomSummary(roomId) {
+  const normalized = String(roomId || '').trim()
+  if (normalized === 'hall') return '当前大厅'
+  if (normalized === '') return '当前大厅'
+  return `当前 ${roomLabel({ id: normalized })}`
+}
+
 function roomAccent(room, index) {
   const idIndex = Number.parseInt(room?.id, 10)
   const offset = Number.isFinite(idIndex) ? idIndex - 1 : index
@@ -49,11 +56,18 @@ function roomStyle(room, index) {
 
 function roomBossName(room) {
   if (!room) return '等待 Boss'
-  return room.currentBossName || (room.cycleEnabled ? '循环待命' : '未开启循环')
+  else if (room.currentBossName === "" || room.currentBossName === undefined)return room.cycleEnabled ? 'Boss循环待命' : '未开启Boss循环'
+  return '当前Boss : ' + room.currentBossName
 }
 
 function roomOnlineText(room) {
   return `${Math.max(0, Number(room?.onlineCount || 0))} 人`
+}
+
+function roomAvgHpText(room) {
+  const avgHp = Math.max(0, Number(room?.currentBossAvgHp || 0))
+  if (avgHp <= 0) return '--'
+  return avgHp.toLocaleString('zh-CN')
 }
 
 function roomStatusLabel(room) {
@@ -83,11 +97,8 @@ function canJoin(room) {
 <template>
   <section class="room-selector" aria-label="房间选择">
     <div class="room-selector__head">
-      <div>
-        <span>Room Selector</span>
-        <strong>战线分流</strong>
-      </div>
-      <small>{{ roomLabel({id: currentRoomId}) }}</small>
+      <strong>战线分流</strong>
+      <small>{{ currentRoomSummary(currentRoomId) }}</small>
     </div>
     <div class="room-selector__list">
       <button
@@ -115,10 +126,11 @@ function canJoin(room) {
             <strong>{{ roomOnlineText(room) }}</strong>
           </span>
           <span>
-            <small>状态</small>
-            <strong>{{ roomActionLabel(room) }}</strong>
+            <small>均血</small>
+            <strong>{{ roomAvgHpText(room) }}</strong>
           </span>
         </span>
+        <span class="room-selector__action">{{ roomActionLabel(room) }}</span>
       </button>
     </div>
     <p v-if="rooms.length === 0" class="room-selector__empty">正在同步房间战线。</p>
@@ -129,54 +141,74 @@ function canJoin(room) {
 <style scoped>
 .room-selector {
   display: grid;
-  gap: 16px;
-  padding: 22px;
+  gap: 15px 6px;   /* 行间距15px，列间距6px（此处列间距其实没有用，但保留无妨） */
+  padding: 8px 10px;
   border: 1px solid rgba(132, 166, 214, 0.18);
-  border-radius: 24px;
+  border-radius: 18px;
   background:
     radial-gradient(circle at top right, rgba(120, 216, 255, 0.1), transparent 36%),
     rgba(12, 21, 35, 0.78);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(18px);
-}
+  /* 改为：第一行头部20px，第二行占满剩余空间 */
+  grid-template-rows: 20px 1fr;
+  /* 给整体一个最大高度（按需调整），防止无限撑高 */
+  max-height: 600px;       /* 也可用 height: 100% 继承父级高度 */
+
+  overflow: hidden;        /* 溢出交给内部列表处理 */}
 
 .room-selector__head {
   display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: start;
+  align-items: center;
+  gap: 2px;
   color: #8ca1c0;
 }
 
-.room-selector__head span,
+.room-selector__head small,
+.room-selector__head strong {
+  display: inline;
+  line-height: 1;
+}
+
 .room-selector__head small {
-  display: block;
-  font-size: 0.82rem;
+  font-size: 0.62rem;
   font-weight: 700;
+  line-height: 1.1;
 }
 
 .room-selector__head strong {
-  display: block;
-  margin-top: 4px;
   color: #eef4ff;
   font-family: 'Rajdhani', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 1.55rem;
+  font-size: 0.92rem;
   line-height: 1;
 }
 
 .room-selector__list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;          /* 保持网格项从顶部开始，不拉伸 */
+  gap: 6px;
+  padding-top: 6px;
+  margin-top: -6px;
+
+  /* 关键：行高跟随内容，不要按比例平分 */
+  grid-auto-rows: auto;          /* 或 min-content，默认就是 auto，可显式写出 */
+
+  /* 让这个区域可滚动 */
+  overflow-y: auto;
+
+  /* 可选：保证滚动时头部不动 */
+  min-height: 0;                 /* 防止网格子项默认最小高度撑开 */
 }
 
 .room-selector__button {
   display: grid;
-  gap: 13px;
-  min-height: 178px;
-  padding: 18px;
+  gap: 6px;
+  min-height: 74px;
+  padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 22px;
+  border-radius: 14px;
   color: #eef4ff;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
@@ -186,6 +218,7 @@ function canJoin(room) {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  z-index: 0;
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -196,20 +229,21 @@ function canJoin(room) {
 .room-selector__button::after {
   content: '';
   position: absolute;
-  right: -42px;
-  bottom: -58px;
-  width: 132px;
-  height: 132px;
+  right: -26px;
+  bottom: -38px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(var(--room-accent-rgb), 0.28), transparent 70%);
   pointer-events: none;
 }
 
 .room-selector__button:hover:not(:disabled) {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
+  z-index: 2;
   border-color: rgba(var(--room-accent-rgb), 0.42);
   box-shadow:
-    0 18px 34px rgba(0, 0, 0, 0.3),
+    0 10px 18px rgba(0, 0, 0, 0.26),
     inset 0 0 0 1px rgba(var(--room-accent-rgb), 0.08);
 }
 
@@ -217,33 +251,33 @@ function canJoin(room) {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
 }
 
 .room-selector__id {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 26px;
+  height: 26px;
   border: 1px solid rgba(var(--room-accent-rgb), 0.32);
-  border-radius: 15px;
+  border-radius: 9px;
   color: rgb(var(--room-accent-rgb));
   background: rgba(var(--room-accent-rgb), 0.12);
   font-family: 'Orbitron', 'SFMono-Regular', monospace;
-  font-size: 0.95rem;
+  font-size: 0.68rem;
   font-weight: 800;
 }
 
 .room-selector__badge {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 20px;
+  padding: 0 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   color: #dfeaff;
   background: rgba(255, 255, 255, 0.04);
-  font-size: 0.76rem;
+  font-size: 0.6rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -251,38 +285,38 @@ function canJoin(room) {
 .room-selector__name {
   color: #f8fbff;
   font-family: 'Rajdhani', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 1.45rem;
+  font-size: 0.92rem;
   font-weight: 700;
   line-height: 1;
 }
 
 .room-selector__boss {
-  min-height: 2.8em;
+  min-height: 2.1em;
   color: #8ca1c0;
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 0.7rem;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
 .room-selector__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 5px;
 }
 
 .room-selector__stats > span {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 6px 7px;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 15px;
+  border-radius: 9px;
   background: rgba(6, 11, 19, 0.48);
 }
 
 .room-selector__stats small {
   color: #65809d;
-  font-size: 0.72rem;
+  font-size: 0.58rem;
 }
 
 .room-selector__stats strong {
@@ -290,10 +324,16 @@ function canJoin(room) {
   overflow: hidden;
   color: #eef4ff;
   font-family: 'Orbitron', 'SFMono-Regular', monospace;
-  font-size: 0.88rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.room-selector__action {
+  font-size: 0.66rem;
+  color: #9fc6ff;
+  font-weight: 700;
 }
 
 .room-selector__button--active {
@@ -334,13 +374,12 @@ function canJoin(room) {
 
 @media (max-width: 720px) {
   .room-selector {
-    padding: 16px;
-    border-radius: 20px;
+    padding: 10px;
+    border-radius: 16px;
   }
 
   .room-selector__head {
-    align-items: start;
-    flex-direction: column;
+    justify-content: start;
   }
 
   .room-selector__list {

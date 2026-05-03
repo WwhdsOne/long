@@ -5740,13 +5740,13 @@ body:has(.battle-page-hud),
 
 .battle-page-hud .stage-layout--battle {
   grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
-  gap: 20px;
+  gap: 16px;
   align-items: stretch;
 }
 
 .battle-page-hud .vote-stage {
   display: grid;
-  gap: 20px;
+  gap: 10px;
   margin-top: 0;
   padding: 0;
   border: 0;
@@ -5754,6 +5754,10 @@ body:has(.battle-page-hud),
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
+}
+
+.battle-page-hud .vote-stage > .room-selector {
+  margin-top: -2px;
 }
 
 .battle-page-hud .feedback--error {
