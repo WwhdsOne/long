@@ -56,6 +56,10 @@
   - [developer-reference/2026-04-30-V2伤害计算链路总览.md](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
   - [developer-reference/2026-04-30-天赋技能数值总览.md](./developer-reference/2026-04-30-天赋技能数值总览.md)
 
+### 房间分线
+
+- [architecture/2026-05-03-房间分线方案.md](./architecture/2026-05-03-房间分线方案.md)
+
 ### Boss 与战斗表现
 
 - [designs/2026-04-25-Boss分区基础视觉与点击口径设计.md](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
