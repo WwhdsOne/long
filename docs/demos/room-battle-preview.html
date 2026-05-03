@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>房间分线战斗页局部预览</title>
+<style>
+  @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Rajdhani:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap");
+
+  :root {
+    --bg: #08101a;
+    --bg-2: #0d1726;
+    --panel: rgba(12, 21, 35, 0.78);
+    --panel-strong: rgba(10, 18, 31, 0.94);
+    --line: rgba(132, 166, 214, 0.16);
+    --line-strong: rgba(132, 166, 214, 0.3);
+    --text: #eef4ff;
+    --muted: #8ca1c0;
+    --muted-2: #65809d;
+    --gold: #ffd46b;
+    --amber: #ff9a55;
+    --cyan: #78d8ff;
+    --emerald: #69e7b0;
+    --red: #ff8577;
+    --violet: #c8a7ff;
+    --shadow: 0 20px 60px rgba(0, 0, 0, 0.42);
+    --radius: 24px;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    font-family: "Noto Sans SC", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at top left, rgba(120, 216, 255, 0.16), transparent 28%),
+      radial-gradient(circle at 85% 12%, rgba(255, 132, 119, 0.14), transparent 22%),
+      radial-gradient(circle at 50% 100%, rgba(105, 231, 176, 0.1), transparent 28%),
+      linear-gradient(180deg, #060c14 0%, #09111b 32%, #08101a 100%);
+    letter-spacing: 0.01em;
+    padding: 28px 20px 40px;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    background-size: 100% 4px, 4px 100%;
+    mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.45), transparent 75%);
+    opacity: 0.18;
+  }
+
+  .preview-shell {
+    max-width: 1280px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+    gap: 20px;
+    margin-bottom: 18px;
+  }
+
+  .hero-card,
+  .hero-side,
+  .selector-panel,
+  .battle-panel,
+  .aside-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    backdrop-filter: blur(18px);
+    box-shadow: var(--shadow);
+  }
+
+  .hero-card {
+    padding: 28px 30px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-card::after {
+    content: "";
+    position: absolute;
+    inset: auto -80px -120px auto;
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(120, 216, 255, 0.22), transparent 68%);
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--gold);
+    font-family: "Rajdhani", sans-serif;
+    font-size: 0.84rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .eyebrow::before {
+    content: "";
+    width: 34px;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 212, 107, 0), rgba(255, 212, 107, 0.95));
+  }
+
+  h1 {
+    font-family: "Rajdhani", sans-serif;
+    font-size: clamp(2.4rem, 4vw, 4.5rem);
+    font-weight: 700;
+    line-height: 0.92;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    max-width: 10ch;
+    text-wrap: balance;
+  }
+
+  .hero-copy {
+    max-width: 64ch;
+    color: #bed0ea;
+    line-height: 1.72;
+    margin-top: 16px;
+    font-size: 0.98rem;
+  }
+
+  .hero-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  .hero-tag,
+  .micro-chip,
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    padding: 8px 14px;
+    font-size: 0.84rem;
+    color: #dae6fb;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .hero-side {
+    padding: 24px;
+    display: grid;
+    gap: 14px;
+    align-content: start;
+  }
+
+  .metric-card {
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+    padding: 16px 18px;
+  }
+
+  .metric-label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-bottom: 8px;
+  }
+
+  .metric-value {
+    font-family: "Orbitron", sans-serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
+  .metric-sub {
+    margin-top: 8px;
+    color: var(--muted-2);
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+
+  .selector-panel {
+    padding: 22px;
+    margin-bottom: 20px;
+  }
+
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .panel-head__title {
+    font-family: "Rajdhani", sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+
+  .panel-head__sub {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+
+  .room-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .room-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 22px;
+    padding: 18px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+      radial-gradient(circle at top right, rgba(120, 216, 255, 0.1), transparent 42%);
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+    transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease, opacity 0.22s ease;
+    min-height: 188px;
+    display: grid;
+    gap: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .room-card:hover:not(.room-card--locked) {
+    transform: translateY(-3px);
+    border-color: rgba(120, 216, 255, 0.35);
+    box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28), inset 0 0 0 1px rgba(120, 216, 255, 0.08);
+  }
+
+  .room-card--locked {
+    cursor: not-allowed;
+    opacity: 0.68;
+  }
+
+  .room-card--active {
+    border-color: rgba(255, 212, 107, 0.5);
+    box-shadow:
+      0 18px 44px rgba(255, 154, 85, 0.16),
+      inset 0 0 0 1px rgba(255, 212, 107, 0.2);
+  }
+
+  .room-card::after {
+    content: "";
+    position: absolute;
+    inset: auto -34px -54px auto;
+    width: 118px;
+    height: 118px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(var(--room-accent-rgb, 120, 216, 255), 0.32), transparent 70%);
+    pointer-events: none;
+  }
+
+  .room-top {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .room-id {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: rgba(var(--room-accent-rgb, 120, 216, 255), 0.12);
+    border: 1px solid rgba(var(--room-accent-rgb, 120, 216, 255), 0.28);
+    color: rgb(var(--room-accent-rgb, 120, 216, 255));
+    display: grid;
+    place-items: center;
+    font-family: "Orbitron", sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+  }
+
+  .room-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 0.74rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #dfeaff;
+    background: rgba(255, 255, 255, 0.04);
+    white-space: nowrap;
+  }
+
+  .room-name {
+    font-family: "Rajdhani", sans-serif;
+    font-size: 1.46rem;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .room-copy {
+    color: var(--muted);
+    font-size: 0.87rem;
+    line-height: 1.5;
+  }
+
+  .room-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .room-stat {
+    padding: 10px 12px;
+    border-radius: 15px;
+    background: rgba(6, 11, 19, 0.48);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .room-stat__label {
+    color: var(--muted-2);
+    font-size: 0.72rem;
+    margin-bottom: 4px;
+  }
+
+  .room-stat__value {
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.98rem;
+  }
+
+  .switch-banner {
+    margin-top: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(90deg, rgba(255, 212, 107, 0.08), rgba(120, 216, 255, 0.08));
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .switch-banner__text {
+    color: #d9e5fa;
+    font-size: 0.9rem;
+  }
+
+  .switch-banner__cooldown {
+    color: var(--gold);
+    font-family: "Orbitron", sans-serif;
+    font-size: 1rem;
+  }
+
+  .preview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+    gap: 20px;
+  }
+
+  .battle-panel {
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .battle-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at top right, rgba(120, 216, 255, 0.14), transparent 25%),
+      linear-gradient(135deg, rgba(255, 255, 255, 0.02), transparent 28%);
+  }
+
+  .boss-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) 156px;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .boss-card {
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--panel-strong);
+    padding: 22px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .boss-card::after {
+    content: "";
+    position: absolute;
+    inset: auto auto -70px -40px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(var(--active-accent-rgb, 120, 216, 255), 0.18), transparent 68%);
+    pointer-events: none;
+  }
+
+  .boss-overline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .boss-title {
+    font-family: "Rajdhani", sans-serif;
+    font-size: clamp(2rem, 3vw, 3.2rem);
+    line-height: 0.95;
+    margin-bottom: 8px;
+  }
+
+  .boss-subtitle {
+    color: #c3d3ea;
+    line-height: 1.62;
+    font-size: 0.94rem;
+    max-width: 60ch;
+  }
+
+  .boss-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .hp-block {
+    margin-top: 18px;
+  }
+
+  .hp-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .hp-label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .hp-value {
+    font-family: "Orbitron", sans-serif;
+    font-size: 1.05rem;
+    color: #fff6d6;
+  }
+
+  .hp-bar {
+    width: 100%;
+    height: 18px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 12px rgba(0, 0, 0, 0.24);
+  }
+
+  .hp-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(var(--active-accent-rgb, 120, 216, 255), 0.82), rgba(255, 212, 107, 0.96));
+    box-shadow: 0 0 24px rgba(var(--active-accent-rgb, 120, 216, 255), 0.32);
+    position: relative;
+  }
+
+  .hp-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+    animation: sweep 2.8s linear infinite;
+  }
+
+  @keyframes sweep {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(180%);
+    }
+  }
+
+  .boss-foot {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .boss-foot__item {
+    border-radius: 16px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .boss-foot__label {
+    color: var(--muted-2);
+    font-size: 0.74rem;
+    margin-bottom: 5px;
+  }
+
+  .boss-foot__value {
+    font-size: 0.96rem;
+    color: #f5f8ff;
+  }
+
+  .boss-seal {
+    border-radius: 26px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      radial-gradient(circle at center, rgba(var(--active-accent-rgb, 120, 216, 255), 0.15), transparent 66%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+    display: grid;
+    place-items: center;
+    position: relative;
+    overflow: hidden;
+    min-height: 100%;
+  }
+
+  .boss-seal::before,
+  .boss-seal::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .boss-seal::before {
+    width: 112px;
+    height: 112px;
+  }
+
+  .boss-seal::after {
+    width: 76px;
+    height: 76px;
+  }
+
+  .boss-seal__room {
+    text-align: center;
+    z-index: 1;
+  }
+
+  .boss-seal__room strong {
+    display: block;
+    font-family: "Orbitron", sans-serif;
+    font-size: 2rem;
+    margin-bottom: 4px;
+  }
+
+  .boss-seal__room span {
+    color: var(--muted);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .battle-lower {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.82fr);
+    gap: 16px;
+  }
+
+  .rank-card,
+  .delta-card,
+  .aside-card {
+    border-radius: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 14, 24, 0.7);
+    padding: 18px;
+  }
+
+  .card-title {
+    font-family: "Rajdhani", sans-serif;
+    font-size: 1.18rem;
+    margin-bottom: 4px;
+  }
+
+  .card-sub {
+    color: var(--muted);
+    font-size: 0.84rem;
+    line-height: 1.5;
+    margin-bottom: 14px;
+  }
+
+  .rank-list {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+
+  .rank-item {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .rank-no {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted);
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.84rem;
+  }
+
+  .rank-main {
+    min-width: 0;
+  }
+
+  .rank-name {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: 0.92rem;
+  }
+
+  .rank-name strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .rank-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+  }
+
+  .rank-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(var(--active-accent-rgb, 120, 216, 255), 0.58), rgba(255, 212, 107, 0.96));
+  }
+
+  .rank-dmg {
+    font-family: "Orbitron", sans-serif;
+    font-size: 0.92rem;
+    color: #fff3c8;
+  }
+
+  .delta-list {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+
+  .delta-item {
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .delta-item strong {
+    display: block;
+    font-size: 0.95rem;
+    margin-bottom: 5px;
+  }
+
+  .delta-item p {
+    color: var(--muted);
+    line-height: 1.58;
+    font-size: 0.84rem;
+  }
+
+  .aside-panel {
+    padding: 20px;
+    display: grid;
+    gap: 16px;
+    align-content: start;
+  }
+
+  .aside-list,
+  .feed-list {
+    list-style: none;
+    display: grid;
+    gap: 12px;
+  }
+
+  .aside-item {
+    border-radius: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .aside-item strong {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.92rem;
+  }
+
+  .aside-item p {
+    color: var(--muted);
+    line-height: 1.58;
+    font-size: 0.84rem;
+  }
+
+  .feed-item {
+    display: grid;
+    gap: 6px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .feed-item:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .feed-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted-2);
+    font-size: 0.76rem;
+  }
+
+  .feed-text {
+    color: #dce6f7;
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .footer-note {
+    margin-top: 18px;
+    color: var(--muted-2);
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+
+  .pill-positive {
+    color: #caffe2;
+    background: rgba(105, 231, 176, 0.08);
+    border-color: rgba(105, 231, 176, 0.16);
+  }
+
+  .pill-warning {
+    color: #ffe6b4;
+    background: rgba(255, 154, 85, 0.08);
+    border-color: rgba(255, 154, 85, 0.16);
+  }
+
+  .pill-danger {
+    color: #ffd0ca;
+    background: rgba(255, 133, 119, 0.08);
+    border-color: rgba(255, 133, 119, 0.16);
+  }
+
+  .pill-neutral {
+    color: #d8e8ff;
+    background: rgba(120, 216, 255, 0.08);
+    border-color: rgba(120, 216, 255, 0.16);
+  }
+
+  @media (max-width: 1080px) {
+    .hero,
+    .preview-grid,
+    .battle-lower,
+    .boss-head {
+      grid-template-columns: 1fr;
+    }
+
+    .room-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .boss-seal {
+      min-height: 164px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    body {
+      padding: 18px 14px 28px;
+    }
+
+    .hero-card,
+    .hero-side,
+    .selector-panel,
+    .battle-panel,
+    .aside-panel {
+      border-radius: 20px;
+    }
+
+    .hero-card,
+    .hero-side,
+    .selector-panel,
+    .battle-panel,
+    .aside-panel,
+    .boss-card,
+    .rank-card,
+    .delta-card,
+    .aside-card {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+
+    .panel-head {
+      align-items: start;
+      flex-direction: column;
+    }
+
+    .switch-banner,
+    .boss-foot {
+      grid-template-columns: 1fr;
+      display: grid;
+    }
+
+    .switch-banner {
+      justify-content: stretch;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="preview-shell">
+  <section class="hero">
+    <article class="hero-card">
+      <div class="eyebrow">Room Split Preview</div>
+      <h1>Room Selector Combat HUD</h1>
+      <p class="hero-copy">
+        这是一份只针对“房间分线”场景的战斗页局部预览。它不重做整个 BattlePage，
+        只把本次方案最关键的三个信息层拉出来：房间选择、当前房间 Boss HUD、切房规则反馈。
+      </p>
+      <div class="hero-tags">
+        <span class="hero-tag">Boss 状态按房间隔离</span>
+        <span class="hero-tag">总点击与总榜继续全服共享</span>
+        <span class="hero-tag">切房冷却由服务端状态驱动</span>
+      </div>
+    </article>
+
+    <aside class="hero-side">
+      <article class="metric-card">
+        <div class="metric-label">全服总点击</div>
+        <div class="metric-value" id="total-votes">18,442,190</div>
+        <div class="metric-sub">这个数字不随房间切换变化，用来强调“房间只隔离 Boss 战斗，不拆全服主线”。</div>
+      </article>
+      <article class="metric-card">
+        <div class="metric-label">当前房间在线</div>
+        <div class="metric-value" id="global-room-online">89</div>
+        <div class="metric-sub" id="global-room-note">裂帛战区当前在线 89 人，属于中压线，适合稳定打榜。</div>
+      </article>
+      <article class="metric-card">
+        <div class="metric-label">切换冷却</div>
+        <div class="metric-value" id="global-cooldown">00:05</div>
+        <div class="metric-sub">冷却结束后点击其他房间卡，即可预览房间切换成功后的 Boss HUD 变化。</div>
+      </article>
+    </aside>
+  </section>
+
+  <section class="selector-panel">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-head__title">Room Selector</h2>
+        <p class="panel-head__sub">默认房间、推荐战力、在线人数都放在同一层。用户不用进弹窗，也能在战斗页上半屏完成判断。</p>
+      </div>
+      <span class="micro-chip pill-neutral">当前预览只覆盖分线相关局部，不包含完整战斗区</span>
+    </div>
+    <div class="room-grid" id="room-grid"></div>
+    <div class="switch-banner">
+      <div class="switch-banner__text" id="switch-banner-text">你刚刚从灰烬前线切入裂帛战区，下一次切房还需等待。</div>
+      <div class="switch-banner__cooldown" id="switch-banner-cooldown">00:05</div>
+    </div>
+  </section>
+
+  <section class="preview-grid">
+    <article class="battle-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-head__title">Current Room Boss HUD</h2>
+          <p class="panel-head__sub">Boss 名称、血量、房间榜单和切房提示统一聚到一个面板里，避免“切完房还要扫多处 UI 才能确认是否生效”。</p>
+        </div>
+        <span class="status-chip pill-warning" id="boss-status-chip">冷却中，暂不可再次切房</span>
+      </div>
+
+      <div class="boss-head">
+        <section class="boss-card">
+          <div class="boss-overline">
+            <span class="micro-chip pill-positive" id="room-tag">当前房间 · 裂帛战区</span>
+            <span class="micro-chip pill-neutral" id="boss-tier-tag">推荐战力 3w - 8w</span>
+            <span class="micro-chip pill-danger" id="boss-alert-tag">阶段提示 · 裂帛剥离中</span>
+          </div>
+          <h3 class="boss-title" id="boss-name">裂帛监工 · 阿塔斯</h3>
+          <p class="boss-subtitle" id="boss-copy">中压线 Boss，伤害榜竞争明显，但击杀速度仍可控，适合希望稳定拿到名次与结算奖励的玩家。</p>
+
+          <div class="boss-meta" id="boss-meta"></div>
+
+          <div class="hp-block">
+            <div class="hp-row">
+              <span class="hp-label">Boss HP</span>
+              <strong class="hp-value" id="boss-hp-text">8,960,000 / 15,000,000</strong>
+            </div>
+            <div class="hp-bar">
+              <div class="hp-fill" id="boss-hp-fill" style="width:59.73%"></div>
+            </div>
+          </div>
+
+          <div class="boss-foot">
+            <div class="boss-foot__item">
+              <div class="boss-foot__label">房间伤害榜人数</div>
+              <div class="boss-foot__value" id="boss-foot-rankers">31 人</div>
+            </div>
+            <div class="boss-foot__item">
+              <div class="boss-foot__label">预计结算区间</div>
+              <div class="boss-foot__value" id="boss-foot-reward">220 - 340 金 / 12 - 20 石</div>
+            </div>
+            <div class="boss-foot__item">
+              <div class="boss-foot__label">刷新节奏</div>
+              <div class="boss-foot__value" id="boss-foot-cycle">约 18 - 24 分钟/只</div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="boss-seal">
+          <div class="boss-seal__room">
+            <strong id="seal-room-id">02</strong>
+            <span id="seal-room-name">RIFT ROOM</span>
+          </div>
+        </aside>
+      </div>
+
+      <div class="battle-lower">
+        <section class="rank-card">
+          <h3 class="card-title">房间 Boss 伤害榜</h3>
+          <p class="card-sub">只展示当前房间榜单。切房成功后，这里和上方 Boss HP 会一起切换。</p>
+          <ol class="rank-list" id="rank-list"></ol>
+        </section>
+
+        <section class="delta-card">
+          <h3 class="card-title">切房后会变什么</h3>
+          <p class="card-sub">这三项是本次方案最该被用户感知到的变化。</p>
+          <ul class="delta-list">
+            <li class="delta-item">
+              <strong>`boss.id` / `boss.name` 会切换</strong>
+              <p>用户能明确看到自己已经从一个 Boss 实例进入另一个 Boss 实例，而不是只换了一个标签。</p>
+            </li>
+            <li class="delta-item">
+              <strong>`currentHp` 与阶段提示会切换</strong>
+              <p>避免出现“切房成功了，但血量看起来没变”的误解，这也是广播层和读取层必须一起改的原因。</p>
+            </li>
+            <li class="delta-item">
+              <strong>`bossLeaderboard` 会切换</strong>
+              <p>用户进入新房间后，榜单必须立刻反映新房间玩家，不然会感觉像落在旧快照里。</p>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </article>
+
+    <aside class="aside-panel">
+      <section class="aside-card">
+        <h3 class="card-title">分线规则说明</h3>
+        <p class="card-sub">这部分是给页面文案占位的，不是服务端接口定义。</p>
+        <ul class="aside-list">
+          <li class="aside-item">
+            <strong>房间独立 Boss</strong>
+            <p>每个房间的当前 Boss、血量、伤害榜和击杀奖励独立结算，避免高练度玩家直接压扁所有人体验。</p>
+          </li>
+          <li class="aside-item">
+            <strong>全服主线仍然共享</strong>
+            <p>总点击、点击总榜、公告流继续保持全服共享，玩家不会因为切房就失去“全服一起推进”的感觉。</p>
+          </li>
+          <li class="aside-item">
+            <strong>切房冷却以后端为准</strong>
+            <p>客户端只展示剩余时间；真正的房间归属、默认房间回落和冷却校验都由服务端状态控制。</p>
+          </li>
+        </ul>
+      </section>
+
+      <section class="aside-card">
+        <h3 class="card-title">事件流回显</h3>
+        <p class="card-sub">模拟切房反馈文案。点击房间卡或等待冷却归零后，可看到这块变化。</p>
+        <ul class="feed-list" id="feed-list"></ul>
+      </section>
+
+      <p class="footer-note">
+        预览文件只演示 BattlePage 上半屏的信息组织方式，不代表最终前端结构一定要拆成这些组件。
+        真正落地时仍应尽量复用现有 `publicPageState.js` 和 `BattlePage.vue` 的状态与样式入口。
+      </p>
+    </aside>
+  </section>
+</div>
+
+<script>
+  const rooms = [
+    {
+      id: "1",
+      name: "灰烬前线",
+      shortName: "ASH",
+      accentRgb: "105, 231, 176",
+      label: "默认房间",
+      labelClass: "pill-positive",
+      power: "2.5w 以下",
+      online: 126,
+      pace: "稳定刷熟练度",
+      copy: "低压线，Boss 周期偏长，适合补刀、熟悉部位节奏和带新人。",
+      boss: {
+        name: "灼骨巨像 · 乌尔",
+        summary: "默认房间 Boss 节奏更慢，掉血更平滑，适合低练度玩家确保参与感。",
+        hp: 12480000,
+        maxHp: 18000000,
+        phase: "熔炉裂缝扩张中",
+        rankers: 44,
+        reward: "160 - 250 金 / 8 - 14 石",
+        cycle: "约 24 - 30 分钟/只",
+        tags: ["新手保护线", "默认落点", "首日推荐"],
+        ranking: [
+          { name: "晚钟守林人", damage: 2280000 },
+          { name: "白雾档案员", damage: 1870000 },
+          { name: "钝角法槌", damage: 1530000 },
+          { name: "砂墙旅鼠", damage: 1190000 }
+        ]
+      }
+    },
+    {
+      id: "2",
+      name: "裂帛战区",
+      shortName: "RIFT",
+      accentRgb: "120, 216, 255",
+      label: "当前房间",
+      labelClass: "pill-neutral",
+      power: "3w - 8w",
+      online: 89,
+      pace: "稳态打榜",
+      copy: "中压线，击杀节奏更紧，伤害榜竞争明显，但仍能兼顾参与感和奖励效率。",
+      boss: {
+        name: "裂帛监工 · 阿塔斯",
+        summary: "中压线 Boss，伤害榜竞争明显，但击杀速度仍可控，适合希望稳定拿到名次与结算奖励的玩家。",
+        hp: 8960000,
+        maxHp: 15000000,
+        phase: "裂帛剥离中",
+        rankers: 31,
+        reward: "220 - 340 金 / 12 - 20 石",
+        cycle: "约 18 - 24 分钟/只",
+        tags: ["当前热门线", "中压线", "推荐主刷"],
+        ranking: [
+          { name: "斩焰舵手", damage: 3250000 },
+          { name: "齿轮旅团长", damage: 2910000 },
+          { name: "夜港第七席", damage: 2540000 },
+          { name: "钨钢棘冠", damage: 2140000 }
+        ]
+      }
+    },
+    {
+      id: "3",
+      name: "王冠深井",
+      shortName: "CROWN",
+      accentRgb: "255, 133, 119",
+      label: "高压线",
+      labelClass: "pill-danger",
+      power: "8w 以上",
+      online: 34,
+      pace: "高爆发速推",
+      copy: "高压线，Boss 击杀非常快，适合高练度玩家冲榜与速刷，不建议低练度日常停留。",
+      boss: {
+        name: "空冠噬君 · 瑟维尔",
+        summary: "高压线 Boss 处于快节奏收束阶段，适合高练度玩家冲一波大结算。",
+        hp: 3120000,
+        maxHp: 12000000,
+        phase: "王冠碎片喷发",
+        rankers: 18,
+        reward: "360 - 520 金 / 18 - 28 石",
+        cycle: "约 8 - 12 分钟/只",
+        tags: ["高压速推", "爆发窗口短", "不推荐挂机"],
+        ranking: [
+          { name: "弧光审判官", damage: 4760000 },
+          { name: "黑曜扳机", damage: 4310000 },
+          { name: "折镜祭司", damage: 4020000 },
+          { name: "冷焰令史", damage: 3690000 }
+        ]
+      }
+    }
+  ];
+
+  const totalVotes = 18442190;
+  let currentRoomId = "2";
+  let cooldownSeconds = 5;
+  let lastRoomName = "灰烬前线";
+  let feedSeq = 3;
+  const feed = [
+    { id: 1, type: "系统", text: "旧客户端不带 roomID 时，会默认落到默认房间。", time: "刚刚" },
+    { id: 2, type: "分线", text: "房间榜单和 Boss HP 在同一块 HUD 内切换，避免用户误判。", time: "刚刚" },
+    { id: 3, type: "冷却", text: "你刚刚从灰烬前线切入裂帛战区，切房冷却已开始。", time: "刚刚" }
+  ];
+
+  const roomGrid = document.getElementById("room-grid");
+  const feedList = document.getElementById("feed-list");
+  const totalVotesEl = document.getElementById("total-votes");
+  const globalRoomOnlineEl = document.getElementById("global-room-online");
+  const globalRoomNoteEl = document.getElementById("global-room-note");
+  const globalCooldownEl = document.getElementById("global-cooldown");
+  const switchBannerTextEl = document.getElementById("switch-banner-text");
+  const switchBannerCooldownEl = document.getElementById("switch-banner-cooldown");
+  const bossStatusChipEl = document.getElementById("boss-status-chip");
+  const roomTagEl = document.getElementById("room-tag");
+  const bossTierTagEl = document.getElementById("boss-tier-tag");
+  const bossAlertTagEl = document.getElementById("boss-alert-tag");
+  const bossNameEl = document.getElementById("boss-name");
+  const bossCopyEl = document.getElementById("boss-copy");
+  const bossMetaEl = document.getElementById("boss-meta");
+  const bossHpTextEl = document.getElementById("boss-hp-text");
+  const bossHpFillEl = document.getElementById("boss-hp-fill");
+  const bossFootRankersEl = document.getElementById("boss-foot-rankers");
+  const bossFootRewardEl = document.getElementById("boss-foot-reward");
+  const bossFootCycleEl = document.getElementById("boss-foot-cycle");
+  const sealRoomIdEl = document.getElementById("seal-room-id");
+  const sealRoomNameEl = document.getElementById("seal-room-name");
+  const rankListEl = document.getElementById("rank-list");
+
+  totalVotesEl.textContent = formatNumber(totalVotes);
+
+  function formatNumber(value) {
+    return new Intl.NumberFormat("zh-CN").format(value);
+  }
+
+  function formatClock(seconds) {
+    const safe = Math.max(0, seconds);
+    const min = String(Math.floor(safe / 60)).padStart(2, "0");
+    const sec = String(safe % 60).padStart(2, "0");
+    return `${min}:${sec}`;
+  }
+
+  function currentRoom() {
+    return rooms.find((room) => room.id === currentRoomId) || rooms[0];
+  }
+
+  function pushFeed(type, text) {
+    feedSeq += 1;
+    feed.unshift({
+      id: feedSeq,
+      type,
+      text,
+      time: "刚刚"
+    });
+    if (feed.length > 5) {
+      feed.length = 5;
+    }
+  }
+
+  function renderFeed() {
+    feedList.innerHTML = feed.map((item) => `
+      <li class="feed-item">
+        <div class="feed-meta">
+          <span>${item.type}</span>
+          <span>${item.time}</span>
+        </div>
+        <p class="feed-text">${item.text}</p>
+      </li>
+    `).join("");
+  }
+
+  function renderRooms() {
+    roomGrid.innerHTML = rooms.map((room) => {
+      const isCurrent = room.id === currentRoomId;
+      const isLocked = cooldownSeconds > 0 && !isCurrent;
+      const buttonLabel = isCurrent
+        ? "当前所在"
+        : isLocked
+          ? `冷却中 ${formatClock(cooldownSeconds)}`
+          : "点击切换";
+
+      return `
+        <button
+          type="button"
+          class="room-card${isCurrent ? " room-card--active" : ""}${isLocked ? " room-card--locked" : ""}"
+          data-room-id="${room.id}"
+          style="--room-accent-rgb:${room.accentRgb};"
+          aria-disabled="${isLocked ? "true" : "false"}"
+        >
+          <div class="room-top">
+            <div class="room-id">${room.id}</div>
+            <span class="room-badge ${room.labelClass}">${room.label}</span>
+          </div>
+          <div>
+            <div class="room-name">${room.name}</div>
+            <p class="room-copy">${room.copy}</p>
+          </div>
+          <div class="room-stats">
+            <div class="room-stat">
+              <div class="room-stat__label">推荐战力</div>
+              <div class="room-stat__value">${room.power}</div>
+            </div>
+            <div class="room-stat">
+              <div class="room-stat__label">当前在线</div>
+              <div class="room-stat__value">${formatNumber(room.online)}</div>
+            </div>
+            <div class="room-stat">
+              <div class="room-stat__label">节奏标签</div>
+              <div class="room-stat__value">${room.pace}</div>
+            </div>
+            <div class="room-stat">
+              <div class="room-stat__label">操作状态</div>
+              <div class="room-stat__value">${buttonLabel}</div>
+            </div>
+          </div>
+        </button>
+      `;
+    }).join("");
+
+    roomGrid.querySelectorAll(".room-card").forEach((button) => {
+      button.addEventListener("click", () => {
+        const nextRoomId = button.dataset.roomId;
+        if (!nextRoomId || nextRoomId === currentRoomId) {
+          return;
+        }
+        if (cooldownSeconds > 0) {
+          pushFeed("拦截", `切房被阻止：还需等待 ${formatClock(cooldownSeconds)}。`);
+          renderFeed();
+          return;
+        }
+
+        lastRoomName = currentRoom().name;
+        currentRoomId = nextRoomId;
+        cooldownSeconds = 12;
+        const room = currentRoom();
+        pushFeed("切换", `已切入 ${room.name}，SSE / WS 将统一重连到该房间视角。`);
+        renderAll();
+      });
+    });
+  }
+
+  function renderBoss() {
+    const room = currentRoom();
+    const percent = (room.boss.hp / room.boss.maxHp) * 100;
+
+    document.documentElement.style.setProperty("--active-accent-rgb", room.accentRgb);
+    globalRoomOnlineEl.textContent = formatNumber(room.online);
+    globalRoomNoteEl.textContent = `${room.name} 当前在线 ${room.online} 人，定位为${room.pace}，推荐战力 ${room.power}。`;
+    globalCooldownEl.textContent = formatClock(cooldownSeconds);
+    switchBannerCooldownEl.textContent = formatClock(cooldownSeconds);
+    switchBannerTextEl.textContent = cooldownSeconds > 0
+      ? `你刚刚从${lastRoomName}切入${room.name}，下一次切房还需等待。`
+      : `切房冷却已结束。你现在可以从${room.name}切去其他房间，观察 Boss HUD 与榜单如何联动变化。`;
+    bossStatusChipEl.textContent = cooldownSeconds > 0 ? "冷却中，暂不可再次切房" : "冷却结束，可以再次切房";
+    bossStatusChipEl.className = `status-chip ${cooldownSeconds > 0 ? "pill-warning" : "pill-positive"}`;
+
+    roomTagEl.textContent = `当前房间 · ${room.name}`;
+    bossTierTagEl.textContent = `推荐战力 ${room.power}`;
+    bossAlertTagEl.textContent = `阶段提示 · ${room.boss.phase}`;
+    bossNameEl.textContent = room.boss.name;
+    bossCopyEl.textContent = room.boss.summary;
+
+    bossMetaEl.innerHTML = room.boss.tags.map((tag, index) => {
+      const className = index === 0 ? "pill-positive" : index === 1 ? "pill-neutral" : "pill-danger";
+      return `<span class="micro-chip ${className}">${tag}</span>`;
+    }).join("");
+
+    bossHpTextEl.textContent = `${formatNumber(room.boss.hp)} / ${formatNumber(room.boss.maxHp)}`;
+    bossHpFillEl.style.width = `${percent.toFixed(2)}%`;
+    bossFootRankersEl.textContent = `${room.boss.rankers} 人`;
+    bossFootRewardEl.textContent = room.boss.reward;
+    bossFootCycleEl.textContent = room.boss.cycle;
+    sealRoomIdEl.textContent = room.id.padStart(2, "0");
+    sealRoomNameEl.textContent = `${room.shortName} ROOM`;
+
+    const topDamage = room.boss.ranking[0].damage;
+    rankListEl.innerHTML = room.boss.ranking.map((entry, index) => `
+      <li class="rank-item">
+        <span class="rank-no">#${index + 1}</span>
+        <div class="rank-main">
+          <div class="rank-name">
+            <strong>${entry.name}</strong>
+            <span>${Math.round((entry.damage / topDamage) * 100)}%</span>
+          </div>
+          <div class="rank-bar">
+            <span style="width:${(entry.damage / topDamage) * 100}%"></span>
+          </div>
+        </div>
+        <span class="rank-dmg">${formatNumber(entry.damage)}</span>
+      </li>
+    `).join("");
+  }
+
+  function renderAll() {
+    renderRooms();
+    renderBoss();
+    renderFeed();
+  }
+
+  renderAll();
+
+  window.setInterval(() => {
+    if (cooldownSeconds > 0) {
+      cooldownSeconds -= 1;
+      if (cooldownSeconds === 0) {
+        pushFeed("冷却", `切房冷却已结束。当前停留在 ${currentRoom().name}。`);
+      }
+      renderAll();
+    }
+  }, 1000);
+</script>
+</body>
+</html>

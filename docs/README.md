@@ -59,6 +59,7 @@
 ### 房间分线
 
 - [architecture/2026-05-03-房间分线方案.md](./architecture/2026-05-03-房间分线方案.md)
+- [demos/room-battle-preview.html](./demos/room-battle-preview.html)
 
 ### Boss 与战斗表现
 
