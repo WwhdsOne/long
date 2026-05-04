@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -985,6 +986,161 @@ func TestSilverStormTriggersWhenExtraTalentDamageBreaksPart(t *testing.T) {
 	}
 	if !combatState.SilverStormActive {
 		t.Fatal("expected silver storm active after extra damage break")
+	}
+}
+
+func TestJudgmentDayForcesCollapseBeforeDamageCalculation(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	baseNow := time.Unix(1_700_000_200, 0)
+	store.now = func() time.Time { return baseNow }
+
+	ctx := context.Background()
+	nickname := "审判日崩塌联动测试"
+
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"armor_core":     5,
+		"armor_ultimate": 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed talents: %v", err)
+	}
+
+	boss, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "judgment-day-collapse-test",
+		Name:  "审判日崩塌联动Boss",
+		MaxHP: 100000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeHeavy, MaxHP: 100000, CurrentHP: 100000, Alive: true, Armor: 999999},
+		},
+	})
+	if err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	compiledTalents, _ := store.compiledTalentSetForNickname(ctx, nickname)
+	if compiledTalents == nil {
+		t.Fatal("expected compiled talents")
+	}
+	combatStats, err := store.combatStatsForNickname(ctx, nickname, Loadout{})
+	if err != nil {
+		t.Fatalf("combat stats: %v", err)
+	}
+	baseDamageStats := CalcBossPartDamage(combatStats, PartTypeHeavy, boss.Parts[0].Armor, 1, boss.CurrentHP, boss.MaxHP)
+	baseActualDamage := baseDamageStats.NormalDamage
+	if baseActualDamage <= 0 {
+		t.Fatalf("expected positive base damage, got %d", baseActualDamage)
+	}
+	remainingBossHP := boss.CurrentHP - baseActualDamage
+	remainingPartHP := boss.Parts[0].CurrentHP - baseActualDamage
+	collapsedStats := CalcBossPartDamage(combatStats, PartTypeHeavy, 0, 1, remainingBossHP, boss.MaxHP)
+	expectedJudgmentDamage := int64(float64(collapsedStats.NormalDamage) * compiledTalents.Armor.UltimateDamageRatio)
+	if expectedJudgmentDamage > remainingPartHP {
+		expectedJudgmentDamage = remainingPartHP
+	}
+
+	state := NewTalentCombatState()
+	state.PartJudgmentDayCount[TalentPartKey(0, 0)] = compiledTalents.Armor.UltimateTrigger - 1
+	if err := store.SaveTalentCombatState(ctx, nickname, "judgment-day-collapse-test", state); err != nil {
+		t.Fatalf("seed combat state: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+
+	var judgmentEvent *TalentTriggerEvent
+	for _, event := range result.TalentEvents {
+		if event.EffectType == "judgment_day" {
+			judgmentEvent = &event
+			break
+		}
+	}
+	if judgmentEvent == nil {
+		t.Fatalf("expected judgment day event, got %+v", result.TalentEvents)
+	}
+	if judgmentEvent.ExtraDamage != expectedJudgmentDamage {
+		t.Fatalf("expected judgment day damage %d after forced collapse, got %d", expectedJudgmentDamage, judgmentEvent.ExtraDamage)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "judgment-day-collapse-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if !slices.Contains(combatState.CollapseParts, 0) {
+		t.Fatalf("expected target part to enter collapse, got %+v", combatState.CollapseParts)
+	}
+	if combatState.CollapseDuration != 6 {
+		t.Fatalf("expected collapse duration 6, got %d", combatState.CollapseDuration)
+	}
+	if combatState.CollapseEndsAt != baseNow.Unix()+6 {
+		t.Fatalf("expected collapse end at %d, got %d", baseNow.Unix()+6, combatState.CollapseEndsAt)
+	}
+}
+
+func TestJudgmentDayRefreshesExistingCollapseDuration(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	baseNow := time.Unix(1_700_000_260, 0)
+	store.now = func() time.Time { return baseNow }
+
+	ctx := context.Background()
+	nickname := "审判日刷新崩塌测试"
+
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"armor_core":     5,
+		"armor_ultimate": 5,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed talents: %v", err)
+	}
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "judgment-day-collapse-refresh-test",
+		Name:  "审判日刷新崩塌Boss",
+		MaxHP: 50000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeHeavy, MaxHP: 50000, CurrentHP: 50000, Alive: true, Armor: 999999},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	compiledTalents, _ := store.compiledTalentSetForNickname(ctx, nickname)
+	if compiledTalents == nil {
+		t.Fatal("expected compiled talents")
+	}
+
+	state := NewTalentCombatState()
+	state.CollapseParts = []int{0}
+	state.CollapseDuration = 6
+	state.CollapseEndsAt = baseNow.Unix() + 1
+	state.PartJudgmentDayCount[TalentPartKey(0, 0)] = compiledTalents.Armor.UltimateTrigger - 1
+	if err := store.SaveTalentCombatState(ctx, nickname, "judgment-day-collapse-refresh-test", state); err != nil {
+		t.Fatalf("seed combat state: %v", err)
+	}
+
+	if _, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname); err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+
+	combatState, err := store.GetTalentCombatState(ctx, nickname, "judgment-day-collapse-refresh-test")
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if combatState.CollapseEndsAt != baseNow.Unix()+6 {
+		t.Fatalf("expected judgment day to refresh collapse to %d, got %d", baseNow.Unix()+6, combatState.CollapseEndsAt)
 	}
 }
 

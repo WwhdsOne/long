@@ -1817,7 +1817,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		PartType: string(part.Type),
 	})
 
-	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, compiledTalents, combatState, now, nowMs)
+	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, combatStats, effectivePartType, compiledTalents, combatState, now, nowMs)
 	if extraDamage > 0 {
 		totalDamage += extraDamage
 		result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
@@ -2232,7 +2232,7 @@ func applyBossPartDamageDelta(boss *Boss, part *BossPart, damage int64) (beforeH
 	return beforeHP, actualDamage, partWasAlive && !part.Alive
 }
 
-func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now, nowMs int64) (int64, []TalentTriggerEvent, string) {
+func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, combatStats CombatStats, effectivePartType PartType, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now, nowMs int64) (int64, []TalentTriggerEvent, string) {
 	if boss == nil || part == nil || strings.TrimSpace(nickname) == "" || clickCount <= 0 {
 		return 0, nil, ""
 	}
@@ -2241,18 +2241,20 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 	}
 
 	triggerCtx := &talentTriggerContext{
-		boss:            boss,
-		part:            part,
-		nickname:        nickname,
-		clickCount:      clickCount,
-		baseDamage:      baseDamage,
-		isCritical:      isCritical,
-		partIndex:       partIndex,
-		compiledTalents: compiledTalents,
-		combatState:     combatState,
-		now:             now,
-		nowMs:           nowMs,
-		roll:            s.roll,
+		boss:              boss,
+		part:              part,
+		nickname:          nickname,
+		clickCount:        clickCount,
+		baseDamage:        baseDamage,
+		isCritical:        isCritical,
+		partIndex:         partIndex,
+		combatStats:       combatStats,
+		effectivePartType: effectivePartType,
+		compiledTalents:   compiledTalents,
+		combatState:       combatState,
+		now:               now,
+		nowMs:             nowMs,
+		roll:              s.roll,
 	}
 	for _, trigger := range compiledTalents.triggers {
 		trigger(triggerCtx)

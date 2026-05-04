@@ -91,7 +91,7 @@ func compileTalentSet(state *TalentState) *CompiledTalentSet {
 			ChaseRatio: TalentNormalStormChaseRatio,
 		},
 		Armor: compiledArmorTalents{
-			CollapseDuration: 8,
+			CollapseDuration: 6,
 		},
 	}
 	if state == nil || len(state.Talents) == 0 {
@@ -316,7 +316,7 @@ func compileNormalTalents(compiled *CompiledTalentSet) compiledNormalTalents {
 
 func compileArmorTalents(compiled *CompiledTalentSet) compiledArmorTalents {
 	armor := compiledArmorTalents{
-		CollapseDuration: 8,
+		CollapseDuration: 6,
 		CollapseAmp:      1.0,
 	}
 	if compiled.Has("armor_core") {

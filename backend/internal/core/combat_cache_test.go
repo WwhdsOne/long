@@ -182,8 +182,8 @@ func TestCompileTalentSetBuildsArmorAndCritThresholds(t *testing.T) {
 	if compiled.Armor.AutoStrikeRatio != armorAutoStrikeRatioForLevel(2) {
 		t.Fatalf("expected auto strike ratio %.2f, got %.2f", armorAutoStrikeRatioForLevel(2), compiled.Armor.AutoStrikeRatio)
 	}
-	if compiled.Armor.CollapseDuration != 8 {
-		t.Fatalf("expected collapse duration remain 8, got %d", compiled.Armor.CollapseDuration)
+	if compiled.Armor.CollapseDuration != 6 {
+		t.Fatalf("expected collapse duration remain 6, got %d", compiled.Armor.CollapseDuration)
 	}
 	expectedCollapseAmp := armorCollapseResonanceAmpForLevel(3) * armorRuinAmpForLevel(5)
 	if compiled.Armor.CollapseAmp != expectedCollapseAmp {

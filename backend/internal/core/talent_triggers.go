@@ -16,6 +16,8 @@ type talentTriggerContext struct {
 	baseDamage         int64
 	isCritical         bool
 	partIndex          int
+	combatStats        CombatStats
+	effectivePartType  PartType
 	compiledTalents    *CompiledTalentSet
 	combatState        *TalentCombatState
 	now                int64
@@ -105,11 +107,7 @@ func applyArmorCoreTrigger(tc *talentTriggerContext) {
 	}
 
 	cd := tc.compiledTalents.Armor.CollapseDuration
-	if !slices.Contains(tc.combatState.CollapseParts, tc.partIndex) {
-		tc.combatState.CollapseParts = append(tc.combatState.CollapseParts, tc.partIndex)
-	}
-	tc.combatState.CollapseEndsAt = tc.now + cd
-	tc.combatState.CollapseDuration = cd
+	applyCollapseState(tc, cd)
 	tc.events = append(tc.events, TalentTriggerEvent{
 		TalentID: "armor_core", Name: "灭绝穿甲", EffectType: "collapse_trigger",
 		Message: fmt.Sprintf("结构崩塌！护甲归零 %d 秒", cd),
@@ -117,6 +115,53 @@ func applyArmorCoreTrigger(tc *talentTriggerContext) {
 		PartY:   tc.part.Y,
 	})
 	tc.combatState.PartHeavyClickCount[partKey] = 0
+}
+
+func applyCollapseState(tc *talentTriggerContext, duration int64) {
+	if tc == nil || tc.combatState == nil || tc.part == nil || duration <= 0 {
+		return
+	}
+	if !slices.Contains(tc.combatState.CollapseParts, tc.partIndex) {
+		tc.combatState.CollapseParts = append(tc.combatState.CollapseParts, tc.partIndex)
+	}
+	tc.combatState.CollapseEndsAt = tc.now + duration
+	tc.combatState.CollapseDuration = duration
+}
+
+func judgmentDayBaseDamage(tc *talentTriggerContext) int64 {
+	if tc == nil || tc.part == nil {
+		return 0
+	}
+
+	activeCollapse := tc.combatState.CollapseEndsAt > tc.now && slices.Contains(tc.combatState.CollapseParts, tc.partIndex)
+	if activeCollapse {
+		return maxInt64(1, tc.baseDamage)
+	}
+
+	aliveCount := 0
+	for _, part := range tc.boss.Parts {
+		if part.Alive {
+			aliveCount++
+		}
+	}
+
+	currentStats := CalcBossPartDamage(tc.combatStats, tc.effectivePartType, tc.part.Armor, aliveCount, tc.boss.CurrentHP, tc.boss.MaxHP)
+	collapsedStats := CalcBossPartDamage(tc.combatStats, tc.effectivePartType, 0, aliveCount, tc.boss.CurrentHP, tc.boss.MaxHP)
+
+	currentResolved := currentStats.NormalDamage
+	collapsedResolved := collapsedStats.NormalDamage
+	if tc.isCritical {
+		currentResolved = currentStats.CriticalDamage
+		collapsedResolved = collapsedStats.CriticalDamage
+	}
+	if tc.compiledTalents.Armor.CollapseAmp > 1 {
+		collapsedResolved = int64(float64(collapsedResolved) * tc.compiledTalents.Armor.CollapseAmp)
+	}
+	if currentResolved <= 0 {
+		return maxInt64(1, tc.baseDamage)
+	}
+
+	return maxInt64(1, int64(math.Round(float64(maxInt64(1, tc.baseDamage))*float64(collapsedResolved)/float64(currentResolved))))
 }
 
 func applyArmorAutoStrikeTrigger(tc *talentTriggerContext) {
@@ -195,8 +240,10 @@ func applyArmorUltimateTrigger(tc *talentTriggerContext) {
 		return
 	}
 
+	baseDamage := judgmentDayBaseDamage(tc)
+	applyCollapseState(tc, tc.compiledTalents.Armor.CollapseDuration)
 	ratio := tc.compiledTalents.Armor.UltimateDamageRatio
-	dmg := min(int64(float64(maxInt64(1, tc.baseDamage))*ratio), tc.part.CurrentHP)
+	dmg := min(int64(float64(baseDamage)*ratio), tc.part.CurrentHP)
 	_, dmg, _ = applyBossPartDamageDelta(tc.boss, tc.part, dmg)
 	tc.totalExtra += dmg
 	tc.combatState.JudgmentDayUsed[pk] = now

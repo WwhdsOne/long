@@ -51,6 +51,7 @@
   - [designs/2026-04-30-天赋系统数值策划案-V2.0.md](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
   - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
   - [reports/2026-04-28-天赋成本调整总结.md](./reports/2026-04-28-天赋成本调整总结.md)
+  - [reports/2026-05-04-V2天赋系统补丁记录.md](./reports/2026-05-04-V2天赋系统补丁记录.md)
   - [superpowers/specs/2026-04-28-talent-system-rework-design.md](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
 - 架构方案：
   - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
