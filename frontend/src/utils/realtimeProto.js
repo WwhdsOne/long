@@ -13,6 +13,12 @@ const decodeOptions = {
   objects: true,
 }
 
+const sparseDecodeOptions = {
+  longs: Number,
+  arrays: false,
+  objects: true,
+}
+
 function packFrame(messageType, encoded) {
   const body = encoded instanceof Uint8Array ? encoded : new Uint8Array(encoded)
   const frame = new Uint8Array(1 + body.length)
@@ -56,7 +62,7 @@ export function decodeRealtimeBinaryMessage(frame) {
     case realtimeBinaryType.publicDelta:
       return {
         type: 'public_delta',
-        payload: toPlain(realtime.PublicDelta, realtime.PublicDelta.decode(body)),
+        payload: toPlain(realtime.PublicDelta, realtime.PublicDelta.decode(body), sparseDecodeOptions),
       }
     case realtimeBinaryType.userDelta:
       return {

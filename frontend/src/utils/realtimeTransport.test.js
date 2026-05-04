@@ -130,6 +130,46 @@ describe('realtimeTransport', () => {
     })
   })
 
+  it('public_delta 没有 leaderboard 字段时不会把已有榜单覆盖成空数组', () => {
+    const publicDeltas = []
+    const sockets = []
+    const transport = createRealtimeTransport({
+      createWebSocket(url) {
+        const socket = new FakeWebSocket(url)
+        sockets.push(socket)
+        socket.emitOpen()
+        return socket
+      },
+      createEventSource() {
+        throw new Error('should not create event source')
+      },
+      onPublicDelta(payload) {
+        publicDeltas.push(payload)
+      },
+    })
+
+    transport.connect({ nickname: '阿明' })
+
+    const encoded = realtime.PublicDelta.encode(realtime.PublicDelta.create({
+      totalVotes: 10,
+      roomId: 'hall',
+    })).finish()
+    const frame = new Uint8Array(1 + encoded.length)
+    frame[0] = realtimeBinaryType.publicDelta
+    frame.set(encoded, 1)
+
+    sockets[0].emitBinary(frame.buffer)
+
+    expect(publicDeltas).toEqual([
+      {
+        totalVotes: 10,
+        roomId: 'hall',
+        leaderboard: [],
+        bossLeaderboard: [],
+      },
+    ])
+  })
+
   it('click_ack 走 WebSocket 发送点击并回调最小反馈', () => {
     const sockets = []
     const clickAcks = []

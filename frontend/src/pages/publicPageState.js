@@ -1438,7 +1438,10 @@ function applyPublicState(payload) {
         buttonTotalVotes.value = Number(payload.totalVotes ?? buttonTotalVotes.value)
     }
     if ('leaderboard' in payload) {
-        leaderboard.value = Array.isArray(payload.leaderboard) ? payload.leaderboard : []
+        const nextLeaderboard = Array.isArray(payload.leaderboard) ? payload.leaderboard : null
+        if (nextLeaderboard && nextLeaderboard.length > 0) {
+            leaderboard.value = nextLeaderboard
+        }
     }
     if ('roomId' in payload) {
         currentRoomId.value = String(payload.roomId || currentRoomId.value || '1')
