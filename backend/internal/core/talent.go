@@ -418,13 +418,13 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 			dmgPerOmen = talentPercent(critOmenKillDmgPerOmenForLevel(currentFactor))
 		}
 		return fmt.Sprintf("部位血量低于 %s 时，每层死兆额外 +%s 伤害（例：47层=+47%%）。被动生效。", hpThreshold, dmgPerOmen)
-		case "omen_reap_passive":
-			return fmt.Sprintf("死兆达15/30/60/90/120层时，伤害自动提升至×%.2f/×%.2f/×%.2f/×%.2f/×%.2f（不消耗层数）。被动生效。",
-				critOmenReapMultForLevel(currentFactor, 0),
-				critOmenReapMultForLevel(currentFactor, 1),
-				critOmenReapMultForLevel(currentFactor, 2),
-				critOmenReapMultForLevel(currentFactor, 3),
-				critOmenReapMultForLevel(currentFactor, 4))
+	case "omen_reap_passive":
+		return fmt.Sprintf("死兆达15/30/60/90/120层时，伤害自动提升至×%.2f/×%.2f/×%.2f/×%.2f/×%.2f（不消耗层数）。被动生效。",
+			critOmenReapMultForLevel(currentFactor, 0),
+			critOmenReapMultForLevel(currentFactor, 1),
+			critOmenReapMultForLevel(currentFactor, 2),
+			critOmenReapMultForLevel(currentFactor, 3),
+			critOmenReapMultForLevel(currentFactor, 4))
 	case "weakspot_insight":
 		return fmt.Sprintf("对弱点部位暴击时额外乘以 ×%.2f 的独立倍率。", critWeakspotInsightMultiplierForLevel(currentFactor))
 	case "final_cut":
@@ -873,19 +873,19 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 		add("触发阈值", talentPercentScaled(value["hpThreshold"], currentFactor), talentPercentScaled(value["hpThreshold"], nextLevel))
 		add("每层增伤", talentPercentScaled(value["dmgPerOmen"], currentFactor), talentPercentScaled(value["dmgPerOmen"], nextLevel))
 	case "omen_reap_passive":
-			add("档位增伤",
-				fmt.Sprintf("15层×%.2f / 30层×%.2f / 60层×%.2f / 90层×%.2f / 120层×%.2f",
-					critOmenReapMultForLevel(currentFactor, 0),
-					critOmenReapMultForLevel(currentFactor, 1),
-					critOmenReapMultForLevel(currentFactor, 2),
-					critOmenReapMultForLevel(currentFactor, 3),
-					critOmenReapMultForLevel(currentFactor, 4)),
-				fmt.Sprintf("15层×%.2f / 30层×%.2f / 60层×%.2f / 90层×%.2f / 120层×%.2f",
-					critOmenReapMultForLevel(nextLevel, 0),
-					critOmenReapMultForLevel(nextLevel, 1),
-					critOmenReapMultForLevel(nextLevel, 2),
-					critOmenReapMultForLevel(nextLevel, 3),
-					critOmenReapMultForLevel(nextLevel, 4)))
+		add("档位增伤",
+			fmt.Sprintf("15层×%.2f / 30层×%.2f / 60层×%.2f / 90层×%.2f / 120层×%.2f",
+				critOmenReapMultForLevel(currentFactor, 0),
+				critOmenReapMultForLevel(currentFactor, 1),
+				critOmenReapMultForLevel(currentFactor, 2),
+				critOmenReapMultForLevel(currentFactor, 3),
+				critOmenReapMultForLevel(currentFactor, 4)),
+			fmt.Sprintf("15层×%.2f / 30层×%.2f / 60层×%.2f / 90层×%.2f / 120层×%.2f",
+				critOmenReapMultForLevel(nextLevel, 0),
+				critOmenReapMultForLevel(nextLevel, 1),
+				critOmenReapMultForLevel(nextLevel, 2),
+				critOmenReapMultForLevel(nextLevel, 3),
+				critOmenReapMultForLevel(nextLevel, 4)))
 	case "weakspot_insight":
 		add("弱点暴击倍率", fmt.Sprintf("×%.2f", critWeakspotInsightMultiplierForLevel(currentFactor)), fmt.Sprintf("×%.2f", critWeakspotInsightMultiplierForLevel(nextLevel)))
 	case "final_cut":

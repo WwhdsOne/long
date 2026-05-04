@@ -78,14 +78,14 @@ make frontend-dev
 make build
 make test
 make check
-npm --prefix frontend run test
+bun --cwd=frontend run test
 make hooks-install
 ```
 
 ### 约束
 
 - Go 命令必须在 `backend/` 目录执行，或使用 `go -C backend ...`。
-- 前端命令默认在仓库根目录通过 `npm --prefix frontend ...` 执行。
+- 前端命令默认在仓库根目录通过 `bun --cwd=frontend ...` 执行。
 - `make check` 是本地手动全量校验入口，包含：
   - 后端测试
   - `go vet`
@@ -98,10 +98,12 @@ make hooks-install
 
 - 安装命令：`make hooks-install`
 - 当前 `pre-commit` 会执行：
+  - 第一阶段前端更新：`bun --cwd=frontend install`
+  - 第二阶段后端更新：`go -C backend mod tidy`
   - `go -C backend fix ./...`
   - `go -C backend test ./...`
   - `go -C backend vet ./...`
-  - `npm --prefix frontend run test`
+  - `bun --cwd=frontend run test`
 
 ## 部署约束
 

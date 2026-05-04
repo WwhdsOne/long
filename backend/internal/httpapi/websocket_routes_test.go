@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
+	"github.com/hertz-contrib/websocket"
 
 	"long/internal/core"
 	"long/internal/events"
 	"long/internal/ratelimit"
+	"long/internal/realtimepb"
 )
 
 type dispatchingChangePublisher struct {
@@ -42,22 +44,37 @@ func (m *mockClickGuard) Allow(key string) (time.Duration, error) {
 	return 0, nil
 }
 
-func captureRealtimeMessages(t *testing.T, fn func(func(any) error) error) [][]byte {
+type capturedRealtimeFrame struct {
+	messageType int
+	payload     []byte
+}
+
+func captureRealtimeFrames(t *testing.T, fn func(func(realtimeOutboundFrame) error) error) []capturedRealtimeFrame {
 	t.Helper()
 
-	var messages [][]byte
-	err := fn(func(payload any) error {
-		encoded, err := sonic.Marshal(payload)
-		if err != nil {
-			return err
-		}
-		messages = append(messages, encoded)
+	var frames []capturedRealtimeFrame
+	err := fn(func(frame realtimeOutboundFrame) error {
+		frames = append(frames, capturedRealtimeFrame{
+			messageType: frame.messageType,
+			payload:     append([]byte(nil), frame.payload...),
+		})
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("capture realtime messages: %v", err)
 	}
 
+	return frames
+}
+
+func captureRealtimeMessages(t *testing.T, fn func(func(realtimeOutboundFrame) error) error) [][]byte {
+	t.Helper()
+
+	frames := captureRealtimeFrames(t, fn)
+	messages := make([][]byte, 0, len(frames))
+	for _, frame := range frames {
+		messages = append(messages, frame.payload)
+	}
 	return messages
 }
 
@@ -67,6 +84,29 @@ func decodeRealtimeMessage[T any](t *testing.T, payload []byte) T {
 	var message T
 	if err := sonic.Unmarshal(payload, &message); err != nil {
 		t.Fatalf("decode realtime message: %v", err)
+	}
+	return message
+}
+
+func encodeRealtimeBinaryClickRequestForTest(t *testing.T, slug string, comboCount int64) []byte {
+	t.Helper()
+
+	payload, err := packRealtimeBinaryMessage(realtimeBinaryTypeClickRequest, &realtimepb.ClickRequest{
+		Slug:       slug,
+		ComboCount: comboCount,
+	})
+	if err != nil {
+		t.Fatalf("encode realtime binary click request: %v", err)
+	}
+	return payload
+}
+
+func decodeRealtimeBinaryClickAckForTest(t *testing.T, payload []byte) *realtimepb.ClickAck {
+	t.Helper()
+
+	message := &realtimepb.ClickAck{}
+	if err := unpackRealtimeBinaryMessage(payload, realtimeBinaryTypeClickAck, message); err != nil {
+		t.Fatalf("decode realtime binary click ack: %v", err)
 	}
 	return message
 }
@@ -177,8 +217,8 @@ func TestRealtimeSessionHelloReturnsSnapshotAndUserState(t *testing.T) {
 		clientID:             "127.0.0.1",
 	})
 
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	messages := captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"hello","nickname":"阿明"}`), send)
 	})
 	if len(messages) != 1 {
 		t.Fatalf("expected one realtime message, got %d", len(messages))
@@ -223,8 +263,8 @@ func TestRealtimeSessionHelloReturnsPublicOnlyForAnonymousUser(t *testing.T) {
 		clientID:              "127.0.0.1",
 	})
 
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	messages := captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"hello","nickname":"阿明"}`), send)
 	})
 	if len(messages) != 1 {
 		t.Fatalf("expected one realtime message, got %d", len(messages))
@@ -267,8 +307,8 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 		clientID:             "127.0.0.1",
 	})
 
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	messages := captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"hello","nickname":"阿明"}`), send)
 	})
 	if len(messages) != 1 {
 		t.Fatalf("expected one realtime message, got %d", len(messages))
@@ -333,34 +373,26 @@ func TestRealtimeSessionClickReturnsAckAndPublishesDeltas(t *testing.T) {
 	wsClient, unsubscribeWS := hub.Subscribe("阿明")
 	defer unsubscribeWS()
 
-	_ = captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	_ = captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"hello","nickname":"阿明"}`), send)
 	})
 
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"feel"}`), send)
+	frames := captureRealtimeFrames(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.BinaryMessage, encodeRealtimeBinaryClickRequestForTest(t, "feel", 0), send)
 	})
-	if len(messages) != 1 {
-		t.Fatalf("expected one realtime message, got %d", len(messages))
+	if len(frames) != 1 {
+		t.Fatalf("expected one realtime message, got %d", len(frames))
 	}
 
-	ack := decodeRealtimeMessage[struct {
-		Type    string `json:"type"`
-		Payload struct {
-			Delta                int64 `json:"delta"`
-			Critical             bool  `json:"critical"`
-			MyBossDamage         int64 `json:"myBossDamage"`
-			BossLeaderboardCount int   `json:"bossLeaderboardCount"`
-		} `json:"payload"`
-	}](t, messages[0])
-	if ack.Type != realtimeMessageTypeClickAck {
-		t.Fatalf("expected click_ack, got %+v", ack)
+	if frames[0].messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary click ack, got %d", frames[0].messageType)
 	}
-	if ack.Payload.Delta != 1 || ack.Payload.Critical {
-		t.Fatalf("unexpected click ack payload: %+v", ack.Payload)
+	ack := decodeRealtimeBinaryClickAckForTest(t, frames[0].payload)
+	if ack.GetDelta() != 1 || ack.GetCritical() {
+		t.Fatalf("unexpected click ack payload: %+v", ack)
 	}
-	if ack.Payload.MyBossDamage != 61 || ack.Payload.BossLeaderboardCount != 2 {
-		t.Fatalf("expected realtime ack to carry boss summary fields, got %+v", ack.Payload)
+	if ack.GetMyBossDamage() != 61 || ack.GetBossLeaderboardCount() != 2 {
+		t.Fatalf("expected realtime ack to carry boss summary fields, got %+v", ack)
 	}
 
 	readHubEventSet(t, sseClient, map[string]struct{}{
@@ -424,33 +456,25 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	wsClient, unsubscribeWS := hub.Subscribe("阿明")
 	defer unsubscribeWS()
 
-	_ = captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	_ = captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"hello","nickname":"阿明"}`), send)
 	})
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"boss-part:1-2"}`), send)
+	frames := captureRealtimeFrames(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.BinaryMessage, encodeRealtimeBinaryClickRequestForTest(t, "boss-part:1-2", 0), send)
 	})
-	if len(messages) != 1 {
-		t.Fatalf("expected one realtime message, got %d", len(messages))
+	if len(frames) != 1 {
+		t.Fatalf("expected one realtime message, got %d", len(frames))
 	}
 
-	ack := decodeRealtimeMessage[struct {
-		Type    string `json:"type"`
-		Payload struct {
-			Delta                int64 `json:"delta"`
-			Critical             bool  `json:"critical"`
-			MyBossDamage         int64 `json:"myBossDamage"`
-			BossLeaderboardCount int   `json:"bossLeaderboardCount"`
-		} `json:"payload"`
-	}](t, messages[0])
-	if ack.Type != realtimeMessageTypeClickAck {
-		t.Fatalf("expected click_ack, got %+v", ack)
+	if frames[0].messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary click ack, got %d", frames[0].messageType)
 	}
-	if ack.Payload.Delta != 1 {
-		t.Fatalf("unexpected boss click ack payload: %+v", ack.Payload)
+	ack := decodeRealtimeBinaryClickAckForTest(t, frames[0].payload)
+	if ack.GetDelta() != 1 {
+		t.Fatalf("unexpected boss click ack payload: %+v", ack)
 	}
-	if ack.Payload.MyBossDamage != 61 || ack.Payload.BossLeaderboardCount != 1 {
-		t.Fatalf("expected boss summary in boss click ack, got %+v", ack.Payload)
+	if ack.GetMyBossDamage() != 61 || ack.GetBossLeaderboardCount() != 1 {
+		t.Fatalf("expected boss summary in boss click ack, got %+v", ack)
 	}
 	sseUserEvent := readHubPublicAndUserEvent(t, sseClient)
 	wsUserEvent := readHubPublicAndUserEvent(t, wsClient)
@@ -516,8 +540,8 @@ func TestRealtimeSessionReturnsProtocolErrors(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			messages := captureRealtimeMessages(t, func(send func(any) error) error {
-				return session.handleMessage(context.Background(), []byte(tc.raw), send)
+			messages := captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+				return session.handleMessage(context.Background(), websocket.TextMessage, []byte(tc.raw), send)
 			})
 			if len(messages) != 1 {
 				t.Fatalf("expected one realtime error, got %d", len(messages))
@@ -548,8 +572,8 @@ func TestRealtimeSessionClickRequiresAuthenticatedNicknameWhenConfigured(t *test
 		clientID:              "127.0.0.1",
 	})
 
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"feel"}`), send)
+	messages := captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"click","slug":"feel"}`), send)
 	})
 	if len(messages) != 1 {
 		t.Fatalf("expected one realtime error, got %d", len(messages))
@@ -573,12 +597,12 @@ func TestRealtimeSessionClickReturnsRateLimitError(t *testing.T) {
 		authenticatorEnabled: false,
 		clientID:             "127.0.0.1",
 	})
-	_ = captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"hello","nickname":"阿明"}`), send)
+	_ = captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"hello","nickname":"阿明"}`), send)
 	})
 
-	messages := captureRealtimeMessages(t, func(send func(any) error) error {
-		return session.handleMessage(context.Background(), []byte(`{"type":"click","slug":"feel"}`), send)
+	messages := captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"click","slug":"feel"}`), send)
 	})
 	if len(messages) != 1 {
 		t.Fatalf("expected one realtime error, got %d", len(messages))

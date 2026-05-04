@@ -1,3 +1,5 @@
+import { decodeRealtimeBinaryMessage, encodeRealtimeClickRequest } from './realtimeProto'
+
 function trimNickname(value) {
   return String(value ?? '').trim()
 }
@@ -98,6 +100,16 @@ export function createRealtimeTransport(options = {}) {
   }
 
   function handleSocketMessage(raw) {
+    if (typeof raw !== 'string') {
+      try {
+        const message = decodeRealtimeBinaryMessage(raw)
+        applyRealtimeMessage(message)
+      } catch {
+        onTransportError('实时二进制消息解析失败，请刷新页面后重试。')
+      }
+      return
+    }
+
     let message
     try {
       message = JSON.parse(raw)
@@ -106,6 +118,10 @@ export function createRealtimeTransport(options = {}) {
       return
     }
 
+    applyRealtimeMessage(message)
+  }
+
+  function applyRealtimeMessage(message) {
     switch (message?.type) {
       case 'snapshot':
         clearReconnectTimer()
@@ -248,6 +264,7 @@ export function createRealtimeTransport(options = {}) {
     }
 
     ws = socket
+    socket.binaryType = 'arraybuffer'
     socket.onopen = () => {
       if (ws !== socket) {
         return
@@ -296,8 +313,7 @@ export function createRealtimeTransport(options = {}) {
       }
 
       try {
-        ws.send(JSON.stringify({
-          type: 'click',
+        ws.send(encodeRealtimeClickRequest({
           slug,
           comboCount,
         }))

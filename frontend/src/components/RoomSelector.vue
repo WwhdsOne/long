@@ -39,7 +39,7 @@ const ROOM_ACCENTS = [
 ]
 
 function roomLabel(room) {
-  return `房间 ${room?.id || '1'}`
+  return `${room?.id || '1'}`
 }
 
 function currentRoomSummary(roomId) {

@@ -131,6 +131,16 @@ type realtimeSession struct {
 	lastActiveAt          time.Time
 }
 
+type realtimeInboundFrame struct {
+	messageType int
+	payload     []byte
+}
+
+type realtimeOutboundFrame struct {
+	messageType int
+	payload     []byte
+}
+
 func newRealtimeSession(options realtimeSessionOptions) *realtimeSession {
 	return &realtimeSession{
 		stateView:             options.stateView,
@@ -182,18 +192,21 @@ func runRealtimeConnection(conn *websocket.Conn, session *realtimeSession) {
 	defer session.close()
 	defer conn.Close()
 
-	readCh := make(chan []byte)
+	readCh := make(chan realtimeInboundFrame)
 	readDone := make(chan struct{})
 
 	go func() {
 		defer close(readDone)
 		for {
-			_, payload, err := conn.ReadMessage()
+			messageType, payload, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
 			select {
-			case readCh <- append([]byte(nil), payload...):
+			case readCh <- realtimeInboundFrame{
+				messageType: messageType,
+				payload:     append([]byte(nil), payload...),
+			}:
 			case <-connectionCtx.Done():
 				return
 			}
@@ -204,10 +217,10 @@ func runRealtimeConnection(conn *websocket.Conn, session *realtimeSession) {
 		select {
 		case <-readDone:
 			return
-		case payload := <-readCh:
-			if err := session.handleMessage(connectionCtx, payload, func(message any) error {
+		case frame := <-readCh:
+			if err := session.handleMessage(connectionCtx, frame.messageType, frame.payload, func(message realtimeOutboundFrame) error {
 				conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-				return conn.WriteJSON(message)
+				return conn.WriteMessage(message.messageType, message.payload)
 			}); err != nil {
 				return
 			}
@@ -223,8 +236,12 @@ func runRealtimeConnection(conn *websocket.Conn, session *realtimeSession) {
 	}
 }
 
-func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, send func(any) error) error {
+func (s *realtimeSession) handleMessage(ctx context.Context, messageType int, payload []byte, send func(realtimeOutboundFrame) error) error {
 	s.lastActiveAt = time.Now()
+
+	if messageType == websocket.BinaryMessage {
+		return s.handleBinaryMessage(ctx, payload, send)
+	}
 
 	var message realtimeClientMessage
 	if err := sonic.Unmarshal(payload, &message); err != nil {
@@ -238,77 +255,92 @@ func (s *realtimeSession) handleMessage(ctx context.Context, payload []byte, sen
 	case realtimeMessageTypeSyncRequest:
 		return s.sendSnapshot(ctx, send)
 	case realtimeMessageTypePing:
-		return send(realtimePongMessage{Type: realtimeMessageTypePong})
+		return sendText(send, realtimePongMessage{Type: realtimeMessageTypePong})
 	case realtimeMessageTypeClick:
-		slug := strings.TrimSpace(message.Slug)
-		if slug == "" {
-			return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击消息缺少按钮标识。"))
-		}
-
-		nickname, result, apiErr := executeButtonClick(ctx, Options{
-			Store:           s.store,
-			ClickGuard:      s.clickGuard,
-			ChangePublisher: s.changePublisher,
-		}, clickRequestContext{
-			Slug:                  slug,
-			NicknameHint:          s.nickname,
-			AuthenticatedNickname: s.authenticatedNickname,
-			AuthenticatorEnabled:  s.authenticatorEnabled,
-			ClientID:              s.clientID,
-			ComboCount:            message.ComboCount,
-		})
-		if apiErr != nil {
-			return send(s.protocolError(apiErr.Code, apiErr.Message))
-		}
-
-		s.setNickname(resolveRealtimeReadNickname(s.authenticatorEnabled, nickname, nickname))
-
-		change := core.StateChange{
-			Type:      core.StateChangeButtonClicked,
-			Nickname:  nickname,
-			RoomID:    result.RoomID,
-			Timestamp: time.Now().Unix(),
-		}
-		if result.BroadcastUserAll {
-			change.BroadcastUserAll = true
-		}
-		publishChange(ctx, s.changePublisher, change)
-
-		ack := realtimeClickAckMessage{
-			Type: realtimeMessageTypeClickAck,
-			Payload: realtimeClickAckPayload{
-				Delta:                result.Delta,
-				Critical:             result.Critical,
-				BossDamage:           result.BossDamage,
-				MyBossDamage:         result.MyBossDamage,
-				BossLeaderboardCount: result.BossLeaderboardCount,
-				DamageType:           result.DamageType,
-				TalentEvents:         result.TalentEvents,
-				PartStateDeltas:      result.PartStateDeltas,
-				TalentCombatState:    result.TalentCombatState,
-				Button: struct {
-					Key string `json:"key"`
-				}{
-					Key: slug,
-				},
-			},
-		}
-		if s.nickname != "" && s.stateView != nil {
-			if userState, err := s.stateView.GetUserState(ctx, s.nickname); err == nil {
-				ack.Payload.UserDelta = &realtimeUserDelta{
-					Gold:         &userState.Gold,
-					Stones:       &userState.Stones,
-					TalentPoints: &userState.TalentPoints,
-				}
-			}
-		}
-		return send(ack)
+		return s.executeClick(ctx, strings.TrimSpace(message.Slug), message.ComboCount, send)
 	default:
 		return send(s.protocolError(realtimeErrorCodeInvalidMessage, "不支持的实时消息类型。"))
 	}
 }
 
-func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(any) error) error {
+func (s *realtimeSession) handleBinaryMessage(ctx context.Context, payload []byte, send func(realtimeOutboundFrame) error) error {
+	request, err := decodeRealtimeBinaryClickRequest(payload)
+	if err != nil {
+		return send(s.protocolError(realtimeErrorCodeInvalidMessage, "实时二进制消息格式不对，请刷新页面后重试。"))
+	}
+	return s.executeClick(ctx, strings.TrimSpace(request.GetSlug()), request.GetComboCount(), send)
+}
+
+func (s *realtimeSession) executeClick(ctx context.Context, slug string, comboCount int64, send func(realtimeOutboundFrame) error) error {
+	if slug == "" {
+		return send(s.protocolError(realtimeErrorCodeInvalidRequest, "点击消息缺少按钮标识。"))
+	}
+
+	nickname, result, apiErr := executeButtonClick(ctx, Options{
+		Store:           s.store,
+		ClickGuard:      s.clickGuard,
+		ChangePublisher: s.changePublisher,
+	}, clickRequestContext{
+		Slug:                  slug,
+		NicknameHint:          s.nickname,
+		AuthenticatedNickname: s.authenticatedNickname,
+		AuthenticatorEnabled:  s.authenticatorEnabled,
+		ClientID:              s.clientID,
+		ComboCount:            comboCount,
+	})
+	if apiErr != nil {
+		return send(s.protocolError(apiErr.Code, apiErr.Message))
+	}
+
+	s.setNickname(resolveRealtimeReadNickname(s.authenticatorEnabled, nickname, nickname))
+
+	change := core.StateChange{
+		Type:      core.StateChangeButtonClicked,
+		Nickname:  nickname,
+		RoomID:    result.RoomID,
+		Timestamp: time.Now().Unix(),
+	}
+	if result.BroadcastUserAll {
+		change.BroadcastUserAll = true
+	}
+	publishChange(ctx, s.changePublisher, change)
+
+	ack := realtimeClickAckPayload{
+		Delta:                result.Delta,
+		Critical:             result.Critical,
+		BossDamage:           result.BossDamage,
+		MyBossDamage:         result.MyBossDamage,
+		BossLeaderboardCount: result.BossLeaderboardCount,
+		DamageType:           result.DamageType,
+		TalentEvents:         result.TalentEvents,
+		PartStateDeltas:      result.PartStateDeltas,
+		TalentCombatState:    result.TalentCombatState,
+		Button: struct {
+			Key string `json:"key"`
+		}{
+			Key: slug,
+		},
+	}
+	if s.nickname != "" && s.stateView != nil {
+		if userState, err := s.stateView.GetUserState(ctx, s.nickname); err == nil {
+			ack.UserDelta = &realtimeUserDelta{
+				Gold:         &userState.Gold,
+				Stones:       &userState.Stones,
+				TalentPoints: &userState.TalentPoints,
+			}
+		}
+	}
+	encoded, err := encodeRealtimeBinaryClickAck(ack)
+	if err != nil {
+		return err
+	}
+	return send(realtimeOutboundFrame{
+		messageType: websocket.BinaryMessage,
+		payload:     encoded,
+	})
+}
+
+func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(realtimeOutboundFrame) error) error {
 	if s.stateView == nil {
 		return send(s.protocolError(realtimeErrorCodeStateFetchFail, "实时状态同步失败，请稍后重试。"))
 	}
@@ -335,7 +367,7 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(any) error
 		userState = &payload
 	}
 
-	return send(realtimeSnapshotMessage{
+	return sendText(send, realtimeSnapshotMessage{
 		Type:   realtimeMessageTypeSnapshot,
 		Public: snapshot,
 		User:   userState,
@@ -390,40 +422,73 @@ func (s *realtimeSession) close() {
 }
 
 func (s *realtimeSession) writeUpdate(conn *websocket.Conn, update events.ServerEvent) error {
-	message, ok := realtimeMessageFromEvent(update)
+	message, ok, err := realtimeMessageFromEvent(update)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		return nil
 	}
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	return conn.WriteJSON(message)
+	return conn.WriteMessage(message.messageType, message.payload)
 }
 
-func (s *realtimeSession) protocolError(code string, message string) realtimeErrorMessage {
-	return realtimeErrorMessage{
+func (s *realtimeSession) protocolError(code string, message string) realtimeOutboundFrame {
+	payload, _ := sonic.Marshal(realtimeErrorMessage{
 		Type:    realtimeMessageTypeError,
 		Code:    code,
 		Message: message,
+	})
+	return realtimeOutboundFrame{
+		messageType: websocket.TextMessage,
+		payload:     payload,
 	}
 }
 
-func realtimeMessageFromEvent(event events.ServerEvent) (any, bool) {
+func sendText(send func(realtimeOutboundFrame) error, message any) error {
+	payload, err := sonic.Marshal(message)
+	if err != nil {
+		return err
+	}
+	return send(realtimeOutboundFrame{
+		messageType: websocket.TextMessage,
+		payload:     payload,
+	})
+}
+
+func realtimeMessageFromEvent(event events.ServerEvent) (realtimeOutboundFrame, bool, error) {
 	switch event.Name {
 	case events.PublicStateEventName:
-		return realtimeDeltaMessage{
-			Type:    realtimeMessageTypePublicDelta,
-			Payload: event.Payload,
-		}, true
+		payload, err := encodeRealtimeBinaryPublicDeltaFromJSON(event.Payload)
+		if err != nil {
+			return realtimeOutboundFrame{}, false, err
+		}
+		return realtimeOutboundFrame{
+			messageType: websocket.BinaryMessage,
+			payload:     payload,
+		}, true, nil
 	case events.UserStateEventName:
-		return realtimeDeltaMessage{
-			Type:    realtimeMessageTypeUserDelta,
-			Payload: event.Payload,
-		}, true
+		payload, err := encodeRealtimeBinaryUserDeltaFromJSON(event.Payload)
+		if err != nil {
+			return realtimeOutboundFrame{}, false, err
+		}
+		return realtimeOutboundFrame{
+			messageType: websocket.BinaryMessage,
+			payload:     payload,
+		}, true, nil
 	case events.OnlineCountEventName:
-		return realtimeDeltaMessage{
+		payload, err := sonic.Marshal(realtimeDeltaMessage{
 			Type:    realtimeMessageTypeOnlineCount,
 			Payload: event.Payload,
-		}, true
+		})
+		if err != nil {
+			return realtimeOutboundFrame{}, false, err
+		}
+		return realtimeOutboundFrame{
+			messageType: websocket.TextMessage,
+			payload:     payload,
+		}, true, nil
 	default:
-		return nil, false
+		return realtimeOutboundFrame{}, false, nil
 	}
 }

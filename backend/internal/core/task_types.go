@@ -158,25 +158,25 @@ type TaskCycleResultsView struct {
 
 // PlayerTask 玩家当前可见任务视图。
 type PlayerTask struct {
-	TaskID        string            `json:"taskId"`
-	Title         string            `json:"title"`
-	Description   string            `json:"description"`
-	TaskType      TaskType          `json:"taskType"`
-	EventKind     TaskEventKind     `json:"eventKind"`
-	WindowKind    TaskWindowKind    `json:"windowKind"`
-	ConditionKind TaskConditionKind `json:"conditionKind"`
-	TargetValue   int64             `json:"targetValue"`
-	Rewards       TaskRewards       `json:"rewards"`
-	DisplayOrder  int64             `json:"displayOrder"`
-	StartAt       int64             `json:"startAt,omitempty"`
-	EndAt         int64             `json:"endAt,omitempty"`
-	CycleKey      string            `json:"cycleKey"`
-	Progress      int64             `json:"progress"`
-	Status        TaskPlayerStatus  `json:"status"`
-	CompletedAt   int64             `json:"completedAt,omitempty"`
-	ClaimedAt     int64             `json:"claimedAt,omitempty"`
-	CanClaim                bool                     `json:"canClaim"`
-	EquipmentRewardDetails  []EquipmentRewardDetail  `json:"equipmentRewardDetails,omitempty"`
+	TaskID                 string                  `json:"taskId"`
+	Title                  string                  `json:"title"`
+	Description            string                  `json:"description"`
+	TaskType               TaskType                `json:"taskType"`
+	EventKind              TaskEventKind           `json:"eventKind"`
+	WindowKind             TaskWindowKind          `json:"windowKind"`
+	ConditionKind          TaskConditionKind       `json:"conditionKind"`
+	TargetValue            int64                   `json:"targetValue"`
+	Rewards                TaskRewards             `json:"rewards"`
+	DisplayOrder           int64                   `json:"displayOrder"`
+	StartAt                int64                   `json:"startAt,omitempty"`
+	EndAt                  int64                   `json:"endAt,omitempty"`
+	CycleKey               string                  `json:"cycleKey"`
+	Progress               int64                   `json:"progress"`
+	Status                 TaskPlayerStatus        `json:"status"`
+	CompletedAt            int64                   `json:"completedAt,omitempty"`
+	ClaimedAt              int64                   `json:"claimedAt,omitempty"`
+	CanClaim               bool                    `json:"canClaim"`
+	EquipmentRewardDetails []EquipmentRewardDetail `json:"equipmentRewardDetails,omitempty"`
 }
 
 // NormalizeTaskDefinitionModel 将任务定义补齐为新旧字段并存的兼容模型。

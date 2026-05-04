@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { encodeRealtimeClickRequest, realtimeBinaryType } from './realtimeProto'
 import { createRealtimeTransport } from './realtimeTransport'
+import { realtime } from '../proto/realtime.js'
 
 class FakeWebSocket {
   constructor(url) {
@@ -26,7 +28,13 @@ class FakeWebSocket {
   }
 
   emitMessage(payload) {
-    this.onmessage?.({ data: JSON.stringify(payload) })
+    this.onmessage?.({
+      data: typeof payload === 'string' ? payload : JSON.stringify(payload),
+    })
+  }
+
+  emitBinary(payload) {
+    this.onmessage?.({ data: payload })
   }
 
   emitError() {
@@ -143,30 +151,32 @@ describe('realtimeTransport', () => {
     sockets[0].emitOpen()
 
     expect(transport.sendClick('feel')).toBe(true)
-    expect(sockets[0].sent.at(-1)).toBe(JSON.stringify({
-      type: 'click',
+    expect(sockets[0].sent.at(-1)).toEqual(encodeRealtimeClickRequest({
       slug: 'feel',
       comboCount: 0,
     }))
 
-    sockets[0].emitMessage({
-      type: 'click_ack',
-      payload: {
-        button: { key: 'feel', count: 4 },
-        delta: 1,
-        critical: false,
-        myBossDamage: 61,
-        bossLeaderboardCount: 2,
-      },
-    })
+    const encodedAck = realtime.ClickAck.encode(realtime.ClickAck.create({
+      button: { key: 'feel' },
+      delta: 1,
+      critical: false,
+      myBossDamage: 61,
+      bossLeaderboardCount: 2,
+    })).finish()
+    const ackFrame = new Uint8Array(1 + encodedAck.length)
+    ackFrame[0] = realtimeBinaryType.clickAck
+    ackFrame.set(encodedAck, 1)
+    sockets[0].emitBinary(ackFrame.buffer)
 
     expect(clickAcks).toEqual([
       {
-        button: { key: 'feel', count: 4 },
+        button: { key: 'feel' },
         delta: 1,
         critical: false,
         myBossDamage: 61,
         bossLeaderboardCount: 2,
+        partStateDeltas: [],
+        talentEvents: [],
       },
     ])
   })

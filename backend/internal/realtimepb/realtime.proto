@@ -1,0 +1,233 @@
+syntax = "proto3";
+
+package realtime;
+
+option go_package = "long/internal/realtimepb";
+
+message ClickRequest {
+  string slug = 1;
+  int64 combo_count = 2;
+}
+
+message ClickAck {
+  int64 delta = 1;
+  bool critical = 2;
+  int64 boss_damage = 3;
+  int64 my_boss_damage = 4;
+  int32 boss_leaderboard_count = 5;
+  string damage_type = 6;
+  repeated TalentTriggerEvent talent_events = 7;
+  repeated BossPartStateDelta part_state_deltas = 8;
+  TalentCombatState talent_combat_state = 9;
+  UserDeltaPatch user_delta = 10;
+  ButtonRef button = 11;
+}
+
+message UserDeltaPatch {
+  int64 gold = 1;
+  int64 stones = 2;
+  int64 talent_points = 3;
+}
+
+message ButtonRef {
+  string key = 1;
+}
+
+message PublicDelta {
+  int64 total_votes = 1;
+  repeated LeaderboardEntry leaderboard = 2;
+  string room_id = 3;
+  Boss boss = 4;
+  repeated BossLeaderboardEntry boss_leaderboard = 5;
+  string announcement_version = 6;
+}
+
+message UserDelta {
+  UserStats user_stats = 1;
+  BossUserStats my_boss_stats = 2;
+  int64 my_boss_kills = 3;
+  int64 total_boss_kills = 4;
+  string room_id = 5;
+  Loadout loadout = 6;
+  CombatStats combat_stats = 7;
+  int64 gold = 8;
+  int64 stones = 9;
+  int64 talent_points = 10;
+  repeated Reward recent_rewards = 11;
+  repeated TalentTriggerEvent talent_events = 12;
+  TalentCombatState talent_combat_state = 13;
+  string equipped_battle_click_skin_id = 14;
+  string equipped_battle_click_cursor_image_path = 15;
+}
+
+message UserStats {
+  string nickname = 1;
+  int64 click_count = 2;
+}
+
+message LeaderboardEntry {
+  int32 rank = 1;
+  string nickname = 2;
+  int64 click_count = 3;
+}
+
+message BossPart {
+  int32 x = 1;
+  int32 y = 2;
+  string type = 3;
+  string display_name = 4;
+  string image_path = 5;
+  int64 max_hp = 6;
+  int64 current_hp = 7;
+  int64 armor = 8;
+  bool alive = 9;
+}
+
+message Boss {
+  string id = 1;
+  string template_id = 2;
+  string room_id = 3;
+  string queue_id = 4;
+  string name = 5;
+  string status = 6;
+  int64 max_hp = 7;
+  int64 current_hp = 8;
+  int64 gold_on_kill = 9;
+  int64 stone_on_kill = 10;
+  int64 talent_points_on_kill = 11;
+  repeated BossPart parts = 12;
+  int64 started_at = 13;
+  int64 defeated_at = 14;
+}
+
+message BossLeaderboardEntry {
+  int32 rank = 1;
+  string nickname = 2;
+  int64 damage = 3;
+}
+
+message BossUserStats {
+  string nickname = 1;
+  int64 damage = 2;
+  int32 rank = 3;
+}
+
+message InventoryItem {
+  string item_id = 1;
+  string instance_id = 2;
+  string name = 3;
+  string slot = 4;
+  string rarity = 5;
+  string image_path = 6;
+  string image_alt = 7;
+  int64 quantity = 8;
+  bool equipped = 9;
+  int32 enhance_level = 10;
+  bool bound = 11;
+  bool locked = 12;
+  int64 attack_power = 13;
+  double armor_pen_percent = 14;
+  double crit_rate = 15;
+  double crit_damage_multiplier = 16;
+  double part_type_damage_soft = 17;
+  double part_type_damage_heavy = 18;
+  double part_type_damage_weak = 19;
+}
+
+message Loadout {
+  InventoryItem weapon = 1;
+  InventoryItem helmet = 2;
+  InventoryItem chest = 3;
+  InventoryItem gloves = 4;
+  InventoryItem legs = 5;
+  InventoryItem accessory = 6;
+}
+
+message CombatStats {
+  int64 effective_increment = 1;
+  int64 normal_damage = 2;
+  double critical_chance_percent = 3;
+  int64 critical_damage = 4;
+  int64 attack_power = 5;
+  double armor_pen_percent = 6;
+  double crit_damage_multiplier = 7;
+  double all_damage_amplify = 8;
+  double part_type_damage_soft = 9;
+  double part_type_damage_heavy = 10;
+  double part_type_damage_weak = 11;
+  double per_part_damage_percent = 12;
+  double low_hp_multiplier = 13;
+  double low_hp_threshold = 14;
+}
+
+message Reward {
+  string boss_id = 1;
+  string boss_name = 2;
+  string item_id = 3;
+  string item_name = 4;
+  int64 granted_at = 5;
+}
+
+message TalentTriggerEvent {
+  string talent_id = 1;
+  string name = 2;
+  string effect_type = 3;
+  int64 extra_damage = 4;
+  string message = 5;
+  int32 part_x = 6;
+  int32 part_y = 7;
+}
+
+message BossPartStateDelta {
+  int32 x = 1;
+  int32 y = 2;
+  int64 damage = 3;
+  int64 before_hp = 4;
+  int64 after_hp = 5;
+  string part_type = 6;
+}
+
+message TalentBleedState {
+  int64 started_at_ms = 1;
+  int64 next_tick_at_ms = 2;
+  int64 ends_at_ms = 3;
+  int64 duration_ms = 4;
+  int64 tick_interval_ms = 5;
+  int64 total_ticks = 6;
+  int64 applied_ticks = 7;
+  int64 total_damage = 8;
+  int64 applied_damage = 9;
+}
+
+message TalentCombatState {
+  int32 omen_stacks = 1;
+  map<string, TalentBleedState> bleeds = 2;
+  repeated int32 collapse_parts = 3;
+  int64 collapse_ends_at = 4;
+  int64 collapse_duration = 5;
+  repeated int32 doom_marks = 6;
+  bool has_triggered_doom = 7;
+  map<string, int64> doom_mark_cum_damage = 8;
+  int32 silver_storm_remaining = 9;
+  int64 silver_storm_ends_at = 10;
+  bool silver_storm_active = 11;
+  string auto_strike_target_part = 12;
+  int64 auto_strike_combo_count = 13;
+  int64 auto_strike_expires_at = 14;
+  int64 last_final_cut_at = 15;
+  map<string, int64> judgment_day_used = 16;
+  int64 judgment_day_cooldown_sec = 17;
+  map<string, int64> part_heavy_click_count = 18;
+  map<string, int64> part_judgment_day_count = 19;
+  map<string, int64> part_retained_clicks = 20;
+  map<string, int64> part_storm_combo_count = 21;
+  map<string, int64> skinner_parts = 22;
+  map<string, int64> skinner_duration_by_part = 23;
+  int64 skinner_cooldown_ends_at = 24;
+  int64 skinner_cooldown_duration = 25;
+  int64 normal_trigger_count = 26;
+  int64 armor_trigger_count = 27;
+  int64 judgment_day_trigger_count = 28;
+  int64 auto_strike_trigger_count = 29;
+  int64 auto_strike_window_sec = 30;
+}

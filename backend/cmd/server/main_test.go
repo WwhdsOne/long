@@ -53,7 +53,7 @@ func TestRenderStartupInfoIncludesBannerAndSummary(t *testing.T) {
 	assertContains(t, info, "Redis: 127.0.0.1:6379/2")
 	assertContains(t, info, "Redis TLS: true")
 	assertContains(t, info, "Mongo: true (vote_wall)")
-assertContains(t, info, "日志: level=info format=json")
+	assertContains(t, info, "日志: level=info format=json")
 }
 
 func assertContains(t *testing.T, got string, want string) {

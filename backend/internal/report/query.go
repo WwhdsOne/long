@@ -24,4 +24,3 @@ func shanghaiLocation() *time.Location {
 	}
 	return loc
 }
-

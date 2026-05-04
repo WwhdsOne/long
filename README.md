@@ -48,7 +48,7 @@ make backend-run
 make frontend-dev
 make build
 make test
-npm --prefix frontend run test
+bun --cwd=frontend run test
 make check
 ```
 
@@ -57,6 +57,7 @@ make check
 - `make dev`：同时启动 Go 后端和 Vite 前端。
 - `make build`：只构建前端产物到 `backend/public/`。
 - `make test`：运行后端测试。
+- `bun --cwd=frontend run test`：运行前端测试。
 - `make check`：本地手动全量校验，包含后端测试、`go vet`、前端测试和前端构建。
 - Go 命令必须在 `backend/` 下执行，或使用 `go -C backend ...`。
 
@@ -72,10 +73,12 @@ make hooks-install
 
 当前 `pre-commit` 会执行：
 
+- 第一阶段前端更新：`bun --cwd=frontend install`
+- 第二阶段后端更新：`go -C backend mod tidy`
 - `go -C backend fix ./...`
 - `go -C backend test ./...`
 - `go -C backend vet ./...`
-- `npm --prefix frontend run test`
+- `bun --cwd=frontend run test`
 
 `make check` 仍保留为手动全量校验入口，但不再作为 GitHub Actions 部署步骤的一部分。
 
