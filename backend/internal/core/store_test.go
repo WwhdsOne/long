@@ -272,6 +272,68 @@ func TestClickBossPartUsesPlayerRoom(t *testing.T) {
 	}
 }
 
+func TestListRoomsUsesBossCycleQueueAverageHP(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "room-1-template-a",
+		Name:  "模板 A",
+		MaxHP: 1,
+		Layout: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 1000, CurrentHP: 1000, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("save template a: %v", err)
+	}
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "room-1-template-b",
+		Name:  "模板 B",
+		MaxHP: 1,
+		Layout: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 3000, CurrentHP: 3000, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("save template b: %v", err)
+	}
+	if _, err := store.SetBossCycleQueueForRoom(ctx, "1", []string{"room-1-template-a", "room-1-template-b"}); err != nil {
+		t.Fatalf("set room cycle queue: %v", err)
+	}
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 1000,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 500, CurrentHP: 500, Alive: true},
+			{X: 1, Y: 0, Type: PartTypeSoft, MaxHP: 500, CurrentHP: 500, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room boss: %v", err)
+	}
+
+	if _, err := store.ClickBossPart(ctx, "boss-part:0-0", "阿明"); err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+
+	rooms, err := store.ListRooms(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("list rooms: %v", err)
+	}
+
+	for _, room := range rooms.Rooms {
+		if room.ID != "1" {
+			continue
+		}
+		if room.CurrentBossAvgHP != 2000 {
+			t.Fatalf("expected avg hp to use cycle queue average 2000, got %+v", room)
+		}
+		return
+	}
+
+	t.Fatal("expected room 1 in room list")
+}
+
 func TestClickBossPartFallsBackToDefaultCombatRoomWhenPlayerInHall(t *testing.T) {
 	store, cleanup := newTestRoomStore(t)
 	defer cleanup()

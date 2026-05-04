@@ -288,6 +288,10 @@ func (s *Store) roomInfos(ctx context.Context, currentRoomID string, cooldownRem
 			}
 			onlineCount = int(count)
 		}
+		avgBossHP, err := s.roomCycleAverageBossHP(ctx, id)
+		if err != nil {
+			return nil, err
+		}
 		enabled, err := s.bossCycleEnabledForRoom(ctx, id)
 		if err != nil {
 			return nil, err
@@ -307,13 +311,26 @@ func (s *Store) roomInfos(ctx context.Context, currentRoomID string, cooldownRem
 			info.CurrentBossStatus = boss.Status
 			info.CurrentBossHP = boss.CurrentHP
 			info.CurrentBossMaxHP = boss.MaxHP
-			if len(boss.Parts) > 0 {
-				info.CurrentBossAvgHP = boss.CurrentHP / int64(len(boss.Parts))
-			}
 		}
+		info.CurrentBossAvgHP = avgBossHP
 		rooms = append(rooms, info)
 	}
 	return rooms, nil
+}
+
+func (s *Store) roomCycleAverageBossHP(ctx context.Context, roomID string) (int64, error) {
+	queue, err := s.loadBossTemplateQueueForRoom(ctx, roomID)
+	if err != nil {
+		if errors.Is(err, ErrBossCycleQueueEmpty) || errors.Is(err, ErrBossPoolEmpty) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	var total int64
+	for _, template := range queue {
+		total += template.MaxHP
+	}
+	return total / int64(len(queue)), nil
 }
 
 func (s *Store) roomJoinable(ctx context.Context, roomID string) (bool, error) {
