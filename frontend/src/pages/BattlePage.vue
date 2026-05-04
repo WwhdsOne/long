@@ -75,7 +75,12 @@ const DEFAULT_BOSS_SWORD_CURSOR_URL = 'https://hai-world2.oss-cn-beijing.aliyunc
 const HALL_ROOM_ID = 'hall'
 const bossSwordCursorUrl = computed(() => equippedBattleClickCursorImagePath.value || DEFAULT_BOSS_SWORD_CURSOR_URL)
 const isHallRoom = computed(() => String(currentRoomId.value || '') === HALL_ROOM_ID)
-const currentRoomDisplay = computed(() => isHallRoom.value ? '大厅' : `房间 ${currentRoom.value?.id || currentRoomId.value || '1'}`)
+const currentRoomDisplay = computed(() => {
+  if (isHallRoom.value) return '大厅'
+  const displayName = String(currentRoom.value?.displayName || '').trim()
+  if (displayName) return displayName
+  return `房间 ${currentRoom.value?.id || currentRoomId.value || '1'}`
+})
 const currentRoomSeal = computed(() => isHallRoom.value ? 'HL' : String(currentRoom.value?.id || currentRoomId.value || '1').padStart(2, '0'))
 const myBattlePower = computed(() => (
   Math.max(0, Number(combatStats.value?.attackPower || 0)) +

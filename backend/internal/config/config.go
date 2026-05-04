@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -96,7 +95,7 @@ type ArchiveConfig struct{}
 // RoomConfig 控制房间分线配置。
 type RoomConfig struct {
 	Enabled        bool
-	IDs            []string
+	Count          int
 	DefaultRoom    string
 	SwitchCooldown time.Duration
 }
@@ -163,10 +162,10 @@ type fileConfig struct {
 		DebounceMs int `yaml:"debounce_ms"`
 	} `yaml:"realtime"`
 	Room struct {
-		Enabled               bool     `yaml:"enabled"`
-		IDs                   []string `yaml:"ids"`
-		DefaultRoom           string   `yaml:"default_room"`
-		SwitchCooldownSeconds int      `yaml:"switch_cooldown_seconds"`
+		Enabled               bool   `yaml:"enabled"`
+		Count                 int    `yaml:"count"`
+		DefaultRoom           string `yaml:"default_room"`
+		SwitchCooldownSeconds int    `yaml:"switch_cooldown_seconds"`
 	} `yaml:"room"`
 	Log struct {
 		Level         string `yaml:"level"`
@@ -288,7 +287,7 @@ func loadFromConsul() (Config, consulSource, error) {
 		},
 		Room: RoomConfig{
 			Enabled:        parsed.Room.Enabled,
-			IDs:            normalizeRoomIDs(parsed.Room.IDs),
+			Count:          parsed.Room.Count,
 			DefaultRoom:    strings.TrimSpace(parsed.Room.DefaultRoom),
 			SwitchCooldown: time.Duration(parsed.Room.SwitchCooldownSeconds) * time.Second,
 		},
@@ -369,40 +368,14 @@ func validate(config Config) error {
 }
 
 func normalizeRoomConfig(cfg RoomConfig) RoomConfig {
-	cfg.IDs = normalizeRoomIDs(cfg.IDs)
-	if len(cfg.IDs) == 0 {
-		cfg.IDs = []string{"1"}
+	if cfg.Count <= 0 {
+		cfg.Count = 1
 	}
-	defaultRoom := strings.TrimSpace(cfg.DefaultRoom)
-	if defaultRoom == "" {
-		defaultRoom = cfg.IDs[0]
-	}
-	found := slices.Contains(cfg.IDs, defaultRoom)
-	if !found {
-		defaultRoom = cfg.IDs[0]
-	}
+	cfg.DefaultRoom = strings.TrimSpace(cfg.DefaultRoom)
 	if cfg.SwitchCooldown < 0 {
 		cfg.SwitchCooldown = 0
 	}
-	cfg.DefaultRoom = defaultRoom
 	return cfg
-}
-
-func normalizeRoomIDs(ids []string) []string {
-	cleaned := make([]string, 0, len(ids))
-	seen := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		cleaned = append(cleaned, id)
-	}
-	return cleaned
 }
 
 func normalizeLLMBaseURL(baseURL string) string {

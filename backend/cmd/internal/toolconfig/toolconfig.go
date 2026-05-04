@@ -96,17 +96,20 @@ func Load(opts Options) (config.Config, error) {
 		if err != nil {
 			return config.Config{}, err
 		}
-		roomIDs := splitCSV(os.Getenv("ROOM_IDS"))
-		if len(roomIDs) == 0 {
-			roomIDs = []string{"1"}
+		roomCount, err := optionalInt("ROOM_COUNT", 1)
+		if err != nil {
+			return config.Config{}, err
+		}
+		if roomCount <= 0 {
+			roomCount = 1
 		}
 		defaultRoom := strings.TrimSpace(os.Getenv("ROOM_DEFAULT"))
 		if defaultRoom == "" {
-			defaultRoom = roomIDs[0]
+			defaultRoom = "1"
 		}
 		cfg.Room = config.RoomConfig{
 			Enabled:        roomEnabled,
-			IDs:            roomIDs,
+			Count:          roomCount,
 			DefaultRoom:    defaultRoom,
 			SwitchCooldown: time.Duration(switchCooldownSeconds) * time.Second,
 		}

@@ -11,6 +11,8 @@ describe('RoomSelector 紧凑卡片', () => {
   it('房间卡补充 Boss 均血并精简布局', () => {
     expect(source).toContain("import RoomSwitchCooldownTag from './RoomSwitchCooldownTag.vue'")
     expect(source).toContain('<RoomSwitchCooldownTag :cooldown-remaining-seconds="cooldownRemainingSeconds" />')
+    expect(source).toContain("const displayName = String(room?.displayName || '').trim()")
+    expect(source).toContain("return defaultRoomLabel(room?.id)")
     expect(source).toContain("if (props.cooldownRemainingSeconds > 0) return '冷却未结束'")
     expect(source).toContain('function roomAvgHpText(room) {')
     expect(source).toContain('formatIntegerExact(room?.currentBossAvgHp)')

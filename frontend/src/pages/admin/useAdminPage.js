@@ -53,6 +53,7 @@ export function useAdminPage() {
   const selectedBossTemplateId = ref('')
   const adminRoomId = ref('1')
   const adminRooms = ref([])
+  const adminRoomSettings = ref([])
 
   const adminState = ref(emptyAdminState())
   const buttonPage = ref(emptyButtonPage())
@@ -122,6 +123,20 @@ export function useAdminPage() {
       }
     } catch {
       adminRooms.value = []
+    }
+  }
+
+  async function fetchAdminRoomSettings() {
+    try {
+      const response = await fetchWithTimeout('/api/admin/rooms')
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '房间配置加载失败'))
+      }
+      const payload = await response.json()
+      adminRoomSettings.value = Array.isArray(payload) ? payload : []
+    } catch (error) {
+      errorMessage.value = error.message || '房间配置加载失败'
+      adminRoomSettings.value = []
     }
   }
 
@@ -397,6 +412,7 @@ export function useAdminPage() {
   async function refreshAll() {
     await Promise.all([
       fetchAdminRooms(),
+      fetchAdminRoomSettings(),
       fetchAdminState(),
       fetchPlayerPage(),
       fetchEquipmentPage(equipmentPage.value.page),
@@ -415,6 +431,7 @@ export function useAdminPage() {
       }
 
       await fetchAdminRooms()
+      await fetchAdminRoomSettings()
       await fetchAdminState()
       await Promise.all([
         fetchAnnouncements(),
@@ -447,6 +464,7 @@ export function useAdminPage() {
       checkingSession.value = false
       setSuccess('后台已解锁。')
       await fetchAdminRooms()
+      await fetchAdminRoomSettings()
       await fetchAdminState()
       await Promise.all([fetchPlayerPage(), fetchEquipmentPage(), fetchShopItems(), fetchTasks()])
     } catch (error) {
@@ -462,6 +480,7 @@ export function useAdminPage() {
     adminState.value = emptyAdminState()
     adminRoomId.value = '1'
     adminRooms.value = []
+    adminRoomSettings.value = []
     buttonPage.value = emptyButtonPage()
     equipmentPage.value = emptyEquipmentPage()
     playerPage.value = emptyPlayerPage()
@@ -512,6 +531,7 @@ export function useAdminPage() {
     adminState,
     adminRoomId,
     adminRooms,
+    adminRoomSettings,
     announcementForm,
     announcements,
     applyLootRows,
@@ -540,6 +560,7 @@ export function useAdminPage() {
     errorMessage,
     fetchAdminState,
     fetchAdminRooms,
+    fetchAdminRoomSettings,
     fetchAnnouncements,
     fetchButtonPage,
     fetchEquipmentPage,
@@ -603,6 +624,7 @@ export function useAdminPage() {
     adminState,
     adminRoomId,
     adminRooms,
+    adminRoomSettings,
     announcementForm,
     announcements,
     authenticated,
@@ -651,6 +673,7 @@ export function useAdminPage() {
     checkSession,
     fetchAdminState,
     fetchAdminRooms,
+    fetchAdminRoomSettings,
     fetchAnnouncements,
     fetchBossHistory,
     fetchButtonPage,

@@ -1964,6 +1964,7 @@ function ensureRealtimeTransport() {
             applyPublicState(payload)
             loading.value = false
             errorMessage.value = ''
+            void loadRooms()
         },
         onUserDelta(payload) {
             applyUserState(payload)
