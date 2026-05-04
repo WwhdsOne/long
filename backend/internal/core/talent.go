@@ -1406,6 +1406,10 @@ func (s *Store) talentCombatStateKey(nickname, bossID string) string {
 	return s.namespace + "player:talent_state:" + nickname + ":" + bossID
 }
 
+func (s *Store) talentCombatStateIndexKey(bossID string) string {
+	return s.namespace + "talent_state:boss_idx:" + bossID
+}
+
 func (s *Store) talentEventQueueKey(nickname, bossID string) string {
 	return s.namespace + "player:talent_events:" + nickname + ":" + bossID
 }
@@ -1459,7 +1463,11 @@ func (s *Store) SaveTalentCombatState(ctx context.Context, nickname, bossID stri
 	if err != nil {
 		return err
 	}
-	return s.client.HSet(ctx, s.talentCombatStateKey(nickname, bossID), "state", string(raw)).Err()
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.talentCombatStateKey(nickname, bossID), "state", string(raw))
+	pipe.SAdd(ctx, s.talentCombatStateIndexKey(bossID), nickname)
+	_, err = pipe.Exec(ctx)
+	return err
 }
 
 func (s *Store) appendPendingTalentEvents(ctx context.Context, nickname, bossID string, events []TalentTriggerEvent) error {
@@ -1502,7 +1510,11 @@ func (s *Store) consumePendingTalentEvents(ctx context.Context, nickname, bossID
 
 // DeleteTalentCombatState Boss 战后清理天赋战斗状态。
 func (s *Store) DeleteTalentCombatState(ctx context.Context, nickname, bossID string) error {
-	return s.client.Del(ctx, s.talentCombatStateKey(nickname, bossID), s.talentEventQueueKey(nickname, bossID)).Err()
+	pipe := s.client.TxPipeline()
+	pipe.Del(ctx, s.talentCombatStateKey(nickname, bossID), s.talentEventQueueKey(nickname, bossID))
+	pipe.SRem(ctx, s.talentCombatStateIndexKey(bossID), nickname)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // AddOmenStacks 增加死兆层数并返回新值。

@@ -1154,6 +1154,48 @@ func TestSilverStormTriggersWhenExtraTalentDamageBreaksPart(t *testing.T) {
 	}
 }
 
+func TestTalentCombatStateIndexMaintainedOnSaveAndDelete(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "索引维护测试"
+	bossID := "talent-index-maintenance-test"
+
+	state := NewTalentCombatState()
+	if err := store.SaveTalentCombatState(ctx, nickname, bossID, state); err != nil {
+		t.Fatalf("save combat state: %v", err)
+	}
+
+	nicknames, err := store.listTalentCombatStateNicknames(ctx, bossID)
+	if err != nil {
+		t.Fatalf("list combat state nicknames: %v", err)
+	}
+	if !slices.Contains(nicknames, nickname) {
+		t.Fatalf("expected nickname in index, got %+v", nicknames)
+	}
+
+	indexMembers, err := store.client.SMembers(ctx, store.talentCombatStateIndexKey(bossID)).Result()
+	if err != nil {
+		t.Fatalf("read index set: %v", err)
+	}
+	if !slices.Contains(indexMembers, nickname) {
+		t.Fatalf("expected nickname in redis index, got %+v", indexMembers)
+	}
+
+	if err := store.DeleteTalentCombatState(ctx, nickname, bossID); err != nil {
+		t.Fatalf("delete combat state: %v", err)
+	}
+
+	nicknames, err = store.listTalentCombatStateNicknames(ctx, bossID)
+	if err != nil {
+		t.Fatalf("list combat state nicknames after delete: %v", err)
+	}
+	if slices.Contains(nicknames, nickname) {
+		t.Fatalf("expected nickname removed from index, got %+v", nicknames)
+	}
+}
+
 func TestJudgmentDayForcesCollapseBeforeDamageCalculation(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

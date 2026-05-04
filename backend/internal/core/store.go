@@ -1943,6 +1943,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
 	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
+	pipe.SAdd(ctx, s.talentCombatStateIndexKey(boss.ID), nickname)
 	if _, execErr := pipe.Exec(ctx); execErr != nil {
 		return result, nil
 	}
@@ -2120,37 +2121,7 @@ func (s *Store) ProcessTalentBleedTicks(ctx context.Context) ([]StateChange, err
 }
 
 func (s *Store) listTalentCombatStateNicknames(ctx context.Context, bossID string) ([]string, error) {
-	prefix := s.namespace + "player:talent_state:"
-	suffix := ":" + bossID
-	pattern := prefix + "*" + suffix
-	seen := make(map[string]struct{})
-	var nicknames []string
-	var cursor uint64
-	for {
-		keys, nextCursor, err := s.client.Scan(ctx, cursor, pattern, 200).Result()
-		if err != nil {
-			return nil, err
-		}
-		for _, key := range keys {
-			if !strings.HasPrefix(key, prefix) || !strings.HasSuffix(key, suffix) {
-				continue
-			}
-			nickname := strings.TrimSuffix(strings.TrimPrefix(key, prefix), suffix)
-			if nickname == "" {
-				continue
-			}
-			if _, ok := seen[nickname]; ok {
-				continue
-			}
-			seen[nickname] = struct{}{}
-			nicknames = append(nicknames, nickname)
-		}
-		if nextCursor == 0 {
-			break
-		}
-		cursor = nextCursor
-	}
-	return nicknames, nil
+	return s.client.SMembers(ctx, s.talentCombatStateIndexKey(bossID)).Result()
 }
 
 func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname string, combatState *TalentCombatState, totalDamage int64) error {
@@ -2194,6 +2165,7 @@ func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
 	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
+	pipe.SAdd(ctx, s.talentCombatStateIndexKey(boss.ID), nickname)
 	_, err = pipe.Exec(ctx)
 	return err
 }
