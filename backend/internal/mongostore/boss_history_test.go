@@ -22,10 +22,7 @@ func TestCollectAllBossHistoryPagesReadsPastFirstHundred(t *testing.T) {
 			}, nil
 		}
 
-		end := start + int(pageSize)
-		if end > total {
-			end = total
-		}
+		end := min(start+int(pageSize), total)
 
 		rows := make([]core.BossHistoryEntry, 0, end-start)
 		for index := start; index < end; index++ {
