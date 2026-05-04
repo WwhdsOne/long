@@ -67,9 +67,8 @@ const {
 const bossDropModalOpen = ref(false)
 const bossGridRef = ref(null)
 const swordCursorRef = ref(null)
+const swordCursorImageRef = ref(null)
 const bossCursorVisible = ref(false)
-const bossCursorX = ref(0)
-const bossCursorY = ref(0)
 const bossCellSizePx = ref(56)
 const DEFAULT_BOSS_SWORD_CURSOR_URL = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
 const HALL_ROOM_ID = 'hall'
@@ -133,6 +132,11 @@ watch(() => currentRoomId.value, (next, prev) => {
 
 const talentEffectOverlayRef = ref(null)
 let bossGridResizeObserver = null
+let bossGridRect = null
+let bossCursorFrame = 0
+let pendingBossCursorPoint = null
+let appliedBossCursorPoint = null
+let bossCursorRotationDeg = 0
 
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
@@ -164,12 +168,50 @@ function exitCurrentRoom() {
   joinRoom(HALL_ROOM_ID)
 }
 
-function updateCursorPos(e) {
+function applyBossCursorTransform() {
+  const swordCursor = swordCursorRef.value
+  if (!swordCursor || !appliedBossCursorPoint) return
+  const {x, y} = appliedBossCursorPoint
+  swordCursor.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`
+}
+
+function flushBossCursorFrame() {
+  bossCursorFrame = 0
+  if (!pendingBossCursorPoint) return
+  appliedBossCursorPoint = pendingBossCursorPoint
+  pendingBossCursorPoint = null
+  applyBossCursorTransform()
+}
+
+function queueBossCursorPosition(x, y) {
+  pendingBossCursorPoint = {x, y}
+  if (bossCursorFrame) return
+  bossCursorFrame = requestAnimationFrame(() => {
+    flushBossCursorFrame()
+  })
+}
+
+function measureBossGridRect() {
   const grid = bossGridRef.value
-  if (!grid) return
-  const rect = grid.getBoundingClientRect()
-  bossCursorX.value = e.clientX - rect.left
-  bossCursorY.value = e.clientY - rect.top
+  if (!grid) {
+    bossGridRect = null
+    return null
+  }
+  bossGridRect = grid.getBoundingClientRect()
+  return bossGridRect
+}
+
+function updateCursorPos(e) {
+  const rect = bossGridRect || measureBossGridRect()
+  if (!rect) return
+  queueBossCursorPosition(e.clientX - rect.left, e.clientY - rect.top)
+}
+
+function setBossCursorRotation(nextRotationDeg) {
+  bossCursorRotationDeg = nextRotationDeg
+  const swordCursorImage = swordCursorImageRef.value
+  if (!swordCursorImage) return
+  swordCursorImage.style.transform = `rotate(${bossCursorRotationDeg}deg)`
 }
 
 function measureBossCellSize() {
@@ -320,35 +362,38 @@ function doCursorAttack(e) {
   if (now - lastAttackTime < 16) return
   lastAttackTime = now
   e.preventDefault()
-  const swordCursor = swordCursorRef.value
-  if (!swordCursor) return
+  const swordCursorImage = swordCursorImageRef.value
+  if (!swordCursorImage) return
 
   clearTimeout(recoverTimer)
-  swordCursor.classList.remove('swinging', 'recovering')
-  void swordCursor.offsetWidth // 强制重排，连续点击动画重新触发
-  swordCursor.classList.add('swinging')
+  swordCursorImage.classList.remove('swinging', 'recovering')
+  void swordCursorImage.offsetWidth // 强制重排，连续点击动画重新触发
+  setBossCursorRotation(60)
+  swordCursorImage.classList.add('swinging')
 
   recoverTimer = setTimeout(() => {
-    if (!swordCursor) return
-    swordCursor.classList.remove('swinging')
-    swordCursor.classList.add('recovering')
+    if (!swordCursorImage) return
+    swordCursorImage.classList.remove('swinging')
+    swordCursorImage.classList.add('recovering')
+    setBossCursorRotation(0)
   }, 50)
 
   spawnSparks(e.clientX, e.clientY, detectCellType(e.target))
 }
 
 function handleBossGridPointerMove(e) {
-  bossCursorVisible.value = true
   updateCursorPos(e)
 }
 
 function handleBossGridPointerEnter(e) {
+  measureBossGridRect()
   bossCursorVisible.value = true
   updateCursorPos(e)
 }
 
 function handleBossGridPointerLeave() {
   bossCursorVisible.value = false
+  pendingBossCursorPoint = null
 }
 
 function handleBossGridPointerDown(e) {
@@ -362,9 +407,11 @@ function handleBossGridClick(e) {
 }
 
 onMounted(() => {
+  measureBossGridRect()
   measureBossCellSize()
   if (typeof ResizeObserver !== 'undefined') {
     bossGridResizeObserver = new ResizeObserver(() => {
+      measureBossGridRect()
       measureBossCellSize()
     })
     if (bossGridRef.value instanceof HTMLElement) {
@@ -381,6 +428,7 @@ onBeforeUnmount(() => {
   bossGridResizeObserver = null
   clearInterval(tickTimer)
   cancelAnimationFrame(particleRaf)
+  cancelAnimationFrame(bossCursorFrame)
   clearTimeout(recoverTimer)
   clearTimeout(comboMilestoneTimer)
   sparks.forEach(s => s.el.remove())
@@ -954,16 +1002,21 @@ const silverStormActive = computed(() => {
                   <span v-else class="boss-part-cell__empty"></span>
                 </button>
               </div>
-              <img
+              <div
                   id="boss-sword-cursor"
                   ref="swordCursorRef"
-                  :src="bossSwordCursorUrl"
                   :style="{
-                    left: `${bossCursorX}px`,
-                    top: `${bossCursorY}px`,
                     opacity: bossCursorVisible ? 1 : 0,
                   }"
-              />
+              >
+                <img
+                    ref="swordCursorImageRef"
+                    class="boss-sword-cursor__image"
+                    :src="bossSwordCursorUrl"
+                    alt=""
+                    aria-hidden="true"
+                />
+              </div>
             </div>
           </div>
 
