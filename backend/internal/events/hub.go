@@ -30,8 +30,8 @@ type realtimeUserStatePayload struct {
 	MyBossKills                        int64                     `json:"myBossKills"`
 	TotalBossKills                     int64                     `json:"totalBossKills"`
 	RoomID                             string                    `json:"roomId,omitempty"`
-	Loadout                            core.Loadout              `json:"loadout"`
-	CombatStats                        core.CombatStats          `json:"combatStats"`
+	Loadout                            *core.Loadout             `json:"loadout,omitempty"`
+	CombatStats                        *core.CombatStats         `json:"combatStats,omitempty"`
 	Gold                               int64                     `json:"gold"`
 	Stones                             int64                     `json:"stones"`
 	TalentPoints                       int64                     `json:"talentPoints"`
@@ -164,13 +164,13 @@ func buildPublicStatePayload(snapshot core.Snapshot, includeLeaderboard bool) pu
 	return payload
 }
 
-func (h *Hub) BroadcastUser(nickname string, state core.UserState) error {
+func (h *Hub) BroadcastUser(nickname string, state core.UserState, includeProfile bool) error {
 	normalizedNickname := strings.TrimSpace(nickname)
 	if normalizedNickname == "" {
 		return nil
 	}
 
-	payload, err := sonic.Marshal(buildRealtimeUserStatePayload(state))
+	payload, err := sonic.Marshal(buildRealtimeUserStatePayload(state, includeProfile))
 	if err != nil {
 		return err
 	}
@@ -187,15 +187,13 @@ func (h *Hub) BroadcastUser(nickname string, state core.UserState) error {
 	return nil
 }
 
-func buildRealtimeUserStatePayload(state core.UserState) realtimeUserStatePayload {
-	return realtimeUserStatePayload{
+func buildRealtimeUserStatePayload(state core.UserState, includeProfile bool) realtimeUserStatePayload {
+	payload := realtimeUserStatePayload{
 		UserStats:                          state.UserStats,
 		MyBossStats:                        state.MyBossStats,
 		MyBossKills:                        state.MyBossKills,
 		TotalBossKills:                     state.TotalBossKills,
 		RoomID:                             state.RoomID,
-		Loadout:                            state.Loadout,
-		CombatStats:                        state.CombatStats,
 		Gold:                               state.Gold,
 		Stones:                             state.Stones,
 		TalentPoints:                       state.TalentPoints,
@@ -205,6 +203,13 @@ func buildRealtimeUserStatePayload(state core.UserState) realtimeUserStatePayloa
 		EquippedBattleClickSkinID:          state.EquippedBattleClickSkinID,
 		EquippedBattleClickCursorImagePath: state.EquippedBattleClickCursorImagePath,
 	}
+	if includeProfile {
+		loadout := state.Loadout
+		combatStats := state.CombatStats
+		payload.Loadout = &loadout
+		payload.CombatStats = &combatStats
+	}
+	return payload
 }
 
 func (h *Hub) SubscriberCount() int {
@@ -276,7 +281,7 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 				c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
 				return
 			}
-			if err := writeEvent(writer, UserStateEventName, buildRealtimeUserStatePayload(userState)); err != nil {
+			if err := writeEvent(writer, UserStateEventName, buildRealtimeUserStatePayload(userState, true)); err != nil {
 				return
 			}
 		}

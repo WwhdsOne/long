@@ -458,6 +458,12 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 		if strings.Contains(eventPayload, "\"inventory\"") {
 			t.Fatalf("expected broadcast user_state to omit inventory, got %s", eventPayload)
 		}
+		if strings.Contains(eventPayload, "\"loadout\"") {
+			t.Fatalf("expected boss click user_state to omit loadout, got %s", eventPayload)
+		}
+		if strings.Contains(eventPayload, "\"combatStats\"") {
+			t.Fatalf("expected boss click user_state to omit combatStats, got %s", eventPayload)
+		}
 		if strings.Contains(eventPayload, "\"gems\"") {
 			t.Fatalf("expected broadcast user_state to omit gems, got %s", eventPayload)
 		}

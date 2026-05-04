@@ -51,7 +51,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 		CombatStats:                        core.CombatStats{EffectiveIncrement: 3},
 		EquippedBattleClickSkinID:          "skin-basic",
 		EquippedBattleClickCursorImagePath: "https://example.com/basic.png",
-	}); err != nil {
+	}, false); err != nil {
 		t.Fatalf("broadcast user state: %v", err)
 	}
 
@@ -71,6 +71,9 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	}
 	if strings.Contains(payload, `"inventory"`) {
 		t.Fatalf("expected slim user payload to omit inventory, got %s", payload)
+	}
+	if strings.Contains(payload, `"combatStats"`) {
+		t.Fatalf("expected slim user payload to omit combatStats, got %s", payload)
 	}
 
 	select {

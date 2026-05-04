@@ -9,7 +9,8 @@ import (
 )
 
 type dispatcherTestReader struct {
-	snapshot core.Snapshot
+	snapshot  core.Snapshot
+	userState core.UserState
 }
 
 func (r *dispatcherTestReader) GetSnapshot(context.Context) (core.Snapshot, error) {
@@ -17,7 +18,7 @@ func (r *dispatcherTestReader) GetSnapshot(context.Context) (core.Snapshot, erro
 }
 
 func (r *dispatcherTestReader) GetUserState(context.Context, string) (core.UserState, error) {
-	return core.UserState{}, nil
+	return r.userState, nil
 }
 
 func (r *dispatcherTestReader) GetBossResources(context.Context) (core.BossResources, error) {
@@ -83,5 +84,41 @@ func TestDispatcherBroadcastLeaderboardIncludesLeaderboard(t *testing.T) {
 	payload := string(event.Payload)
 	if !strings.Contains(payload, `"leaderboard":[{"rank":1,"nickname":"阿明","clickCount":12}]`) {
 		t.Fatalf("expected full public payload with leaderboard, got %s", payload)
+	}
+}
+
+func TestDispatcherHandleEquipmentChangeBroadcastsProfileFields(t *testing.T) {
+	reader := &dispatcherTestReader{
+		userState: core.UserState{
+			UserStats: &core.UserStats{Nickname: "阿明", ClickCount: 9},
+			Loadout: core.Loadout{
+				Weapon: &core.InventoryItem{ItemID: "iron-sword", Name: "铁剑", Slot: "weapon"},
+			},
+			CombatStats: core.CombatStats{AttackPower: 128, EffectiveIncrement: 7},
+		},
+	}
+	cache := NewCache(reader)
+	hub := NewHub()
+	dispatcher := NewDispatcher(cache, hub, 1)
+
+	client, unsubscribe := hub.Subscribe("阿明")
+	defer unsubscribe()
+	_ = readEventByName(t, client, OnlineCountEventName)
+
+	if err := dispatcher.HandleChange(context.Background(), core.StateChange{
+		Type:      core.StateChangeEquipmentChanged,
+		Nickname:  "阿明",
+		Timestamp: 1,
+	}); err != nil {
+		t.Fatalf("handle equipment change: %v", err)
+	}
+
+	event := readEventByName(t, client, UserStateEventName)
+	payload := string(event.Payload)
+	if !strings.Contains(payload, `"loadout":{"weapon":{"itemId":"iron-sword"`) {
+		t.Fatalf("expected equipment change to keep loadout, got %s", payload)
+	}
+	if !strings.Contains(payload, `"attackPower":128`) || !strings.Contains(payload, `"effectiveIncrement":7`) {
+		t.Fatalf("expected equipment change to keep combatStats, got %s", payload)
 	}
 }

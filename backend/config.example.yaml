@@ -8,9 +8,17 @@ redis:
   tls_enabled: false
 redis_prefix: "hai-world"
 rate_limit:
-  limit: 42
-  window_ms: 2000
+  limit: 50                # 原来是80
+  window_ms: 5000
   blacklist_ms: 600000
+  blacklist_multiplier: 2.0
+  offense_decay_ms: 86400000
+  medium:
+    limit: 400              # 原来是600
+    window_ms: 600000
+  long:
+    limit: 1500             # 原来是2400
+    window_ms: 3600000
 admin:
   username: "root"
   password: "123456"

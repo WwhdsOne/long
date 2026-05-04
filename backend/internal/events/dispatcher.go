@@ -57,8 +57,9 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change core.StateChange) 
 	if err != nil {
 		return err
 	}
+	includeProfile := shouldBroadcastUserProfile(change.Type)
 	for nickname, userState := range userStates {
-		if err := d.hub.BroadcastUser(nickname, userState); err != nil {
+		if err := d.hub.BroadcastUser(nickname, userState, includeProfile); err != nil {
 			return err
 		}
 	}
@@ -136,4 +137,13 @@ func userTargetsForChange(change core.StateChange, activeNicknames []string) []s
 		return nil
 	}
 	return []string{change.Nickname}
+}
+
+func shouldBroadcastUserProfile(changeType core.StateChangeType) bool {
+	switch changeType {
+	case core.StateChangeEquipmentChanged, core.StateChangeEquipmentMetaChanged:
+		return true
+	default:
+		return false
+	}
 }
