@@ -39,6 +39,7 @@
   - [architecture/2026-05-01-日志与MongoDB演进方案.md](./architecture/2026-05-01-日志与MongoDB演进方案.md)
 - 点击链路与天赋热路径优化：
   - [architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md](./architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md)
+  - [architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md](./architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md)
   - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
 - 任务系统实施：
   - [implementation/2026-05-02-任务模型升级实施计划.md](./implementation/2026-05-02-任务模型升级实施计划.md)
@@ -65,6 +66,7 @@
 ### 实时链路与接入层
 
 - [architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md](./architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md)
+- [architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md](./architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md)
 - [reports/2026-04-21-realtime-optimization-report.md](./reports/2026-04-21-realtime-optimization-report.md)
 - [reports/2026-04-28-点击伤害链路与优化总结.md](./reports/2026-04-28-点击伤害链路与优化总结.md)
 - [implementation/2026-04-26-ws-optimization.md](./implementation/2026-04-26-ws-optimization.md)
