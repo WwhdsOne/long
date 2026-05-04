@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"long/cmd/internal/toolconfig"
 	"long/internal/config"
 	"long/internal/mongostore"
 )
@@ -32,7 +33,7 @@ func run() error {
 	if len(os.Args) < 2 {
 		return errors.New("用法: go -C backend run ./cmd/migrateroommodel <plan|migrate|verify>")
 	}
-	cfg, err := config.LoadTest()
+	cfg, err := toolconfig.Load(toolconfig.Options{NeedMongo: true})
 	if err != nil {
 		return err
 	}

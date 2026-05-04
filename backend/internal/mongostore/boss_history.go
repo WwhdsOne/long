@@ -199,11 +199,9 @@ func (s *BossHistoryStore) ListAdminBossHistoryPage(ctx context.Context, page in
 
 // ListBossHistory 返回全部 Boss 历史倒序列表。
 func (s *BossHistoryStore) ListBossHistory(ctx context.Context) ([]core.BossHistoryEntry, error) {
-	page, err := s.ListAdminBossHistoryPage(ctx, 1, 1000000)
-	if err != nil {
-		return nil, err
-	}
-	return page.Items, nil
+	return collectAllBossHistoryPages(func(page int64, pageSize int64) (core.AdminBossHistoryPage, error) {
+		return s.ListAdminBossHistoryPage(ctx, page, pageSize)
+	}, 100)
 }
 
 func normalizePage(page int64, pageSize int64) (int64, int64) {
@@ -217,6 +215,28 @@ func normalizePage(page int64, pageSize int64) (int64, int64) {
 		pageSize = 100
 	}
 	return page, pageSize
+}
+
+func collectAllBossHistoryPages(fetch func(page int64, pageSize int64) (core.AdminBossHistoryPage, error), pageSize int64) ([]core.BossHistoryEntry, error) {
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+
+	items := make([]core.BossHistoryEntry, 0)
+	for page := int64(1); ; page++ {
+		result, err := fetch(page, pageSize)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, result.Items...)
+		if result.TotalPages > 0 && page >= result.TotalPages {
+			break
+		}
+		if len(result.Items) == 0 {
+			break
+		}
+	}
+	return items, nil
 }
 
 func withTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

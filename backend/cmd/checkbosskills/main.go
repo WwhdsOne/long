@@ -13,6 +13,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"long/cmd/internal/toolconfig"
 	"long/internal/config"
 )
 
@@ -39,7 +40,7 @@ func run() error {
 		return err
 	}
 
-	cfg, err := config.LoadTest()
+	cfg, err := toolconfig.Load(toolconfig.Options{})
 	if err != nil {
 		return err
 	}

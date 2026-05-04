@@ -7,6 +7,7 @@ import ShopPage from './ShopPage.vue'
 import TaskPage from './TaskPage.vue'
 import TalentsPage from './TalentsPage.vue'
 import {usePublicPageState} from './publicPageState'
+import {formatCompact} from '../utils/formatNumber.js'
 
 const {
   publicPages,
@@ -15,7 +16,7 @@ const {
   hasClaimableTasks,
   syncing,
   syncLabel,
-  lastUpdatedAt,
+  combatStats,
   announcementModalOpen,
   latestAnnouncement,
   closeAnnouncementModal,
@@ -35,6 +36,14 @@ registerPublicPageLifecycle()
 const loginModalOpen = ref(false)
 const armoryPageIDs = new Set(['resources', 'inventory', 'stats', 'loadout'])
 const isBattlePage = computed(() => currentPublicPage.value === 'battle')
+const myBattlePower = computed(() => (
+  Math.max(0, Number(combatStats.value?.attackPower || 0)) +
+  Math.max(0, Number(combatStats.value?.normalDamage || 0)) +
+  Math.max(0, Number(combatStats.value?.criticalDamage || 0))
+))
+const heroBattlePowerLabel = computed(() => (
+  isLoggedIn.value ? formatCompact(myBattlePower.value) : '登录后激活'
+))
 
 function isArmoryPage(pageID) {
   return armoryPageIDs.has(pageID)
@@ -96,8 +105,10 @@ async function handleLoginSubmit() {
             <span class="live-pill__dot"></span>
             {{ syncLabel }}
           </span>
-          <span class="hero__time">最近刷新 {{ lastUpdatedAt || '--:--:--' }}</span>
-          <a class="hero__admin-link" href="/admin">管理后台</a>
+          <article class="power-glory-card" aria-label="当前用户战斗力">
+            <span class="power-glory-card__eyebrow">当前用户战斗力</span>
+            <strong class="power-glory-card__value">{{ heroBattlePowerLabel }}</strong>
+          </article>
         </div>
       </section>
     </template>

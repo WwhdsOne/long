@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"long/cmd/internal/toolconfig"
 	"long/internal/config"
 	"long/internal/core"
 	"long/internal/mongostore"
@@ -26,12 +27,14 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.LoadTest()
+	cfg, err := toolconfig.Load(toolconfig.Options{
+		IncludeRoom: true,
+	})
 	if err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
 	redisClient, err := newRedisClient(ctx, cfg)

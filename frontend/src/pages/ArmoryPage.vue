@@ -432,9 +432,6 @@ onBeforeUnmount(() => {
           · 强化石 <span class="num-stone">{{ stones }}</span>
           · 天赋点 <span class="num-stone">{{ talentPoints }}</span>
         </p>
-        <div v-if="props.focusSection === 'resources'" class="leaderboard-list leaderboard-list--empty">
-          <p>资源、背包、属性、装备栏已拆成独立页签。</p>
-        </div>
         <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
           <p>先去打 Boss，掉落会自动进背包。</p>
         </div>

@@ -82,6 +82,9 @@ const myBattlePower = computed(() => (
   Math.max(0, Number(combatStats.value?.normalDamage || 0)) +
   Math.max(0, Number(combatStats.value?.criticalDamage || 0))
 ))
+const battlePowerLabel = computed(() => (
+  isLoggedIn.value ? formatCompact(myBattlePower.value) : '登录后激活'
+))
 const bossBattlePower = computed(() => {
   if (!boss.value) return 0
   const armorPower = Array.isArray(boss.value.parts)
@@ -92,6 +95,7 @@ const bossBattlePower = computed(() => {
 
 const comboMilestoneText = ref('')
 const comboMilestoneTick = ref(0)
+const pendingScrollToTopAfterExit = ref(false)
 let comboMilestoneTimer = 0
 
 watch(() => comboCount.value, (next, prev) => {
@@ -104,6 +108,17 @@ watch(() => comboCount.value, (next, prev) => {
   comboMilestoneTimer = setTimeout(() => {
     comboMilestoneText.value = ''
   }, 900)
+})
+
+watch(() => currentRoomId.value, (next, prev) => {
+  if (!pendingScrollToTopAfterExit.value) return
+  if (String(prev || '') === HALL_ROOM_ID) {
+    pendingScrollToTopAfterExit.value = false
+    return
+  }
+  if (String(next || '') !== HALL_ROOM_ID) return
+  pendingScrollToTopAfterExit.value = false
+  window.scrollTo({top: 0, behavior: 'smooth'})
 })
 
 const talentEffectOverlayRef = ref(null)
@@ -135,6 +150,7 @@ function formatRoomExitCooldown(seconds) {
 
 function exitCurrentRoom() {
   if (roomExitLocked.value || roomSwitching.value) return
+  pendingScrollToTopAfterExit.value = true
   joinRoom(HALL_ROOM_ID)
 }
 
@@ -606,11 +622,13 @@ const silverStormActive = computed(() => {
   <div class="battle-page-hud">
   <section class="battle-page-hud__hero" aria-label="战斗状态">
     <div class="battle-page-hud__copy">
-      <p class="vote-stage__eyebrow">Room Combat HUD</p>
-      <h1>战斗指挥中枢</h1>
+      <p class="vote-stage__eyebrow">Hai-World Room Combat HUD</p>
+      <h1 class="battle-page-hud__title">
+        <span class="battle-page-hud__title-part">大海世界战斗指挥中枢</span>
+        <span class="battle-page-hud__title-part">狠狠干一票</span>
+      </h1>
       <div class="boss-hud__chips">
         <span>{{ currentRoomDisplay }}</span>
-        <span>我的战力 {{ formatCompact(myBattlePower) }}</span>
         <span v-if="!isHallRoom">Boss战力 {{ formatCompact(bossBattlePower) }}</span>
         <span v-else>选择房间后进入 Boss 战斗</span>
       </div>
@@ -621,8 +639,10 @@ const silverStormActive = computed(() => {
         <span class="live-pill__dot"></span>
         {{ syncLabel }}
       </span>
-      <span class="battle-page-hud__time">最近刷新 {{ lastUpdatedAt || '--:--:--' }}</span>
-      <a class="battle-page-hud__admin-link" href="/admin">管理后台</a>
+      <article class="power-glory-card power-glory-card--battle" aria-label="当前用户战斗力">
+        <span class="power-glory-card__eyebrow">当前用户战斗力</span>
+        <strong class="power-glory-card__value">{{ battlePowerLabel }}</strong>
+      </article>
     </div>
   </section>
 
