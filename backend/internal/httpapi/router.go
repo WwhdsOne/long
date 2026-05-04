@@ -20,6 +20,7 @@ type ButtonStore interface {
 	GetState(context.Context, string) (core.State, error)
 	GetSnapshot(context.Context) (core.Snapshot, error)
 	GetUserState(context.Context, string) (core.UserState, error)
+	GetPlayerResources(context.Context, string) (core.PlayerResources, error)
 	ClickButton(context.Context, string, string, int64) (core.ClickResult, error)
 	ClickBossPart(context.Context, string, string) (core.ClickResult, error)
 	AttackBossPartAFK(context.Context, string) (core.ClickResult, error)
@@ -133,6 +134,8 @@ type DomainEventWriter interface {
 // ClickGuard 点击频率限制接口。
 type ClickGuard interface {
 	Allow(string) (time.Duration, error)
+	ListBlacklist() []core.BlacklistEntry
+	Unblock(string) bool
 }
 
 // AfkController 负责离页挂机状态流转与结算。

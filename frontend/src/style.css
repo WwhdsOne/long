@@ -3625,7 +3625,7 @@ select {
 
 .boss-zone-button__damage-burst--bleed {
   color: #f87171;
-  font-size: 0.72em;
+  font-size: 0.86em;
   text-shadow: 0 0 8px rgba(220, 38, 38, 0.3), 0 2px 6px rgba(15, 23, 42, 0.5);
 }
 

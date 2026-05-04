@@ -25,6 +25,7 @@ vendor/
 *.swp
 *.swo
 .superpowers/
+wclick.conf
 
 # OS
 .DS_Store

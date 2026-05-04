@@ -321,12 +321,12 @@ func (s *realtimeSession) executeClick(ctx context.Context, slug string, comboCo
 			Key: slug,
 		},
 	}
-	if s.nickname != "" && s.stateView != nil {
-		if userState, err := s.stateView.GetUserState(ctx, s.nickname); err == nil {
+	if s.nickname != "" && s.store != nil {
+		if resources, err := s.store.GetPlayerResources(ctx, s.nickname); err == nil {
 			ack.UserDelta = &realtimeUserDelta{
-				Gold:         &userState.Gold,
-				Stones:       &userState.Stones,
-				TalentPoints: &userState.TalentPoints,
+				Gold:         &resources.Gold,
+				Stones:       &resources.Stones,
+				TalentPoints: &resources.TalentPoints,
 			}
 		}
 	}

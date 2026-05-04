@@ -78,12 +78,25 @@ describe('BattlePage 光标与伤害说明', () => {
     expect(stateSource).toContain('scale: 2.75,')
   })
 
-  it('出血结算通过用户态事件触发独立小字，而不是依赖点击回包', () => {
+  it('出血结算通过用户态事件触发独立小字，并且不再走主伤害 burst 截断队列', () => {
+    expect(styleSource).toContain('.boss-zone-button__damage-burst--bleed {')
+    expect(styleSource).toContain('font-size: 0.86em;')
     expect(stateSource).toContain('function triggerTalentEventDamageBursts(events) {')
     expect(stateSource).toContain("if (event.effectType !== 'bleed' || Number(event.extraDamage || 0) <= 0)")
-    expect(stateSource).toContain("triggerDamageBurst(`boss-part:${event.partX}-${event.partY}`, {")
-    expect(stateSource).toContain("damageType: 'bleed'")
+    expect(stateSource).toContain('function triggerBleedBurst(partKey, payload = {}) {')
+    expect(stateSource).toContain('const currentBursts = bleedBursts.value[normalizedKey] || []')
+    expect(stateSource).toContain('bleedBursts,')
+    expect(stateSource).toContain('bleedTriggerFeed,')
+    expect(stateSource).toContain('ttl: 280,')
+    expect(stateSource).toContain("if (variant === 'bleed') {")
+    expect(stateSource).toContain('function appendBleedTriggerEvents(events) {')
+    expect(stateSource).toContain('bleedTriggerFeed.value = [')
+    expect(stateSource).toContain('function appendBleedTriggerEvents(events) {')
+    expect(stateSource).toContain('bleedTriggerFeed.value = [')
+    expect(stateSource).toContain("const otherEvents = mergedFeed.filter((entry) => entry.effectType !== 'bleed').slice(0, 6)")
+    expect(stateSource).not.toContain("triggerDamageBurst(`boss-part:${event.partX}-${event.partY}`, {")
     expect(stateSource).toContain('triggerTalentEventDamageBursts(payload.talentEvents)')
+    expect(battleSource).toContain('zoneBleedBursts(zone)')
   })
 
   it('重甲格子有金属质感和低频扫光，只作用在 5x5 战斗格子', () => {

@@ -44,6 +44,14 @@ func (m *mockClickGuard) Allow(key string) (time.Duration, error) {
 	return 0, nil
 }
 
+func (m *mockClickGuard) ListBlacklist() []core.BlacklistEntry {
+	return nil
+}
+
+func (m *mockClickGuard) Unblock(string) bool {
+	return false
+}
+
 type capturedRealtimeFrame struct {
 	messageType int
 	payload     []byte

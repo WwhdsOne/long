@@ -15,6 +15,31 @@ import (
 	ossupload "long/internal/oss"
 )
 
+type mockAdminClickGuard struct {
+	entries       []core.BlacklistEntry
+	lastUnblockID string
+}
+
+func (m *mockAdminClickGuard) Allow(string) (time.Duration, error) {
+	return 0, nil
+}
+
+func (m *mockAdminClickGuard) ListBlacklist() []core.BlacklistEntry {
+	return append([]core.BlacklistEntry(nil), m.entries...)
+}
+
+func (m *mockAdminClickGuard) Unblock(clientID string) bool {
+	m.lastUnblockID = clientID
+	for index, entry := range m.entries {
+		if entry.ClientID != clientID {
+			continue
+		}
+		m.entries = append(m.entries[:index], m.entries[index+1:]...)
+		return true
+	}
+	return false
+}
+
 type mockStore struct {
 	state                     core.State
 	talentState               *core.TalentState
@@ -174,6 +199,15 @@ func (m *mockStore) GetUserState(_ context.Context, nickname string) (core.UserS
 		return core.UserState{}, m.getStateErr
 	}
 	return m.userStateForNickname(nickname), nil
+}
+
+func (m *mockStore) GetPlayerResources(_ context.Context, nickname string) (core.PlayerResources, error) {
+	state := m.userStateForNickname(nickname)
+	return core.PlayerResources{
+		Gold:         state.Gold,
+		Stones:       state.Stones,
+		TalentPoints: state.TalentPoints,
+	}, nil
 }
 
 func (m *mockStore) userStateForNickname(nickname string) core.UserState {
@@ -387,6 +421,59 @@ func TestAdminTaskRoutesReturnReadableMessagesOnBusinessErrors(t *testing.T) {
 	}
 	if !strings.Contains(duplicateResponse.Body.String(), "生效中的任务") {
 		t.Fatalf("expected readable task duplicate message, got %s", duplicateResponse.Body.String())
+	}
+}
+
+func TestAdminBlacklistRoutesListAndUnblock(t *testing.T) {
+	guard := &mockAdminClickGuard{
+		entries: []core.BlacklistEntry{{
+			ClientID:         "nickname:阿明",
+			Nickname:         "阿明",
+			BlockedAt:        1714903200,
+			BlockedUntil:     1714903800,
+			RemainingSeconds: 600,
+		}},
+	}
+	handler := NewHandler(Options{
+		Store:       &mockStore{},
+		Broadcaster: &mockBroadcaster{},
+		ClickGuard:  guard,
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "blacklist-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected admin login to set cookie")
+	}
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/admin/blacklist", nil)
+	listRequest.AddCookie(cookies[0])
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, listRequest)
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from blacklist list, got %d", listResponse.Code)
+	}
+	if !strings.Contains(listResponse.Body.String(), `"nickname":"阿明"`) {
+		t.Fatalf("expected nickname in blacklist response, got %s", listResponse.Body.String())
+	}
+
+	unblockRequest := httptest.NewRequest(http.MethodPost, "/api/admin/blacklist/nickname:%E9%98%BF%E6%98%8E/unblock", nil)
+	unblockRequest.AddCookie(cookies[0])
+	unblockResponse := httptest.NewRecorder()
+	handler.ServeHTTP(unblockResponse, unblockRequest)
+	if unblockResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from blacklist unblock, got %d", unblockResponse.Code)
+	}
+	if guard.lastUnblockID != "nickname:阿明" {
+		t.Fatalf("expected unblock target nickname:阿明, got %q", guard.lastUnblockID)
 	}
 }
 

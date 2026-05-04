@@ -3142,6 +3142,55 @@ func TestGetUserStateConsumesPendingTalentEvents(t *testing.T) {
 	}
 }
 
+func TestGetPlayerResourcesDoesNotConsumePendingTalentEvents(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "资源只读不消费测试"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), map[string]any{
+		"gold":          "12",
+		"stones":        "34",
+		"talent_points": "56",
+	}).Err(); err != nil {
+		t.Fatalf("seed resources: %v", err)
+	}
+	if err := store.appendPendingTalentEvents(ctx, nickname, "resource-read-talent-event-test", []TalentTriggerEvent{
+		{
+			TalentID:   "crit_bleed",
+			Name:       "致命出血",
+			EffectType: "bleed",
+			Message:    "出血结算",
+			PartX:      0,
+			PartY:      0,
+		},
+	}); err != nil {
+		t.Fatalf("seed pending talent events: %v", err)
+	}
+
+	queueKey := store.talentEventQueueKey(nickname, "resource-read-talent-event-test")
+	if size, err := store.client.LLen(ctx, queueKey).Result(); err != nil {
+		t.Fatalf("check pending queue size: %v", err)
+	} else if size != 1 {
+		t.Fatalf("expected pending queue size 1 after seed, got %d", size)
+	}
+
+	resources, err := store.GetPlayerResources(ctx, nickname)
+	if err != nil {
+		t.Fatalf("read resources: %v", err)
+	}
+	if resources.Gold != 12 || resources.Stones != 34 || resources.TalentPoints != 56 {
+		t.Fatalf("unexpected resources: %+v", resources)
+	}
+
+	if size, err := store.client.LLen(ctx, queueKey).Result(); err != nil {
+		t.Fatalf("check pending queue size after resource read: %v", err)
+	} else if size != 1 {
+		t.Fatalf("expected pending queue untouched after resource read, got %d", size)
+	}
+}
+
 func TestArmorCoreCollapseTrigger(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

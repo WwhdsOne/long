@@ -24,6 +24,7 @@ export function createAdminPageActions(state) {
     fetchAdminState,
     fetchAdminRooms,
     fetchAnnouncements,
+    fetchBlacklist,
     fetchAdminRoomSettings,
     fetchButtonPage,
     fetchEquipmentPage,
@@ -454,6 +455,24 @@ export function createAdminPageActions(state) {
     await deleteByID(`/api/admin/messages/${encodeURIComponent(id)}`, '留言已删除。', '删除留言失败', fetchMessages)
   }
 
+  async function unblockBlacklistEntry(clientId, nickname) {
+    saving.value = true
+    try {
+      const response = await fetch(`/api/admin/blacklist/${encodeURIComponent(clientId)}/unblock`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '手动解封失败'))
+      }
+      setSuccess(`已解封 ${nickname || clientId}。`)
+      await fetchBlacklist()
+    } catch (error) {
+      errorMessage.value = error.message || '手动解封失败'
+    } finally {
+      saving.value = false
+    }
+  }
+
   async function uploadImageInner(event, applyImage, successTip, category = '') {
     const file = event.target?.files?.[0]
     if (!file) {
@@ -835,6 +854,7 @@ export function createAdminPageActions(state) {
     deleteBossTemplate,
     deleteEquipment,
     deleteMessage,
+    unblockBlacklistEntry,
     disableBossCycle,
     editBossTemplate,
     editTaskDefinition,

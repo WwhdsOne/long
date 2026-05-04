@@ -937,6 +937,29 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	return userState, nil
 }
 
+// GetPlayerResources 获取玩家资源快照，不消费 pending 天赋事件。
+func (s *Store) GetPlayerResources(ctx context.Context, nickname string) (PlayerResources, error) {
+	trimmedNickname, hasNickname := normalizeNickname(nickname)
+	if !hasNickname {
+		return PlayerResources{}, nil
+	}
+
+	normalizedNickname, err := s.validatedNickname(trimmedNickname)
+	if err != nil {
+		return PlayerResources{}, err
+	}
+
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return PlayerResources{}, err
+	}
+	return PlayerResources{
+		Gold:         resources.Gold,
+		Stones:       resources.Stones,
+		TalentPoints: resources.TalentPoints,
+	}, nil
+}
+
 // ClickButton 处理 Boss 部位点击。slug 必须以 boss-part: 开头。
 func (s *Store) ClickButton(ctx context.Context, slug string, nickname string, comboCount int64) (ClickResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
@@ -3417,6 +3440,12 @@ type playerResources struct {
 	Stones       int64
 	TalentPoints int64
 	BossKills    int64
+}
+
+type PlayerResources struct {
+	Gold         int64
+	Stones       int64
+	TalentPoints int64
 }
 
 type BossKillBackfillStats struct {
