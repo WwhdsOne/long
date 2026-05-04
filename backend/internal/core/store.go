@@ -937,6 +937,29 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	return userState, nil
 }
 
+// GetPlayerResources 获取玩家资源快照，不消费 pending 天赋事件。
+func (s *Store) GetPlayerResources(ctx context.Context, nickname string) (PlayerResources, error) {
+	trimmedNickname, hasNickname := normalizeNickname(nickname)
+	if !hasNickname {
+		return PlayerResources{}, nil
+	}
+
+	normalizedNickname, err := s.validatedNickname(trimmedNickname)
+	if err != nil {
+		return PlayerResources{}, err
+	}
+
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return PlayerResources{}, err
+	}
+	return PlayerResources{
+		Gold:         resources.Gold,
+		Stones:       resources.Stones,
+		TalentPoints: resources.TalentPoints,
+	}, nil
+}
+
 // ClickButton 处理 Boss 部位点击。slug 必须以 boss-part: 开头。
 func (s *Store) ClickButton(ctx context.Context, slug string, nickname string, comboCount int64) (ClickResult, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
@@ -1943,6 +1966,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
 	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
+	pipe.SAdd(ctx, s.talentCombatStateIndexKey(boss.ID), nickname)
 	if _, execErr := pipe.Exec(ctx); execErr != nil {
 		return result, nil
 	}
@@ -2120,37 +2144,7 @@ func (s *Store) ProcessTalentBleedTicks(ctx context.Context) ([]StateChange, err
 }
 
 func (s *Store) listTalentCombatStateNicknames(ctx context.Context, bossID string) ([]string, error) {
-	prefix := s.namespace + "player:talent_state:"
-	suffix := ":" + bossID
-	pattern := prefix + "*" + suffix
-	seen := make(map[string]struct{})
-	var nicknames []string
-	var cursor uint64
-	for {
-		keys, nextCursor, err := s.client.Scan(ctx, cursor, pattern, 200).Result()
-		if err != nil {
-			return nil, err
-		}
-		for _, key := range keys {
-			if !strings.HasPrefix(key, prefix) || !strings.HasSuffix(key, suffix) {
-				continue
-			}
-			nickname := strings.TrimSuffix(strings.TrimPrefix(key, prefix), suffix)
-			if nickname == "" {
-				continue
-			}
-			if _, ok := seen[nickname]; ok {
-				continue
-			}
-			seen[nickname] = struct{}{}
-			nicknames = append(nicknames, nickname)
-		}
-		if nextCursor == 0 {
-			break
-		}
-		cursor = nextCursor
-	}
-	return nicknames, nil
+	return s.client.SMembers(ctx, s.talentCombatStateIndexKey(bossID)).Result()
 }
 
 func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname string, combatState *TalentCombatState, totalDamage int64) error {
@@ -2194,6 +2188,7 @@ func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
 	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
+	pipe.SAdd(ctx, s.talentCombatStateIndexKey(boss.ID), nickname)
 	_, err = pipe.Exec(ctx)
 	return err
 }
@@ -3445,6 +3440,12 @@ type playerResources struct {
 	Stones       int64
 	TalentPoints int64
 	BossKills    int64
+}
+
+type PlayerResources struct {
+	Gold         int64
+	Stones       int64
+	TalentPoints int64
 }
 
 type BossKillBackfillStats struct {

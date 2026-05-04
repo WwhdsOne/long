@@ -19,6 +19,7 @@ describe('BattlePage 房间战斗页', () => {
   it('大厅和战斗房间按 hall 态切换显示内容', () => {
     expect(battleSource).toContain("const HALL_ROOM_ID = 'hall'")
     expect(battleSource).toContain('const isHallRoom = computed(() => String(currentRoomId.value || \'\') === HALL_ROOM_ID)')
+    expect(battleSource).toContain("const displayName = String(currentRoom.value?.displayName || '').trim()")
     expect(battleSource).toContain('v-if="isHallRoom"')
     expect(battleSource).toContain('v-if="!isHallRoom"')
     expect(battleSource).toContain('当前处于大厅。这里只显示战线分流和点击总榜，不显示 Boss 战斗区与 Boss 伤害榜。')
@@ -38,6 +39,9 @@ describe('BattlePage 房间战斗页', () => {
     expect(stateSource).toContain('function setRoomSwitchCooldown(remainingSeconds) {')
     expect(stateSource).toContain('setRoomSwitchCooldown(payload?.switchCooldownRemainingSeconds ?? 0)')
     expect(stateSource).toContain('setRoomSwitchCooldown(payload?.cooldownRemainingSeconds ?? payload?.switchCooldownRemainingSeconds ?? 0)')
+    expect(stateSource).toContain('onPublicDelta(payload) {')
+    expect(stateSource).toContain('applyPublicState(payload)')
+    expect(stateSource).toContain('void loadRooms()')
   })
 
   it('退出当前房间直接切到 hall', () => {

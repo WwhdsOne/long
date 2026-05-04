@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +21,7 @@ var ErrRoomNotJoinable = errors.New("room not joinable")
 // RoomConfig 控制可加入房间列表与切房冷却。
 type RoomConfig struct {
 	Enabled        bool
-	IDs            []string
+	Count          int
 	DefaultRoom    string
 	SwitchCooldown time.Duration
 }
@@ -30,6 +29,7 @@ type RoomConfig struct {
 // RoomInfo 描述一个可选房间的当前运行态。
 type RoomInfo struct {
 	ID                 string `json:"id"`
+	DisplayName        string `json:"displayName"`
 	Current            bool   `json:"current"`
 	Joinable           bool   `json:"joinable"`
 	OnlineCount        int    `json:"onlineCount"`
@@ -60,41 +60,31 @@ type RoomSwitchResult struct {
 }
 
 func normalizeRoomConfig(cfg RoomConfig) RoomConfig {
-	ids := make([]string, 0, len(cfg.IDs))
-	seen := make(map[string]struct{}, len(cfg.IDs))
-	for _, id := range cfg.IDs {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		ids = append(ids, id)
-	}
-	if len(ids) == 0 {
-		ids = []string{fallbackRoomID}
+	if cfg.Count <= 0 {
+		cfg.Count = 1
 	}
 	defaultRoom := strings.TrimSpace(cfg.DefaultRoom)
-	if defaultRoom == "" {
-		defaultRoom = ids[0]
-	}
-	if _, ok := seen[defaultRoom]; !ok {
-		defaultRoom = ids[0]
+	if !slices.Contains(configuredRoomIDsFromCount(cfg.Count), defaultRoom) {
+		defaultRoom = fallbackRoomID
 	}
 	if cfg.SwitchCooldown < 0 {
 		cfg.SwitchCooldown = 0
 	}
-	cfg.IDs = ids
 	cfg.DefaultRoom = defaultRoom
 	return cfg
 }
 
 func (s *Store) configuredRoomIDs() []string {
-	ids := append([]string(nil), s.roomConfig.IDs...)
-	if len(ids) == 0 {
-		return []string{fallbackRoomID}
+	return configuredRoomIDsFromCount(s.roomConfig.Count)
+}
+
+func configuredRoomIDsFromCount(count int) []string {
+	if count <= 0 {
+		count = 1
+	}
+	ids := make([]string, 0, count)
+	for i := 1; i <= count; i++ {
+		ids = append(ids, strconv.Itoa(i))
 	}
 	return ids
 }
@@ -138,6 +128,10 @@ func (s *Store) playerRoomCooldownKey(nickname string) string {
 	return s.playerRoomCooldownPrefix + strings.TrimSpace(nickname)
 }
 
+func (s *Store) roomNamesKey() string {
+	return s.namespace + "room:names"
+}
+
 func (s *Store) bossCurrentKeyForRoom(roomID string) string {
 	return s.bossCurrentKey + ":" + s.normalizeRoomID(roomID)
 }
@@ -155,6 +149,41 @@ func (s *Store) combatRoomID(roomID string) string {
 		return s.defaultRoomID()
 	}
 	return s.normalizeRoomID(roomID)
+}
+
+func defaultRoomDisplayName(roomID string) string {
+	return "房间 " + strings.TrimSpace(roomID)
+}
+
+func (s *Store) GetRoomDisplayName(ctx context.Context, roomID string) (string, error) {
+	roomID = strings.TrimSpace(roomID)
+	if !s.isKnownRoom(roomID) {
+		return "", ErrRoomNotFound
+	}
+	displayName, err := s.client.HGet(ctx, s.roomNamesKey(), roomID).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return defaultRoomDisplayName(roomID), nil
+		}
+		return "", err
+	}
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		return defaultRoomDisplayName(roomID), nil
+	}
+	return displayName, nil
+}
+
+func (s *Store) SetRoomDisplayName(ctx context.Context, roomID string, displayName string) error {
+	roomID = strings.TrimSpace(roomID)
+	if !s.isKnownRoom(roomID) {
+		return ErrRoomNotFound
+	}
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		return s.client.HDel(ctx, s.roomNamesKey(), roomID).Err()
+	}
+	return s.client.HSet(ctx, s.roomNamesKey(), roomID, displayName).Err()
 }
 
 func (s *Store) ResolvePlayerRoom(ctx context.Context, nickname string) (string, error) {
@@ -276,7 +305,6 @@ func (s *Store) roomSwitchCooldownUntil(ctx context.Context, nickname string) (i
 
 func (s *Store) roomInfos(ctx context.Context, currentRoomID string, cooldownRemaining int64) ([]RoomInfo, error) {
 	ids := s.configuredRoomIDs()
-	sort.Strings(ids)
 	rooms := make([]RoomInfo, 0, len(ids))
 	for _, id := range ids {
 		boss, err := s.currentBossForRoom(ctx, id)
@@ -299,8 +327,13 @@ func (s *Store) roomInfos(ctx context.Context, currentRoomID string, cooldownRem
 		if err != nil {
 			return nil, err
 		}
+		displayName, err := s.GetRoomDisplayName(ctx, id)
+		if err != nil {
+			return nil, err
+		}
 		info := RoomInfo{
 			ID:                 id,
+			DisplayName:        displayName,
 			Current:            id == currentRoomID,
 			Joinable:           enabled || (boss != nil && boss.Status == bossStatusActive),
 			OnlineCount:        onlineCount,

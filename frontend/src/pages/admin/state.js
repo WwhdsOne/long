@@ -213,6 +213,12 @@ export function emptyPlayerPage() {
   }
 }
 
+export function emptyBlacklistPage() {
+  return {
+    items: [],
+  }
+}
+
 export function emptyLootRows() {
   return [{ itemId: '', dropRatePercent: '' }]
 }
@@ -376,6 +382,20 @@ export function normalizePlayerPage(payload) {
   }
 }
 
+export function normalizeBlacklistPage(payload) {
+  return {
+    items: Array.isArray(payload)
+      ? payload.map((entry) => ({
+          clientId: entry?.clientId || '',
+          nickname: entry?.nickname || '',
+          blockedAt: Number(entry?.blockedAt ?? 0),
+          blockedUntil: Number(entry?.blockedUntil ?? 0),
+          remainingSeconds: Number(entry?.remainingSeconds ?? 0),
+        }))
+      : [],
+  }
+}
+
 export function normalizeTaskDefinition(payload) {
   const model = normalizeTaskModelFields(payload)
   return {
@@ -466,9 +486,33 @@ export function formatTime(timestamp) {
   }
 
   return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
   }).format(new Date(timestamp * 1000))
+}
+
+export function formatDuration(seconds) {
+  const total = Math.max(0, Number(seconds) || 0)
+  if (total <= 0) {
+    return '已到期'
+  }
+
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const restSeconds = total % 60
+  const parts = []
+  if (hours > 0) {
+    parts.push(`${hours}小时`)
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}分钟`)
+  }
+  if (restSeconds > 0 || parts.length === 0) {
+    parts.push(`${restSeconds}秒`)
+  }
+  return parts.join('')
 }

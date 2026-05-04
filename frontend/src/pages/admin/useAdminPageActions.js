@@ -5,6 +5,7 @@ export function createAdminPageActions(state) {
     adminState,
     adminRoomId,
     announcementForm,
+    adminRoomSettings,
     applyLootRows,
     bossCycleEnabled,
     bossForm,
@@ -21,7 +22,10 @@ export function createAdminPageActions(state) {
     equipmentPrompt,
     errorMessage,
     fetchAdminState,
+    fetchAdminRooms,
     fetchAnnouncements,
+    fetchBlacklist,
+    fetchAdminRoomSettings,
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
@@ -66,6 +70,37 @@ export function createAdminPageActions(state) {
       await fetchAdminState()
     } catch (error) {
       errorMessage.value = error.message || fallback
+    } finally {
+      saving.value = false
+    }
+  }
+
+  async function saveRoomDisplayName(roomId, displayName) {
+    saving.value = true
+    try {
+      const response = await fetch(`/api/admin/rooms/${encodeURIComponent(roomId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName }),
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '保存房间名失败'))
+      }
+      const payload = await response.json()
+      const nextList = Array.isArray(adminRoomSettings.value) ? [...adminRoomSettings.value] : []
+      const nextRoom = payload && typeof payload === 'object' ? payload : { id: roomId, displayName }
+      const matchIndex = nextList.findIndex((item) => String(item?.id || '') === String(roomId))
+      if (matchIndex >= 0) {
+        nextList.splice(matchIndex, 1, { ...nextList[matchIndex], ...nextRoom })
+      } else {
+        nextList.push(nextRoom)
+      }
+      adminRoomSettings.value = nextList
+      setSuccess('房间名已保存。')
+      await fetchAdminRooms()
+      await fetchAdminRoomSettings()
+    } catch (error) {
+      errorMessage.value = error.message || '保存房间名失败'
     } finally {
       saving.value = false
     }
@@ -418,6 +453,24 @@ export function createAdminPageActions(state) {
 
   async function deleteMessage(id) {
     await deleteByID(`/api/admin/messages/${encodeURIComponent(id)}`, '留言已删除。', '删除留言失败', fetchMessages)
+  }
+
+  async function unblockBlacklistEntry(clientId, nickname) {
+    saving.value = true
+    try {
+      const response = await fetch(`/api/admin/blacklist/${encodeURIComponent(clientId)}/unblock`, {
+        method: 'POST',
+      })
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '手动解封失败'))
+      }
+      setSuccess(`已解封 ${nickname || clientId}。`)
+      await fetchBlacklist()
+    } catch (error) {
+      errorMessage.value = error.message || '手动解封失败'
+    } finally {
+      saving.value = false
+    }
   }
 
   async function uploadImageInner(event, applyImage, successTip, category = '') {
@@ -801,6 +854,7 @@ export function createAdminPageActions(state) {
     deleteBossTemplate,
     deleteEquipment,
     deleteMessage,
+    unblockBlacklistEntry,
     disableBossCycle,
     editBossTemplate,
     editTaskDefinition,
@@ -825,6 +879,7 @@ export function createAdminPageActions(state) {
     saveButton,
     saveEquipment,
     saveLoot,
+    saveRoomDisplayName,
     saveShopItem,
     saveTaskDefinition,
     selectBossTemplate,

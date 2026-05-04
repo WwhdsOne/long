@@ -39,7 +39,14 @@ const ROOM_ACCENTS = [
 ]
 
 function roomLabel(room) {
-  return `${room?.id || '1'}`
+  const displayName = String(room?.displayName || '').trim()
+  if (displayName) return displayName
+  return defaultRoomLabel(room?.id)
+}
+
+function defaultRoomLabel(roomId) {
+  const normalized = String(roomId || '1').trim() || '1'
+  return `房间 ${normalized}`
 }
 
 function currentRoomSummary(roomId) {

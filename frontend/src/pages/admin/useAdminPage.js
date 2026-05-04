@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import {
   emptyAdminState,
   emptyAnnouncementForm,
+  emptyBlacklistPage,
   emptyBossHistoryPage,
   emptyButtonForm,
   emptyButtonPage,
@@ -14,10 +15,12 @@ import {
   emptyShopItemForm,
   emptyTaskCycleResults,
   emptyTaskForm,
+  formatDuration,
   formatItemStats,
   formatTime,
   normalizeAdminState,
   normalizeAnnouncements,
+  normalizeBlacklistPage,
   normalizeBossHistoryPage,
   normalizeButtonPage,
   normalizeEquipmentPage,
@@ -53,11 +56,13 @@ export function useAdminPage() {
   const selectedBossTemplateId = ref('')
   const adminRoomId = ref('1')
   const adminRooms = ref([])
+  const adminRoomSettings = ref([])
 
   const adminState = ref(emptyAdminState())
   const buttonPage = ref(emptyButtonPage())
   const equipmentPage = ref(emptyEquipmentPage())
   const playerPage = ref(emptyPlayerPage())
+  const blacklistPage = ref(emptyBlacklistPage())
   const bossHistoryPage = ref(emptyBossHistoryPage())
   const announcements = ref([])
   const messagePage = ref(emptyMessagePage())
@@ -77,6 +82,7 @@ export function useAdminPage() {
   const loadingAnnouncements = ref(false)
   const loadingMessages = ref(false)
   const loadingPlayers = ref(false)
+  const loadingBlacklist = ref(false)
   const loadingTasks = ref(false)
   const loadingShopItems = ref(false)
   const loadingTaskArchives = ref(false)
@@ -122,6 +128,20 @@ export function useAdminPage() {
       }
     } catch {
       adminRooms.value = []
+    }
+  }
+
+  async function fetchAdminRoomSettings() {
+    try {
+      const response = await fetchWithTimeout('/api/admin/rooms')
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '房间配置加载失败'))
+      }
+      const payload = await response.json()
+      adminRoomSettings.value = Array.isArray(payload) ? payload : []
+    } catch (error) {
+      errorMessage.value = error.message || '房间配置加载失败'
+      adminRoomSettings.value = []
     }
   }
 
@@ -229,6 +249,21 @@ export function useAdminPage() {
       errorMessage.value = error.message || '玩家列表加载失败'
     } finally {
       loadingPlayers.value = false
+    }
+  }
+
+  async function fetchBlacklist() {
+    loadingBlacklist.value = true
+    try {
+      const response = await fetchWithTimeout('/api/admin/blacklist')
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, '黑名单加载失败'))
+      }
+      blacklistPage.value = normalizeBlacklistPage(await response.json())
+    } catch (error) {
+      errorMessage.value = error.message || '黑名单加载失败'
+    } finally {
+      loadingBlacklist.value = false
     }
   }
 
@@ -397,7 +432,9 @@ export function useAdminPage() {
   async function refreshAll() {
     await Promise.all([
       fetchAdminRooms(),
+      fetchAdminRoomSettings(),
       fetchAdminState(),
+      fetchBlacklist(),
       fetchPlayerPage(),
       fetchEquipmentPage(equipmentPage.value.page),
       fetchShopItems(),
@@ -415,10 +452,12 @@ export function useAdminPage() {
       }
 
       await fetchAdminRooms()
+      await fetchAdminRoomSettings()
       await fetchAdminState()
       await Promise.all([
         fetchAnnouncements(),
         fetchMessages(),
+        fetchBlacklist(),
         fetchPlayerPage(),
         fetchEquipmentPage(),
         fetchShopItems(),
@@ -447,8 +486,9 @@ export function useAdminPage() {
       checkingSession.value = false
       setSuccess('后台已解锁。')
       await fetchAdminRooms()
+      await fetchAdminRoomSettings()
       await fetchAdminState()
-      await Promise.all([fetchPlayerPage(), fetchEquipmentPage(), fetchShopItems(), fetchTasks()])
+      await Promise.all([fetchBlacklist(), fetchPlayerPage(), fetchEquipmentPage(), fetchShopItems(), fetchTasks()])
     } catch (error) {
       errorMessage.value = error.message || '登录失败'
     } finally {
@@ -462,9 +502,11 @@ export function useAdminPage() {
     adminState.value = emptyAdminState()
     adminRoomId.value = '1'
     adminRooms.value = []
+    adminRoomSettings.value = []
     buttonPage.value = emptyButtonPage()
     equipmentPage.value = emptyEquipmentPage()
     playerPage.value = emptyPlayerPage()
+    blacklistPage.value = emptyBlacklistPage()
     bossHistoryPage.value = emptyBossHistoryPage()
     messagePage.value = emptyMessagePage()
     taskDefinitions.value = []
@@ -512,6 +554,7 @@ export function useAdminPage() {
     adminState,
     adminRoomId,
     adminRooms,
+    adminRoomSettings,
     announcementForm,
     announcements,
     applyLootRows,
@@ -520,6 +563,7 @@ export function useAdminPage() {
     bossForm,
     bossHistoryPage,
     bossTemplates,
+    blacklistPage,
     buttonForm,
     buttonPage,
     checkingSession,
@@ -540,7 +584,9 @@ export function useAdminPage() {
     errorMessage,
     fetchAdminState,
     fetchAdminRooms,
+    fetchAdminRoomSettings,
     fetchAnnouncements,
+    fetchBlacklist,
     fetchButtonPage,
     fetchEquipmentPage,
     fetchMessages,
@@ -552,6 +598,7 @@ export function useAdminPage() {
     generatingEquipmentDraft,
     loading,
     loadingAnnouncements,
+    loadingBlacklist,
     loadingButtons,
     loadingEquipment,
     loadingHistory,
@@ -562,6 +609,7 @@ export function useAdminPage() {
     messagePage,
     normalizeAdminState,
     normalizeAnnouncements,
+    normalizeBlacklistPage,
     normalizeBossHistoryPage,
     normalizeButtonPage,
     normalizeEquipmentPage,
@@ -603,6 +651,7 @@ export function useAdminPage() {
     adminState,
     adminRoomId,
     adminRooms,
+    adminRoomSettings,
     announcementForm,
     announcements,
     authenticated,
@@ -610,6 +659,7 @@ export function useAdminPage() {
     bossForm,
     bossHistoryPage,
     bossTemplates,
+    blacklistPage,
     buttonForm,
     buttonPage,
     checkingSession,
@@ -623,6 +673,7 @@ export function useAdminPage() {
     equipmentPage,
     errorMessage,
     findEquipmentTemplate,
+    formatDuration,
     formatItemStats,
     formatTime,
     hasBoss,
@@ -630,6 +681,7 @@ export function useAdminPage() {
     generatingEquipmentDraft,
     loading,
     loadingAnnouncements,
+    loadingBlacklist,
     loadingButtons,
     loadingEquipment,
     loadingHistory,
@@ -651,7 +703,9 @@ export function useAdminPage() {
     checkSession,
     fetchAdminState,
     fetchAdminRooms,
+    fetchAdminRoomSettings,
     fetchAnnouncements,
+    fetchBlacklist,
     fetchBossHistory,
     fetchButtonPage,
     fetchEquipmentPage,
@@ -680,6 +734,7 @@ export function useAdminPage() {
     uploadShopCursorImage: actions.uploadShopCursorImage,
     uploadShopImage: actions.uploadShopImage,
     uploadShopPreviewImage: actions.uploadShopPreviewImage,
+    unblockBlacklistEntry: actions.unblockBlacklistEntry,
     uploadingImage,
   }
 }

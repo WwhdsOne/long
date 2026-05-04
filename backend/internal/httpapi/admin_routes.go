@@ -20,8 +20,10 @@ func registerAdminRoutes(router route.IRouter, options Options) {
 
 	registerAdminSessionRoutes(router, options)
 	registerAdminOverviewRoutes(router, options)
+	registerAdminBlacklistRoutes(router, options)
 	registerAdminBossRoutes(router, options)
 	registerAdminContentRoutes(router, options)
+	registerAdminRoomRoutes(router, options)
 	registerAdminTaskRoutes(router, options)
 	registerAdminShopRoutes(router, options)
 	registerAdminPlayerAuthRoutes(router, options)
@@ -170,5 +172,51 @@ func registerAdminOverviewRoutes(router route.IRouter, options Options) {
 		}
 
 		writeJSON(c, consts.StatusOK, player)
+	})
+}
+
+func registerAdminBlacklistRoutes(router route.IRouter, options Options) {
+	router.GET("/api/admin/blacklist", func(_ context.Context, c *app.RequestContext) {
+		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
+			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+			return
+		}
+		if options.ClickGuard == nil {
+			writeJSON(c, consts.StatusOK, []core.BlacklistEntry{})
+			return
+		}
+		writeJSON(c, consts.StatusOK, options.ClickGuard.ListBlacklist())
+	})
+
+	router.POST("/api/admin/blacklist/:clientId/unblock", func(ctx context.Context, c *app.RequestContext) {
+		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
+			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+			return
+		}
+		if options.ClickGuard == nil {
+			writeJSON(c, consts.StatusServiceUnavailable, map[string]string{"error": "BLACKLIST_UNAVAILABLE"})
+			return
+		}
+
+		clientID := strings.TrimSpace(c.Param("clientId"))
+		if clientID == "" {
+			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_CLIENT_ID"})
+			return
+		}
+		if !options.ClickGuard.Unblock(clientID) {
+			writeJSON(c, consts.StatusNotFound, map[string]string{"error": "BLACKLIST_ENTRY_NOT_FOUND"})
+			return
+		}
+
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
+			Operator:   options.AdminAuthenticator.Username(),
+			Action:     "blacklist.unblock",
+			TargetType: "client",
+			TargetID:   clientID,
+			RequestPath: requestPath(c),
+			RequestIP:  requestIP(c),
+			Result:     "success",
+		})
+		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 }

@@ -8,16 +8,16 @@ redis:
   tls_enabled: false
 redis_prefix: "hai-world"
 rate_limit:
-  limit: 50                # 原来是80
+  limit: 60
   window_ms: 5000
   blacklist_ms: 600000
   blacklist_multiplier: 2.0
   offense_decay_ms: 86400000
   medium:
-    limit: 400              # 原来是600
+    limit: 1000
     window_ms: 600000
   long:
-    limit: 1500             # 原来是2400
+    limit: 2500
     window_ms: 3600000
 admin:
   username: "root"
@@ -44,7 +44,7 @@ realtime:
   debounce_ms: 50
 room:
   enabled: true
-  ids: ["1", "2", "3"]
+  count: 3
   default_room: "1"
   switch_cooldown_seconds: 300
 log:

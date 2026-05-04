@@ -91,7 +91,7 @@ const DAMAGE_VARIANTS = {
     },
     bleed: {
         scale: 0.78,
-        ttl: 1100,
+        ttl: 280,
         shake: 0,
         stageFx: [],
         particles: 1,
@@ -180,7 +180,9 @@ function defaultTalentVisualState() {
 }
 
 const damageBursts = ref({})
+const bleedBursts = ref({})
 const talentTriggerFeed = ref([])
+const bleedTriggerFeed = ref([])
 const damageStageFx = ref({
     shake: false,
     flash: false,
@@ -290,23 +292,24 @@ const partProgressList = computed(() => {
   if (!Array.isArray(parts) || parts.length === 0) return []
   const stormMap = cs?.partStormComboCount || {}
   const heavyMap = cs?.partHeavyClickCount || {}
-	  const jdUsedMap = cs?.judgmentDayUsed || {}
-	  const jdCooldown = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
-	  const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
-	  const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
-	  const jdTrigger = judgmentDayTrigger.value
-	  const nowSec = Date.now() / 1000
-	  const result = []
-	  for (const part of parts) {
-	    const key = `${part.x}-${part.y}`
-	    const storm = Number(stormMap[key]) || 0
-	    const armor = Number(heavyMap[key]) || 0
-	    const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
-	    const rawHeavy = Number(heavyMap[key]) || 0
-	    const lastJdTrigger = Number(jdUsedMap[key]) || 0
-	    const jdOnCooldown = part.type === 'heavy' && lastJdTrigger > 0 && jdCooldown > 0 && (nowSec - lastJdTrigger) < jdCooldown
-	    const jdCount = (part.type === 'heavy' && !jdOnCooldown) ? rawHeavy : 0
-	    const jdProgress = jdTrigger > 0 ? Math.min(100, Math.round((jdCount / jdTrigger) * 100)) : 0
+  const judgmentDayMap = cs?.partJudgmentDayCount || {}
+  const jdUsedMap = cs?.judgmentDayUsed || {}
+  const jdCooldown = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
+  const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
+  const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
+  const jdTrigger = judgmentDayTrigger.value
+  const nowSec = Date.now() / 1000
+  const result = []
+  for (const part of parts) {
+    const key = `${part.x}-${part.y}`
+    const storm = Number(stormMap[key]) || 0
+    const armor = Number(heavyMap[key]) || 0
+    const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
+    const rawJudgmentDay = Number(judgmentDayMap[key]) || 0
+    const lastJdTrigger = Number(jdUsedMap[key]) || 0
+    const jdOnCooldown = part.type === 'heavy' && lastJdTrigger > 0 && jdCooldown > 0 && (nowSec - lastJdTrigger) < jdCooldown
+    const jdCount = (part.type === 'heavy' && !jdOnCooldown) ? rawJudgmentDay : 0
+    const jdProgress = jdTrigger > 0 ? Math.min(100, Math.round((jdCount / jdTrigger) * 100)) : 0
     if (storm <= 0 && armor <= 0 && autoStrike <= 0 && jdCount <= 0) continue
     if (!part.alive) continue
     result.push({
@@ -1838,13 +1841,14 @@ function applyTalentVisualState(events) {
     }
 }
 
-function appendTalentTriggerEvents(events) {
+function appendBleedTriggerEvents(events) {
     if (!Array.isArray(events) || events.length === 0) {
         return
     }
     const now = Date.now()
-    talentTriggerFeed.value = [
-        ...events.map((event, index) => ({
+    const nextEntries = events
+        .filter((event) => event?.effectType === 'bleed')
+        .map((event, index) => ({
             id: `${now}-${index}-${event.talentId || 'talent'}`,
             name: event.name || event.talentId || '天赋',
             message: event.message || '天赋触发',
@@ -1853,9 +1857,42 @@ function appendTalentTriggerEvents(events) {
             effectType: event.effectType || '',
             partX: event.partX,
             partY: event.partY,
-        })),
+        }))
+    if (nextEntries.length === 0) {
+        return
+    }
+    bleedTriggerFeed.value = [
+        ...nextEntries,
+        ...bleedTriggerFeed.value,
+    ]
+        .sort((left, right) => Number(right.triggeredAt || 0) - Number(left.triggeredAt || 0))
+        .slice(0, 12)
+}
+
+function appendTalentTriggerEvents(events) {
+    if (!Array.isArray(events) || events.length === 0) {
+        return
+    }
+    const now = Date.now()
+    const nextEntries = events.map((event, index) => ({
+            id: `${now}-${index}-${event.talentId || 'talent'}`,
+            name: event.name || event.talentId || '天赋',
+            message: event.message || '天赋触发',
+            extraDamage: Number(event.extraDamage || 0),
+            triggeredAt: Number(event.triggeredAt || now),
+            effectType: event.effectType || '',
+            partX: event.partX,
+            partY: event.partY,
+        }))
+    const mergedFeed = [
+        ...nextEntries,
         ...talentTriggerFeed.value,
-    ].slice(0, 6)
+    ]
+    const otherEvents = mergedFeed.filter((entry) => entry.effectType !== 'bleed').slice(0, 6)
+    talentTriggerFeed.value = otherEvents
+        .sort((left, right) => Number(right.triggeredAt || 0) - Number(left.triggeredAt || 0))
+        .slice(0, 6)
+    appendBleedTriggerEvents(events)
     applyTalentVisualState(events)
 }
 
@@ -1870,7 +1907,7 @@ function triggerTalentEventDamageBursts(events) {
         if (event.partX === undefined || event.partY === undefined) {
             continue
         }
-        triggerDamageBurst(`boss-part:${event.partX}-${event.partY}`, {
+        triggerBleedBurst(`boss-part:${event.partX}-${event.partY}`, {
             bossDamage: Number(event.extraDamage || 0),
             damageType: 'bleed',
             effectType: 'bleed',
@@ -1903,6 +1940,8 @@ function clearUserRealtimeState() {
     lastKnownGold = 0
     lastKnownStones = 0
     clearTalentVisualState()
+    bleedBursts.value = {}
+    bleedTriggerFeed.value = []
 }
 
 function clearPendingClicks(key = '') {
@@ -1964,6 +2003,7 @@ function ensureRealtimeTransport() {
             applyPublicState(payload)
             loading.value = false
             errorMessage.value = ''
+            void loadRooms()
         },
         onUserDelta(payload) {
             applyUserState(payload)
@@ -2050,6 +2090,30 @@ function clearDamageBurst(key, burstID = '') {
         nextBursts[normalizedKey] = remained
     }
     damageBursts.value = nextBursts
+}
+
+function clearBleedBurst(key, burstID = '') {
+    const normalizedKey = String(key || '').trim()
+    if (!normalizedKey || !bleedBursts.value[normalizedKey]) {
+        return
+    }
+    if (!burstID) {
+        bleedBursts.value[normalizedKey].forEach((entry) => clearDamageBurstTimer(entry.id))
+        const nextBursts = {...bleedBursts.value}
+        delete nextBursts[normalizedKey]
+        bleedBursts.value = nextBursts
+        return
+    }
+
+    const remained = bleedBursts.value[normalizedKey].filter((entry) => entry.id !== burstID)
+    clearDamageBurstTimer(burstID)
+    const nextBursts = {...bleedBursts.value}
+    if (remained.length === 0) {
+        delete nextBursts[normalizedKey]
+    } else {
+        nextBursts[normalizedKey] = remained
+    }
+    bleedBursts.value = nextBursts
 }
 
 function clearStageEffect(name) {
@@ -2183,6 +2247,24 @@ function nextBurstOffset(key, variant) {
         }
     }, 260)
 
+    if (variant === 'bleed') {
+        const bleedLane = currentIndex % 6
+        const bleedOffsets = [
+            [-18, -28],
+            [18, -42],
+            [-22, -56],
+            [22, -70],
+            [-14, -84],
+            [14, -98],
+        ]
+        const base = bleedOffsets[bleedLane]
+        const stack = Math.floor(currentIndex / bleedOffsets.length)
+        return {
+            x: base[0],
+            y: base[1] - stack * 18,
+        }
+    }
+
     const pattern = [
         [0, -36],
         [0, -52],
@@ -2268,6 +2350,34 @@ function triggerDamageBurst(key, payload = {}) {
         window.setTimeout(() => {
             clearDamageBurst(normalizedKey, burst.id)
         }, config.ttl),
+    )
+}
+
+function triggerBleedBurst(partKey, payload = {}) {
+    const normalizedKey = String(partKey || '').trim()
+    if (!normalizedKey) {
+        return
+    }
+
+    const part = findBossPartByKey(normalizedKey)
+    const burst = buildDamageBurst(normalizedKey, {
+        ...payload,
+        damageType: 'bleed',
+        effectType: 'bleed',
+    }, part, 'bleed')
+    const currentBursts = bleedBursts.value[normalizedKey] || []
+    const nextBursts = [...currentBursts, burst].slice(-6)
+    bleedBursts.value = {
+        ...bleedBursts.value,
+        [normalizedKey]: nextBursts,
+    }
+
+    clearDamageBurstTimer(burst.id)
+    burstTimers.set(
+        burst.id,
+        window.setTimeout(() => {
+            clearBleedBurst(normalizedKey, burst.id)
+        }, burst.ttl),
     )
 }
 
@@ -2878,7 +2988,9 @@ export function usePublicPageState() {
         lastUpdatedAt,
         liveConnected,
         damageBursts,
+        bleedBursts,
         talentTriggerFeed,
+        bleedTriggerFeed,
         talentVisualState,
         comboCount,
         stormCombo,

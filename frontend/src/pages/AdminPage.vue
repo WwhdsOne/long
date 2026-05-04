@@ -1,9 +1,11 @@
 <script setup>
+import AdminBlacklistTab from '../components/admin/AdminBlacklistTab.vue'
 import AdminBossTab from '../components/admin/AdminBossTab.vue'
 import AdminContentTab from '../components/admin/AdminContentTab.vue'
 import AdminDashboardTab from '../components/admin/AdminDashboardTab.vue'
 import AdminEquipmentTab from '../components/admin/AdminEquipmentTab.vue'
 import AdminHistoryTab from '../components/admin/AdminHistoryTab.vue'
+import AdminRoomTab from '../components/admin/AdminRoomTab.vue'
 import AdminShopTab from '../components/admin/AdminShopTab.vue'
 import AdminTaskTab from '../components/admin/AdminTaskTab.vue'
 import { useAdminPage } from './admin/useAdminPage'
@@ -69,7 +71,7 @@ const admin = reactive(useAdminPage())
             <select class="nickname-form__input" :value="admin.adminRoomId" @change="admin.switchAdminRoom($event.target.value)">
               <option v-if="!admin.adminRooms.length" :value="admin.adminRoomId">房间 {{ admin.adminRoomId }}</option>
               <option v-for="room in admin.adminRooms" :key="room.id" :value="room.id">
-                房间 {{ room.id }}{{ room.cycleEnabled ? ' · 循环中' : '' }}
+                {{ room.displayName || `房间 ${room.id}` }}{{ room.cycleEnabled ? ' · 循环中' : '' }}
               </option>
             </select>
           </label>
@@ -86,9 +88,11 @@ const admin = reactive(useAdminPage())
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'boss' }" @click="admin.activeTab = 'boss'">Boss</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'equipment' }" @click="admin.activeTab = 'equipment'; admin.fetchEquipmentPage(admin.equipmentPage.page)">装备</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'shop' }" @click="admin.activeTab = 'shop'; admin.fetchShopItems()">商店</button>
+          <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'rooms' }" @click="admin.activeTab = 'rooms'; admin.fetchAdminRoomSettings()">房间</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'content' }" @click="admin.activeTab = 'content'; admin.fetchAnnouncements(); admin.fetchMessages()">内容</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'history' }" @click="admin.activeTab = 'history'; admin.fetchBossHistory(admin.bossHistoryPage.page)">历史</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'tasks' }" @click="admin.activeTab = 'tasks'; admin.fetchTasks()">任务</button>
+          <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'blacklist' }" @click="admin.activeTab = 'blacklist'; admin.fetchBlacklist()">黑名单</button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'dashboard' }" @click="admin.activeTab = 'dashboard'">看板</button>
         </div>
 
@@ -157,6 +161,12 @@ const admin = reactive(useAdminPage())
           :upload-shop-preview-image="admin.uploadShopPreviewImage"
           :upload-shop-cursor-image="admin.uploadShopCursorImage"
         />
+        <AdminRoomTab
+          v-else-if="admin.activeTab === 'rooms'"
+          :rooms="admin.adminRoomSettings"
+          :saving="admin.saving"
+          :save-room-display-name="admin.saveRoomDisplayName"
+        />
         <AdminContentTab
           v-else-if="admin.activeTab === 'content'"
           :announcement-form="admin.announcementForm"
@@ -205,6 +215,17 @@ const admin = reactive(useAdminPage())
           :open-new-task="admin.openNewTask"
           :add-task-equipment-reward="admin.addTaskEquipmentReward"
           :remove-task-equipment-reward="admin.removeTaskEquipmentReward"
+          :format-time="admin.formatTime"
+        />
+
+        <AdminBlacklistTab
+          v-else-if="admin.activeTab === 'blacklist'"
+          :blacklist-page="admin.blacklistPage"
+          :loading-blacklist="admin.loadingBlacklist"
+          :saving="admin.saving"
+          :fetch-blacklist="admin.fetchBlacklist"
+          :unblock-blacklist-entry="admin.unblockBlacklistEntry"
+          :format-duration="admin.formatDuration"
           :format-time="admin.formatTime"
         />
 

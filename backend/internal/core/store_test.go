@@ -96,6 +96,17 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 func newTestRoomStore(t *testing.T) (*Store, func()) {
 	t.Helper()
 
+	return newTestStoreWithRoomConfig(t, RoomConfig{
+		Enabled:        true,
+		Count:          2,
+		DefaultRoom:    "1",
+		SwitchCooldown: 5 * time.Minute,
+	})
+}
+
+func newTestStoreWithRoomConfig(t *testing.T, roomCfg RoomConfig) (*Store, func()) {
+	t.Helper()
+
 	server, err := miniredis.Run()
 	if err != nil {
 		t.Fatalf("start miniredis: %v", err)
@@ -107,16 +118,170 @@ func newTestRoomStore(t *testing.T) (*Store, func()) {
 
 	return NewStore(client, "vote:", StoreOptions{
 			CriticalChancePercent: 5,
-			Room: RoomConfig{
-				Enabled:        true,
-				IDs:            []string{"1", "2"},
-				DefaultRoom:    "1",
-				SwitchCooldown: 5 * time.Minute,
-			},
+			Room: roomCfg,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
 			_ = client.Close()
 			server.Close()
 		}
+}
+
+func TestConfiguredRoomIDsGeneratedFromCount(t *testing.T) {
+	store, cleanup := newTestStoreWithRoomConfig(t, RoomConfig{
+		Enabled:        true,
+		Count:          3,
+		DefaultRoom:    "1",
+		SwitchCooldown: 5 * time.Minute,
+	})
+	defer cleanup()
+
+	got := store.configuredRoomIDs()
+	want := []string{"1", "2", "3"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("expected %v, got %v", want, got)
+	}
+}
+
+func TestResolvePlayerRoomFallsBackWhenStoredRoomInvalid(t *testing.T) {
+	store, cleanup := newTestStoreWithRoomConfig(t, RoomConfig{
+		Enabled:        true,
+		Count:          2,
+		DefaultRoom:    "1",
+		SwitchCooldown: 5 * time.Minute,
+	})
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.Set(ctx, store.playerRoomKey("阿明"), "99", 0).Err(); err != nil {
+		t.Fatalf("seed player room: %v", err)
+	}
+
+	roomID, err := store.ResolvePlayerRoom(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("resolve player room: %v", err)
+	}
+	if roomID != "1" {
+		t.Fatalf("expected fallback room 1, got %q", roomID)
+	}
+}
+
+func TestListRoomsKeepsJoinableRuleAfterCountRefactor(t *testing.T) {
+	store, cleanup := newTestStoreWithRoomConfig(t, RoomConfig{
+		Enabled:        true,
+		Count:          3,
+		DefaultRoom:    "1",
+		SwitchCooldown: 5 * time.Minute,
+	})
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 20,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 20, CurrentHP: 20, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+
+	rooms, err := store.ListRooms(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("list rooms: %v", err)
+	}
+	for _, room := range rooms.Rooms {
+		if room.ID != "2" {
+			continue
+		}
+		if room.Joinable {
+			t.Fatalf("expected room 2 to stay not joinable without active boss or cycle, got %+v", room)
+		}
+		return
+	}
+
+	t.Fatal("expected room 2 in room list")
+}
+
+func TestListRoomsUsesDisplayNameFromRedis(t *testing.T) {
+	store, cleanup := newTestStoreWithRoomConfig(t, RoomConfig{
+		Enabled:        true,
+		Count:          2,
+		DefaultRoom:    "1",
+		SwitchCooldown: 5 * time.Minute,
+	})
+	defer cleanup()
+
+	ctx := context.Background()
+	mustSetRoomDisplayName(t, store, "2", "高压线")
+
+	rooms, err := store.ListRooms(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("list rooms: %v", err)
+	}
+
+	room := findRoomInfo(t, rooms.Rooms, "2")
+	if room.DisplayName != "高压线" {
+		t.Fatalf("expected display name 高压线, got %q", room.DisplayName)
+	}
+}
+
+func TestListRoomsFallsBackToDefaultDisplayName(t *testing.T) {
+	store, cleanup := newTestStoreWithRoomConfig(t, RoomConfig{
+		Enabled:        true,
+		Count:          2,
+		DefaultRoom:    "1",
+		SwitchCooldown: 5 * time.Minute,
+	})
+	defer cleanup()
+
+	ctx := context.Background()
+	rooms, err := store.ListRooms(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("list rooms: %v", err)
+	}
+
+	room := findRoomInfo(t, rooms.Rooms, "1")
+	if room.DisplayName != "房间 1" {
+		t.Fatalf("expected fallback display name 房间 1, got %q", room.DisplayName)
+	}
+}
+
+func TestSetRoomDisplayNameRejectsUnknownRoom(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	err := store.SetRoomDisplayName(context.Background(), "99", "未知房间")
+	if !errors.Is(err, ErrRoomNotFound) {
+		t.Fatalf("expected ErrRoomNotFound, got %v", err)
+	}
+}
+
+func TestSetRoomDisplayNameClearsCustomName(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	mustSetRoomDisplayName(t, store, "1", "一线大厅")
+
+	if err := store.SetRoomDisplayName(ctx, "1", "   "); err != nil {
+		t.Fatalf("clear room display name: %v", err)
+	}
+
+	displayName, err := store.GetRoomDisplayName(ctx, "1")
+	if err != nil {
+		t.Fatalf("get room display name after clear: %v", err)
+	}
+	if displayName != "房间 1" {
+		t.Fatalf("expected fallback display name after clear, got %q", displayName)
+	}
+
+	exists, err := store.client.HExists(ctx, store.roomNamesKey(), "1").Result()
+	if err != nil {
+		t.Fatalf("check display name field exists: %v", err)
+	}
+	if exists {
+		t.Fatal("expected display name field to be deleted after clear")
+	}
 }
 
 func TestGetUserStateReadsResourceKeyWithoutGems(t *testing.T) {
@@ -986,6 +1151,48 @@ func TestSilverStormTriggersWhenExtraTalentDamageBreaksPart(t *testing.T) {
 	}
 	if !combatState.SilverStormActive {
 		t.Fatal("expected silver storm active after extra damage break")
+	}
+}
+
+func TestTalentCombatStateIndexMaintainedOnSaveAndDelete(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "索引维护测试"
+	bossID := "talent-index-maintenance-test"
+
+	state := NewTalentCombatState()
+	if err := store.SaveTalentCombatState(ctx, nickname, bossID, state); err != nil {
+		t.Fatalf("save combat state: %v", err)
+	}
+
+	nicknames, err := store.listTalentCombatStateNicknames(ctx, bossID)
+	if err != nil {
+		t.Fatalf("list combat state nicknames: %v", err)
+	}
+	if !slices.Contains(nicknames, nickname) {
+		t.Fatalf("expected nickname in index, got %+v", nicknames)
+	}
+
+	indexMembers, err := store.client.SMembers(ctx, store.talentCombatStateIndexKey(bossID)).Result()
+	if err != nil {
+		t.Fatalf("read index set: %v", err)
+	}
+	if !slices.Contains(indexMembers, nickname) {
+		t.Fatalf("expected nickname in redis index, got %+v", indexMembers)
+	}
+
+	if err := store.DeleteTalentCombatState(ctx, nickname, bossID); err != nil {
+		t.Fatalf("delete combat state: %v", err)
+	}
+
+	nicknames, err = store.listTalentCombatStateNicknames(ctx, bossID)
+	if err != nil {
+		t.Fatalf("list combat state nicknames after delete: %v", err)
+	}
+	if slices.Contains(nicknames, nickname) {
+		t.Fatalf("expected nickname removed from index, got %+v", nicknames)
 	}
 }
 
@@ -2935,6 +3142,55 @@ func TestGetUserStateConsumesPendingTalentEvents(t *testing.T) {
 	}
 }
 
+func TestGetPlayerResourcesDoesNotConsumePendingTalentEvents(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "资源只读不消费测试"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), map[string]any{
+		"gold":          "12",
+		"stones":        "34",
+		"talent_points": "56",
+	}).Err(); err != nil {
+		t.Fatalf("seed resources: %v", err)
+	}
+	if err := store.appendPendingTalentEvents(ctx, nickname, "resource-read-talent-event-test", []TalentTriggerEvent{
+		{
+			TalentID:   "crit_bleed",
+			Name:       "致命出血",
+			EffectType: "bleed",
+			Message:    "出血结算",
+			PartX:      0,
+			PartY:      0,
+		},
+	}); err != nil {
+		t.Fatalf("seed pending talent events: %v", err)
+	}
+
+	queueKey := store.talentEventQueueKey(nickname, "resource-read-talent-event-test")
+	if size, err := store.client.LLen(ctx, queueKey).Result(); err != nil {
+		t.Fatalf("check pending queue size: %v", err)
+	} else if size != 1 {
+		t.Fatalf("expected pending queue size 1 after seed, got %d", size)
+	}
+
+	resources, err := store.GetPlayerResources(ctx, nickname)
+	if err != nil {
+		t.Fatalf("read resources: %v", err)
+	}
+	if resources.Gold != 12 || resources.Stones != 34 || resources.TalentPoints != 56 {
+		t.Fatalf("unexpected resources: %+v", resources)
+	}
+
+	if size, err := store.client.LLen(ctx, queueKey).Result(); err != nil {
+		t.Fatalf("check pending queue size after resource read: %v", err)
+	} else if size != 1 {
+		t.Fatalf("expected pending queue untouched after resource read, got %d", size)
+	}
+}
+
 func TestArmorCoreCollapseTrigger(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -3134,4 +3390,24 @@ func TestArmorCoreCollapseDoesNotRetriggerWhileActive(t *testing.T) {
 	if len(combatState.CollapseParts) != 1 || combatState.CollapseParts[0] != 0 {
 		t.Fatalf("崩塌持续期间 CollapseParts 不应重复追加，实际 %v", combatState.CollapseParts)
 	}
+}
+
+func mustSetRoomDisplayName(t *testing.T, store *Store, roomID string, displayName string) {
+	t.Helper()
+
+	if err := store.SetRoomDisplayName(context.Background(), roomID, displayName); err != nil {
+		t.Fatalf("set room display name: %v", err)
+	}
+}
+
+func findRoomInfo(t *testing.T, rooms []RoomInfo, roomID string) RoomInfo {
+	t.Helper()
+
+	for _, room := range rooms {
+		if room.ID == roomID {
+			return room
+		}
+	}
+	t.Fatalf("room %s not found", roomID)
+	return RoomInfo{}
 }

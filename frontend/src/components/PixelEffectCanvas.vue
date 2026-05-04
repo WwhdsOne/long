@@ -508,6 +508,7 @@ const finalCutRenderer = {
 // ---- 6. collapse_trigger: 盾牌爆裂（方案9，删除裂纹残留） ----
 const collapseTriggerTickMs = 20
 const collapseTriggerSpeedScale = 1.25
+const collapseTriggerSpreadRatio = 0.85
 
 const collapseTriggerRenderer = {
   init(size) {
@@ -527,12 +528,15 @@ const collapseTriggerRenderer = {
       }
     }
     if (s.phase === 'explode') {
+      const spreadRadius = size * collapseTriggerSpreadRatio
       let alive = 0
       for (const p of s.parts) {
         if (p.life <= 0) continue
-        p.x += p.vx; p.y += p.vy; p.vx *= 0.985; p.vy *= 0.985
+        p.x += p.vx; p.y += p.vy; p.vx *= 0.992; p.vy *= 0.992
+        const distFromCenter = Math.hypot(p.x - cx, p.y - cy)
         if (p.x < -8 || p.x > size + 8 || p.y < -8 || p.y > size + 8) p.life -= 0.08
-        else if (s.timer > 300) p.life -= 0.015
+        else if (distFromCenter >= spreadRadius) p.life -= 0.02
+        else if (s.timer > 520) p.life -= 0.006
         if (p.life > 0) alive++
       }
       if (alive === 0) { s.phase = 'done'; s.timer = 0 }

@@ -28,7 +28,9 @@ const {
   errorMessage,
   pendingKeys,
   damageBursts,
+  bleedBursts,
   talentTriggerFeed,
+  bleedTriggerFeed,
   talentVisualState,
   comboCount,
   stormCombo,
@@ -75,7 +77,12 @@ const DEFAULT_BOSS_SWORD_CURSOR_URL = 'https://hai-world2.oss-cn-beijing.aliyunc
 const HALL_ROOM_ID = 'hall'
 const bossSwordCursorUrl = computed(() => equippedBattleClickCursorImagePath.value || DEFAULT_BOSS_SWORD_CURSOR_URL)
 const isHallRoom = computed(() => String(currentRoomId.value || '') === HALL_ROOM_ID)
-const currentRoomDisplay = computed(() => isHallRoom.value ? '大厅' : `房间 ${currentRoom.value?.id || currentRoomId.value || '1'}`)
+const currentRoomDisplay = computed(() => {
+  if (isHallRoom.value) return '大厅'
+  const displayName = String(currentRoom.value?.displayName || '').trim()
+  if (displayName) return displayName
+  return `房间 ${currentRoom.value?.id || currentRoomId.value || '1'}`
+})
 const currentRoomSeal = computed(() => isHallRoom.value ? 'HL' : String(currentRoom.value?.id || currentRoomId.value || '1').padStart(2, '0'))
 const myBattlePower = computed(() => (
   Math.max(0, Number(combatStats.value?.attackPower || 0)) +
@@ -519,6 +526,12 @@ function zoneDamageBursts(zone) {
   return damageBursts.value?.[key] || []
 }
 
+function zoneBleedBursts(zone) {
+  const key = getBossZoneButtonKey(zone)
+  if (!key) return []
+  return bleedBursts.value?.[key] || []
+}
+
 // 天赋视觉状态
 const talentEdgeGlowClass = computed(() => {
   if (hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)) return 'talent-edge-glow--crit'
@@ -532,7 +545,7 @@ const talentEdgeGlowClass = computed(() => {
 
 const showSilverFlash = computed(() => silverStormActive.value && silverStormCountdown.value >= 14)
 const TALENT_EFFECT_WINDOW_MS = 1350
-const BLEED_EFFECT_WINDOW_MS = 720
+const BLEED_EFFECT_WINDOW_MS = 1200
 const ULTIMATE_EFFECT_WINDOW_MS = 3200
 const JUDGMENT_DAY_EFFECT_WINDOW_MS = 5000
 
@@ -560,10 +573,11 @@ function effectWindowMs(type) {
 
 function recentTriggers(type, windowMs = TALENT_EFFECT_WINDOW_MS) {
   const filtered = talentTriggerFeed.value.filter((entry) => entry.effectType === type && isTriggerFresh(entry, windowMs))
-  if (type === 'bleed') {
-    return filtered.slice(0, 2)
-  }
   return filtered
+}
+
+function recentBleedTriggers(windowMs = BLEED_EFFECT_WINDOW_MS) {
+  return bleedTriggerFeed.value.filter((entry) => isTriggerFresh(entry, windowMs)).slice(0, 12)
 }
 
 function isTriggerFresh(entry, windowMs = TALENT_EFFECT_WINDOW_MS) {
@@ -979,6 +993,27 @@ const silverStormActive = computed(() => {
                 }"
                         ></span>
                       </template>
+                      <template
+                          v-for="burst in zoneBleedBursts(zone)"
+                          :key="burst.id"
+                      >
+              <span
+                  class="boss-zone-button__damage-burst"
+                  :class="[
+                  `boss-zone-button__damage-burst--${burst.type}`,
+                ]"
+                  :style="{
+                  '--damage-offset-x': `${burst.offsetX}px`,
+                  '--damage-offset-y': `${burst.offsetY}px`,
+                  '--damage-scale': burst.scale,
+                  '--damage-ttl': `${burst.ttl}ms`,
+                }"
+              >
+                <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{
+                  burst.value
+                }}
+              </span>
+                      </template>
                     </div>
                     <span
                         v-if="isPartDoomMarked(zone)"
@@ -1088,7 +1123,7 @@ const silverStormActive = computed(() => {
                :style="effectOverlayStyle('auto_strike', { scale: 2.05, fallback: { top: '50%', left: '50%' } })">
             <PixelEffectCanvas effect="auto_strike" :size="effectCanvasSize(2.05)" :loop="false"/>
           </div>
-          <div v-for="entry in recentTriggers('bleed', BLEED_EFFECT_WINDOW_MS)"
+          <div v-for="entry in recentBleedTriggers(BLEED_EFFECT_WINDOW_MS)"
                :key="entry.id"
                class="talent-canvas-fx"
                :style="triggerOverlayStyle('bleed', {
@@ -1108,8 +1143,8 @@ const silverStormActive = computed(() => {
           <div v-if="hasRecentTrigger('collapse_trigger')"
                :key="triggerKey('collapse_trigger')"
                class="talent-canvas-fx"
-               :style="effectOverlayStyle('collapse_trigger', { scale: 1, fallback: { top: '50%', left: '50%' } })">
-            <PixelEffectCanvas effect="collapse_trigger" :size="effectCanvasSize(2.5)" :loop="false"/>
+               :style="effectOverlayStyle('collapse_trigger', { scale: 2, fallback: { top: '50%', left: '50%' } })">
+            <PixelEffectCanvas effect="collapse_trigger" :size="effectCanvasSize(5)" :loop="false"/>
           </div>
           <div v-if="hasRecentTrigger('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"
                :key="triggerKey('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"

@@ -65,7 +65,7 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               read_timeout_ms: 4000
             room:
               enabled: true
-              ids: ["1", "2", "2", " "]
+              count: 3
               default_room: "2"
               switch_cooldown_seconds: 300
         `))
@@ -157,14 +157,66 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if !cfg.Room.Enabled {
 		t.Fatal("expected room enabled")
 	}
-	if len(cfg.Room.IDs) != 2 || cfg.Room.IDs[0] != "1" || cfg.Room.IDs[1] != "2" {
-		t.Fatalf("expected normalized room ids [1 2], got %+v", cfg.Room.IDs)
+	if cfg.Room.Count != 3 {
+		t.Fatalf("expected room count 3, got %d", cfg.Room.Count)
 	}
 	if cfg.Room.DefaultRoom != "2" {
 		t.Fatalf("expected default room 2, got %q", cfg.Room.DefaultRoom)
 	}
 	if cfg.Room.SwitchCooldown != 5*time.Minute {
 		t.Fatalf("expected room switch cooldown 5m, got %s", cfg.Room.SwitchCooldown)
+	}
+}
+
+func TestLoadDefaultsInvalidRoomCount(t *testing.T) {
+	t.Setenv("CONSUL_CONFIG_KEY", "vote-wall/test")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		payload := base64.StdEncoding.EncodeToString([]byte(`
+            port: 2333
+            redis:
+              host: 127.0.0.1
+              port: 6379
+              username: ""
+              password: ""
+              db: 0
+              tls_enabled: false
+            redis_prefix: "vote:"
+            rate_limit:
+              limit: 30
+              window_ms: 2000
+              blacklist_ms: 600000
+            admin:
+              username: "admin"
+              password: "secret"
+              session_secret: "session-secret"
+            player_auth:
+              jwt_secret: "player-secret"
+              jwt_ttl_seconds: 604800
+            room:
+              enabled: true
+              count: 0
+              default_room: "2"
+              switch_cooldown_seconds: 300
+        `))
+
+		w.Header().Set("X-Consul-Index", "7")
+		fmt.Fprintf(w, `[{"Value":%q}]`, payload)
+	}))
+	defer server.Close()
+
+	t.Setenv("CONSUL_ADDR", server.URL)
+
+	cfg, err := LoadTest()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	if cfg.Room.Count != 1 {
+		t.Fatalf("expected room count fallback 1, got %d", cfg.Room.Count)
+	}
+	if cfg.Room.DefaultRoom != "2" {
+		t.Fatalf("expected default room to stay 2 for core normalization, got %q", cfg.Room.DefaultRoom)
 	}
 }
 

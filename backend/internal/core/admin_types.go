@@ -31,6 +31,15 @@ type AdminPlayerPage struct {
 	Total      int64                 `json:"total"`
 }
 
+// BlacklistEntry 管理后台限流黑名单条目。
+type BlacklistEntry struct {
+	ClientID         string `json:"clientId"`
+	Nickname         string `json:"nickname"`
+	BlockedAt        int64  `json:"blockedAt"`
+	BlockedUntil     int64  `json:"blockedUntil"`
+	RemainingSeconds int64  `json:"remainingSeconds"`
+}
+
 // BossUpsert 管理后台 Boss 启动载荷
 type BossUpsert struct {
 	ID                 string     `json:"id"`

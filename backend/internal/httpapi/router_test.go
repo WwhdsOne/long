@@ -15,6 +15,31 @@ import (
 	ossupload "long/internal/oss"
 )
 
+type mockAdminClickGuard struct {
+	entries       []core.BlacklistEntry
+	lastUnblockID string
+}
+
+func (m *mockAdminClickGuard) Allow(string) (time.Duration, error) {
+	return 0, nil
+}
+
+func (m *mockAdminClickGuard) ListBlacklist() []core.BlacklistEntry {
+	return append([]core.BlacklistEntry(nil), m.entries...)
+}
+
+func (m *mockAdminClickGuard) Unblock(clientID string) bool {
+	m.lastUnblockID = clientID
+	for index, entry := range m.entries {
+		if entry.ClientID != clientID {
+			continue
+		}
+		m.entries = append(m.entries[:index], m.entries[index+1:]...)
+		return true
+	}
+	return false
+}
+
 type mockStore struct {
 	state                     core.State
 	talentState               *core.TalentState
@@ -33,6 +58,7 @@ type mockStore struct {
 	bossResourcesByNickname   map[string]core.BossResources
 	roomList                  core.RoomList
 	roomSwitchResult          core.RoomSwitchResult
+	roomDisplayNames          map[string]string
 	tasks                     []core.PlayerTask
 	shopItems                 []core.ShopCatalogItemView
 	result                    core.ClickResult
@@ -123,6 +149,42 @@ func (m *mockStore) ListRooms(_ context.Context, nickname string) (core.RoomList
 	return m.roomList, nil
 }
 
+func (m *mockStore) SetRoomDisplayName(_ context.Context, roomID string, displayName string) error {
+	if !m.hasRoom(roomID) {
+		return core.ErrRoomNotFound
+	}
+	if m.roomDisplayNames == nil {
+		m.roomDisplayNames = map[string]string{}
+	}
+	if strings.TrimSpace(displayName) == "" {
+		delete(m.roomDisplayNames, roomID)
+		for index, room := range m.roomList.Rooms {
+			if room.ID == roomID {
+				m.roomList.Rooms[index].DisplayName = "房间 " + roomID
+				break
+			}
+		}
+		return nil
+	}
+	m.roomDisplayNames[roomID] = displayName
+	for index, room := range m.roomList.Rooms {
+		if room.ID == roomID {
+			m.roomList.Rooms[index].DisplayName = displayName
+			break
+		}
+	}
+	return nil
+}
+
+func (m *mockStore) hasRoom(roomID string) bool {
+	for _, room := range m.roomList.Rooms {
+		if room.ID == roomID {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *mockStore) SwitchPlayerRoom(_ context.Context, nickname string, roomID string) (core.RoomSwitchResult, error) {
 	m.lastSwitchRoomNickname = nickname
 	m.lastSwitchRoomID = roomID
@@ -137,6 +199,15 @@ func (m *mockStore) GetUserState(_ context.Context, nickname string) (core.UserS
 		return core.UserState{}, m.getStateErr
 	}
 	return m.userStateForNickname(nickname), nil
+}
+
+func (m *mockStore) GetPlayerResources(_ context.Context, nickname string) (core.PlayerResources, error) {
+	state := m.userStateForNickname(nickname)
+	return core.PlayerResources{
+		Gold:         state.Gold,
+		Stones:       state.Stones,
+		TalentPoints: state.TalentPoints,
+	}, nil
 }
 
 func (m *mockStore) userStateForNickname(nickname string) core.UserState {
@@ -353,6 +424,59 @@ func TestAdminTaskRoutesReturnReadableMessagesOnBusinessErrors(t *testing.T) {
 	}
 }
 
+func TestAdminBlacklistRoutesListAndUnblock(t *testing.T) {
+	guard := &mockAdminClickGuard{
+		entries: []core.BlacklistEntry{{
+			ClientID:         "nickname:阿明",
+			Nickname:         "阿明",
+			BlockedAt:        1714903200,
+			BlockedUntil:     1714903800,
+			RemainingSeconds: 600,
+		}},
+	}
+	handler := NewHandler(Options{
+		Store:       &mockStore{},
+		Broadcaster: &mockBroadcaster{},
+		ClickGuard:  guard,
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "blacklist-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected admin login to set cookie")
+	}
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/admin/blacklist", nil)
+	listRequest.AddCookie(cookies[0])
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, listRequest)
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from blacklist list, got %d", listResponse.Code)
+	}
+	if !strings.Contains(listResponse.Body.String(), `"nickname":"阿明"`) {
+		t.Fatalf("expected nickname in blacklist response, got %s", listResponse.Body.String())
+	}
+
+	unblockRequest := httptest.NewRequest(http.MethodPost, "/api/admin/blacklist/nickname:%E9%98%BF%E6%98%8E/unblock", nil)
+	unblockRequest.AddCookie(cookies[0])
+	unblockResponse := httptest.NewRecorder()
+	handler.ServeHTTP(unblockResponse, unblockRequest)
+	if unblockResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from blacklist unblock, got %d", unblockResponse.Code)
+	}
+	if guard.lastUnblockID != "nickname:阿明" {
+		t.Fatalf("expected unblock target nickname:阿明, got %q", guard.lastUnblockID)
+	}
+}
+
 func TestShopRoutesReturnCatalogAndSupportAuthenticatedPurchase(t *testing.T) {
 	store := &mockStore{
 		state: core.State{
@@ -561,6 +685,172 @@ func TestAdminTaskRoutesListAndSave(t *testing.T) {
 	if resultsResponse.Code != http.StatusOK {
 		t.Fatalf("expected cycle results to succeed, got %d", resultsResponse.Code)
 	}
+}
+
+func TestAdminRoomsReturnsDisplayNames(t *testing.T) {
+	store := &mockStore{
+		roomList: core.RoomList{
+			Rooms: []core.RoomInfo{
+				{ID: "1", DisplayName: "房间 1", CurrentBossName: "一线 Boss", CycleEnabled: true},
+				{ID: "2", DisplayName: "高压线", CurrentBossName: "二线 Boss", CycleEnabled: false},
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "room-secret",
+		}),
+	})
+
+	unauthorizedRequest := httptest.NewRequest(http.MethodGet, "/api/admin/rooms", nil)
+	unauthorizedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorizedResponse, unauthorizedRequest)
+	if unauthorizedResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without admin cookie, got %d", unauthorizedResponse.Code)
+	}
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/admin/rooms", nil)
+	listRequest.AddCookie(mustAdminLoginCookie(t, handler))
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, listRequest)
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin room list, got %d", listResponse.Code)
+	}
+	if store.lastListRoomsNickname != "" {
+		t.Fatalf("expected admin room list to use empty nickname, got %q", store.lastListRoomsNickname)
+	}
+	if !strings.Contains(listResponse.Body.String(), `"id":"1"`) ||
+		!strings.Contains(listResponse.Body.String(), `"displayName":"高压线"`) ||
+		!strings.Contains(listResponse.Body.String(), `"currentBossName":"一线 Boss"`) ||
+		!strings.Contains(listResponse.Body.String(), `"cycleEnabled":true`) {
+		t.Fatalf("expected admin room list to expose room runtime fields, got %s", listResponse.Body.String())
+	}
+}
+
+func TestAdminRoomUpdateSavesDisplayName(t *testing.T) {
+	store := &mockStore{
+		roomList: core.RoomList{
+			Rooms: []core.RoomInfo{
+				{ID: "1", DisplayName: "房间 1"},
+				{ID: "2", DisplayName: "房间 2"},
+			},
+		},
+	}
+	publisher := &mockChangePublisher{}
+	handler := NewHandler(Options{
+		Store:           store,
+		Broadcaster:     &mockBroadcaster{},
+		ChangePublisher: publisher,
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "room-secret",
+		}),
+	})
+
+	updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/rooms/2", strings.NewReader(`{"displayName":"高压线"}`))
+	updateRequest.Header.Set("Content-Type", "application/json")
+	updateRequest.AddCookie(mustAdminLoginCookie(t, handler))
+	updateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(updateResponse, updateRequest)
+	if updateResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin room update, got %d", updateResponse.Code)
+	}
+	if got := store.roomDisplayNames["2"]; got != "高压线" {
+		t.Fatalf("expected room 2 display name to be saved, got %q", got)
+	}
+	if !strings.Contains(updateResponse.Body.String(), `"displayName":"高压线"`) {
+		t.Fatalf("expected update response to include saved displayName, got %s", updateResponse.Body.String())
+	}
+	if len(publisher.changes) == 0 {
+		t.Fatal("expected room rename to publish change")
+	}
+}
+
+func TestAdminRoomUpdateClearsDisplayNameWhenEmpty(t *testing.T) {
+	store := &mockStore{
+		roomList: core.RoomList{
+			Rooms: []core.RoomInfo{
+				{ID: "1", DisplayName: "房间 1"},
+				{ID: "2", DisplayName: "高压线"},
+			},
+		},
+		roomDisplayNames: map[string]string{"2": "高压线"},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "room-secret",
+		}),
+	})
+
+	updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/rooms/2", strings.NewReader(`{"displayName":""}`))
+	updateRequest.Header.Set("Content-Type", "application/json")
+	updateRequest.AddCookie(mustAdminLoginCookie(t, handler))
+	updateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(updateResponse, updateRequest)
+	if updateResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from admin room clear, got %d", updateResponse.Code)
+	}
+	if _, ok := store.roomDisplayNames["2"]; ok {
+		t.Fatal("expected custom display name to be cleared")
+	}
+	if !strings.Contains(updateResponse.Body.String(), `"displayName":"房间 2"`) {
+		t.Fatalf("expected cleared response to fall back to default display name, got %s", updateResponse.Body.String())
+	}
+}
+
+func TestAdminRoomUpdateRejectsUnknownRoom(t *testing.T) {
+	store := &mockStore{
+		roomList: core.RoomList{
+			Rooms: []core.RoomInfo{
+				{ID: "1", DisplayName: "房间 1"},
+				{ID: "2", DisplayName: "房间 2"},
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "room-secret",
+		}),
+	})
+
+	updateRequest := httptest.NewRequest(http.MethodPut, "/api/admin/rooms/99", strings.NewReader(`{"displayName":"未知房间"}`))
+	updateRequest.Header.Set("Content-Type", "application/json")
+	updateRequest.AddCookie(mustAdminLoginCookie(t, handler))
+	updateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(updateResponse, updateRequest)
+	if updateResponse.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 from unknown room update, got %d", updateResponse.Code)
+	}
+	if !strings.Contains(updateResponse.Body.String(), "ROOM_NOT_FOUND") {
+		t.Fatalf("expected room not found error, got %s", updateResponse.Body.String())
+	}
+}
+
+func mustAdminLoginCookie(t *testing.T, handler http.Handler) *http.Cookie {
+	t.Helper()
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected admin login to set cookie")
+	}
+	return cookies[0]
 }
 
 func (m *mockStore) ClickButton(_ context.Context, slug string, nickname string, comboCount int64) (core.ClickResult, error) {
@@ -1052,6 +1342,33 @@ func TestJoinRoomRejectsNotJoinableRoom(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), "ROOM_NOT_JOINABLE") {
 		t.Fatalf("expected ROOM_NOT_JOINABLE response, got %s", response.Body.String())
+	}
+}
+
+func TestGetRoomsReturnsDisplayName(t *testing.T) {
+	store := &mockStore{
+		roomList: core.RoomList{
+			CurrentRoomID: "1",
+			Rooms: []core.RoomInfo{
+				{ID: "1", DisplayName: "高压线", Joinable: true},
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/rooms?nickname=%E9%98%BF%E6%98%8E", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if !strings.Contains(response.Body.String(), `"displayName":"高压线"`) {
+		t.Fatalf("expected room list to include displayName, got %s", response.Body.String())
 	}
 }
 

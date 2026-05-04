@@ -230,7 +230,7 @@ func run() error {
 		CriticalChancePercent: 5,
 		Room: core.RoomConfig{
 			Enabled:        cfg.Room.Enabled,
-			IDs:            cfg.Room.IDs,
+			Count:          cfg.Room.Count,
 			DefaultRoom:    cfg.Room.DefaultRoom,
 			SwitchCooldown: cfg.Room.SwitchCooldown,
 		},

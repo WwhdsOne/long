@@ -29,7 +29,7 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain("<PixelEffectCanvas effect=\"auto_strike\" :size=\"effectCanvasSize(2.05)\" :loop=\"false\"/>")
     expect(battleSource).toContain("<PixelEffectCanvas effect=\"bleed\" :size=\"effectCanvasSize(2.6)\" :loop=\"false\"/>")
     expect(battleSource).toContain("<PixelEffectCanvas effect=\"final_cut\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\"/>")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(2.5)\" :loop=\"false\"/>")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(5)\" :loop=\"false\"/>")
     expect(battleSource).toContain("<PixelEffectCanvas effect=\"judgment_day\" :size=\"bossGridEffectSize()\" :loop=\"false\"/>")
     expect(styleSource).toContain('image-rendering: pixelated;')
   })
@@ -43,7 +43,7 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(battleSource).toContain("anchor: triggerAnchor('bleed', BLEED_EFFECT_WINDOW_MS, entry)")
     expect(battleSource).toContain("fallback: effectFallback(2.6, { top: '50%', left: '50%' })")
     expect(battleSource).toContain("effectOverlayStyle('final_cut', { anchor: 'grid', fallback:")
-    expect(battleSource).toContain("effectOverlayStyle('collapse_trigger', { scale: 1, fallback:")
+    expect(battleSource).toContain("effectOverlayStyle('collapse_trigger', { scale: 2, fallback:")
   })
 
   it('终末血斩改为直接驱动 5x5 战斗区的贯穿终结斩特效', () => {
@@ -54,12 +54,13 @@ describe('BattlePage 战斗特效覆盖层', () => {
   })
 
   it('流血改为按事件列表并发叠加渲染，而不是只取最新一层覆盖旧层', () => {
-    expect(battleSource).toContain("v-for=\"entry in recentTriggers('bleed', BLEED_EFFECT_WINDOW_MS)\"")
+    expect(battleSource).toContain("v-for=\"entry in recentBleedTriggers(BLEED_EFFECT_WINDOW_MS)\"")
     expect(battleSource).not.toContain("hasRecentTrigger('bleed')")
     expect(battleSource).toContain(":key=\"entry.id\"")
     expect(battleSource).toContain('function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS, entryOverride = null) {')
-    expect(battleSource).toContain("const BLEED_EFFECT_WINDOW_MS = 720")
-    expect(battleSource).toContain("return filtered.slice(0, 2)")
+    expect(battleSource).toContain("const BLEED_EFFECT_WINDOW_MS = 1200")
+    expect(battleSource).toContain('function recentBleedTriggers(windowMs = BLEED_EFFECT_WINDOW_MS) {')
+    expect(battleSource).toContain("return bleedTriggerFeed.value.filter((entry) => isTriggerFresh(entry, windowMs)).slice(0, 12)")
   })
 
   it('审判日在战斗页使用独立更长的挂载窗口，避免比 demo 提前卸载', () => {
@@ -87,21 +88,27 @@ describe('BattlePage 战斗特效覆盖层', () => {
   })
 
   it('崩塌只保留覆盖层瞬发特效，不再在格子内部重复渲染 PixelShatter', () => {
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(2.5)\" :loop=\"false\"/>")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(5)\" :loop=\"false\"/>")
     expect(battleSource).not.toContain('<PixelShatter')
   })
 
-  it('崩塌特效缩小25%并让渲染节奏提速25%', () => {
-    expect(battleSource).toContain("effectOverlayStyle('collapse_trigger', { scale: 1, fallback:")
-    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(2.5)\" :loop=\"false\"/>")
+  it('崩塌特效维持 5 倍覆盖层，并把内部扩散范围提到 0.85', () => {
+    expect(battleSource).toContain("effectOverlayStyle('collapse_trigger', { scale: 2, fallback:")
+    expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(5)\" :loop=\"false\"/>")
     expect(canvasSource).toContain('const impactX = size / 2')
     expect(canvasSource).toContain('const impactY = size / 2')
     expect(canvasSource).toContain('const pivotX = impactX - handleLen')
     expect(canvasSource).toContain('const pivotY = impactY')
     expect(canvasSource).toContain('const collapseTriggerTickMs = 20')
     expect(canvasSource).toContain('const collapseTriggerSpeedScale = 1.25')
+    expect(canvasSource).toContain('const collapseTriggerSpreadRatio = 0.85')
     expect(canvasSource).toContain('s.timer += collapseTriggerTickMs')
     expect(canvasSource).toContain('const speed = (0.6 + Math.random() * 2) * collapseTriggerSpeedScale')
+    expect(canvasSource).toContain('const spreadRadius = size * collapseTriggerSpreadRatio')
+    expect(canvasSource).toContain('const distFromCenter = Math.hypot(p.x - cx, p.y - cy)')
+    expect(canvasSource).toContain('p.x += p.vx; p.y += p.vy; p.vx *= 0.992; p.vy *= 0.992')
+    expect(canvasSource).toContain('else if (distFromCenter >= spreadRadius) p.life -= 0.02')
+    expect(canvasSource).toContain('else if (s.timer > 520) p.life -= 0.006')
   })
 
   it('特效覆盖层层级高于点击格子和伤害数字，不再被战斗格子遮挡', () => {

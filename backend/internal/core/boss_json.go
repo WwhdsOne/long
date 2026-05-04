@@ -297,6 +297,7 @@ func (e *BossHistoryEntry) UnmarshalJSON(data []byte) error {
 func (r RoomInfo) MarshalJSON() ([]byte, error) {
 	type roomInfoJSON struct {
 		ID                 string `json:"id"`
+		DisplayName        string `json:"displayName"`
 		Current            bool   `json:"current"`
 		Joinable           bool   `json:"joinable"`
 		OnlineCount        int    `json:"onlineCount"`
@@ -312,6 +313,7 @@ func (r RoomInfo) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(roomInfoJSON{
 		ID:                 r.ID,
+		DisplayName:        r.DisplayName,
 		Current:            r.Current,
 		Joinable:           r.Joinable,
 		OnlineCount:        r.OnlineCount,

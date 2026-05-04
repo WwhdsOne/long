@@ -80,3 +80,43 @@ func TestLimiterUsesFortyTwoAsDefaultBurstLimit(t *testing.T) {
 		t.Fatal("expected request 43 to be rate limited")
 	}
 }
+
+func TestLimiterListsAndUnblocksBlacklistEntries(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Limit:             1,
+		Window:            time.Second,
+		BlacklistDuration: 10 * time.Minute,
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	if _, err := limiter.Allow("203.0.113.99"); err != nil {
+		t.Fatalf("expected first request to pass, got %v", err)
+	}
+	if _, err := limiter.Allow("203.0.113.99"); err == nil {
+		t.Fatal("expected client to be blocked")
+	}
+
+	entries := limiter.ListBlacklist()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 blacklist entry, got %d", len(entries))
+	}
+	if entries[0].ClientID != "203.0.113.99" {
+		t.Fatalf("expected client id 203.0.113.99, got %s", entries[0].ClientID)
+	}
+	if entries[0].BlockedAt == 0 {
+		t.Fatal("expected blocked at to be recorded")
+	}
+
+	if !limiter.Unblock("203.0.113.99") {
+		t.Fatal("expected unblock to succeed")
+	}
+	if got := limiter.ListBlacklist(); len(got) != 0 {
+		t.Fatalf("expected blacklist to be empty after unblock, got %d", len(got))
+	}
+	if _, err := limiter.Allow("203.0.113.99"); err != nil {
+		t.Fatalf("expected client to pass after unblock, got %v", err)
+	}
+}
