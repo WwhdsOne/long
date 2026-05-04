@@ -1,11 +1,20 @@
 const SUFFIXES = [
+  { threshold: 1000000000000000000n, suffix: 'Qi' },
+  { threshold: 1000000000000000n, suffix: 'Qa' },
+  { threshold: 1000000000000n, suffix: 'T' },
+  { threshold: 1000000000n, suffix: 'B' },
+  { threshold: 1000000n, suffix: 'M' },
+  { threshold: 1000n, suffix: 'K' },
+]
+
+const COMPACT_SUFFIXES = [
   { threshold: 1e9, suffix: 'B' },
   { threshold: 1e6, suffix: 'M' },
   { threshold: 1e3, suffix: 'K' },
   { threshold: 1, suffix: '' },
 ]
 
-const BIGINT_SUFFIXES = [
+const BIGINT_COMPACT_SUFFIXES = [
   { threshold: 1000000000n, suffix: 'B' },
   { threshold: 1000000n, suffix: 'M' },
   { threshold: 1000n, suffix: 'K' },
@@ -32,17 +41,41 @@ function bigintValue(value) {
   }
 }
 
-function groupDigits(raw) {
+function scientificIntegerString(raw) {
   const negative = raw.startsWith('-')
-  const digits = negative ? raw.slice(1) : raw
-  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-  return negative ? `-${grouped}` : grouped
+  const digits = (negative ? raw.slice(1) : raw).replace(/^0+/, '') || '0'
+  if (digits === '0') return '0'
+  const exponent = digits.length - 1
+  const fractional = digits.slice(1).replace(/0+$/, '')
+  const mantissa = fractional ? `${digits[0]}.${fractional}` : digits[0]
+  const formatted = exponent > 0 ? `${mantissa}e+${exponent}` : mantissa
+  return negative ? `-${formatted}` : formatted
+}
+
+function suffixIntegerString(raw) {
+  const big = BigInt(raw)
+  const negative = big < 0n
+  const abs = negative ? -big : big
+  if (abs < 1000n) return raw
+
+  const scientificThreshold = SUFFIXES[0].threshold * 1000n
+  if (abs >= scientificThreshold) return scientificIntegerString(raw)
+
+  for (const { threshold, suffix } of SUFFIXES) {
+    if (abs < threshold) continue
+    const whole = abs / threshold
+    const decimal = (abs % threshold) * 10n / threshold
+    const formatted = decimal > 0n ? `${whole}.${decimal}` : whole.toString()
+    return `${negative ? '-' : ''}${formatted}${suffix}`
+  }
+
+  return raw
 }
 
 export function formatIntegerExact(value) {
   const raw = integerString(value)
   if (raw == null) return '0'
-  return groupDigits(raw)
+  return suffixIntegerString(raw)
 }
 
 export function ratioPercent(current, max) {
@@ -59,7 +92,7 @@ export function formatCompact(value) {
   if (big != null) {
     const negative = big < 0n
     const abs = negative ? -big : big
-    for (const { threshold, suffix } of BIGINT_SUFFIXES) {
+    for (const { threshold, suffix } of BIGINT_COMPACT_SUFFIXES) {
       if (abs >= threshold) {
         const whole = abs / threshold
         const decimal = (abs % threshold) * 10n / threshold
@@ -73,7 +106,7 @@ export function formatCompact(value) {
   const num = Number(value ?? 0)
   if (!Number.isFinite(num)) return '0'
 
-  for (const { threshold, suffix } of SUFFIXES) {
+  for (const { threshold, suffix } of COMPACT_SUFFIXES) {
     if (Math.abs(num) >= threshold) {
       const scaled = num / threshold
       const formatted = scaled % 1 === 0 ? scaled.toString() : Number(scaled.toFixed(1)).toString()
