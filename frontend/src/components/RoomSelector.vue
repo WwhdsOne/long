@@ -136,7 +136,7 @@ function canJoin(room) {
             <strong>{{ roomOnlineText(room) }}</strong>
           </span>
           <span>
-            <small>均血</small>
+            <small>房间内Boss平均血量</small>
             <strong>{{ roomAvgHpText(room) }}</strong>
           </span>
         </span>

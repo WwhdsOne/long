@@ -14,7 +14,7 @@ describe('RoomSelector 紧凑卡片', () => {
     expect(source).toContain("if (props.cooldownRemainingSeconds > 0) return '冷却未结束'")
     expect(source).toContain('function roomAvgHpText(room) {')
     expect(source).toContain('formatIntegerExact(room?.currentBossAvgHp)')
-    expect(source).toContain('<small>均血</small>')
+    expect(source).toContain('<small>房间内Boss平均血量</small>')
     expect(source).toContain('<span class="room-selector__action">{{ roomActionLabel(room) }}</span>')
     expect(source).toContain('grid-template-columns: repeat(3, minmax(0, 1fr));')
     expect(source).toContain('min-height: 74px;')

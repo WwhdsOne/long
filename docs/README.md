@@ -37,6 +37,9 @@
   - [architecture/2026-05-01-任务系统与Mongo整合方案.md](./architecture/2026-05-01-任务系统与Mongo整合方案.md)
   - [architecture/2026-05-01-冷数据迁移与Mongo主存方案.md](./architecture/2026-05-01-冷数据迁移与Mongo主存方案.md)
   - [architecture/2026-05-01-日志与MongoDB演进方案.md](./architecture/2026-05-01-日志与MongoDB演进方案.md)
+- 点击链路与天赋热路径优化：
+  - [architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md](./architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md)
+  - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
 - 任务系统实施：
   - [implementation/2026-05-02-任务模型升级实施计划.md](./implementation/2026-05-02-任务模型升级实施计划.md)
   - [implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md](./implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md)
@@ -49,12 +52,21 @@
   - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
   - [reports/2026-04-28-天赋成本调整总结.md](./reports/2026-04-28-天赋成本调整总结.md)
   - [superpowers/specs/2026-04-28-talent-system-rework-design.md](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
+- 架构方案：
+  - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
 - 开发参考：
   - [developer-reference/2026-04-26-天赋系统开发参考.md](./developer-reference/2026-04-26-天赋系统开发参考.md)
   - [developer-reference/2026-04-27-均衡攻势工作原理.md](./developer-reference/2026-04-27-均衡攻势工作原理.md)
   - [developer-reference/2026-04-27-碎盾攻坚工作原理.md](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
   - [developer-reference/2026-04-30-V2伤害计算链路总览.md](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
   - [developer-reference/2026-04-30-天赋技能数值总览.md](./developer-reference/2026-04-30-天赋技能数值总览.md)
+
+### 实时链路与接入层
+
+- [architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md](./architecture/2026-05-04-gRPC-Envoy-点击链路评估方案.md)
+- [reports/2026-04-21-realtime-optimization-report.md](./reports/2026-04-21-realtime-optimization-report.md)
+- [reports/2026-04-28-点击伤害链路与优化总结.md](./reports/2026-04-28-点击伤害链路与优化总结.md)
+- [implementation/2026-04-26-ws-optimization.md](./implementation/2026-04-26-ws-optimization.md)
 
 ### 房间分线
 
