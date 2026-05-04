@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,116 @@ import (
 	"long/internal/core"
 )
 
+type flexibleInt64 int64
+
+func (v *flexibleInt64) UnmarshalJSON(data []byte) error {
+	raw := strings.TrimSpace(string(data))
+	if raw == "" || raw == "null" {
+		*v = 0
+		return nil
+	}
+	if strings.HasPrefix(raw, `"`) {
+		unquoted, err := strconv.Unquote(raw)
+		if err != nil {
+			return err
+		}
+		raw = strings.TrimSpace(unquoted)
+	}
+	if raw == "" {
+		*v = 0
+		return nil
+	}
+	if strings.ContainsAny(raw, ".eE") {
+		return errors.New("invalid int64")
+	}
+	parsed, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return err
+	}
+	*v = flexibleInt64(parsed)
+	return nil
+}
+
+type bossPartPayload struct {
+	X           int           `json:"x"`
+	Y           int           `json:"y"`
+	Type        core.PartType `json:"type"`
+	DisplayName string        `json:"displayName,omitempty"`
+	ImagePath   string        `json:"imagePath,omitempty"`
+	MaxHP       flexibleInt64 `json:"maxHp"`
+	CurrentHP   flexibleInt64 `json:"currentHp"`
+	Armor       flexibleInt64 `json:"armor"`
+	Alive       bool          `json:"alive"`
+}
+
+func (p bossPartPayload) toCore() core.BossPart {
+	return core.BossPart{
+		X:           p.X,
+		Y:           p.Y,
+		Type:        p.Type,
+		DisplayName: p.DisplayName,
+		ImagePath:   p.ImagePath,
+		MaxHP:       int64(p.MaxHP),
+		CurrentHP:   int64(p.CurrentHP),
+		Armor:       int64(p.Armor),
+		Alive:       p.Alive,
+	}
+}
+
+type bossUpsertPayload struct {
+	ID                 string            `json:"id"`
+	RoomID             string            `json:"roomId,omitempty"`
+	Name               string            `json:"name"`
+	MaxHP              flexibleInt64     `json:"maxHp"`
+	GoldOnKill         flexibleInt64     `json:"goldOnKill"`
+	StoneOnKill        flexibleInt64     `json:"stoneOnKill"`
+	TalentPointsOnKill flexibleInt64     `json:"talentPointsOnKill"`
+	Parts              []bossPartPayload `json:"parts,omitempty"`
+}
+
+func (p bossUpsertPayload) toCore() core.BossUpsert {
+	parts := make([]core.BossPart, 0, len(p.Parts))
+	for _, part := range p.Parts {
+		parts = append(parts, part.toCore())
+	}
+	return core.BossUpsert{
+		ID:                 p.ID,
+		RoomID:             p.RoomID,
+		Name:               p.Name,
+		MaxHP:              int64(p.MaxHP),
+		GoldOnKill:         int64(p.GoldOnKill),
+		StoneOnKill:        int64(p.StoneOnKill),
+		TalentPointsOnKill: int64(p.TalentPointsOnKill),
+		Parts:              parts,
+	}
+}
+
+type bossTemplateUpsertPayload struct {
+	ID                 string            `json:"id"`
+	Name               string            `json:"name"`
+	MaxHP              flexibleInt64     `json:"maxHp"`
+	GoldOnKill         flexibleInt64     `json:"goldOnKill"`
+	StoneOnKill        flexibleInt64     `json:"stoneOnKill"`
+	TalentPointsOnKill flexibleInt64     `json:"talentPointsOnKill"`
+	Layout             []bossPartPayload `json:"layout,omitempty"`
+}
+
+func (p bossTemplateUpsertPayload) toCore() core.BossTemplateUpsert {
+	layout := make([]core.BossPart, 0, len(p.Layout))
+	for _, part := range p.Layout {
+		layout = append(layout, part.toCore())
+	}
+	return core.BossTemplateUpsert{
+		ID:                 p.ID,
+		Name:               p.Name,
+		MaxHP:              int64(p.MaxHP),
+		GoldOnKill:         int64(p.GoldOnKill),
+		StoneOnKill:        int64(p.StoneOnKill),
+		TalentPointsOnKill: int64(p.TalentPointsOnKill),
+		Layout:             layout,
+	}
+}
+
 func registerAdminBossRoutes(router route.IRouter, options Options) {
 	router.POST("/api/admin/boss/activate", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
@@ -20,20 +131,21 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body core.BossUpsert
+		var body bossUpsertPayload
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
+		upsert := body.toCore()
 
-		roomID := strings.TrimSpace(firstNonEmptyString(body.RoomID, c.Query("roomId")))
+		roomID := strings.TrimSpace(firstNonEmptyString(upsert.RoomID, c.Query("roomId")))
 		var boss *core.Boss
 		var err error
 		if store, ok := options.Store.(interface {
 			ActivateBossInRoom(context.Context, string, core.BossUpsert) (*core.Boss, error)
 		}); ok {
-			boss, err = store.ActivateBossInRoom(ctx, roomID, body)
+			boss, err = store.ActivateBossInRoom(ctx, roomID, upsert)
 		} else {
-			boss, err = options.Store.ActivateBoss(ctx, body)
+			boss, err = options.Store.ActivateBoss(ctx, upsert)
 		}
 		if err != nil {
 			if errors.Is(err, core.ErrBossPartsRequired) {
@@ -155,12 +267,13 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body core.BossTemplateUpsert
+		var body bossTemplateUpsertPayload
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
+		upsert := body.toCore()
 
-		if err := options.Store.SaveBossTemplate(ctx, body); err != nil {
+		if err := options.Store.SaveBossTemplate(ctx, upsert); err != nil {
 			if errors.Is(err, core.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_PARTS_REQUIRED",
@@ -176,7 +289,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.template.create",
 			TargetType:  "boss_template",
-			TargetID:    body.ID,
+			TargetID:    upsert.ID,
 			RequestPath: requestPath(c),
 			RequestIP:   requestIP(c),
 			Result:      "success",
@@ -191,13 +304,14 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		var body core.BossTemplateUpsert
+		var body bossTemplateUpsertPayload
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
 		}
-		body.ID = c.Param("templateId")
+		upsert := body.toCore()
+		upsert.ID = c.Param("templateId")
 
-		if err := options.Store.SaveBossTemplate(ctx, body); err != nil {
+		if err := options.Store.SaveBossTemplate(ctx, upsert); err != nil {
 			if errors.Is(err, core.ErrBossPartsRequired) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "BOSS_PARTS_REQUIRED",
@@ -213,7 +327,7 @@ func registerAdminBossRoutes(router route.IRouter, options Options) {
 			Operator:    options.AdminAuthenticator.Username(),
 			Action:      "boss.template.update",
 			TargetType:  "boss_template",
-			TargetID:    body.ID,
+			TargetID:    upsert.ID,
 			RequestPath: requestPath(c),
 			RequestIP:   requestIP(c),
 			Result:      "success",

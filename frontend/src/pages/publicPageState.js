@@ -1,6 +1,7 @@
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 
 import {mergeBossState} from '../utils/bossState'
+import {ratioPercent} from '../utils/formatNumber'
 import {formatDropRate} from '../utils/buttonBoard'
 import {mergeClickFallbackState} from '../utils/clickResponse'
 import {formatRarityLabel, getRarityClassName, splitEquipmentName} from '../utils/rarity'
@@ -745,7 +746,7 @@ const bossProgress = computed(() => {
         return 0
     }
 
-    return Math.max(0, Math.min(100, (boss.value.currentHp / boss.value.maxHp) * 100))
+    return ratioPercent(boss.value.currentHp, boss.value.maxHp)
 })
 const loadoutSlots = EQUIPMENT_SLOTS
 const equippedItems = computed(() => loadoutSlots.map((slot) => loadout.value[slot.value]).filter(Boolean))
@@ -1391,7 +1392,7 @@ async function loadBossHistory(force = false) {
         }
 
         const payload = await response.json()
-        bossHistory.value = Array.isArray(payload) ? payload : []
+        bossHistory.value = Array.isArray(payload) ? payload.map((entry) => mergeBossState(null, entry)) : []
         bossHistoryLoaded.value = true
     } catch (error) {
         if (error instanceof TypeError) {

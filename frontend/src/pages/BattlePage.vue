@@ -3,7 +3,7 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import PixelEffectCanvas from '../components/PixelEffectCanvas.vue'
 import RoomSelector from '../components/RoomSelector.vue'
-import {formatCompact} from '../utils/formatNumber.js'
+import { formatCompact, formatIntegerExact, ratioPercent } from '../utils/formatNumber.js'
 
 const {
   boss,
@@ -88,9 +88,19 @@ const battlePowerLabel = computed(() => (
 const bossBattlePower = computed(() => {
   if (!boss.value) return 0
   const armorPower = Array.isArray(boss.value.parts)
-    ? boss.value.parts.reduce((sum, part) => sum + Math.max(0, Number(part?.armor || 0)), 0)
-    : 0
-  return Math.max(0, Number(boss.value.maxHp || 0)) + armorPower
+    ? boss.value.parts.reduce((sum, part) => {
+      try {
+        return sum + BigInt(String(part?.armor ?? 0))
+      } catch {
+        return sum
+      }
+    }, 0n)
+    : 0n
+  try {
+    return (BigInt(String(boss.value.maxHp || 0)) + armorPower).toString()
+  } catch {
+    return '0'
+  }
 })
 
 const comboMilestoneText = ref('')
@@ -423,7 +433,7 @@ function closeBossDropPool() {
 
 function getPartHealthPercent(part) {
   if (!part?.maxHp) return 0
-  return Math.max(0, Math.min(100, (part.currentHp / part.maxHp) * 100))
+  return ratioPercent(part.currentHp, part.maxHp)
 }
 
 function getBossZoneButtonKey(zone) {
@@ -452,7 +462,7 @@ function isBossZoneDisabled(zone) {
 function bossZoneAriaLabel(zone) {
   if (!zone) return '空 Boss 分区'
   const label = zone.displayName || partTypeLabels[zone.type] || zone.type
-  return `${label} 分区，血量 ${zone.currentHp}/${zone.maxHp}`
+  return `${label} 分区，血量 ${formatIntegerExact(zone.currentHp)}/${formatIntegerExact(zone.maxHp)}`
 }
 
 function zoneDamageBursts(zone) {
@@ -711,7 +721,7 @@ const silverStormActive = computed(() => {
           </div>
           <div class="boss-stage__meta">
             <span class="boss-stage__pill">{{ bossStatusLabel }}</span>
-            <strong v-if="boss">HP {{ boss.currentHp }} / {{ boss.maxHp }}</strong>
+            <strong v-if="boss">HP {{ formatIntegerExact(boss.currentHp) }} / {{ formatIntegerExact(boss.maxHp) }}</strong>
             <strong v-else>我的伤害 {{ myBossDamage }}</strong>
           </div>
           <div class="boss-hud__seal" aria-hidden="true">
@@ -937,7 +947,7 @@ const silverStormActive = computed(() => {
               ></span>
                     </div>
                     <div class="boss-zone-button__meta">
-                      <span>血量 : {{ formatCompact(zone.currentHp) }}/{{ formatCompact(zone.maxHp) }}</span><br>
+                      <span>血量 : {{ formatIntegerExact(zone.currentHp) }}/{{ formatIntegerExact(zone.maxHp) }}</span><br>
                       <span>护甲 : {{ isPartCollapsed(zone) ? '0' : formatCompact(zone.armor) }}</span>
                     </div>
                   </template>

@@ -10,6 +10,7 @@ const source = readFileSync(path.resolve(currentDir, './RoomSelector.vue'), 'utf
 describe('RoomSelector 紧凑卡片', () => {
   it('房间卡补充 Boss 均血并精简布局', () => {
     expect(source).toContain('function roomAvgHpText(room) {')
+    expect(source).toContain('formatIntegerExact(room?.currentBossAvgHp)')
     expect(source).toContain('<small>均血</small>')
     expect(source).toContain('<span class="room-selector__action">{{ roomActionLabel(room) }}</span>')
     expect(source).toContain('grid-template-columns: repeat(3, minmax(0, 1fr));')

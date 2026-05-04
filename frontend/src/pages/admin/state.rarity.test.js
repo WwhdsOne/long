@@ -35,12 +35,16 @@ describe('admin state rarity normalization', () => {
     const template = normalizeBossTemplate({
       id: 'dragon',
       name: '火龙',
-      maxHp: 9999,
+      maxHp: '9223372036854775800',
+      layout: [{ x: 0, y: 0, maxHp: '9223372036854775800', currentHp: '9223372036854775800', armor: '12' }],
       goldOnKill: 5000,
       stoneOnKill: 120,
       talentPointsOnKill: 88,
     })
 
+    expect(template.maxHp).toBe('9223372036854775800')
+    expect(template.layout[0].maxHp).toBe('9223372036854775800')
+    expect(template.layout[0].armor).toBe('12')
     expect(template.goldOnKill).toBe(5000)
     expect(template.stoneOnKill).toBe(120)
     expect(template.talentPointsOnKill).toBe(88)

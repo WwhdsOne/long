@@ -16,6 +16,8 @@ describe('AdminBossTab 部位血量口径', () => {
     expect(componentSource).toContain('readonly')
     expect(actionSource).toContain('sumBossPartMaxHp')
     expect(actionSource).toContain('maxHp: sumBossPartMaxHp(bossForm.value.layout)')
+    expect(componentSource).not.toContain('Number(part?.maxHp ?? 0)')
+    expect(actionSource).not.toContain('Number(part?.maxHp ?? 0)')
   })
 
   it('Boss 部位编辑器支持部位名称和小图路径', () => {
@@ -24,6 +26,8 @@ describe('AdminBossTab 部位血量口径', () => {
     expect(componentSource).toContain('<span>名称</span>')
     expect(componentSource).toContain('<span>图片</span>')
     expect(componentSource).toContain('normalizeBossPartCell')
+    expect(componentSource).toContain('inputmode="numeric"')
+    expect(componentSource).not.toContain('v-model="selectedCell.maxHp" class="nickname-form__input" type="number"')
   })
 
   it('模板掉落池直接填写掉落几率，不再填写权重', () => {

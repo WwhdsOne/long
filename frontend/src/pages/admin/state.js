@@ -244,11 +244,16 @@ export function normalizeBossTemplate(entry) {
   return {
     id: entry?.id || '',
     name: entry?.name || '',
-    maxHp: Number(entry?.maxHp ?? 0),
+    maxHp: String(entry?.maxHp ?? 0),
     goldOnKill: Number(entry?.goldOnKill ?? 0),
     stoneOnKill: Number(entry?.stoneOnKill ?? 0),
     talentPointsOnKill: Number(entry?.talentPointsOnKill ?? 0),
-    layout: Array.isArray(entry?.layout) ? entry.layout : [],
+    layout: Array.isArray(entry?.layout) ? entry.layout.map((part) => ({
+      ...part,
+      maxHp: String(part?.maxHp ?? 0),
+      currentHp: String(part?.currentHp ?? part?.maxHp ?? 0),
+      armor: String(part?.armor ?? 0),
+    })) : [],
     loot: Array.isArray(entry?.loot) ? entry.loot.map(normalizeLootEntry) : [],
   }
 }

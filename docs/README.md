@@ -70,6 +70,7 @@
 
 - [designs/2026-04-25-Boss分区基础视觉与点击口径设计.md](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
 - [reports/2026-04-25-Boss分区改造实施记录.md](./reports/2026-04-25-Boss分区改造实施记录.md)
+- [reports/2026-05-04-user-state-payload-optimization-summary.md](./reports/2026-05-04-user-state-payload-optimization-summary.md)
 - [implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md](./implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md)
 - [implementation/2026-04-29-伤害动画解析优先级.md](./implementation/2026-04-29-伤害动画解析优先级.md)
 - [demos/](./demos/)

@@ -80,11 +80,24 @@ const queueTemplateEntries = computed(() => {
 })
 const queueTemplateSet = computed(() => new Set(queueDraft.value))
 
+function normalizeBossIntegerString(value, min = 0n) {
+  const raw = String(value ?? '').trim()
+  if (!/^\d+$/.test(raw)) {
+    return String(min)
+  }
+  const normalized = raw.replace(/^0+(?=\d)/, '') || '0'
+  const parsed = BigInt(normalized)
+  return parsed < min ? String(min) : normalized
+}
+
 function sumBossPartMaxHp(layout) {
   if (!Array.isArray(layout) || layout.length === 0) {
-    return 0
+    return '0'
   }
-  return layout.reduce((total, part) => total + Math.max(1, Number(part?.maxHp ?? 0)), 0)
+  return layout.reduce((total, part) => {
+    const maxHp = BigInt(normalizeBossIntegerString(part?.maxHp, 1n))
+    return total + maxHp
+  }, 0n).toString()
 }
 
 function findPart(x, y) {
@@ -98,11 +111,11 @@ function selectCell(x, y) {
     selectedCell.value = { ...existing }
     return
   }
-  selectedCell.value = { x, y, type: 'soft', displayName: '', imagePath: '', maxHp: 1000, currentHp: 1000, armor: 0, alive: true }
+  selectedCell.value = { x, y, type: 'soft', displayName: '', imagePath: '', maxHp: '1000', currentHp: '1000', armor: 0, alive: true }
 }
 
 function normalizeBossPartCell(cell) {
-  const maxHp = Math.max(1, Number(cell.maxHp || 1))
+  const maxHp = normalizeBossIntegerString(cell.maxHp, 1n)
   return {
     ...cell,
     type: cell.type || 'soft',
@@ -357,7 +370,7 @@ function goNextPage() {
                   </label>
                   <label class="boss-editor-inspector__field">
                     <span>血量</span>
-                    <input v-model="selectedCell.maxHp" class="nickname-form__input" type="number" min="1" />
+                    <input v-model="selectedCell.maxHp" class="nickname-form__input" type="text" inputmode="numeric" pattern="[0-9]*" />
                   </label>
                   <label class="boss-editor-inspector__field">
                     <span>护甲</span>

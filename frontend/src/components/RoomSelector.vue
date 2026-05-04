@@ -1,4 +1,6 @@
 <script setup>
+import { formatIntegerExact } from '../utils/formatNumber'
+
 const props = defineProps({
   rooms: {
     type: Array,
@@ -65,9 +67,8 @@ function roomOnlineText(room) {
 }
 
 function roomAvgHpText(room) {
-  const avgHp = Math.max(0, Number(room?.currentBossAvgHp || 0))
-  if (avgHp <= 0) return '--'
-  return avgHp.toLocaleString('zh-CN')
+  const value = formatIntegerExact(room?.currentBossAvgHp)
+  return value === '0' ? '--' : value
 }
 
 function roomStatusLabel(room) {

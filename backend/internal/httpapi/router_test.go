@@ -1580,6 +1580,46 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	}
 }
 
+func TestAdminBossPoolRoutesAcceptStringInt64HP(t *testing.T) {
+	store := &mockStore{}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie from login")
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":"9223372036854775800","layout":[{"x":0,"y":0,"type":"soft","maxHp":"9223372036854775800","currentHp":"9223372036854775800","armor":"0"}]}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.AddCookie(cookies[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from boss template save with string int64 hp, got %d body=%s", response.Code, response.Body.String())
+	}
+	if store.lastBossTemplate.MaxHP != 9223372036854775800 {
+		t.Fatalf("expected template maxHp preserved, got %+v", store.lastBossTemplate)
+	}
+	if len(store.lastBossTemplate.Layout) != 1 || store.lastBossTemplate.Layout[0].MaxHP != 9223372036854775800 {
+		t.Fatalf("expected layout maxHp preserved, got %+v", store.lastBossTemplate.Layout)
+	}
+}
+
 func TestAdminBossPartsRequiredReturnsBadRequest(t *testing.T) {
 	store := &mockStore{
 		activateBossErr:     core.ErrBossPartsRequired,

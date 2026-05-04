@@ -44,7 +44,7 @@ describe('clickResponse', () => {
       }),
     ).toEqual({
       userStats: { nickname: '阿明', clickCount: 12 },
-      boss: { id: 'boss-1', status: 'active', currentHp: 39, maxHp: 100 },
+      boss: { id: 'boss-1', status: 'active', currentHp: '39', maxHp: '100', parts: [] },
       bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 60 }],
       bossLeaderboardCount: 2,
       myBossStats: { nickname: '阿明', damage: 60 },

@@ -200,6 +200,16 @@ export function createAdminPageActions(state) {
     }
   }
 
+  function normalizeBossIntegerString(value, min = 0n) {
+    const raw = String(value ?? '').trim()
+    if (!/^\d+$/.test(raw)) {
+      return String(min)
+    }
+    const normalized = raw.replace(/^0+(?=\d)/, '') || '0'
+    const parsed = BigInt(normalized)
+    return parsed < min ? String(min) : normalized
+  }
+
   async function saveBossTemplate() {
     saving.value = true
     try {
@@ -746,11 +756,15 @@ export function createAdminPageActions(state) {
     bossForm.value = {
       id: entry.id,
       name: entry.name,
-      maxHp: entry.maxHp,
+      maxHp: String(entry.maxHp ?? ''),
       goldOnKill: Number(entry.goldOnKill || 0),
       stoneOnKill: Number(entry.stoneOnKill || 0),
       talentPointsOnKill: Number(entry.talentPointsOnKill || 0),
-      layout: entry.layout || [],
+      layout: Array.isArray(entry.layout) ? entry.layout.map((part) => ({
+        ...part,
+        maxHp: String(part?.maxHp ?? ''),
+        currentHp: String(part?.currentHp ?? part?.maxHp ?? ''),
+      })) : [],
     }
     selectedBossTemplateId.value = entry.id
     applyLootRows(entry.loot)
@@ -764,9 +778,12 @@ export function createAdminPageActions(state) {
 
   function sumBossPartMaxHp(layout) {
     if (!Array.isArray(layout) || layout.length === 0) {
-      return 1
+      return '1'
     }
-    return layout.reduce((total, part) => total + Math.max(1, Number(part?.maxHp ?? 0)), 0)
+    return layout.reduce((total, part) => {
+      const maxHp = BigInt(normalizeBossIntegerString(part?.maxHp, 1n))
+      return total + maxHp
+    }, 0n).toString()
   }
 
   function removeLootRow(index) {
