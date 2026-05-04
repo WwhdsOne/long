@@ -1039,10 +1039,7 @@ func TestJudgmentDayForcesCollapseBeforeDamageCalculation(t *testing.T) {
 	remainingBossHP := boss.CurrentHP - baseActualDamage
 	remainingPartHP := boss.Parts[0].CurrentHP - baseActualDamage
 	collapsedStats := CalcBossPartDamage(combatStats, PartTypeHeavy, 0, 1, remainingBossHP, boss.MaxHP)
-	expectedJudgmentDamage := int64(float64(collapsedStats.NormalDamage) * compiledTalents.Armor.UltimateDamageRatio)
-	if expectedJudgmentDamage > remainingPartHP {
-		expectedJudgmentDamage = remainingPartHP
-	}
+	expectedJudgmentDamage := min(int64(float64(collapsedStats.NormalDamage)*compiledTalents.Armor.UltimateDamageRatio), remainingPartHP)
 
 	state := NewTalentCombatState()
 	state.PartJudgmentDayCount[TalentPartKey(0, 0)] = compiledTalents.Armor.UltimateTrigger - 1
