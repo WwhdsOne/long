@@ -408,7 +408,8 @@ onBeforeUnmount(() => {
         <div class="armory-block__head">
           <p class="vote-stage__eyebrow">背包</p>
           <div class="armory-inventory-head__actions">
-            <strong>{{ inventory.length }} 件</strong>
+            <strong>右键装备可以强化、拆解、装备、锁定 ｜</strong>
+            <strong>当前有 {{ inventory.length }} 件装备</strong>
             <button
                 class="nickname-form__ghost armory-inventory-head__bulk-button"
                 type="button"
