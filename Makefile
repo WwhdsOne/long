@@ -77,3 +77,7 @@ frontend-preview: ## 预览前端产物
 
 hooks-install: ## 安装 Git hooks（需要本地已安装 lefthook）
 	lefthook install
+
+update-all: ## 更新依赖
+	$(GO) get -u ./... && $(GO) mod tidy
+	$(BUN) --cwd=frontend update

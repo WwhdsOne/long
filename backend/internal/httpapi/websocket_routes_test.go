@@ -553,6 +553,46 @@ func TestRealtimeMessageFromRoomStateEventEncodesBinaryFrame(t *testing.T) {
 	}
 }
 
+func TestRealtimeMessageFromRoomStateEventEncodesStringBossHPFrame(t *testing.T) {
+	frame, ok, err := realtimeMessageFromEvent(events.ServerEvent{
+		Name: events.RoomStateEventName,
+		Payload: []byte(`{
+			"currentRoomId":"2",
+			"switchCooldownRemainingSeconds":9,
+			"rooms":[{
+				"id":"2",
+				"displayName":"二线",
+				"current":true,
+				"joinable":true,
+				"onlineCount":6,
+				"cycleEnabled":true,
+				"queueId":"2",
+				"currentBossHp":"5514",
+				"currentBossMaxHp":"90000",
+				"currentBossAvgHp":"70000"
+			}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("encode room_state event with string boss hp: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected room_state event to be encoded")
+	}
+	if frame.messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary frame, got %d", frame.messageType)
+	}
+
+	message := decodeRealtimeBinaryRoomStateForTest(t, frame.payload)
+	if len(message.GetRooms()) != 1 {
+		t.Fatalf("unexpected rooms payload: %+v", message.GetRooms())
+	}
+	room := message.GetRooms()[0]
+	if room.GetCurrentBossHp() != 5514 || room.GetCurrentBossMaxHp() != 90000 || room.GetCurrentBossAvgHp() != 70000 {
+		t.Fatalf("unexpected boss hp payload: %+v", room)
+	}
+}
+
 func TestRealtimeSessionReturnsProtocolErrors(t *testing.T) {
 	session := newRealtimeSession(realtimeSessionOptions{
 		stateView:            &mockStore{},
