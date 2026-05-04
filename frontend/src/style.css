@@ -164,6 +164,10 @@ select {
 }
 
 .public-nav__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-width: 86px;
   padding: 10px 16px;
   border: 0;
@@ -172,6 +176,16 @@ select {
   color: rgba(255, 255, 255, 0.72);
   font-weight: 800;
   cursor: pointer;
+}
+
+.public-nav__task-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ff6b6b;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.18);
+  flex: 0 0 auto;
 }
 
 .public-nav__item--active {
@@ -1127,6 +1141,12 @@ select {
   color: #fff7fa;
   background: linear-gradient(180deg, var(--primary), var(--primary-deep));
   box-shadow: 0 16px 24px rgba(225, 29, 72, 0.22);
+}
+
+.nickname-form__submit--claimed {
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(148, 163, 184, 0.28);
+  box-shadow: none;
 }
 
 .nickname-form__ghost {

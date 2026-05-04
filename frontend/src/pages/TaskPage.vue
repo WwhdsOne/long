@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import { getRarityClassName } from '../utils/rarity'
 import { usePublicPageState } from './publicPageState'
@@ -13,6 +13,9 @@ const {
 } = usePublicPageState()
 
 const claimingTaskId = ref('')
+const claimingAllTasks = ref(false)
+
+const claimableTasks = computed(() => tasks.value.filter((task) => Boolean(task?.canClaim)))
 
 function taskStatusLabel(status) {
   switch (status) {
@@ -87,6 +90,38 @@ async function handleClaimTask(taskId) {
     claimingTaskId.value = ''
   }
 }
+
+async function handleClaimAllTasks() {
+  if (claimingAllTasks.value || claimableTasks.value.length === 0) {
+    return
+  }
+  claimingAllTasks.value = true
+  try {
+    for (const task of claimableTasks.value) {
+      claimingTaskId.value = task.taskId
+      const result = await claimTask(task.taskId)
+      if (!result?.ok) {
+        break
+      }
+    }
+  } finally {
+    claimingTaskId.value = ''
+    claimingAllTasks.value = false
+  }
+}
+
+function claimButtonLabel(task) {
+  if (claimingTaskId.value === task.taskId) {
+    return '领取中...'
+  }
+  if (task.canClaim) {
+    return '领取奖励'
+  }
+  if (task.status === 'claimed') {
+    return '已领取'
+  }
+  return taskStatusLabel(task.status)
+}
 </script>
 
 <template>
@@ -97,6 +132,14 @@ async function handleClaimTask(taskId) {
           <p class="vote-stage__eyebrow">当前任务</p>
           <strong>{{ tasks.length > 0 ? `${tasks.length} 条进行中` : '暂无可见任务' }}</strong>
         </div>
+        <button
+          class="nickname-form__submit"
+          type="button"
+          :disabled="claimableTasks.length === 0 || claimingAllTasks"
+          @click="handleClaimAllTasks"
+        >
+          {{ claimingAllTasks ? '领取中...' : '一键领取' }}
+        </button>
       </div>
       <div v-if="tasks.length === 0" class="leaderboard-list leaderboard-list--empty">
         <p>当前没有生效任务，晚点再来看看。</p>
@@ -144,11 +187,12 @@ async function handleClaimTask(taskId) {
           <div class="announcement-modal__actions" style="justify-content: flex-start;">
             <button
               class="nickname-form__submit"
+              :class="{ 'nickname-form__submit--claimed': task.status === 'claimed' }"
               type="button"
-              :disabled="!task.canClaim || claimingTaskId === task.taskId"
+              :disabled="!task.canClaim || claimingTaskId === task.taskId || claimingAllTasks"
               @click="handleClaimTask(task.taskId)"
             >
-              {{ claimingTaskId === task.taskId ? '领取中...' : (task.canClaim ? '领取奖励' : '暂不可领') }}
+              {{ claimButtonLabel(task) }}
             </button>
           </div>
         </article>

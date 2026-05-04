@@ -976,6 +976,9 @@ function startTaskPolling() {
     if (!nickname.value) {
         return
     }
+    void loadTasks().catch(() => {
+        // 首次刷新失败不打断主流程，继续依赖后续轮询重试。
+    })
     taskPollingTimer = window.setInterval(() => {
         void loadTasks().catch(() => {
             // 红点轮询失败不打断主流程，下次继续重试。
@@ -1613,6 +1616,9 @@ async function claimTask(taskId) {
 
     const payload = await response.json()
     applyUserState(payload)
+    if (!('tasks' in payload)) {
+        await loadTasks()
+    }
     errorMessage.value = ''
     return {ok: true}
 }

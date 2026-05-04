@@ -55,4 +55,11 @@ describe('TalentsPage effectLines 响应链路', () => {
     expect(pageSource).toContain('其他注意事项')
     expect(pageSource).toContain('treeDefs.value?.trees?.[selectedTree.value]?.tierCompletionBonuses || {}')
   })
+
+  it('层满判定按当前天赋树真实节点数计算，不使用固定层节点数', () => {
+    expect(pageSource).toContain('function totalNodesInTier(tree, tier) {')
+    expect(pageSource).toContain(".filter((def) => def.tier === tier).length")
+    expect(pageSource).toContain('const needed = totalNodesInTier(tree, tier)')
+    expect(pageSource).not.toContain('const tierNodeCount = { 0: 1, 1: 5, 2: 5, 3: 4, 4: 1 }')
+  })
 })

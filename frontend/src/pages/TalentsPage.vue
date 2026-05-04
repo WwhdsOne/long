@@ -86,7 +86,9 @@ function talentIconPath(id) {
   return effectAssetUrl(`talent-${id}.png`)
 }
 
-const tierNodeCount = { 0: 1, 1: 5, 2: 5, 3: 4, 4: 1 }
+function totalNodesInTier(tree, tier) {
+  return (treeDefs.value?.trees?.[tree]?.talents || []).filter((def) => def.tier === tier).length
+}
 
 function learnedInTierCount(tree, tier) {
   let count = 0
@@ -97,7 +99,7 @@ function learnedInTierCount(tree, tier) {
 }
 
 function isTierFull(tree, tier) {
-  const needed = tierNodeCount[tier] || 0
+  const needed = totalNodesInTier(tree, tier)
   if (needed === 0) return false
   return learnedInTierCount(tree, tier) >= needed
 }
