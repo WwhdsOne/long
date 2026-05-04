@@ -38,11 +38,18 @@ type realtimeUserDeltaPayload struct {
 	EquippedBattleClickCursorImagePath string                    `json:"equippedBattleClickCursorImagePath,omitempty"`
 }
 
+type realtimeRoomStatePayload struct {
+	CurrentRoomID                  string          `json:"currentRoomId"`
+	SwitchCooldownRemainingSeconds int64           `json:"switchCooldownRemainingSeconds"`
+	Rooms                          []core.RoomInfo `json:"rooms"`
+}
+
 const (
 	realtimeBinaryTypeClickRequest byte = 1
 	realtimeBinaryTypeClickAck     byte = 2
 	realtimeBinaryTypePublicDelta  byte = 3
 	realtimeBinaryTypeUserDelta    byte = 4
+	realtimeBinaryTypeRoomState    byte = 5
 )
 
 var errRealtimeBinaryFrameInvalid = errors.New("invalid realtime binary frame")
@@ -122,6 +129,14 @@ func encodeRealtimeBinaryUserDelta(payload realtimeUserDeltaPayload) ([]byte, er
 	})
 }
 
+func encodeRealtimeBinaryRoomState(payload realtimeRoomStatePayload) ([]byte, error) {
+	return packRealtimeBinaryMessage(realtimeBinaryTypeRoomState, &realtimepb.RoomState{
+		CurrentRoomId:                  payload.CurrentRoomID,
+		SwitchCooldownRemainingSeconds: payload.SwitchCooldownRemainingSeconds,
+		Rooms:                          toProtoRoomInfos(payload.Rooms),
+	})
+}
+
 func encodeRealtimeBinaryPublicDeltaFromJSON(raw []byte) ([]byte, error) {
 	var payload realtimePublicDeltaPayload
 	if err := sonic.Unmarshal(raw, &payload); err != nil {
@@ -136,6 +151,14 @@ func encodeRealtimeBinaryUserDeltaFromJSON(raw []byte) ([]byte, error) {
 		return nil, err
 	}
 	return encodeRealtimeBinaryUserDelta(payload)
+}
+
+func encodeRealtimeBinaryRoomStateFromJSON(raw []byte) ([]byte, error) {
+	var payload realtimeRoomStatePayload
+	if err := sonic.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	return encodeRealtimeBinaryRoomState(payload)
 }
 
 func toProtoUserDeltaPatch(delta *realtimeUserDelta) *realtimepb.UserDeltaPatch {
@@ -241,6 +264,29 @@ func toProtoBossUserStats(stats *core.BossUserStats) *realtimepb.BossUserStats {
 		Damage:   stats.Damage,
 		Rank:     int32(stats.Rank),
 	}
+}
+
+func toProtoRoomInfos(rooms []core.RoomInfo) []*realtimepb.RoomInfo {
+	result := make([]*realtimepb.RoomInfo, 0, len(rooms))
+	for _, room := range rooms {
+		result = append(result, &realtimepb.RoomInfo{
+			Id:                       room.ID,
+			DisplayName:              room.DisplayName,
+			Current:                  room.Current,
+			Joinable:                 room.Joinable,
+			OnlineCount:              int32(room.OnlineCount),
+			CycleEnabled:             room.CycleEnabled,
+			QueueId:                  room.QueueID,
+			CurrentBossId:            room.CurrentBossID,
+			CurrentBossName:          room.CurrentBossName,
+			CurrentBossStatus:        room.CurrentBossStatus,
+			CurrentBossHp:            room.CurrentBossHP,
+			CurrentBossMaxHp:         room.CurrentBossMaxHP,
+			CurrentBossAvgHp:         room.CurrentBossAvgHP,
+			CooldownRemainingSeconds: room.CooldownRemainingS,
+		})
+	}
+	return result
 }
 
 func toProtoInventoryItem(item *core.InventoryItem) *realtimepb.InventoryItem {

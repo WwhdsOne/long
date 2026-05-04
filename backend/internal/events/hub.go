@@ -18,6 +18,7 @@ const (
 	PublicStateEventName = "public_state"
 	UserStateEventName   = "user_state"
 	OnlineCountEventName = "online_count"
+	RoomStateEventName   = "room_state"
 )
 
 type onlineCountPayload struct {
@@ -51,11 +52,14 @@ type publicStatePayload struct {
 	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
 }
 
+type roomStatePayload = core.RoomList
+
 // StateReader 提供 SSE 初始状态所需的公共态与个人态读取能力。
 type StateReader interface {
 	GetSnapshot(context.Context) (core.Snapshot, error)
 	GetUserState(context.Context, string) (core.UserState, error)
 	GetBossResources(context.Context) (core.BossResources, error)
+	ListRooms(context.Context, string) (core.RoomList, error)
 }
 
 // ServerEvent 是发往浏览器的一条 SSE 事件。
@@ -187,6 +191,25 @@ func (h *Hub) BroadcastUser(nickname string, state core.UserState, includeProfil
 	return nil
 }
 
+func (h *Hub) BroadcastRoomState(nickname string, rooms core.RoomList) error {
+	normalizedNickname := strings.TrimSpace(nickname)
+	payload, err := sonic.Marshal(roomStatePayload(rooms))
+	if err != nil {
+		return err
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for client := range h.clients {
+		if client.nickname != normalizedNickname {
+			continue
+		}
+		deliverEvent(client.ch, ServerEvent{Name: RoomStateEventName, Payload: payload})
+	}
+
+	return nil
+}
+
 func buildRealtimeUserStatePayload(state core.UserState, includeProfile bool) realtimeUserStatePayload {
 	payload := realtimeUserStatePayload{
 		UserStats:                          state.UserStats,
@@ -272,6 +295,15 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 		defer writer.Close()
 
 		if err := writeEvent(writer, PublicStateEventName, snapshot); err != nil {
+			return
+		}
+
+		roomState, err := reader.ListRooms(ctx, nickname)
+		if err != nil {
+			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
+			return
+		}
+		if err := writeEvent(writer, RoomStateEventName, roomState); err != nil {
 			return
 		}
 

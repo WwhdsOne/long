@@ -23,6 +23,7 @@ const (
 	realtimeMessageTypeSnapshot    = "snapshot"
 	realtimeMessageTypePublicDelta = "public_delta"
 	realtimeMessageTypeUserDelta   = "user_delta"
+	realtimeMessageTypeRoomState   = "room_state"
 	realtimeMessageTypeOnlineCount = "online_count"
 	realtimeMessageTypeClickAck    = "click_ack"
 	realtimeMessageTypeError       = "error"
@@ -42,9 +43,10 @@ type realtimeClientMessage struct {
 }
 
 type realtimeSnapshotMessage struct {
-	Type   string        `json:"type"`
-	Public core.Snapshot `json:"public"`
-	User   any           `json:"user"`
+	Type      string        `json:"type"`
+	Public    core.Snapshot `json:"public"`
+	User      any           `json:"user"`
+	RoomState core.RoomList `json:"roomState"`
 }
 
 type realtimeDeltaMessage struct {
@@ -183,7 +185,10 @@ func effectiveStateView(options Options) StateView {
 	if options.StateView != nil {
 		return options.StateView
 	}
-	return options.Store
+	if stateView, ok := options.Store.(StateView); ok {
+		return stateView
+	}
+	return nil
 }
 
 func runRealtimeConnection(conn *websocket.Conn, session *realtimeSession) {
@@ -356,6 +361,12 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(realtimeOu
 	if err != nil {
 		return send(s.protocolError(realtimeErrorCodeStateFetchFail, "实时状态同步失败，请稍后重试。"))
 	}
+	roomState := core.RoomList{}
+	if s.stateView != nil {
+		if rooms, err := s.stateView.ListRooms(ctx, s.nickname); err == nil {
+			roomState = rooms
+		}
+	}
 
 	var userState any
 	if s.nickname != "" {
@@ -368,9 +379,10 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(realtimeOu
 	}
 
 	return sendText(send, realtimeSnapshotMessage{
-		Type:   realtimeMessageTypeSnapshot,
-		Public: snapshot,
-		User:   userState,
+		Type:      realtimeMessageTypeSnapshot,
+		Public:    snapshot,
+		User:      userState,
+		RoomState: roomState,
 	})
 }
 
@@ -469,6 +481,15 @@ func realtimeMessageFromEvent(event events.ServerEvent) (realtimeOutboundFrame, 
 		}, true, nil
 	case events.UserStateEventName:
 		payload, err := encodeRealtimeBinaryUserDeltaFromJSON(event.Payload)
+		if err != nil {
+			return realtimeOutboundFrame{}, false, err
+		}
+		return realtimeOutboundFrame{
+			messageType: websocket.BinaryMessage,
+			payload:     payload,
+		}, true, nil
+	case events.RoomStateEventName:
+		payload, err := encodeRealtimeBinaryRoomStateFromJSON(event.Payload)
 		if err != nil {
 			return realtimeOutboundFrame{}, false, err
 		}

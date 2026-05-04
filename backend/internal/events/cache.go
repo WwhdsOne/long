@@ -185,3 +185,8 @@ func (c *Cache) GetState(ctx context.Context, nickname string) (core.State, erro
 
 	return core.ComposeState(snapshot, userState), nil
 }
+
+// ListRooms 返回指定玩家视角的房间列表。
+func (c *Cache) ListRooms(ctx context.Context, nickname string) (core.RoomList, error) {
+	return c.reader.ListRooms(ctx, nickname)
+}

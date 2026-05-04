@@ -110,6 +110,13 @@ func (d *Dispatcher) broadcastPublic(ctx context.Context, includeLeaderboard boo
 		if err := d.hub.BroadcastPublicTo(nickname, snapshot, includeLeaderboard); err != nil {
 			return err
 		}
+		rooms, err := d.cache.ListRooms(ctx, nickname)
+		if err != nil {
+			return err
+		}
+		if err := d.hub.BroadcastRoomState(nickname, rooms); err != nil {
+			return err
+		}
 	}
 	return nil
 }

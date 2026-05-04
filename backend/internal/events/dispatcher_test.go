@@ -11,6 +11,7 @@ import (
 type dispatcherTestReader struct {
 	snapshot  core.Snapshot
 	userState core.UserState
+	roomList  core.RoomList
 }
 
 func (r *dispatcherTestReader) GetSnapshot(context.Context) (core.Snapshot, error) {
@@ -25,6 +26,10 @@ func (r *dispatcherTestReader) GetBossResources(context.Context) (core.BossResou
 	return core.BossResources{}, nil
 }
 
+func (r *dispatcherTestReader) ListRooms(context.Context, string) (core.RoomList, error) {
+	return r.roomList, nil
+}
+
 func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 	reader := &dispatcherTestReader{
 		snapshot: core.Snapshot{
@@ -34,6 +39,13 @@ func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 			},
 			BossLeaderboard: []core.BossLeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", Damage: 88},
+			},
+		},
+		roomList: core.RoomList{
+			CurrentRoomID:                  "2",
+			SwitchCooldownRemainingSeconds: 7,
+			Rooms: []core.RoomInfo{
+				{ID: "2", DisplayName: "二线", Current: true, OnlineCount: 3},
 			},
 		},
 	}
@@ -56,6 +68,12 @@ func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 	}
 	if !strings.Contains(payload, `"bossLeaderboard"`) {
 		t.Fatalf("expected slim public delta to keep bossLeaderboard, got %s", payload)
+	}
+
+	roomEvent := readEventByName(t, client, RoomStateEventName)
+	roomPayload := string(roomEvent.Payload)
+	if !strings.Contains(roomPayload, `"currentRoomId":"2"`) || !strings.Contains(roomPayload, `"switchCooldownRemainingSeconds":7`) {
+		t.Fatalf("expected room state payload, got %s", roomPayload)
 	}
 }
 

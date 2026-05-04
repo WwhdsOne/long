@@ -723,6 +723,13 @@ function setRoomSwitchCooldown(remainingSeconds) {
     roomSwitchCooldownEndsAt.value = seconds > 0 ? Date.now() + seconds * 1000 : 0
 }
 
+function applyRoomState(payload) {
+    currentRoomId.value = String(payload?.currentRoomId || currentRoomId.value || '1')
+    rooms.value = Array.isArray(payload?.rooms) ? payload.rooms : []
+    setRoomSwitchCooldown(payload?.cooldownRemainingSeconds ?? payload?.switchCooldownRemainingSeconds ?? 0)
+    roomError.value = ''
+}
+
 const canStartAutoClick = computed(() => isLoggedIn.value && Boolean(autoClickTargetKey.value))
 const autoClickStatus = computed(() => {
     void autoClickEnabled.value
@@ -2006,12 +2013,16 @@ function ensureRealtimeTransport() {
             applyPublicState(payload)
             loading.value = false
             errorMessage.value = ''
-            void loadRooms()
         },
         onUserDelta(payload) {
             applyUserState(payload)
             loading.value = false
             errorMessage.value = ''
+        },
+        onRoomState(payload) {
+            applyRoomState(payload)
+            loading.value = false
+            roomError.value = ''
         },
         onOnlineCount(payload) {
             const count = Number(payload?.count)
@@ -2462,11 +2473,7 @@ async function loadRooms() {
         if (!response.ok) {
             throw new Error('房间列表加载失败')
         }
-        const payload = await response.json()
-        currentRoomId.value = String(payload?.currentRoomId || currentRoomId.value || '1')
-        rooms.value = Array.isArray(payload?.rooms) ? payload.rooms : []
-        setRoomSwitchCooldown(payload?.switchCooldownRemainingSeconds ?? 0)
-        roomError.value = ''
+        applyRoomState(await response.json())
     } catch (error) {
         roomError.value = error.message || '房间列表加载失败。'
     }
@@ -2504,12 +2511,13 @@ async function joinRoom(roomId) {
             throw new Error(message)
         }
         const payload = await response.json()
-        currentRoomId.value = String(payload?.currentRoomId || targetRoomId)
-        rooms.value = Array.isArray(payload?.rooms) ? payload.rooms : rooms.value
-        setRoomSwitchCooldown(payload?.cooldownRemainingSeconds ?? payload?.switchCooldownRemainingSeconds ?? 0)
+        applyRoomState({
+            currentRoomId: payload?.currentRoomId || targetRoomId,
+            rooms: Array.isArray(payload?.rooms) ? payload.rooms : rooms.value,
+            cooldownRemainingSeconds: payload?.cooldownRemainingSeconds ?? payload?.switchCooldownRemainingSeconds ?? 0,
+        })
         connectRealtime(nickname.value)
         await loadState()
-        await loadRooms()
         return {ok: true}
     } catch (error) {
         roomError.value = error.message || '切换房间失败。'
@@ -2768,11 +2776,11 @@ async function resetNickname() {
     stopPresenceHeartbeat()
     await reportPresence(false)
     clearPlayerSessionState()
-    if (currentPublicPage.value === 'shop') {
-        void loadShopItems()
-    }
-    void loadRooms()
-    connectRealtime('')
+        if (currentPublicPage.value === 'shop') {
+            void loadShopItems()
+        }
+        void loadRooms()
+        connectRealtime('')
 }
 
 function clearPlayerSessionState() {
@@ -2911,7 +2919,7 @@ function registerPublicPageLifecycle() {
         }
     }
 
-     onMounted(async () => {
+    onMounted(async () => {
          restoreCachedLatestAnnouncement()
          window.addEventListener('popstate', handlePublicRouteChange)
          startTalentTick()

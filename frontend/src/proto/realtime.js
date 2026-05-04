@@ -1739,6 +1739,879 @@ export const realtime = $root.realtime = (() => {
         return PublicDelta;
     })();
 
+    realtime.RoomInfo = (function() {
+
+        /**
+         * Properties of a RoomInfo.
+         * @memberof realtime
+         * @interface IRoomInfo
+         * @property {string|null} [id] RoomInfo id
+         * @property {string|null} [displayName] RoomInfo displayName
+         * @property {boolean|null} [current] RoomInfo current
+         * @property {boolean|null} [joinable] RoomInfo joinable
+         * @property {number|null} [onlineCount] RoomInfo onlineCount
+         * @property {boolean|null} [cycleEnabled] RoomInfo cycleEnabled
+         * @property {string|null} [queueId] RoomInfo queueId
+         * @property {string|null} [currentBossId] RoomInfo currentBossId
+         * @property {string|null} [currentBossName] RoomInfo currentBossName
+         * @property {string|null} [currentBossStatus] RoomInfo currentBossStatus
+         * @property {number|Long|null} [currentBossHp] RoomInfo currentBossHp
+         * @property {number|Long|null} [currentBossMaxHp] RoomInfo currentBossMaxHp
+         * @property {number|Long|null} [currentBossAvgHp] RoomInfo currentBossAvgHp
+         * @property {number|Long|null} [cooldownRemainingSeconds] RoomInfo cooldownRemainingSeconds
+         */
+
+        /**
+         * Constructs a new RoomInfo.
+         * @memberof realtime
+         * @classdesc Represents a RoomInfo.
+         * @implements IRoomInfo
+         * @constructor
+         * @param {realtime.IRoomInfo=} [properties] Properties to set
+         */
+        function RoomInfo(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * RoomInfo id.
+         * @member {string} id
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.id = "";
+
+        /**
+         * RoomInfo displayName.
+         * @member {string} displayName
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.displayName = "";
+
+        /**
+         * RoomInfo current.
+         * @member {boolean} current
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.current = false;
+
+        /**
+         * RoomInfo joinable.
+         * @member {boolean} joinable
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.joinable = false;
+
+        /**
+         * RoomInfo onlineCount.
+         * @member {number} onlineCount
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.onlineCount = 0;
+
+        /**
+         * RoomInfo cycleEnabled.
+         * @member {boolean} cycleEnabled
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.cycleEnabled = false;
+
+        /**
+         * RoomInfo queueId.
+         * @member {string} queueId
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.queueId = "";
+
+        /**
+         * RoomInfo currentBossId.
+         * @member {string} currentBossId
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.currentBossId = "";
+
+        /**
+         * RoomInfo currentBossName.
+         * @member {string} currentBossName
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.currentBossName = "";
+
+        /**
+         * RoomInfo currentBossStatus.
+         * @member {string} currentBossStatus
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.currentBossStatus = "";
+
+        /**
+         * RoomInfo currentBossHp.
+         * @member {number|Long} currentBossHp
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.currentBossHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * RoomInfo currentBossMaxHp.
+         * @member {number|Long} currentBossMaxHp
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.currentBossMaxHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * RoomInfo currentBossAvgHp.
+         * @member {number|Long} currentBossAvgHp
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.currentBossAvgHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * RoomInfo cooldownRemainingSeconds.
+         * @member {number|Long} cooldownRemainingSeconds
+         * @memberof realtime.RoomInfo
+         * @instance
+         */
+        RoomInfo.prototype.cooldownRemainingSeconds = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * Creates a new RoomInfo instance using the specified properties.
+         * @function create
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {realtime.IRoomInfo=} [properties] Properties to set
+         * @returns {realtime.RoomInfo} RoomInfo instance
+         */
+        RoomInfo.create = function create(properties) {
+            return new RoomInfo(properties);
+        };
+
+        /**
+         * Encodes the specified RoomInfo message. Does not implicitly {@link realtime.RoomInfo.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {realtime.IRoomInfo} message RoomInfo message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        RoomInfo.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.id != null && Object.hasOwnProperty.call(message, "id"))
+                writer.uint32(/* id 1, wireType 2 =*/10).string(message.id);
+            if (message.displayName != null && Object.hasOwnProperty.call(message, "displayName"))
+                writer.uint32(/* id 2, wireType 2 =*/18).string(message.displayName);
+            if (message.current != null && Object.hasOwnProperty.call(message, "current"))
+                writer.uint32(/* id 3, wireType 0 =*/24).bool(message.current);
+            if (message.joinable != null && Object.hasOwnProperty.call(message, "joinable"))
+                writer.uint32(/* id 4, wireType 0 =*/32).bool(message.joinable);
+            if (message.onlineCount != null && Object.hasOwnProperty.call(message, "onlineCount"))
+                writer.uint32(/* id 5, wireType 0 =*/40).int32(message.onlineCount);
+            if (message.cycleEnabled != null && Object.hasOwnProperty.call(message, "cycleEnabled"))
+                writer.uint32(/* id 6, wireType 0 =*/48).bool(message.cycleEnabled);
+            if (message.queueId != null && Object.hasOwnProperty.call(message, "queueId"))
+                writer.uint32(/* id 7, wireType 2 =*/58).string(message.queueId);
+            if (message.currentBossId != null && Object.hasOwnProperty.call(message, "currentBossId"))
+                writer.uint32(/* id 8, wireType 2 =*/66).string(message.currentBossId);
+            if (message.currentBossName != null && Object.hasOwnProperty.call(message, "currentBossName"))
+                writer.uint32(/* id 9, wireType 2 =*/74).string(message.currentBossName);
+            if (message.currentBossStatus != null && Object.hasOwnProperty.call(message, "currentBossStatus"))
+                writer.uint32(/* id 10, wireType 2 =*/82).string(message.currentBossStatus);
+            if (message.currentBossHp != null && Object.hasOwnProperty.call(message, "currentBossHp"))
+                writer.uint32(/* id 11, wireType 0 =*/88).int64(message.currentBossHp);
+            if (message.currentBossMaxHp != null && Object.hasOwnProperty.call(message, "currentBossMaxHp"))
+                writer.uint32(/* id 12, wireType 0 =*/96).int64(message.currentBossMaxHp);
+            if (message.currentBossAvgHp != null && Object.hasOwnProperty.call(message, "currentBossAvgHp"))
+                writer.uint32(/* id 13, wireType 0 =*/104).int64(message.currentBossAvgHp);
+            if (message.cooldownRemainingSeconds != null && Object.hasOwnProperty.call(message, "cooldownRemainingSeconds"))
+                writer.uint32(/* id 14, wireType 0 =*/112).int64(message.cooldownRemainingSeconds);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified RoomInfo message, length delimited. Does not implicitly {@link realtime.RoomInfo.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {realtime.IRoomInfo} message RoomInfo message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        RoomInfo.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a RoomInfo message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.RoomInfo} RoomInfo
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        RoomInfo.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.RoomInfo();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.id = reader.string();
+                        break;
+                    }
+                case 2: {
+                        message.displayName = reader.string();
+                        break;
+                    }
+                case 3: {
+                        message.current = reader.bool();
+                        break;
+                    }
+                case 4: {
+                        message.joinable = reader.bool();
+                        break;
+                    }
+                case 5: {
+                        message.onlineCount = reader.int32();
+                        break;
+                    }
+                case 6: {
+                        message.cycleEnabled = reader.bool();
+                        break;
+                    }
+                case 7: {
+                        message.queueId = reader.string();
+                        break;
+                    }
+                case 8: {
+                        message.currentBossId = reader.string();
+                        break;
+                    }
+                case 9: {
+                        message.currentBossName = reader.string();
+                        break;
+                    }
+                case 10: {
+                        message.currentBossStatus = reader.string();
+                        break;
+                    }
+                case 11: {
+                        message.currentBossHp = reader.int64();
+                        break;
+                    }
+                case 12: {
+                        message.currentBossMaxHp = reader.int64();
+                        break;
+                    }
+                case 13: {
+                        message.currentBossAvgHp = reader.int64();
+                        break;
+                    }
+                case 14: {
+                        message.cooldownRemainingSeconds = reader.int64();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a RoomInfo message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.RoomInfo} RoomInfo
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        RoomInfo.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a RoomInfo message.
+         * @function verify
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        RoomInfo.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.id != null && message.hasOwnProperty("id"))
+                if (!$util.isString(message.id))
+                    return "id: string expected";
+            if (message.displayName != null && message.hasOwnProperty("displayName"))
+                if (!$util.isString(message.displayName))
+                    return "displayName: string expected";
+            if (message.current != null && message.hasOwnProperty("current"))
+                if (typeof message.current !== "boolean")
+                    return "current: boolean expected";
+            if (message.joinable != null && message.hasOwnProperty("joinable"))
+                if (typeof message.joinable !== "boolean")
+                    return "joinable: boolean expected";
+            if (message.onlineCount != null && message.hasOwnProperty("onlineCount"))
+                if (!$util.isInteger(message.onlineCount))
+                    return "onlineCount: integer expected";
+            if (message.cycleEnabled != null && message.hasOwnProperty("cycleEnabled"))
+                if (typeof message.cycleEnabled !== "boolean")
+                    return "cycleEnabled: boolean expected";
+            if (message.queueId != null && message.hasOwnProperty("queueId"))
+                if (!$util.isString(message.queueId))
+                    return "queueId: string expected";
+            if (message.currentBossId != null && message.hasOwnProperty("currentBossId"))
+                if (!$util.isString(message.currentBossId))
+                    return "currentBossId: string expected";
+            if (message.currentBossName != null && message.hasOwnProperty("currentBossName"))
+                if (!$util.isString(message.currentBossName))
+                    return "currentBossName: string expected";
+            if (message.currentBossStatus != null && message.hasOwnProperty("currentBossStatus"))
+                if (!$util.isString(message.currentBossStatus))
+                    return "currentBossStatus: string expected";
+            if (message.currentBossHp != null && message.hasOwnProperty("currentBossHp"))
+                if (!$util.isInteger(message.currentBossHp) && !(message.currentBossHp && $util.isInteger(message.currentBossHp.low) && $util.isInteger(message.currentBossHp.high)))
+                    return "currentBossHp: integer|Long expected";
+            if (message.currentBossMaxHp != null && message.hasOwnProperty("currentBossMaxHp"))
+                if (!$util.isInteger(message.currentBossMaxHp) && !(message.currentBossMaxHp && $util.isInteger(message.currentBossMaxHp.low) && $util.isInteger(message.currentBossMaxHp.high)))
+                    return "currentBossMaxHp: integer|Long expected";
+            if (message.currentBossAvgHp != null && message.hasOwnProperty("currentBossAvgHp"))
+                if (!$util.isInteger(message.currentBossAvgHp) && !(message.currentBossAvgHp && $util.isInteger(message.currentBossAvgHp.low) && $util.isInteger(message.currentBossAvgHp.high)))
+                    return "currentBossAvgHp: integer|Long expected";
+            if (message.cooldownRemainingSeconds != null && message.hasOwnProperty("cooldownRemainingSeconds"))
+                if (!$util.isInteger(message.cooldownRemainingSeconds) && !(message.cooldownRemainingSeconds && $util.isInteger(message.cooldownRemainingSeconds.low) && $util.isInteger(message.cooldownRemainingSeconds.high)))
+                    return "cooldownRemainingSeconds: integer|Long expected";
+            return null;
+        };
+
+        /**
+         * Creates a RoomInfo message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.RoomInfo} RoomInfo
+         */
+        RoomInfo.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.RoomInfo)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.RoomInfo();
+            if (object.id != null)
+                message.id = String(object.id);
+            if (object.displayName != null)
+                message.displayName = String(object.displayName);
+            if (object.current != null)
+                message.current = Boolean(object.current);
+            if (object.joinable != null)
+                message.joinable = Boolean(object.joinable);
+            if (object.onlineCount != null)
+                message.onlineCount = object.onlineCount | 0;
+            if (object.cycleEnabled != null)
+                message.cycleEnabled = Boolean(object.cycleEnabled);
+            if (object.queueId != null)
+                message.queueId = String(object.queueId);
+            if (object.currentBossId != null)
+                message.currentBossId = String(object.currentBossId);
+            if (object.currentBossName != null)
+                message.currentBossName = String(object.currentBossName);
+            if (object.currentBossStatus != null)
+                message.currentBossStatus = String(object.currentBossStatus);
+            if (object.currentBossHp != null)
+                if ($util.Long)
+                    (message.currentBossHp = $util.Long.fromValue(object.currentBossHp)).unsigned = false;
+                else if (typeof object.currentBossHp === "string")
+                    message.currentBossHp = parseInt(object.currentBossHp, 10);
+                else if (typeof object.currentBossHp === "number")
+                    message.currentBossHp = object.currentBossHp;
+                else if (typeof object.currentBossHp === "object")
+                    message.currentBossHp = new $util.LongBits(object.currentBossHp.low >>> 0, object.currentBossHp.high >>> 0).toNumber();
+            if (object.currentBossMaxHp != null)
+                if ($util.Long)
+                    (message.currentBossMaxHp = $util.Long.fromValue(object.currentBossMaxHp)).unsigned = false;
+                else if (typeof object.currentBossMaxHp === "string")
+                    message.currentBossMaxHp = parseInt(object.currentBossMaxHp, 10);
+                else if (typeof object.currentBossMaxHp === "number")
+                    message.currentBossMaxHp = object.currentBossMaxHp;
+                else if (typeof object.currentBossMaxHp === "object")
+                    message.currentBossMaxHp = new $util.LongBits(object.currentBossMaxHp.low >>> 0, object.currentBossMaxHp.high >>> 0).toNumber();
+            if (object.currentBossAvgHp != null)
+                if ($util.Long)
+                    (message.currentBossAvgHp = $util.Long.fromValue(object.currentBossAvgHp)).unsigned = false;
+                else if (typeof object.currentBossAvgHp === "string")
+                    message.currentBossAvgHp = parseInt(object.currentBossAvgHp, 10);
+                else if (typeof object.currentBossAvgHp === "number")
+                    message.currentBossAvgHp = object.currentBossAvgHp;
+                else if (typeof object.currentBossAvgHp === "object")
+                    message.currentBossAvgHp = new $util.LongBits(object.currentBossAvgHp.low >>> 0, object.currentBossAvgHp.high >>> 0).toNumber();
+            if (object.cooldownRemainingSeconds != null)
+                if ($util.Long)
+                    (message.cooldownRemainingSeconds = $util.Long.fromValue(object.cooldownRemainingSeconds)).unsigned = false;
+                else if (typeof object.cooldownRemainingSeconds === "string")
+                    message.cooldownRemainingSeconds = parseInt(object.cooldownRemainingSeconds, 10);
+                else if (typeof object.cooldownRemainingSeconds === "number")
+                    message.cooldownRemainingSeconds = object.cooldownRemainingSeconds;
+                else if (typeof object.cooldownRemainingSeconds === "object")
+                    message.cooldownRemainingSeconds = new $util.LongBits(object.cooldownRemainingSeconds.low >>> 0, object.cooldownRemainingSeconds.high >>> 0).toNumber();
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a RoomInfo message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {realtime.RoomInfo} message RoomInfo
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        RoomInfo.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults) {
+                object.id = "";
+                object.displayName = "";
+                object.current = false;
+                object.joinable = false;
+                object.onlineCount = 0;
+                object.cycleEnabled = false;
+                object.queueId = "";
+                object.currentBossId = "";
+                object.currentBossName = "";
+                object.currentBossStatus = "";
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.currentBossHp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.currentBossHp = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.currentBossMaxHp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.currentBossMaxHp = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.currentBossAvgHp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.currentBossAvgHp = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.cooldownRemainingSeconds = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.cooldownRemainingSeconds = options.longs === String ? "0" : 0;
+            }
+            if (message.id != null && message.hasOwnProperty("id"))
+                object.id = message.id;
+            if (message.displayName != null && message.hasOwnProperty("displayName"))
+                object.displayName = message.displayName;
+            if (message.current != null && message.hasOwnProperty("current"))
+                object.current = message.current;
+            if (message.joinable != null && message.hasOwnProperty("joinable"))
+                object.joinable = message.joinable;
+            if (message.onlineCount != null && message.hasOwnProperty("onlineCount"))
+                object.onlineCount = message.onlineCount;
+            if (message.cycleEnabled != null && message.hasOwnProperty("cycleEnabled"))
+                object.cycleEnabled = message.cycleEnabled;
+            if (message.queueId != null && message.hasOwnProperty("queueId"))
+                object.queueId = message.queueId;
+            if (message.currentBossId != null && message.hasOwnProperty("currentBossId"))
+                object.currentBossId = message.currentBossId;
+            if (message.currentBossName != null && message.hasOwnProperty("currentBossName"))
+                object.currentBossName = message.currentBossName;
+            if (message.currentBossStatus != null && message.hasOwnProperty("currentBossStatus"))
+                object.currentBossStatus = message.currentBossStatus;
+            if (message.currentBossHp != null && message.hasOwnProperty("currentBossHp"))
+                if (typeof message.currentBossHp === "number")
+                    object.currentBossHp = options.longs === String ? String(message.currentBossHp) : message.currentBossHp;
+                else
+                    object.currentBossHp = options.longs === String ? $util.Long.prototype.toString.call(message.currentBossHp) : options.longs === Number ? new $util.LongBits(message.currentBossHp.low >>> 0, message.currentBossHp.high >>> 0).toNumber() : message.currentBossHp;
+            if (message.currentBossMaxHp != null && message.hasOwnProperty("currentBossMaxHp"))
+                if (typeof message.currentBossMaxHp === "number")
+                    object.currentBossMaxHp = options.longs === String ? String(message.currentBossMaxHp) : message.currentBossMaxHp;
+                else
+                    object.currentBossMaxHp = options.longs === String ? $util.Long.prototype.toString.call(message.currentBossMaxHp) : options.longs === Number ? new $util.LongBits(message.currentBossMaxHp.low >>> 0, message.currentBossMaxHp.high >>> 0).toNumber() : message.currentBossMaxHp;
+            if (message.currentBossAvgHp != null && message.hasOwnProperty("currentBossAvgHp"))
+                if (typeof message.currentBossAvgHp === "number")
+                    object.currentBossAvgHp = options.longs === String ? String(message.currentBossAvgHp) : message.currentBossAvgHp;
+                else
+                    object.currentBossAvgHp = options.longs === String ? $util.Long.prototype.toString.call(message.currentBossAvgHp) : options.longs === Number ? new $util.LongBits(message.currentBossAvgHp.low >>> 0, message.currentBossAvgHp.high >>> 0).toNumber() : message.currentBossAvgHp;
+            if (message.cooldownRemainingSeconds != null && message.hasOwnProperty("cooldownRemainingSeconds"))
+                if (typeof message.cooldownRemainingSeconds === "number")
+                    object.cooldownRemainingSeconds = options.longs === String ? String(message.cooldownRemainingSeconds) : message.cooldownRemainingSeconds;
+                else
+                    object.cooldownRemainingSeconds = options.longs === String ? $util.Long.prototype.toString.call(message.cooldownRemainingSeconds) : options.longs === Number ? new $util.LongBits(message.cooldownRemainingSeconds.low >>> 0, message.cooldownRemainingSeconds.high >>> 0).toNumber() : message.cooldownRemainingSeconds;
+            return object;
+        };
+
+        /**
+         * Converts this RoomInfo to JSON.
+         * @function toJSON
+         * @memberof realtime.RoomInfo
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        RoomInfo.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for RoomInfo
+         * @function getTypeUrl
+         * @memberof realtime.RoomInfo
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        RoomInfo.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.RoomInfo";
+        };
+
+        return RoomInfo;
+    })();
+
+    realtime.RoomState = (function() {
+
+        /**
+         * Properties of a RoomState.
+         * @memberof realtime
+         * @interface IRoomState
+         * @property {string|null} [currentRoomId] RoomState currentRoomId
+         * @property {number|Long|null} [switchCooldownRemainingSeconds] RoomState switchCooldownRemainingSeconds
+         * @property {Array.<realtime.IRoomInfo>|null} [rooms] RoomState rooms
+         */
+
+        /**
+         * Constructs a new RoomState.
+         * @memberof realtime
+         * @classdesc Represents a RoomState.
+         * @implements IRoomState
+         * @constructor
+         * @param {realtime.IRoomState=} [properties] Properties to set
+         */
+        function RoomState(properties) {
+            this.rooms = [];
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * RoomState currentRoomId.
+         * @member {string} currentRoomId
+         * @memberof realtime.RoomState
+         * @instance
+         */
+        RoomState.prototype.currentRoomId = "";
+
+        /**
+         * RoomState switchCooldownRemainingSeconds.
+         * @member {number|Long} switchCooldownRemainingSeconds
+         * @memberof realtime.RoomState
+         * @instance
+         */
+        RoomState.prototype.switchCooldownRemainingSeconds = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * RoomState rooms.
+         * @member {Array.<realtime.IRoomInfo>} rooms
+         * @memberof realtime.RoomState
+         * @instance
+         */
+        RoomState.prototype.rooms = $util.emptyArray;
+
+        /**
+         * Creates a new RoomState instance using the specified properties.
+         * @function create
+         * @memberof realtime.RoomState
+         * @static
+         * @param {realtime.IRoomState=} [properties] Properties to set
+         * @returns {realtime.RoomState} RoomState instance
+         */
+        RoomState.create = function create(properties) {
+            return new RoomState(properties);
+        };
+
+        /**
+         * Encodes the specified RoomState message. Does not implicitly {@link realtime.RoomState.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.RoomState
+         * @static
+         * @param {realtime.IRoomState} message RoomState message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        RoomState.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.currentRoomId != null && Object.hasOwnProperty.call(message, "currentRoomId"))
+                writer.uint32(/* id 1, wireType 2 =*/10).string(message.currentRoomId);
+            if (message.switchCooldownRemainingSeconds != null && Object.hasOwnProperty.call(message, "switchCooldownRemainingSeconds"))
+                writer.uint32(/* id 2, wireType 0 =*/16).int64(message.switchCooldownRemainingSeconds);
+            if (message.rooms != null && message.rooms.length)
+                for (let i = 0; i < message.rooms.length; ++i)
+                    $root.realtime.RoomInfo.encode(message.rooms[i], writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+            return writer;
+        };
+
+        /**
+         * Encodes the specified RoomState message, length delimited. Does not implicitly {@link realtime.RoomState.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.RoomState
+         * @static
+         * @param {realtime.IRoomState} message RoomState message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        RoomState.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a RoomState message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.RoomState
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.RoomState} RoomState
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        RoomState.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.RoomState();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.currentRoomId = reader.string();
+                        break;
+                    }
+                case 2: {
+                        message.switchCooldownRemainingSeconds = reader.int64();
+                        break;
+                    }
+                case 3: {
+                        if (!(message.rooms && message.rooms.length))
+                            message.rooms = [];
+                        message.rooms.push($root.realtime.RoomInfo.decode(reader, reader.uint32(), undefined, long + 1));
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a RoomState message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.RoomState
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.RoomState} RoomState
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        RoomState.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a RoomState message.
+         * @function verify
+         * @memberof realtime.RoomState
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        RoomState.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.currentRoomId != null && message.hasOwnProperty("currentRoomId"))
+                if (!$util.isString(message.currentRoomId))
+                    return "currentRoomId: string expected";
+            if (message.switchCooldownRemainingSeconds != null && message.hasOwnProperty("switchCooldownRemainingSeconds"))
+                if (!$util.isInteger(message.switchCooldownRemainingSeconds) && !(message.switchCooldownRemainingSeconds && $util.isInteger(message.switchCooldownRemainingSeconds.low) && $util.isInteger(message.switchCooldownRemainingSeconds.high)))
+                    return "switchCooldownRemainingSeconds: integer|Long expected";
+            if (message.rooms != null && message.hasOwnProperty("rooms")) {
+                if (!Array.isArray(message.rooms))
+                    return "rooms: array expected";
+                for (let i = 0; i < message.rooms.length; ++i) {
+                    let error = $root.realtime.RoomInfo.verify(message.rooms[i], long + 1);
+                    if (error)
+                        return "rooms." + error;
+                }
+            }
+            return null;
+        };
+
+        /**
+         * Creates a RoomState message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.RoomState
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.RoomState} RoomState
+         */
+        RoomState.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.RoomState)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.RoomState();
+            if (object.currentRoomId != null)
+                message.currentRoomId = String(object.currentRoomId);
+            if (object.switchCooldownRemainingSeconds != null)
+                if ($util.Long)
+                    (message.switchCooldownRemainingSeconds = $util.Long.fromValue(object.switchCooldownRemainingSeconds)).unsigned = false;
+                else if (typeof object.switchCooldownRemainingSeconds === "string")
+                    message.switchCooldownRemainingSeconds = parseInt(object.switchCooldownRemainingSeconds, 10);
+                else if (typeof object.switchCooldownRemainingSeconds === "number")
+                    message.switchCooldownRemainingSeconds = object.switchCooldownRemainingSeconds;
+                else if (typeof object.switchCooldownRemainingSeconds === "object")
+                    message.switchCooldownRemainingSeconds = new $util.LongBits(object.switchCooldownRemainingSeconds.low >>> 0, object.switchCooldownRemainingSeconds.high >>> 0).toNumber();
+            if (object.rooms) {
+                if (!Array.isArray(object.rooms))
+                    throw TypeError(".realtime.RoomState.rooms: array expected");
+                message.rooms = [];
+                for (let i = 0; i < object.rooms.length; ++i) {
+                    if (typeof object.rooms[i] !== "object")
+                        throw TypeError(".realtime.RoomState.rooms: object expected");
+                    message.rooms[i] = $root.realtime.RoomInfo.fromObject(object.rooms[i], long + 1);
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a RoomState message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.RoomState
+         * @static
+         * @param {realtime.RoomState} message RoomState
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        RoomState.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.arrays || options.defaults)
+                object.rooms = [];
+            if (options.defaults) {
+                object.currentRoomId = "";
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.switchCooldownRemainingSeconds = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.switchCooldownRemainingSeconds = options.longs === String ? "0" : 0;
+            }
+            if (message.currentRoomId != null && message.hasOwnProperty("currentRoomId"))
+                object.currentRoomId = message.currentRoomId;
+            if (message.switchCooldownRemainingSeconds != null && message.hasOwnProperty("switchCooldownRemainingSeconds"))
+                if (typeof message.switchCooldownRemainingSeconds === "number")
+                    object.switchCooldownRemainingSeconds = options.longs === String ? String(message.switchCooldownRemainingSeconds) : message.switchCooldownRemainingSeconds;
+                else
+                    object.switchCooldownRemainingSeconds = options.longs === String ? $util.Long.prototype.toString.call(message.switchCooldownRemainingSeconds) : options.longs === Number ? new $util.LongBits(message.switchCooldownRemainingSeconds.low >>> 0, message.switchCooldownRemainingSeconds.high >>> 0).toNumber() : message.switchCooldownRemainingSeconds;
+            if (message.rooms && message.rooms.length) {
+                object.rooms = [];
+                for (let j = 0; j < message.rooms.length; ++j)
+                    object.rooms[j] = $root.realtime.RoomInfo.toObject(message.rooms[j], options);
+            }
+            return object;
+        };
+
+        /**
+         * Converts this RoomState to JSON.
+         * @function toJSON
+         * @memberof realtime.RoomState
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        RoomState.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for RoomState
+         * @function getTypeUrl
+         * @memberof realtime.RoomState
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        RoomState.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.RoomState";
+        };
+
+        return RoomState;
+    })();
+
     realtime.UserDelta = (function() {
 
         /**

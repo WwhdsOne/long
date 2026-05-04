@@ -119,6 +119,16 @@ func decodeRealtimeBinaryClickAckForTest(t *testing.T, payload []byte) *realtime
 	return message
 }
 
+func decodeRealtimeBinaryRoomStateForTest(t *testing.T, payload []byte) *realtimepb.RoomState {
+	t.Helper()
+
+	message := &realtimepb.RoomState{}
+	if err := unpackRealtimeBinaryMessage(payload, realtimeBinaryTypeRoomState, message); err != nil {
+		t.Fatalf("decode realtime binary room state: %v", err)
+	}
+	return message
+}
+
 func readHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name string) events.ServerEvent {
 	t.Helper()
 
@@ -512,6 +522,34 @@ func TestRealtimeSessionBossPartClickPublishesBroadcastUserAll(t *testing.T) {
 	}
 	if !publisher.changes[0].BroadcastUserAll {
 		t.Fatalf("expected BroadcastUserAll to be true, got %+v", publisher.changes[0])
+	}
+}
+
+func TestRealtimeMessageFromRoomStateEventEncodesBinaryFrame(t *testing.T) {
+	frame, ok, err := realtimeMessageFromEvent(events.ServerEvent{
+		Name: events.RoomStateEventName,
+		Payload: []byte(`{
+			"currentRoomId":"2",
+			"switchCooldownRemainingSeconds":9,
+			"rooms":[{"id":"2","displayName":"二线","current":true,"onlineCount":6}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("encode room_state event: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected room_state event to be encoded")
+	}
+	if frame.messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary frame, got %d", frame.messageType)
+	}
+
+	message := decodeRealtimeBinaryRoomStateForTest(t, frame.payload)
+	if message.GetCurrentRoomId() != "2" || message.GetSwitchCooldownRemainingSeconds() != 9 {
+		t.Fatalf("unexpected room state payload: %+v", message)
+	}
+	if len(message.GetRooms()) != 1 || message.GetRooms()[0].GetDisplayName() != "二线" {
+		t.Fatalf("unexpected rooms payload: %+v", message.GetRooms())
 	}
 }
 

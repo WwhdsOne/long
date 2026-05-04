@@ -34,14 +34,14 @@ describe('BattlePage 房间战斗页', () => {
     expect(battleSource).not.toContain('function formatRoomExitCooldown(seconds) {')
   })
 
-  it('房间冷却结束时间由 /api/rooms 和切房返回同步', () => {
+  it('房间冷却结束时间由首拉、切房返回和 room_state 同步', () => {
     expect(stateSource).toContain('const roomSwitchCooldownEndsAt = ref(0)')
     expect(stateSource).toContain('function setRoomSwitchCooldown(remainingSeconds) {')
-    expect(stateSource).toContain('setRoomSwitchCooldown(payload?.switchCooldownRemainingSeconds ?? 0)')
+    expect(stateSource).toContain('function applyRoomState(payload) {')
     expect(stateSource).toContain('setRoomSwitchCooldown(payload?.cooldownRemainingSeconds ?? payload?.switchCooldownRemainingSeconds ?? 0)')
-    expect(stateSource).toContain('onPublicDelta(payload) {')
-    expect(stateSource).toContain('applyPublicState(payload)')
-    expect(stateSource).toContain('void loadRooms()')
+    expect(stateSource).toContain('applyRoomState(await response.json())')
+    expect(stateSource).toContain('onRoomState(payload) {')
+    expect(stateSource).toContain('applyRoomState(payload)')
   })
 
   it('退出当前房间直接切到 hall', () => {

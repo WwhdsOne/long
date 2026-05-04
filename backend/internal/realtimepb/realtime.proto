@@ -42,6 +42,29 @@ message PublicDelta {
   string announcement_version = 6;
 }
 
+message RoomInfo {
+  string id = 1;
+  string display_name = 2;
+  bool current = 3;
+  bool joinable = 4;
+  int32 online_count = 5;
+  bool cycle_enabled = 6;
+  string queue_id = 7;
+  string current_boss_id = 8;
+  string current_boss_name = 9;
+  string current_boss_status = 10;
+  int64 current_boss_hp = 11;
+  int64 current_boss_max_hp = 12;
+  int64 current_boss_avg_hp = 13;
+  int64 cooldown_remaining_seconds = 14;
+}
+
+message RoomState {
+  string current_room_id = 1;
+  int64 switch_cooldown_remaining_seconds = 2;
+  repeated RoomInfo rooms = 3;
+}
+
 message UserDelta {
   UserStats user_stats = 1;
   BossUserStats my_boss_stats = 2;

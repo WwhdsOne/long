@@ -134,6 +134,11 @@ func (m *mockStore) GetBossResources(_ context.Context) (core.BossResources, err
 	return m.bossResources, nil
 }
 
+func (m *mockStore) ListRooms(_ context.Context, nickname string) (core.RoomList, error) {
+	m.lastListRoomsNickname = nickname
+	return m.roomList, nil
+}
+
 func (m *mockStore) GetBossResourcesForNickname(_ context.Context, nickname string) (core.BossResources, error) {
 	m.lastBossResourcesNickname = nickname
 	if m.bossResourcesByNickname != nil {
@@ -142,11 +147,6 @@ func (m *mockStore) GetBossResourcesForNickname(_ context.Context, nickname stri
 		}
 	}
 	return m.bossResources, nil
-}
-
-func (m *mockStore) ListRooms(_ context.Context, nickname string) (core.RoomList, error) {
-	m.lastListRoomsNickname = nickname
-	return m.roomList, nil
 }
 
 func (m *mockStore) SetRoomDisplayName(_ context.Context, roomID string, displayName string) error {

@@ -254,6 +254,60 @@ describe('realtimeTransport', () => {
     expect(onlineCounts).toEqual([3, 4])
   })
 
+  it('room_state 可通过 WebSocket 与 SSE 回调房间列表', () => {
+    const sockets = []
+    const sources = []
+    const roomStates = []
+    const transport = createRealtimeTransport({
+      createWebSocket(url) {
+        const socket = new FakeWebSocket(url)
+        sockets.push(socket)
+        return socket
+      },
+      createEventSource(url) {
+        const source = new FakeEventSource(url)
+        sources.push(source)
+        return source
+      },
+      onRoomState(payload) {
+        roomStates.push(payload)
+      },
+    })
+
+    transport.connect({ nickname: '阿明' })
+    sockets[0].emitOpen()
+
+    const encoded = realtime.RoomState.encode(realtime.RoomState.create({
+      currentRoomId: '2',
+      switchCooldownRemainingSeconds: 6,
+      rooms: [{ id: '2', displayName: '二线', current: true, onlineCount: 4 }],
+    })).finish()
+    const frame = new Uint8Array(1 + encoded.length)
+    frame[0] = realtimeBinaryType.roomState
+    frame.set(encoded, 1)
+    sockets[0].emitBinary(frame.buffer)
+
+    sockets[0].emitClose()
+    sources[0].emitEvent('room_state', {
+      currentRoomId: 'hall',
+      switchCooldownRemainingSeconds: 0,
+      rooms: [{ id: '1', displayName: '一线', current: false, onlineCount: 2 }],
+    })
+
+    expect(roomStates).toEqual([
+      {
+        currentRoomId: '2',
+        switchCooldownRemainingSeconds: 6,
+        rooms: [{ id: '2', displayName: '二线', current: true, onlineCount: 4 }],
+      },
+      {
+        currentRoomId: 'hall',
+        switchCooldownRemainingSeconds: 0,
+        rooms: [{ id: '1', displayName: '一线', current: false, onlineCount: 2 }],
+      },
+    ])
+  })
+
   it('WebSocket 断开后会自动退回 SSE 并继续消费增量事件', () => {
     const sockets = []
     const sources = []

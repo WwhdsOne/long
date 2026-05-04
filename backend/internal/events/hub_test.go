@@ -81,6 +81,23 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 		t.Fatalf("expected no user event for 小红, got %+v", unexpected)
 	default:
 	}
+
+	if err := hub.BroadcastRoomState("阿明", core.RoomList{
+		CurrentRoomID:                  "2",
+		SwitchCooldownRemainingSeconds: 5,
+		Rooms: []core.RoomInfo{
+			{ID: "2", DisplayName: "二线", Current: true, OnlineCount: 9},
+		},
+	}); err != nil {
+		t.Fatalf("broadcast room state: %v", err)
+	}
+
+	roomEvent := readEventByName(t, aming, RoomStateEventName)
+	if !strings.Contains(string(roomEvent.Payload), `"currentRoomId":"2"`) {
+		t.Fatalf("expected room_state for 阿明, got %s", string(roomEvent.Payload))
+	}
+	assertNoEvent(t, anonymous, "匿名")
+	assertNoEvent(t, xiaohong, "小红")
 }
 
 func assertNoEvent(t *testing.T, ch <-chan ServerEvent, label string) {

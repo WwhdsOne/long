@@ -32,6 +32,7 @@ export function createRealtimeTransport(options = {}) {
   const onSnapshot = options.onSnapshot || (() => {})
   const onPublicDelta = options.onPublicDelta || (() => {})
   const onUserDelta = options.onUserDelta || (() => {})
+  const onRoomState = options.onRoomState || (() => {})
   const onOnlineCount = options.onOnlineCount || (() => {})
   const onClickAck = options.onClickAck || (() => {})
   const onTransportState = options.onTransportState || (() => {})
@@ -126,6 +127,9 @@ export function createRealtimeTransport(options = {}) {
       case 'snapshot':
         clearReconnectTimer()
         onSnapshot(message.public ?? {}, message.user ?? null)
+        if (message.roomState) {
+          onRoomState(message.roomState)
+        }
         updateState({
           connected: true,
           degraded: false,
@@ -144,6 +148,15 @@ export function createRealtimeTransport(options = {}) {
       case 'user_delta':
         clearReconnectTimer()
         onUserDelta(message.payload ?? {})
+        updateState({
+          connected: true,
+          degraded: false,
+          mode: 'ws',
+        })
+        return
+      case 'room_state':
+        clearReconnectTimer()
+        onRoomState(message.payload ?? {})
         updateState({
           connected: true,
           degraded: false,
@@ -243,6 +256,7 @@ export function createRealtimeTransport(options = {}) {
 
     source.addEventListener('public_state', handleNamedEvent(onPublicDelta))
     source.addEventListener('user_state', handleNamedEvent(onUserDelta))
+    source.addEventListener('room_state', handleNamedEvent(onRoomState))
     source.addEventListener('online_count', handleNamedEvent(onOnlineCount))
   }
 

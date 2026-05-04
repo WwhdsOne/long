@@ -385,6 +385,214 @@ func (x *PublicDelta) GetAnnouncementVersion() string {
 	return ""
 }
 
+type RoomInfo struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Id                       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	DisplayName              string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Current                  bool                   `protobuf:"varint,3,opt,name=current,proto3" json:"current,omitempty"`
+	Joinable                 bool                   `protobuf:"varint,4,opt,name=joinable,proto3" json:"joinable,omitempty"`
+	OnlineCount              int32                  `protobuf:"varint,5,opt,name=online_count,json=onlineCount,proto3" json:"online_count,omitempty"`
+	CycleEnabled             bool                   `protobuf:"varint,6,opt,name=cycle_enabled,json=cycleEnabled,proto3" json:"cycle_enabled,omitempty"`
+	QueueId                  string                 `protobuf:"bytes,7,opt,name=queue_id,json=queueId,proto3" json:"queue_id,omitempty"`
+	CurrentBossId            string                 `protobuf:"bytes,8,opt,name=current_boss_id,json=currentBossId,proto3" json:"current_boss_id,omitempty"`
+	CurrentBossName          string                 `protobuf:"bytes,9,opt,name=current_boss_name,json=currentBossName,proto3" json:"current_boss_name,omitempty"`
+	CurrentBossStatus        string                 `protobuf:"bytes,10,opt,name=current_boss_status,json=currentBossStatus,proto3" json:"current_boss_status,omitempty"`
+	CurrentBossHp            int64                  `protobuf:"varint,11,opt,name=current_boss_hp,json=currentBossHp,proto3" json:"current_boss_hp,omitempty"`
+	CurrentBossMaxHp         int64                  `protobuf:"varint,12,opt,name=current_boss_max_hp,json=currentBossMaxHp,proto3" json:"current_boss_max_hp,omitempty"`
+	CurrentBossAvgHp         int64                  `protobuf:"varint,13,opt,name=current_boss_avg_hp,json=currentBossAvgHp,proto3" json:"current_boss_avg_hp,omitempty"`
+	CooldownRemainingSeconds int64                  `protobuf:"varint,14,opt,name=cooldown_remaining_seconds,json=cooldownRemainingSeconds,proto3" json:"cooldown_remaining_seconds,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *RoomInfo) Reset() {
+	*x = RoomInfo{}
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoomInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoomInfo) ProtoMessage() {}
+
+func (x *RoomInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoomInfo.ProtoReflect.Descriptor instead.
+func (*RoomInfo) Descriptor() ([]byte, []int) {
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RoomInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *RoomInfo) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *RoomInfo) GetCurrent() bool {
+	if x != nil {
+		return x.Current
+	}
+	return false
+}
+
+func (x *RoomInfo) GetJoinable() bool {
+	if x != nil {
+		return x.Joinable
+	}
+	return false
+}
+
+func (x *RoomInfo) GetOnlineCount() int32 {
+	if x != nil {
+		return x.OnlineCount
+	}
+	return 0
+}
+
+func (x *RoomInfo) GetCycleEnabled() bool {
+	if x != nil {
+		return x.CycleEnabled
+	}
+	return false
+}
+
+func (x *RoomInfo) GetQueueId() string {
+	if x != nil {
+		return x.QueueId
+	}
+	return ""
+}
+
+func (x *RoomInfo) GetCurrentBossId() string {
+	if x != nil {
+		return x.CurrentBossId
+	}
+	return ""
+}
+
+func (x *RoomInfo) GetCurrentBossName() string {
+	if x != nil {
+		return x.CurrentBossName
+	}
+	return ""
+}
+
+func (x *RoomInfo) GetCurrentBossStatus() string {
+	if x != nil {
+		return x.CurrentBossStatus
+	}
+	return ""
+}
+
+func (x *RoomInfo) GetCurrentBossHp() int64 {
+	if x != nil {
+		return x.CurrentBossHp
+	}
+	return 0
+}
+
+func (x *RoomInfo) GetCurrentBossMaxHp() int64 {
+	if x != nil {
+		return x.CurrentBossMaxHp
+	}
+	return 0
+}
+
+func (x *RoomInfo) GetCurrentBossAvgHp() int64 {
+	if x != nil {
+		return x.CurrentBossAvgHp
+	}
+	return 0
+}
+
+func (x *RoomInfo) GetCooldownRemainingSeconds() int64 {
+	if x != nil {
+		return x.CooldownRemainingSeconds
+	}
+	return 0
+}
+
+type RoomState struct {
+	state                          protoimpl.MessageState `protogen:"open.v1"`
+	CurrentRoomId                  string                 `protobuf:"bytes,1,opt,name=current_room_id,json=currentRoomId,proto3" json:"current_room_id,omitempty"`
+	SwitchCooldownRemainingSeconds int64                  `protobuf:"varint,2,opt,name=switch_cooldown_remaining_seconds,json=switchCooldownRemainingSeconds,proto3" json:"switch_cooldown_remaining_seconds,omitempty"`
+	Rooms                          []*RoomInfo            `protobuf:"bytes,3,rep,name=rooms,proto3" json:"rooms,omitempty"`
+	unknownFields                  protoimpl.UnknownFields
+	sizeCache                      protoimpl.SizeCache
+}
+
+func (x *RoomState) Reset() {
+	*x = RoomState{}
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoomState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoomState) ProtoMessage() {}
+
+func (x *RoomState) ProtoReflect() protoreflect.Message {
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoomState.ProtoReflect.Descriptor instead.
+func (*RoomState) Descriptor() ([]byte, []int) {
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RoomState) GetCurrentRoomId() string {
+	if x != nil {
+		return x.CurrentRoomId
+	}
+	return ""
+}
+
+func (x *RoomState) GetSwitchCooldownRemainingSeconds() int64 {
+	if x != nil {
+		return x.SwitchCooldownRemainingSeconds
+	}
+	return 0
+}
+
+func (x *RoomState) GetRooms() []*RoomInfo {
+	if x != nil {
+		return x.Rooms
+	}
+	return nil
+}
+
 type UserDelta struct {
 	state                              protoimpl.MessageState `protogen:"open.v1"`
 	UserStats                          *UserStats             `protobuf:"bytes,1,opt,name=user_stats,json=userStats,proto3" json:"user_stats,omitempty"`
@@ -408,7 +616,7 @@ type UserDelta struct {
 
 func (x *UserDelta) Reset() {
 	*x = UserDelta{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[5]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -420,7 +628,7 @@ func (x *UserDelta) String() string {
 func (*UserDelta) ProtoMessage() {}
 
 func (x *UserDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[5]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -433,7 +641,7 @@ func (x *UserDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserDelta.ProtoReflect.Descriptor instead.
 func (*UserDelta) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{5}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UserDelta) GetUserStats() *UserStats {
@@ -551,7 +759,7 @@ type UserStats struct {
 
 func (x *UserStats) Reset() {
 	*x = UserStats{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[6]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -563,7 +771,7 @@ func (x *UserStats) String() string {
 func (*UserStats) ProtoMessage() {}
 
 func (x *UserStats) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[6]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -576,7 +784,7 @@ func (x *UserStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserStats.ProtoReflect.Descriptor instead.
 func (*UserStats) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{6}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *UserStats) GetNickname() string {
@@ -604,7 +812,7 @@ type LeaderboardEntry struct {
 
 func (x *LeaderboardEntry) Reset() {
 	*x = LeaderboardEntry{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[7]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +824,7 @@ func (x *LeaderboardEntry) String() string {
 func (*LeaderboardEntry) ProtoMessage() {}
 
 func (x *LeaderboardEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[7]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +837,7 @@ func (x *LeaderboardEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaderboardEntry.ProtoReflect.Descriptor instead.
 func (*LeaderboardEntry) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{7}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *LeaderboardEntry) GetRank() int32 {
@@ -670,7 +878,7 @@ type BossPart struct {
 
 func (x *BossPart) Reset() {
 	*x = BossPart{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[8]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +890,7 @@ func (x *BossPart) String() string {
 func (*BossPart) ProtoMessage() {}
 
 func (x *BossPart) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[8]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +903,7 @@ func (x *BossPart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossPart.ProtoReflect.Descriptor instead.
 func (*BossPart) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{8}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BossPart) GetX() int32 {
@@ -783,7 +991,7 @@ type Boss struct {
 
 func (x *Boss) Reset() {
 	*x = Boss{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[9]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -795,7 +1003,7 @@ func (x *Boss) String() string {
 func (*Boss) ProtoMessage() {}
 
 func (x *Boss) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[9]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -808,7 +1016,7 @@ func (x *Boss) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Boss.ProtoReflect.Descriptor instead.
 func (*Boss) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{9}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Boss) GetId() string {
@@ -920,7 +1128,7 @@ type BossLeaderboardEntry struct {
 
 func (x *BossLeaderboardEntry) Reset() {
 	*x = BossLeaderboardEntry{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[10]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -932,7 +1140,7 @@ func (x *BossLeaderboardEntry) String() string {
 func (*BossLeaderboardEntry) ProtoMessage() {}
 
 func (x *BossLeaderboardEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[10]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +1153,7 @@ func (x *BossLeaderboardEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossLeaderboardEntry.ProtoReflect.Descriptor instead.
 func (*BossLeaderboardEntry) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{10}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *BossLeaderboardEntry) GetRank() int32 {
@@ -980,7 +1188,7 @@ type BossUserStats struct {
 
 func (x *BossUserStats) Reset() {
 	*x = BossUserStats{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[11]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -992,7 +1200,7 @@ func (x *BossUserStats) String() string {
 func (*BossUserStats) ProtoMessage() {}
 
 func (x *BossUserStats) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[11]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1005,7 +1213,7 @@ func (x *BossUserStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossUserStats.ProtoReflect.Descriptor instead.
 func (*BossUserStats) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{11}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *BossUserStats) GetNickname() string {
@@ -1056,7 +1264,7 @@ type InventoryItem struct {
 
 func (x *InventoryItem) Reset() {
 	*x = InventoryItem{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[12]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1068,7 +1276,7 @@ func (x *InventoryItem) String() string {
 func (*InventoryItem) ProtoMessage() {}
 
 func (x *InventoryItem) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[12]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1081,7 +1289,7 @@ func (x *InventoryItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InventoryItem.ProtoReflect.Descriptor instead.
 func (*InventoryItem) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{12}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *InventoryItem) GetItemId() string {
@@ -1231,7 +1439,7 @@ type Loadout struct {
 
 func (x *Loadout) Reset() {
 	*x = Loadout{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[13]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1243,7 +1451,7 @@ func (x *Loadout) String() string {
 func (*Loadout) ProtoMessage() {}
 
 func (x *Loadout) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[13]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1256,7 +1464,7 @@ func (x *Loadout) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Loadout.ProtoReflect.Descriptor instead.
 func (*Loadout) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{13}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Loadout) GetWeapon() *InventoryItem {
@@ -1323,7 +1531,7 @@ type CombatStats struct {
 
 func (x *CombatStats) Reset() {
 	*x = CombatStats{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[14]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1335,7 +1543,7 @@ func (x *CombatStats) String() string {
 func (*CombatStats) ProtoMessage() {}
 
 func (x *CombatStats) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[14]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1348,7 +1556,7 @@ func (x *CombatStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CombatStats.ProtoReflect.Descriptor instead.
 func (*CombatStats) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{14}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *CombatStats) GetEffectiveIncrement() int64 {
@@ -1462,7 +1670,7 @@ type Reward struct {
 
 func (x *Reward) Reset() {
 	*x = Reward{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[15]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1474,7 +1682,7 @@ func (x *Reward) String() string {
 func (*Reward) ProtoMessage() {}
 
 func (x *Reward) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[15]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1487,7 +1695,7 @@ func (x *Reward) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reward.ProtoReflect.Descriptor instead.
 func (*Reward) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{15}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *Reward) GetBossId() string {
@@ -1540,7 +1748,7 @@ type TalentTriggerEvent struct {
 
 func (x *TalentTriggerEvent) Reset() {
 	*x = TalentTriggerEvent{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[16]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1552,7 +1760,7 @@ func (x *TalentTriggerEvent) String() string {
 func (*TalentTriggerEvent) ProtoMessage() {}
 
 func (x *TalentTriggerEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[16]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1565,7 +1773,7 @@ func (x *TalentTriggerEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TalentTriggerEvent.ProtoReflect.Descriptor instead.
 func (*TalentTriggerEvent) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{16}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *TalentTriggerEvent) GetTalentId() string {
@@ -1631,7 +1839,7 @@ type BossPartStateDelta struct {
 
 func (x *BossPartStateDelta) Reset() {
 	*x = BossPartStateDelta{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[17]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1643,7 +1851,7 @@ func (x *BossPartStateDelta) String() string {
 func (*BossPartStateDelta) ProtoMessage() {}
 
 func (x *BossPartStateDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[17]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1656,7 +1864,7 @@ func (x *BossPartStateDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossPartStateDelta.ProtoReflect.Descriptor instead.
 func (*BossPartStateDelta) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{17}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *BossPartStateDelta) GetX() int32 {
@@ -1718,7 +1926,7 @@ type TalentBleedState struct {
 
 func (x *TalentBleedState) Reset() {
 	*x = TalentBleedState{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[18]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1730,7 +1938,7 @@ func (x *TalentBleedState) String() string {
 func (*TalentBleedState) ProtoMessage() {}
 
 func (x *TalentBleedState) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[18]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1743,7 +1951,7 @@ func (x *TalentBleedState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TalentBleedState.ProtoReflect.Descriptor instead.
 func (*TalentBleedState) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{18}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TalentBleedState) GetStartedAtMs() int64 {
@@ -1847,7 +2055,7 @@ type TalentCombatState struct {
 
 func (x *TalentCombatState) Reset() {
 	*x = TalentCombatState{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[19]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1859,7 +2067,7 @@ func (x *TalentCombatState) String() string {
 func (*TalentCombatState) ProtoMessage() {}
 
 func (x *TalentCombatState) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[19]
+	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1872,7 +2080,7 @@ func (x *TalentCombatState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TalentCombatState.ProtoReflect.Descriptor instead.
 func (*TalentCombatState) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{19}
+	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *TalentCombatState) GetOmenStacks() int32 {
@@ -2123,7 +2331,27 @@ const file_backend_internal_realtimepb_realtime_proto_rawDesc = "" +
 	"\aroom_id\x18\x03 \x01(\tR\x06roomId\x12\"\n" +
 	"\x04boss\x18\x04 \x01(\v2\x0e.realtime.BossR\x04boss\x12I\n" +
 	"\x10boss_leaderboard\x18\x05 \x03(\v2\x1e.realtime.BossLeaderboardEntryR\x0fbossLeaderboard\x121\n" +
-	"\x14announcement_version\x18\x06 \x01(\tR\x13announcementVersion\"\xfb\x05\n" +
+	"\x14announcement_version\x18\x06 \x01(\tR\x13announcementVersion\"\x9e\x04\n" +
+	"\bRoomInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x18\n" +
+	"\acurrent\x18\x03 \x01(\bR\acurrent\x12\x1a\n" +
+	"\bjoinable\x18\x04 \x01(\bR\bjoinable\x12!\n" +
+	"\fonline_count\x18\x05 \x01(\x05R\vonlineCount\x12#\n" +
+	"\rcycle_enabled\x18\x06 \x01(\bR\fcycleEnabled\x12\x19\n" +
+	"\bqueue_id\x18\a \x01(\tR\aqueueId\x12&\n" +
+	"\x0fcurrent_boss_id\x18\b \x01(\tR\rcurrentBossId\x12*\n" +
+	"\x11current_boss_name\x18\t \x01(\tR\x0fcurrentBossName\x12.\n" +
+	"\x13current_boss_status\x18\n" +
+	" \x01(\tR\x11currentBossStatus\x12&\n" +
+	"\x0fcurrent_boss_hp\x18\v \x01(\x03R\rcurrentBossHp\x12-\n" +
+	"\x13current_boss_max_hp\x18\f \x01(\x03R\x10currentBossMaxHp\x12-\n" +
+	"\x13current_boss_avg_hp\x18\r \x01(\x03R\x10currentBossAvgHp\x12<\n" +
+	"\x1acooldown_remaining_seconds\x18\x0e \x01(\x03R\x18cooldownRemainingSeconds\"\xa8\x01\n" +
+	"\tRoomState\x12&\n" +
+	"\x0fcurrent_room_id\x18\x01 \x01(\tR\rcurrentRoomId\x12I\n" +
+	"!switch_cooldown_remaining_seconds\x18\x02 \x01(\x03R\x1eswitchCooldownRemainingSeconds\x12(\n" +
+	"\x05rooms\x18\x03 \x03(\v2\x12.realtime.RoomInfoR\x05rooms\"\xfb\x05\n" +
 	"\tUserDelta\x122\n" +
 	"\n" +
 	"user_stats\x18\x01 \x01(\v2\x13.realtime.UserStatsR\tuserStats\x12;\n" +
@@ -2348,76 +2576,79 @@ func file_backend_internal_realtimepb_realtime_proto_rawDescGZIP() []byte {
 	return file_backend_internal_realtimepb_realtime_proto_rawDescData
 }
 
-var file_backend_internal_realtimepb_realtime_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_backend_internal_realtimepb_realtime_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_backend_internal_realtimepb_realtime_proto_goTypes = []any{
 	(*ClickRequest)(nil),         // 0: realtime.ClickRequest
 	(*ClickAck)(nil),             // 1: realtime.ClickAck
 	(*UserDeltaPatch)(nil),       // 2: realtime.UserDeltaPatch
 	(*ButtonRef)(nil),            // 3: realtime.ButtonRef
 	(*PublicDelta)(nil),          // 4: realtime.PublicDelta
-	(*UserDelta)(nil),            // 5: realtime.UserDelta
-	(*UserStats)(nil),            // 6: realtime.UserStats
-	(*LeaderboardEntry)(nil),     // 7: realtime.LeaderboardEntry
-	(*BossPart)(nil),             // 8: realtime.BossPart
-	(*Boss)(nil),                 // 9: realtime.Boss
-	(*BossLeaderboardEntry)(nil), // 10: realtime.BossLeaderboardEntry
-	(*BossUserStats)(nil),        // 11: realtime.BossUserStats
-	(*InventoryItem)(nil),        // 12: realtime.InventoryItem
-	(*Loadout)(nil),              // 13: realtime.Loadout
-	(*CombatStats)(nil),          // 14: realtime.CombatStats
-	(*Reward)(nil),               // 15: realtime.Reward
-	(*TalentTriggerEvent)(nil),   // 16: realtime.TalentTriggerEvent
-	(*BossPartStateDelta)(nil),   // 17: realtime.BossPartStateDelta
-	(*TalentBleedState)(nil),     // 18: realtime.TalentBleedState
-	(*TalentCombatState)(nil),    // 19: realtime.TalentCombatState
-	nil,                          // 20: realtime.TalentCombatState.BleedsEntry
-	nil,                          // 21: realtime.TalentCombatState.DoomMarkCumDamageEntry
-	nil,                          // 22: realtime.TalentCombatState.JudgmentDayUsedEntry
-	nil,                          // 23: realtime.TalentCombatState.PartHeavyClickCountEntry
-	nil,                          // 24: realtime.TalentCombatState.PartJudgmentDayCountEntry
-	nil,                          // 25: realtime.TalentCombatState.PartRetainedClicksEntry
-	nil,                          // 26: realtime.TalentCombatState.PartStormComboCountEntry
-	nil,                          // 27: realtime.TalentCombatState.SkinnerPartsEntry
-	nil,                          // 28: realtime.TalentCombatState.SkinnerDurationByPartEntry
+	(*RoomInfo)(nil),             // 5: realtime.RoomInfo
+	(*RoomState)(nil),            // 6: realtime.RoomState
+	(*UserDelta)(nil),            // 7: realtime.UserDelta
+	(*UserStats)(nil),            // 8: realtime.UserStats
+	(*LeaderboardEntry)(nil),     // 9: realtime.LeaderboardEntry
+	(*BossPart)(nil),             // 10: realtime.BossPart
+	(*Boss)(nil),                 // 11: realtime.Boss
+	(*BossLeaderboardEntry)(nil), // 12: realtime.BossLeaderboardEntry
+	(*BossUserStats)(nil),        // 13: realtime.BossUserStats
+	(*InventoryItem)(nil),        // 14: realtime.InventoryItem
+	(*Loadout)(nil),              // 15: realtime.Loadout
+	(*CombatStats)(nil),          // 16: realtime.CombatStats
+	(*Reward)(nil),               // 17: realtime.Reward
+	(*TalentTriggerEvent)(nil),   // 18: realtime.TalentTriggerEvent
+	(*BossPartStateDelta)(nil),   // 19: realtime.BossPartStateDelta
+	(*TalentBleedState)(nil),     // 20: realtime.TalentBleedState
+	(*TalentCombatState)(nil),    // 21: realtime.TalentCombatState
+	nil,                          // 22: realtime.TalentCombatState.BleedsEntry
+	nil,                          // 23: realtime.TalentCombatState.DoomMarkCumDamageEntry
+	nil,                          // 24: realtime.TalentCombatState.JudgmentDayUsedEntry
+	nil,                          // 25: realtime.TalentCombatState.PartHeavyClickCountEntry
+	nil,                          // 26: realtime.TalentCombatState.PartJudgmentDayCountEntry
+	nil,                          // 27: realtime.TalentCombatState.PartRetainedClicksEntry
+	nil,                          // 28: realtime.TalentCombatState.PartStormComboCountEntry
+	nil,                          // 29: realtime.TalentCombatState.SkinnerPartsEntry
+	nil,                          // 30: realtime.TalentCombatState.SkinnerDurationByPartEntry
 }
 var file_backend_internal_realtimepb_realtime_proto_depIdxs = []int32{
-	16, // 0: realtime.ClickAck.talent_events:type_name -> realtime.TalentTriggerEvent
-	17, // 1: realtime.ClickAck.part_state_deltas:type_name -> realtime.BossPartStateDelta
-	19, // 2: realtime.ClickAck.talent_combat_state:type_name -> realtime.TalentCombatState
+	18, // 0: realtime.ClickAck.talent_events:type_name -> realtime.TalentTriggerEvent
+	19, // 1: realtime.ClickAck.part_state_deltas:type_name -> realtime.BossPartStateDelta
+	21, // 2: realtime.ClickAck.talent_combat_state:type_name -> realtime.TalentCombatState
 	2,  // 3: realtime.ClickAck.user_delta:type_name -> realtime.UserDeltaPatch
 	3,  // 4: realtime.ClickAck.button:type_name -> realtime.ButtonRef
-	7,  // 5: realtime.PublicDelta.leaderboard:type_name -> realtime.LeaderboardEntry
-	9,  // 6: realtime.PublicDelta.boss:type_name -> realtime.Boss
-	10, // 7: realtime.PublicDelta.boss_leaderboard:type_name -> realtime.BossLeaderboardEntry
-	6,  // 8: realtime.UserDelta.user_stats:type_name -> realtime.UserStats
-	11, // 9: realtime.UserDelta.my_boss_stats:type_name -> realtime.BossUserStats
-	13, // 10: realtime.UserDelta.loadout:type_name -> realtime.Loadout
-	14, // 11: realtime.UserDelta.combat_stats:type_name -> realtime.CombatStats
-	15, // 12: realtime.UserDelta.recent_rewards:type_name -> realtime.Reward
-	16, // 13: realtime.UserDelta.talent_events:type_name -> realtime.TalentTriggerEvent
-	19, // 14: realtime.UserDelta.talent_combat_state:type_name -> realtime.TalentCombatState
-	8,  // 15: realtime.Boss.parts:type_name -> realtime.BossPart
-	12, // 16: realtime.Loadout.weapon:type_name -> realtime.InventoryItem
-	12, // 17: realtime.Loadout.helmet:type_name -> realtime.InventoryItem
-	12, // 18: realtime.Loadout.chest:type_name -> realtime.InventoryItem
-	12, // 19: realtime.Loadout.gloves:type_name -> realtime.InventoryItem
-	12, // 20: realtime.Loadout.legs:type_name -> realtime.InventoryItem
-	12, // 21: realtime.Loadout.accessory:type_name -> realtime.InventoryItem
-	20, // 22: realtime.TalentCombatState.bleeds:type_name -> realtime.TalentCombatState.BleedsEntry
-	21, // 23: realtime.TalentCombatState.doom_mark_cum_damage:type_name -> realtime.TalentCombatState.DoomMarkCumDamageEntry
-	22, // 24: realtime.TalentCombatState.judgment_day_used:type_name -> realtime.TalentCombatState.JudgmentDayUsedEntry
-	23, // 25: realtime.TalentCombatState.part_heavy_click_count:type_name -> realtime.TalentCombatState.PartHeavyClickCountEntry
-	24, // 26: realtime.TalentCombatState.part_judgment_day_count:type_name -> realtime.TalentCombatState.PartJudgmentDayCountEntry
-	25, // 27: realtime.TalentCombatState.part_retained_clicks:type_name -> realtime.TalentCombatState.PartRetainedClicksEntry
-	26, // 28: realtime.TalentCombatState.part_storm_combo_count:type_name -> realtime.TalentCombatState.PartStormComboCountEntry
-	27, // 29: realtime.TalentCombatState.skinner_parts:type_name -> realtime.TalentCombatState.SkinnerPartsEntry
-	28, // 30: realtime.TalentCombatState.skinner_duration_by_part:type_name -> realtime.TalentCombatState.SkinnerDurationByPartEntry
-	18, // 31: realtime.TalentCombatState.BleedsEntry.value:type_name -> realtime.TalentBleedState
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	9,  // 5: realtime.PublicDelta.leaderboard:type_name -> realtime.LeaderboardEntry
+	11, // 6: realtime.PublicDelta.boss:type_name -> realtime.Boss
+	12, // 7: realtime.PublicDelta.boss_leaderboard:type_name -> realtime.BossLeaderboardEntry
+	5,  // 8: realtime.RoomState.rooms:type_name -> realtime.RoomInfo
+	8,  // 9: realtime.UserDelta.user_stats:type_name -> realtime.UserStats
+	13, // 10: realtime.UserDelta.my_boss_stats:type_name -> realtime.BossUserStats
+	15, // 11: realtime.UserDelta.loadout:type_name -> realtime.Loadout
+	16, // 12: realtime.UserDelta.combat_stats:type_name -> realtime.CombatStats
+	17, // 13: realtime.UserDelta.recent_rewards:type_name -> realtime.Reward
+	18, // 14: realtime.UserDelta.talent_events:type_name -> realtime.TalentTriggerEvent
+	21, // 15: realtime.UserDelta.talent_combat_state:type_name -> realtime.TalentCombatState
+	10, // 16: realtime.Boss.parts:type_name -> realtime.BossPart
+	14, // 17: realtime.Loadout.weapon:type_name -> realtime.InventoryItem
+	14, // 18: realtime.Loadout.helmet:type_name -> realtime.InventoryItem
+	14, // 19: realtime.Loadout.chest:type_name -> realtime.InventoryItem
+	14, // 20: realtime.Loadout.gloves:type_name -> realtime.InventoryItem
+	14, // 21: realtime.Loadout.legs:type_name -> realtime.InventoryItem
+	14, // 22: realtime.Loadout.accessory:type_name -> realtime.InventoryItem
+	22, // 23: realtime.TalentCombatState.bleeds:type_name -> realtime.TalentCombatState.BleedsEntry
+	23, // 24: realtime.TalentCombatState.doom_mark_cum_damage:type_name -> realtime.TalentCombatState.DoomMarkCumDamageEntry
+	24, // 25: realtime.TalentCombatState.judgment_day_used:type_name -> realtime.TalentCombatState.JudgmentDayUsedEntry
+	25, // 26: realtime.TalentCombatState.part_heavy_click_count:type_name -> realtime.TalentCombatState.PartHeavyClickCountEntry
+	26, // 27: realtime.TalentCombatState.part_judgment_day_count:type_name -> realtime.TalentCombatState.PartJudgmentDayCountEntry
+	27, // 28: realtime.TalentCombatState.part_retained_clicks:type_name -> realtime.TalentCombatState.PartRetainedClicksEntry
+	28, // 29: realtime.TalentCombatState.part_storm_combo_count:type_name -> realtime.TalentCombatState.PartStormComboCountEntry
+	29, // 30: realtime.TalentCombatState.skinner_parts:type_name -> realtime.TalentCombatState.SkinnerPartsEntry
+	30, // 31: realtime.TalentCombatState.skinner_duration_by_part:type_name -> realtime.TalentCombatState.SkinnerDurationByPartEntry
+	20, // 32: realtime.TalentCombatState.BleedsEntry.value:type_name -> realtime.TalentBleedState
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_backend_internal_realtimepb_realtime_proto_init() }
@@ -2431,7 +2662,7 @@ func file_backend_internal_realtimepb_realtime_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_backend_internal_realtimepb_realtime_proto_rawDesc), len(file_backend_internal_realtimepb_realtime_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   29,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

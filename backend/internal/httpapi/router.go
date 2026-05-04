@@ -86,6 +86,7 @@ type StateView interface {
 	GetState(context.Context, string) (core.State, error)
 	GetSnapshot(context.Context) (core.Snapshot, error)
 	GetUserState(context.Context, string) (core.UserState, error)
+	ListRooms(context.Context, string) (core.RoomList, error)
 }
 
 // RealtimeHub 为 SSE 与 WebSocket 共享的订阅中心。
@@ -209,7 +210,9 @@ const playerSessionCookieName = "long_player_session"
 func registerRoutes(engine *route.Engine, options Options) {
 	stateView := options.StateView
 	if stateView == nil {
-		stateView = options.Store
+		if candidate, ok := options.Store.(StateView); ok {
+			stateView = candidate
+		}
 	}
 
 	registerPublicRoutes(engine, options, stateView)
