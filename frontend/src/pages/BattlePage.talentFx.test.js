@@ -87,6 +87,14 @@ describe('BattlePage 战斗特效覆盖层', () => {
     expect(canvasSource).toContain('sp.life -= 0.026')
   })
 
+  it('战斗页保留房间伤害榜，大厅页保留点击总榜入口', () => {
+    expect(battleSource).toContain('Boss 伤害榜')
+    expect(battleSource).toContain('点击总榜')
+    expect(battleSource).toContain('isHallRoom')
+    expect(battleSource).toContain('bossLeaderboard.length')
+    expect(battleSource).toContain('leaderboard.length')
+  })
+
   it('崩塌只保留覆盖层瞬发特效，不再在格子内部重复渲染 PixelShatter', () => {
     expect(battleSource).toContain("<PixelEffectCanvas effect=\"collapse_trigger\" :size=\"effectCanvasSize(5)\" :loop=\"false\"/>")
     expect(battleSource).not.toContain('<PixelShatter')

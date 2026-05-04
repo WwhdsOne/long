@@ -1333,7 +1333,6 @@ const silverStormActive = computed(() => {
       </article>
     </section>
 
-
     <aside class="social-panel social-panel--ranking">
       <section class="social-card leaderboard-card leaderboard-card--stacked">
         <section v-if="!isHallRoom" class="leaderboard-card__section">
@@ -1384,6 +1383,7 @@ const silverStormActive = computed(() => {
         </section>
       </section>
     </aside>
+
 
   </section>
   </div>
