@@ -207,7 +207,6 @@ export function createRealtimeTransport(options = {}) {
       mode: 'sse',
     })
     onTransportError(message || '实时主链路暂时不可用，已切回兼容模式。')
-    scheduleWebSocketRetry()
 
     let source
     try {
