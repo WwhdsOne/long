@@ -224,7 +224,10 @@ func (s *Store) SwitchPlayerRoom(ctx context.Context, nickname string, targetRoo
 		}
 	}
 
-	nextCooldownUntil := int64(0)
+	nextCooldownUntil := cooldownUntil
+	if nextCooldownUntil <= nowUnix {
+		nextCooldownUntil = 0
+	}
 	pipe := s.client.TxPipeline()
 	pipe.Set(ctx, s.playerRoomKey(normalizedNickname), targetRoomID, 0)
 	if !isHallRoomID(targetRoomID) && targetRoomID != currentRoomID && s.roomConfig.SwitchCooldown > 0 {

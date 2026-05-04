@@ -512,8 +512,12 @@ func TestSwitchPlayerRoomAllowsHall(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("activate room 1 boss: %v", err)
 	}
-	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "1"); err != nil {
+	enterResult, err := store.SwitchPlayerRoom(ctx, "阿明", "1")
+	if err != nil {
 		t.Fatalf("switch into room 1: %v", err)
+	}
+	if enterResult.CooldownRemainingSeconds <= 0 {
+		t.Fatalf("expected entering room 1 to start cooldown, got %d", enterResult.CooldownRemainingSeconds)
 	}
 	result, err := store.SwitchPlayerRoom(ctx, "阿明", "hall")
 	if err != nil {
@@ -521,6 +525,35 @@ func TestSwitchPlayerRoomAllowsHall(t *testing.T) {
 	}
 	if result.CurrentRoomID != "hall" {
 		t.Fatalf("expected current room to be hall, got %q", result.CurrentRoomID)
+	}
+	if result.CooldownRemainingSeconds != enterResult.CooldownRemainingSeconds {
+		t.Fatalf("expected hall to keep cooldown %d, got %d", enterResult.CooldownRemainingSeconds, result.CooldownRemainingSeconds)
+	}
+}
+
+func TestSwitchPlayerRoomRejectsJoinFromHallDuringCooldown(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if _, err := store.ActivateBossInRoom(ctx, "1", BossUpsert{
+		ID:    "room-1-boss",
+		Name:  "一线 Boss",
+		MaxHP: 20,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 20, CurrentHP: 20, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 1 boss: %v", err)
+	}
+	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "1"); err != nil {
+		t.Fatalf("switch into room 1: %v", err)
+	}
+	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "hall"); err != nil {
+		t.Fatalf("switch to hall: %v", err)
+	}
+	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "1"); !errors.Is(err, ErrRoomSwitchCooldown) {
+		t.Fatalf("expected hall rejoin to be blocked by cooldown, got %v", err)
 	}
 }
 

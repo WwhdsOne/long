@@ -24,15 +24,13 @@ describe('BattlePage 房间战斗页', () => {
     expect(battleSource).toContain('当前处于大厅。这里只显示战线分流和点击总榜，不显示 Boss 战斗区与 Boss 伤害榜。')
   })
 
-  it('战斗房间显示退出按钮，未解锁前覆盖倒计时并使用分秒格式', () => {
-    expect(battleSource).toContain('const roomExitCooldownRemainingSeconds = computed(() => {')
-    expect(battleSource).toContain('const roomExitLocked = computed(() => roomExitCooldownRemainingSeconds.value > 0)')
-    expect(battleSource).toContain(':disabled="roomExitLocked || roomSwitching"')
-    expect(battleSource).toContain('function formatRoomExitCooldown(seconds) {')
-    expect(battleSource).toContain("String(minutes).padStart(2, '0')")
-    expect(battleSource).toContain("String(remainSeconds).padStart(2, '0')")
-    expect(battleSource).toContain("{{ formatRoomExitCooldown(roomExitCooldownRemainingSeconds) }}")
-    expect(battleSource).toContain("background: 'rgba(7, 12, 20, 0.78)'")
+  it('战斗房间允许随时退出，并复用公共切房冷却标签', () => {
+    expect(battleSource).toContain('const roomJoinCooldownRemainingSeconds = computed(() => {')
+    expect(battleSource).toContain("import RoomSwitchCooldownTag from '../components/RoomSwitchCooldownTag.vue'")
+    expect(battleSource).toContain('<RoomSwitchCooldownTag :cooldown-remaining-seconds="roomJoinCooldownRemainingSeconds" />')
+    expect(battleSource).toContain(':disabled="roomSwitching"')
+    expect(battleSource).not.toContain('const roomExitLocked = computed(() => roomExitCooldownRemainingSeconds.value > 0)')
+    expect(battleSource).not.toContain('function formatRoomExitCooldown(seconds) {')
   })
 
   it('房间冷却结束时间由 /api/rooms 和切房返回同步', () => {

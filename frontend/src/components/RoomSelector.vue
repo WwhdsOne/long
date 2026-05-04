@@ -1,4 +1,5 @@
 <script setup>
+import RoomSwitchCooldownTag from './RoomSwitchCooldownTag.vue'
 import { formatIntegerExact } from '../utils/formatNumber'
 
 const props = defineProps({
@@ -21,6 +22,10 @@ const props = defineProps({
   loggedIn: {
     type: Boolean,
     default: false,
+  },
+  cooldownRemainingSeconds: {
+    type: Number,
+    default: 0,
   },
 })
 
@@ -82,6 +87,7 @@ function roomActionLabel(room) {
   if (!props.loggedIn) return '登录后切换'
   if (props.switching) return '切换中'
   if (isCurrentRoom(room)) return '当前所在'
+  if (props.cooldownRemainingSeconds > 0) return '冷却未结束'
   if (room?.joinable === false) return '暂不可切'
   return '进入战线'
 }
@@ -91,15 +97,18 @@ function isCurrentRoom(room) {
 }
 
 function canJoin(room) {
-  return props.loggedIn && !props.switching && room?.joinable !== false && !isCurrentRoom(room)
+  return props.loggedIn && !props.switching && props.cooldownRemainingSeconds <= 0 && room?.joinable !== false && !isCurrentRoom(room)
 }
 </script>
 
 <template>
   <section class="room-selector" aria-label="房间选择">
     <div class="room-selector__head">
-      <strong>战线分流</strong>
-      <small>{{ currentRoomSummary(currentRoomId) }}</small>
+      <div class="room-selector__title">
+        <strong>战线分流</strong>
+        <small>{{ currentRoomSummary(currentRoomId) }}</small>
+      </div>
+      <RoomSwitchCooldownTag :cooldown-remaining-seconds="cooldownRemainingSeconds" />
     </div>
     <div class="room-selector__list">
       <button
@@ -160,10 +169,17 @@ function canJoin(room) {
 
 .room-selector__head {
   display: flex;
-  justify-content: start;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  color: #8ca1c0;
+}
+
+.room-selector__title {
+  display: flex;
   align-items: center;
   gap: 2px;
-  color: #8ca1c0;
+  min-width: 0;
 }
 
 .room-selector__head small,

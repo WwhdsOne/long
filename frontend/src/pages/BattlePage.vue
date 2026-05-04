@@ -3,6 +3,7 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import PixelEffectCanvas from '../components/PixelEffectCanvas.vue'
 import RoomSelector from '../components/RoomSelector.vue'
+import RoomSwitchCooldownTag from '../components/RoomSwitchCooldownTag.vue'
 import { formatCompact, formatIntegerExact, ratioPercent } from '../utils/formatNumber.js'
 
 const {
@@ -146,24 +147,15 @@ let recoverTimer = 0
 let lastAttackTime = 0
 let lastPointerDown = 0
 
-const roomExitCooldownRemainingSeconds = computed(() => {
+const roomJoinCooldownRemainingSeconds = computed(() => {
   void nowTick.value
-  if (isHallRoom.value) return 0
   const endsAt = Number(roomSwitchCooldownEndsAt.value || 0)
   if (!Number.isFinite(endsAt) || endsAt <= 0) return 0
   return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
 })
-const roomExitLocked = computed(() => roomExitCooldownRemainingSeconds.value > 0)
-
-function formatRoomExitCooldown(seconds) {
-  const totalSeconds = Math.max(0, Number(seconds || 0))
-  const minutes = Math.floor(totalSeconds / 60)
-  const remainSeconds = totalSeconds % 60
-  return `${String(minutes).padStart(2, '0')}:${String(remainSeconds).padStart(2, '0')}`
-}
 
 function exitCurrentRoom() {
-  if (roomExitLocked.value || roomSwitching.value) return
+  if (roomSwitching.value) return
   pendingScrollToTopAfterExit.value = true
   joinRoom(HALL_ROOM_ID)
 }
@@ -743,6 +735,7 @@ const silverStormActive = computed(() => {
           :switching="roomSwitching"
           :error="roomError"
           :logged-in="isLoggedIn"
+          :cooldown-remaining-seconds="roomJoinCooldownRemainingSeconds"
           @join="joinRoom"
       />
 
@@ -1161,36 +1154,18 @@ const silverStormActive = computed(() => {
 
       <section v-else class="feedback-panel feedback-panel--compact">
         <p>当前战线：{{ currentRoomDisplay }}。我的战力 {{ formatCompact(myBattlePower) }}，Boss战力 {{ formatCompact(bossBattlePower) }}。</p>
+        <RoomSwitchCooldownTag :cooldown-remaining-seconds="roomJoinCooldownRemainingSeconds" />
         <button
             class="nickname-form__submit nickname-form__submit--ghost"
             type="button"
-            :disabled="roomExitLocked || roomSwitching"
+            :disabled="roomSwitching"
             :style="{
               position: 'relative',
-              overflow: 'hidden',
               minWidth: '172px',
-              color: roomExitLocked ? 'rgba(255,255,255,0.24)' : undefined,
             }"
             @click="exitCurrentRoom"
         >
-          <span :style="{ opacity: roomExitLocked ? 0.2 : 1 }">退出当前房间</span>
-          <span
-              v-if="roomExitLocked"
-              :style="{
-                position: 'absolute',
-                inset: '0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'rgba(7, 12, 20, 0.78)',
-                color: '#f8fafc',
-                fontWeight: '800',
-                letterSpacing: '0.08em',
-                backdropFilter: 'blur(3px)',
-              }"
-          >
-            {{ formatRoomExitCooldown(roomExitCooldownRemainingSeconds) }}
-          </span>
+          <span>退出当前房间</span>
         </button>
       </section>
 
