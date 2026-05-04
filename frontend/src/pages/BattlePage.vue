@@ -201,8 +201,12 @@ function measureBossGridRect() {
   return bossGridRect
 }
 
+function invalidateBossGridRect() {
+  bossGridRect = null
+}
+
 function updateCursorPos(e) {
-  const rect = bossGridRect || measureBossGridRect()
+  const rect = measureBossGridRect()
   if (!rect) return
   queueBossCursorPosition(e.clientX - rect.left, e.clientY - rect.top)
 }
@@ -409,6 +413,8 @@ function handleBossGridClick(e) {
 onMounted(() => {
   measureBossGridRect()
   measureBossCellSize()
+  window.addEventListener('scroll', invalidateBossGridRect, {passive: true})
+  window.addEventListener('resize', invalidateBossGridRect)
   if (typeof ResizeObserver !== 'undefined') {
     bossGridResizeObserver = new ResizeObserver(() => {
       measureBossGridRect()
@@ -424,6 +430,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('scroll', invalidateBossGridRect)
+  window.removeEventListener('resize', invalidateBossGridRect)
   bossGridResizeObserver?.disconnect?.()
   bossGridResizeObserver = null
   clearInterval(tickTimer)
