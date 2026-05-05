@@ -46,6 +46,7 @@
   - [implementation/2026-05-02-任务模型升级实施计划.md](./implementation/2026-05-02-任务模型升级实施计划.md)
   - [implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md](./implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md)
   - [implementation/2026-05-02-资料页装备栏与生成失败日志实施计划.md](./implementation/2026-05-02-资料页装备栏与生成失败日志实施计划.md)
+  - [implementation/2026-05-06-部署后测试与性能验收方案.md](./implementation/2026-05-06-部署后测试与性能验收方案.md)
 
 ### 天赋与伤害链路
 
@@ -70,6 +71,8 @@
 ### Boss 与战斗表现
 
 - [designs/2026-04-25-Boss分区基础视觉与点击口径设计.md](./designs/2026-04-25-Boss分区基础视觉与点击口径设计.md)
+- [developer-reference/2026-05-06-local-click-latency-脚本使用说明.md](./developer-reference/2026-05-06-local-click-latency-脚本使用说明.md)
+- [reports/2026-05-06-点击链路性能记录模板.md](./reports/2026-05-06-点击链路性能记录模板.md)
 - [reports/2026-04-25-Boss分区改造实施记录.md](./reports/2026-04-25-Boss分区改造实施记录.md)
 - [reports/2026-05-04-user-state-payload-optimization-summary.md](./reports/2026-05-04-user-state-payload-optimization-summary.md)
 - [implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md](./implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md)

@@ -50,11 +50,11 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change core.StateChange) 
 		return nil
 	}
 
-	userStates, err := d.cache.RefreshUsers(ctx, targetNicknames)
+	includeProfile := shouldBroadcastUserProfile(change.Type)
+	userStates, err := d.cache.RefreshUsers(ctx, targetNicknames, includeProfile)
 	if err != nil {
 		return err
 	}
-	includeProfile := shouldBroadcastUserProfile(change.Type)
 	for nickname, userState := range userStates {
 		if err := d.hub.BroadcastUser(nickname, userState, includeProfile); err != nil {
 			return err

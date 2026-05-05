@@ -15,6 +15,43 @@ import (
 	"long/internal/nickname"
 )
 
+type countingRedisClient struct {
+	redis.UniversalClient
+	hmgetKeys   map[string]int
+	hgetallKeys map[string]int
+	smemberKeys map[string]int
+}
+
+func newCountingRedisClient(client redis.UniversalClient) *countingRedisClient {
+	return &countingRedisClient{
+		UniversalClient: client,
+		hmgetKeys:       make(map[string]int),
+		hgetallKeys:     make(map[string]int),
+		smemberKeys:     make(map[string]int),
+	}
+}
+
+func (c *countingRedisClient) HMGet(ctx context.Context, key string, fields ...string) *redis.SliceCmd {
+	c.hmgetKeys[key]++
+	return c.UniversalClient.HMGet(ctx, key, fields...)
+}
+
+func (c *countingRedisClient) HGetAll(ctx context.Context, key string) *redis.MapStringStringCmd {
+	c.hgetallKeys[key]++
+	return c.UniversalClient.HGetAll(ctx, key)
+}
+
+func (c *countingRedisClient) SMembers(ctx context.Context, key string) *redis.StringSliceCmd {
+	c.smemberKeys[key]++
+	return c.UniversalClient.SMembers(ctx, key)
+}
+
+func (c *countingRedisClient) reset() {
+	clear(c.hmgetKeys)
+	clear(c.hgetallKeys)
+	clear(c.smemberKeys)
+}
+
 func newTestStore(t *testing.T) (*Store, func()) {
 	t.Helper()
 
@@ -31,6 +68,27 @@ func newTestStore(t *testing.T) (*Store, func()) {
 			CriticalChancePercent: 5,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
 			_ = client.Close()
+			server.Close()
+		}
+}
+
+func newCountingTestStore(t *testing.T) (*Store, *countingRedisClient, func()) {
+	t.Helper()
+
+	server, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("start miniredis: %v", err)
+	}
+
+	baseClient := redis.NewClient(&redis.Options{
+		Addr: server.Addr(),
+	})
+	client := newCountingRedisClient(baseClient)
+
+	return NewStore(client, "vote:", StoreOptions{
+			CriticalChancePercent: 5,
+		}, nickname.NewValidator([]string{"习近平", "xjp"})), client, func() {
+			_ = baseClient.Close()
 			server.Close()
 		}
 }
@@ -2343,7 +2401,7 @@ func TestListLeaderboardIncludingZeroClickPlayers(t *testing.T) {
 	for index := 1; index <= 15; index++ {
 		nickname := fmt.Sprintf("玩家%02d", index)
 		if err := store.client.ZAdd(ctx, store.playerIndexKey, redis.Z{
-			Score:  float64(200-index),
+			Score:  float64(200 - index),
 			Member: nickname,
 		}).Err(); err != nil {
 			t.Fatalf("seed player index: %v", err)
@@ -3223,6 +3281,111 @@ func TestGetUserStateConsumesPendingTalentEvents(t *testing.T) {
 	}
 	if len(userState.TalentEvents) != 0 {
 		t.Fatalf("expected pending talent events consumed after first read, got %+v", userState.TalentEvents)
+	}
+}
+
+func TestGetUserStateReadsPlayerInstancesOnce(t *testing.T) {
+	store, counter, cleanup := newCountingTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "实例单读测试"
+
+	seedEquipmentDefinition(t, store, ctx, "single-read-sword", "weapon", 10)
+	instanceID := seedOwnedInstance(t, store, ctx, nickname, "single-read-sword")
+	if err := store.client.HSet(ctx, store.loadoutKey(nickname), "weapon", instanceID).Err(); err != nil {
+		t.Fatalf("seed loadout: %v", err)
+	}
+	counter.reset()
+
+	if _, err := store.GetUserState(ctx, nickname); err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+	if counter.smemberKeys[store.playerInstancesKey(nickname)] != 1 {
+		t.Fatalf("expected player instances to be read once, got %+v", counter.smemberKeys)
+	}
+}
+
+func TestGetUserStateDeduplicatesEquipmentDefinitionReadsWithinRequest(t *testing.T) {
+	store, counter, cleanup := newCountingTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "定义去重测试"
+
+	seedEquipmentDefinition(t, store, ctx, "shared-sword", "weapon", 10)
+	weaponInstanceID := seedOwnedInstance(t, store, ctx, nickname, "shared-sword")
+	_ = seedOwnedInstance(t, store, ctx, nickname, "shared-sword")
+	if err := store.client.HSet(ctx, store.loadoutKey(nickname), "weapon", weaponInstanceID).Err(); err != nil {
+		t.Fatalf("seed loadout: %v", err)
+	}
+	counter.reset()
+
+	if _, err := store.GetUserState(ctx, nickname); err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+	if counter.hmgetKeys[store.equipmentKey("shared-sword")] != 1 {
+		t.Fatalf("expected one equipment definition read within request, got %+v", counter.hmgetKeys)
+	}
+}
+
+func TestGetEquipmentDefinitionUsesShortTTLCacheAndInvalidatesOnSave(t *testing.T) {
+	store, counter, cleanup := newCountingTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0)
+	store.now = func() time.Time {
+		return now
+	}
+
+	seedEquipmentDefinition(t, store, ctx, "cache-sword", "weapon", 10)
+	counter.reset()
+
+	definition, err := store.getEquipmentDefinition(ctx, "cache-sword")
+	if err != nil {
+		t.Fatalf("first get equipment definition: %v", err)
+	}
+	if definition.AttackPower != 10 {
+		t.Fatalf("unexpected first definition: %+v", definition)
+	}
+	definition, err = store.getEquipmentDefinition(ctx, "cache-sword")
+	if err != nil {
+		t.Fatalf("second get equipment definition: %v", err)
+	}
+	if counter.hmgetKeys[store.equipmentKey("cache-sword")] != 1 {
+		t.Fatalf("expected second immediate read to hit local cache, got %+v", counter.hmgetKeys)
+	}
+
+	if err := store.SaveEquipmentDefinition(ctx, EquipmentDefinition{
+		ItemID:      "cache-sword",
+		Name:        "cache-sword-v2",
+		Slot:        "weapon",
+		AttackPower: 25,
+	}); err != nil {
+		t.Fatalf("save equipment definition: %v", err)
+	}
+	definition, err = store.getEquipmentDefinition(ctx, "cache-sword")
+	if err != nil {
+		t.Fatalf("get equipment definition after save: %v", err)
+	}
+	if definition.AttackPower != 25 || definition.Name != "cache-sword-v2" {
+		t.Fatalf("expected refreshed definition after save, got %+v", definition)
+	}
+	if counter.hmgetKeys[store.equipmentKey("cache-sword")] != 2 {
+		t.Fatalf("expected save to invalidate local cache, got %+v", counter.hmgetKeys)
+	}
+
+	now = now.Add(31 * time.Second)
+	definition, err = store.getEquipmentDefinition(ctx, "cache-sword")
+	if err != nil {
+		t.Fatalf("get equipment definition after ttl: %v", err)
+	}
+	if definition.AttackPower != 25 {
+		t.Fatalf("unexpected definition after ttl: %+v", definition)
+	}
+	if counter.hmgetKeys[store.equipmentKey("cache-sword")] != 3 {
+		t.Fatalf("expected cache entry to expire after ttl, got %+v", counter.hmgetKeys)
 	}
 }
 

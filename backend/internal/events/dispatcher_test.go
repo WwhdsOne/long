@@ -10,9 +10,12 @@ import (
 )
 
 type dispatcherTestReader struct {
-	snapshot  core.Snapshot
-	userState core.UserState
-	roomList  core.RoomList
+	snapshot          core.Snapshot
+	userState         core.UserState
+	realtimeUserState core.UserState
+	roomList          core.RoomList
+	fullCalls         int
+	realtimeCalls     int
 }
 
 func (r *dispatcherTestReader) GetSnapshot(context.Context) (core.Snapshot, error) {
@@ -20,7 +23,13 @@ func (r *dispatcherTestReader) GetSnapshot(context.Context) (core.Snapshot, erro
 }
 
 func (r *dispatcherTestReader) GetUserState(context.Context, string) (core.UserState, error) {
+	r.fullCalls++
 	return r.userState, nil
+}
+
+func (r *dispatcherTestReader) GetRealtimeUserState(context.Context, string) (core.UserState, error) {
+	r.realtimeCalls++
+	return r.realtimeUserState, nil
 }
 
 func (r *dispatcherTestReader) GetBossResources(context.Context) (core.BossResources, error) {
@@ -185,6 +194,56 @@ func TestDispatcherHandleEquipmentChangeBroadcastsProfileFields(t *testing.T) {
 	}
 	if !strings.Contains(payload, `"attackPower":128`) || !strings.Contains(payload, `"effectiveIncrement":7`) {
 		t.Fatalf("expected equipment change to keep combatStats, got %s", payload)
+	}
+	if reader.fullCalls != 1 || reader.realtimeCalls != 0 {
+		t.Fatalf("expected equipment change to use full user state path, got full=%d realtime=%d", reader.fullCalls, reader.realtimeCalls)
+	}
+}
+
+func TestDispatcherHandleMessageChangeUsesRealtimeUserStateAndKeepsTalentFields(t *testing.T) {
+	reader := &dispatcherTestReader{
+		userState: core.UserState{
+			UserStats: &core.UserStats{Nickname: "阿明", ClickCount: 9},
+			Loadout: core.Loadout{
+				Weapon: &core.InventoryItem{ItemID: "iron-sword", Name: "铁剑", Slot: "weapon"},
+			},
+			CombatStats: core.CombatStats{AttackPower: 128, EffectiveIncrement: 7},
+		},
+		realtimeUserState: core.UserState{
+			UserStats:         &core.UserStats{Nickname: "阿明", ClickCount: 9},
+			TalentEvents:      []core.TalentTriggerEvent{{TalentID: "crit_bleed", Name: "致命出血", EffectType: "bleed", Message: "出血结算"}},
+			TalentCombatState: &core.TalentCombatState{},
+		},
+	}
+	cache := NewCache(reader)
+	hub := NewHub()
+	dispatcher := NewDispatcher(cache, hub, 1)
+
+	client, unsubscribe := hub.Subscribe("阿明")
+	defer unsubscribe()
+	_ = readEventByName(t, client, OnlineCountEventName)
+
+	if err := dispatcher.HandleChange(context.Background(), core.StateChange{
+		Type:      core.StateChangeMessageCreated,
+		Nickname:  "阿明",
+		Timestamp: 1,
+	}); err != nil {
+		t.Fatalf("handle message change: %v", err)
+	}
+
+	event := readEventByName(t, client, UserStateEventName)
+	payload := string(event.Payload)
+	if !strings.Contains(payload, `"talentEvents":[{"talentId":"crit_bleed"`) {
+		t.Fatalf("expected realtime path to keep talent events, got %s", payload)
+	}
+	if !strings.Contains(payload, `"talentCombatState":{`) {
+		t.Fatalf("expected realtime path to keep talent combat state, got %s", payload)
+	}
+	if strings.Contains(payload, `"loadout"`) || strings.Contains(payload, `"combatStats"`) {
+		t.Fatalf("expected slim realtime payload without profile fields, got %s", payload)
+	}
+	if reader.fullCalls != 0 || reader.realtimeCalls != 1 {
+		t.Fatalf("expected message change to use realtime user state path, got full=%d realtime=%d", reader.fullCalls, reader.realtimeCalls)
 	}
 }
 

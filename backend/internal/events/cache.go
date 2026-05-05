@@ -8,6 +8,10 @@ import (
 	"long/internal/core"
 )
 
+type realtimeUserStateReader interface {
+	GetRealtimeUserState(context.Context, string) (core.UserState, error)
+}
+
 // Cache 在进程内缓存公共快照与个人态，避免每次推送都回源 Redis 聚合。
 type Cache struct {
 	reader             StateReader
@@ -130,12 +134,29 @@ func (c *Cache) GetUserState(ctx context.Context, nickname string) (core.UserSta
 
 // RefreshUser 强制回源刷新一个昵称的个人态。
 func (c *Cache) RefreshUser(ctx context.Context, nickname string) (core.UserState, error) {
+	return c.refreshUser(ctx, nickname, true)
+}
+
+func (c *Cache) refreshUser(ctx context.Context, nickname string, includeProfile bool) (core.UserState, error) {
 	normalizedNickname := strings.TrimSpace(nickname)
-	userState, err := c.reader.GetUserState(ctx, normalizedNickname)
+	var (
+		userState core.UserState
+		err       error
+	)
+	if includeProfile {
+		userState, err = c.reader.GetUserState(ctx, normalizedNickname)
+	} else if realtimeReader, ok := c.reader.(realtimeUserStateReader); ok {
+		userState, err = realtimeReader.GetRealtimeUserState(ctx, normalizedNickname)
+	} else {
+		userState, err = c.reader.GetUserState(ctx, normalizedNickname)
+	}
 	if err != nil {
 		return core.UserState{}, err
 	}
 	if normalizedNickname == "" {
+		return userState, nil
+	}
+	if !includeProfile {
 		return userState, nil
 	}
 
@@ -147,7 +168,7 @@ func (c *Cache) RefreshUser(ctx context.Context, nickname string) (core.UserStat
 }
 
 // RefreshUsers 批量刷新多个昵称的个人态。
-func (c *Cache) RefreshUsers(ctx context.Context, nicknames []string) (map[string]core.UserState, error) {
+func (c *Cache) RefreshUsers(ctx context.Context, nicknames []string, includeProfile bool) (map[string]core.UserState, error) {
 	refreshed := make(map[string]core.UserState, len(nicknames))
 	seen := make(map[string]struct{}, len(nicknames))
 
@@ -161,7 +182,7 @@ func (c *Cache) RefreshUsers(ctx context.Context, nicknames []string) (map[strin
 		}
 		seen[normalizedNickname] = struct{}{}
 
-		userState, err := c.RefreshUser(ctx, normalizedNickname)
+		userState, err := c.refreshUser(ctx, normalizedNickname, includeProfile)
 		if err != nil {
 			return nil, err
 		}

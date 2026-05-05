@@ -60,8 +60,11 @@ const (
 	bossStatusActive   = "active"
 	bossStatusDefeated = "defeated"
 
-	bossPartClickSlugPrefix = "boss-part:"
+	bossPartClickSlugPrefix     = "boss-part:"
+	equipmentDefinitionCacheTTL = 30 * time.Second
 )
+
+var loadoutSlots = []string{"weapon", "helmet", "chest", "gloves", "legs", "accessory"}
 
 // UserStats 用户统计信息
 type UserStats struct {
@@ -599,8 +602,21 @@ type Store struct {
 	combatStatsCache   map[string]CombatStats
 	combatStatsCacheMu sync.RWMutex
 
+	equipmentDefinitionCache   map[string]cachedEquipmentDefinition
+	equipmentDefinitionCacheMu sync.RWMutex
+
 	compiledTalentCache   map[string]*CompiledTalentSet
 	compiledTalentCacheMu sync.RWMutex
+}
+
+type cachedEquipmentDefinition struct {
+	definition EquipmentDefinition
+	expiresAt  time.Time
+}
+
+type equipmentDefinitionRequestCache struct {
+	definitions map[string]EquipmentDefinition
+	missing     map[string]struct{}
 }
 
 // NewStore 创建 Redis 投票存储实例
@@ -654,18 +670,19 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		roll: func(limit int) int {
 			return rand.IntN(limit)
 		},
-		now:                   time.Now,
-		validator:             validator,
-		bossHistoryArchiver:   options.BossHistoryArchiver,
-		bossHistoryStore:      options.BossHistoryStore,
-		messageStore:          options.MessageStore,
-		taskDefinitionStore:   options.TaskDefinitionStore,
-		taskClaimLogStore:     options.TaskClaimLogStore,
-		taskCycleArchiveStore: options.TaskCycleArchiveStore,
-		shopCatalogStore:      options.ShopCatalogStore,
-		shopPurchaseLogStore:  options.ShopPurchaseLogStore,
-		combatStatsCache:      make(map[string]CombatStats),
-		compiledTalentCache:   make(map[string]*CompiledTalentSet),
+		now:                      time.Now,
+		validator:                validator,
+		bossHistoryArchiver:      options.BossHistoryArchiver,
+		bossHistoryStore:         options.BossHistoryStore,
+		messageStore:             options.MessageStore,
+		taskDefinitionStore:      options.TaskDefinitionStore,
+		taskClaimLogStore:        options.TaskClaimLogStore,
+		taskCycleArchiveStore:    options.TaskCycleArchiveStore,
+		shopCatalogStore:         options.ShopCatalogStore,
+		shopPurchaseLogStore:     options.ShopPurchaseLogStore,
+		combatStatsCache:         make(map[string]CombatStats),
+		equipmentDefinitionCache: make(map[string]cachedEquipmentDefinition),
+		compiledTalentCache:      make(map[string]*CompiledTalentSet),
 	}
 }
 
@@ -696,6 +713,53 @@ func (s *Store) invalidateAllCombatStatsCaches() {
 	defer s.combatStatsCacheMu.Unlock()
 
 	clear(s.combatStatsCache)
+}
+
+func (s *Store) cachedEquipmentDefinition(itemID string) (EquipmentDefinition, bool) {
+	now := s.now()
+
+	s.equipmentDefinitionCacheMu.RLock()
+	entry, ok := s.equipmentDefinitionCache[itemID]
+	s.equipmentDefinitionCacheMu.RUnlock()
+	if !ok {
+		return EquipmentDefinition{}, false
+	}
+	if !entry.expiresAt.After(now) {
+		s.equipmentDefinitionCacheMu.Lock()
+		delete(s.equipmentDefinitionCache, itemID)
+		s.equipmentDefinitionCacheMu.Unlock()
+		return EquipmentDefinition{}, false
+	}
+	return entry.definition, true
+}
+
+func (s *Store) storeEquipmentDefinitionCache(itemID string, definition EquipmentDefinition) {
+	s.equipmentDefinitionCacheMu.Lock()
+	defer s.equipmentDefinitionCacheMu.Unlock()
+
+	s.equipmentDefinitionCache[itemID] = cachedEquipmentDefinition{
+		definition: definition,
+		expiresAt:  s.now().Add(equipmentDefinitionCacheTTL),
+	}
+}
+
+func (s *Store) invalidateEquipmentDefinitionCache(itemID string) {
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return
+	}
+
+	s.equipmentDefinitionCacheMu.Lock()
+	defer s.equipmentDefinitionCacheMu.Unlock()
+
+	delete(s.equipmentDefinitionCache, itemID)
+}
+
+func newEquipmentDefinitionRequestCache() *equipmentDefinitionRequestCache {
+	return &equipmentDefinitionRequestCache{
+		definitions: make(map[string]EquipmentDefinition),
+		missing:     make(map[string]struct{}),
+	}
 }
 
 func (s *Store) cachedCompiledTalentSet(nickname string) (*CompiledTalentSet, bool) {
@@ -823,8 +887,17 @@ func (s *Store) GetState(ctx context.Context, nickname string) (State, error) {
 	return ComposeState(snapshot, userState), nil
 }
 
-// GetUserState 获取仅与指定用户相关的状态。
+// GetUserState 获取仅与指定用户相关的完整个人态。
 func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, error) {
+	return s.getUserState(ctx, nickname, true)
+}
+
+// GetRealtimeUserState 获取增量实时推送所需的轻量个人态。
+func (s *Store) GetRealtimeUserState(ctx context.Context, nickname string) (UserState, error) {
+	return s.getUserState(ctx, nickname, false)
+}
+
+func (s *Store) getUserState(ctx context.Context, nickname string, includeProfile bool) (UserState, error) {
 	userState := UserState{
 		Inventory:     []InventoryItem{},
 		Loadout:       Loadout{},
@@ -876,23 +949,29 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	}
 	userState.UserStats = &userStats
 
-	loadout, equipped, err := s.loadoutForNickname(ctx, normalizedNickname)
-	if err != nil {
-		return UserState{}, err
-	}
-	userState.Loadout = loadout
+	if includeProfile {
+		instances, err := s.itemInstancesByIDForNickname(ctx, normalizedNickname)
+		if err != nil {
+			return UserState{}, err
+		}
+		loadoutRefs, err := s.loadoutRefsForNickname(ctx, normalizedNickname)
+		if err != nil {
+			return UserState{}, err
+		}
+		definitionCache := newEquipmentDefinitionRequestCache()
 
-	inventory, err := s.inventoryForNickname(ctx, normalizedNickname, equipped)
-	if err != nil {
-		return UserState{}, err
-	}
-	userState.Inventory = inventory
+		loadout, equipped := s.loadoutFromRefs(ctx, loadoutRefs, instances, definitionCache)
+		userState.Loadout = loadout
 
-	combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
-	if err != nil {
-		return UserState{}, err
+		inventory := s.inventoryFromInstances(ctx, instances, equipped, definitionCache)
+		userState.Inventory = inventory
+
+		combatStats, err := s.combatStatsForNickname(ctx, normalizedNickname, loadout)
+		if err != nil {
+			return UserState{}, err
+		}
+		userState.CombatStats = combatStats
 	}
-	userState.CombatStats = combatStats
 
 	recentRewards, err := s.recentRewardsForNickname(ctx, normalizedNickname)
 	if err != nil {
@@ -900,11 +979,13 @@ func (s *Store) GetUserState(ctx context.Context, nickname string) (UserState, e
 	}
 	userState.RecentRewards = recentRewards
 
-	tasks, err := s.ListTasksForPlayer(ctx, normalizedNickname)
-	if err != nil {
-		return UserState{}, err
+	if includeProfile {
+		tasks, err := s.ListTasksForPlayer(ctx, normalizedNickname)
+		if err != nil {
+			return UserState{}, err
+		}
+		userState.Tasks = tasks
 	}
-	userState.Tasks = tasks
 
 	equippedBattleClickSkinID, equippedBattleClickCursorImagePath, err := s.equippedBattleClickSkinState(ctx, normalizedNickname)
 	if err != nil {
@@ -2909,6 +2990,23 @@ func (s *Store) bossStatsForNickname(ctx context.Context, bossID string, nicknam
 }
 
 func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (EquipmentDefinition, error) {
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return EquipmentDefinition{}, ErrEquipmentNotFound
+	}
+	if definition, ok := s.cachedEquipmentDefinition(itemID); ok {
+		return definition, nil
+	}
+
+	definition, err := s.loadEquipmentDefinitionFromRedis(ctx, itemID)
+	if err != nil {
+		return EquipmentDefinition{}, err
+	}
+	s.storeEquipmentDefinitionCache(itemID, definition)
+	return definition, nil
+}
+
+func (s *Store) loadEquipmentDefinitionFromRedis(ctx context.Context, itemID string) (EquipmentDefinition, error) {
 	values, err := s.client.HMGet(ctx, s.equipmentKey(itemID),
 		"name",
 		"slot",
@@ -2950,6 +3048,32 @@ func (s *Store) getEquipmentDefinition(ctx context.Context, itemID string) (Equi
 		PartTypeDamageWeak:   float64FromString(stringValue(values, 11)),
 		TalentAffinity:       strings.TrimSpace(stringValue(values, 12)),
 	}, nil
+}
+
+func (s *Store) getEquipmentDefinitionFromRequestCache(ctx context.Context, itemID string, requestCache *equipmentDefinitionRequestCache) (EquipmentDefinition, error) {
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return EquipmentDefinition{}, ErrEquipmentNotFound
+	}
+	if requestCache == nil {
+		return s.getEquipmentDefinition(ctx, itemID)
+	}
+	if definition, ok := requestCache.definitions[itemID]; ok {
+		return definition, nil
+	}
+	if _, ok := requestCache.missing[itemID]; ok {
+		return EquipmentDefinition{}, ErrEquipmentNotFound
+	}
+
+	definition, err := s.getEquipmentDefinition(ctx, itemID)
+	if err != nil {
+		if errors.Is(err, ErrEquipmentNotFound) {
+			requestCache.missing[itemID] = struct{}{}
+		}
+		return EquipmentDefinition{}, err
+	}
+	requestCache.definitions[itemID] = definition
+	return definition, nil
 }
 
 func (s *Store) itemInstancesByIDForNickname(ctx context.Context, nickname string) (map[string]ItemInstance, error) {
@@ -3069,22 +3193,29 @@ func (s *Store) getOwnedInstance(ctx context.Context, nickname string, ref strin
 	return instance, nil
 }
 
-func (s *Store) loadoutForNickname(ctx context.Context, nickname string) (Loadout, map[string]string, error) {
-	values, err := s.client.HGetAll(ctx, s.loadoutKey(nickname)).Result()
+func (s *Store) loadoutRefsForNickname(ctx context.Context, nickname string) (map[string]string, error) {
+	values, err := s.client.HMGet(ctx, s.loadoutKey(nickname), loadoutSlots...).Result()
 	if err != nil {
-		return Loadout{}, nil, err
-	}
-	instances, err := s.itemInstancesByIDForNickname(ctx, nickname)
-	if err != nil {
-		return Loadout{}, nil, err
+		return nil, err
 	}
 
+	loadoutRefs := make(map[string]string, len(loadoutSlots))
+	for index, slot := range loadoutSlots {
+		equippedRef := strings.TrimSpace(stringValue(values, index))
+		if equippedRef == "" {
+			continue
+		}
+		loadoutRefs[slot] = equippedRef
+	}
+	return loadoutRefs, nil
+}
+
+func (s *Store) loadoutFromRefs(ctx context.Context, loadoutRefs map[string]string, instances map[string]ItemInstance, requestCache *equipmentDefinitionRequestCache) (Loadout, map[string]string) {
 	loadout := Loadout{}
-	equipped := make(map[string]string, len(values))
-	for slot, equippedRef := range values {
-		slot = normalizeEquipmentSlot(slot)
-		equippedRef = strings.TrimSpace(equippedRef)
-		if equippedRef == "" || slot == "" {
+	equipped := make(map[string]string, len(loadoutRefs))
+	for _, slot := range loadoutSlots {
+		equippedRef := strings.TrimSpace(loadoutRefs[slot])
+		if equippedRef == "" {
 			continue
 		}
 
@@ -3092,7 +3223,7 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string) (Loadou
 		if !ok {
 			continue
 		}
-		definition, defErr := s.getEquipmentDefinition(ctx, instance.ItemID)
+		definition, defErr := s.getEquipmentDefinitionFromRequestCache(ctx, instance.ItemID, requestCache)
 		if defErr != nil {
 			continue
 		}
@@ -3114,18 +3245,26 @@ func (s *Store) loadoutForNickname(ctx context.Context, nickname string) (Loadou
 		}
 	}
 
+	return loadout, equipped
+}
+
+func (s *Store) loadoutForNickname(ctx context.Context, nickname string) (Loadout, map[string]string, error) {
+	loadoutRefs, err := s.loadoutRefsForNickname(ctx, nickname)
+	if err != nil {
+		return Loadout{}, nil, err
+	}
+	instances, err := s.itemInstancesByIDForNickname(ctx, nickname)
+	if err != nil {
+		return Loadout{}, nil, err
+	}
+	loadout, equipped := s.loadoutFromRefs(ctx, loadoutRefs, instances, newEquipmentDefinitionRequestCache())
 	return loadout, equipped, nil
 }
 
-func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equipped map[string]string) ([]InventoryItem, error) {
-	instances, err := s.itemInstancesByIDForNickname(ctx, nickname)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Store) inventoryFromInstances(ctx context.Context, instances map[string]ItemInstance, equipped map[string]string, requestCache *equipmentDefinitionRequestCache) []InventoryItem {
 	items := make([]InventoryItem, 0, len(instances))
 	for _, instance := range instances {
-		definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
+		definition, err := s.getEquipmentDefinitionFromRequestCache(ctx, instance.ItemID, requestCache)
 		if err != nil {
 			items = append(items, InventoryItem{
 				ItemID:       instance.ItemID,
@@ -3143,7 +3282,7 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equip
 	}
 
 	if len(items) == 0 {
-		return []InventoryItem{}, nil
+		return []InventoryItem{}
 	}
 
 	slices.SortFunc(items, func(left, right InventoryItem) int {
@@ -3153,7 +3292,15 @@ func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equip
 		return strings.Compare(left.Slot, right.Slot)
 	})
 
-	return items, nil
+	return items
+}
+
+func (s *Store) inventoryForNickname(ctx context.Context, nickname string, equipped map[string]string) ([]InventoryItem, error) {
+	instances, err := s.itemInstancesByIDForNickname(ctx, nickname)
+	if err != nil {
+		return nil, err
+	}
+	return s.inventoryFromInstances(ctx, instances, equipped, newEquipmentDefinitionRequestCache()), nil
 }
 
 func (s *Store) recentRewardsForNickname(ctx context.Context, nickname string) ([]Reward, error) {

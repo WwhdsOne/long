@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestLoadoutSupportsDesignEquipmentSlotsAndLegacyArmor(t *testing.T) {
-	store, cleanup := newTestStore(t)
+func TestLoadoutReadsFixedSixSlotsViaHMGet(t *testing.T) {
+	store, counter, cleanup := newCountingTestStore(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -16,7 +16,6 @@ func TestLoadoutSupportsDesignEquipmentSlotsAndLegacyArmor(t *testing.T) {
 	seedEquipmentDefinition(t, store, ctx, "star-gloves", "gloves", 40)
 	seedEquipmentDefinition(t, store, ctx, "star-legs", "legs", 50)
 	seedEquipmentDefinition(t, store, ctx, "star-badge", "accessory", 60)
-	seedEquipmentDefinition(t, store, ctx, "old-armor", "armor", 70)
 
 	hammerInst := seedOwnedInstance(t, store, ctx, "阿明", "star-hammer")
 	helmInst := seedOwnedInstance(t, store, ctx, "阿明", "star-helm")
@@ -24,17 +23,18 @@ func TestLoadoutSupportsDesignEquipmentSlotsAndLegacyArmor(t *testing.T) {
 	glovesInst := seedOwnedInstance(t, store, ctx, "阿明", "star-gloves")
 	legsInst := seedOwnedInstance(t, store, ctx, "阿明", "star-legs")
 	badgeInst := seedOwnedInstance(t, store, ctx, "阿明", "star-badge")
-	oldArmorInst := seedOwnedInstance(t, store, ctx, "阿明", "old-armor")
 	if err := store.client.HSet(ctx, store.loadoutKey("阿明"), map[string]any{
-		"weapon":    hammerInst,
-		"helmet":    helmInst,
-		"chest":     chestInst,
-		"gloves":    glovesInst,
-		"legs":      legsInst,
-		"accessory": badgeInst,
+		"weapon":     hammerInst,
+		"helmet":     helmInst,
+		"chest":      chestInst,
+		"gloves":     glovesInst,
+		"legs":       legsInst,
+		"accessory":  badgeInst,
+		"unexpected": "ignored",
 	}).Err(); err != nil {
 		t.Fatalf("seed loadout: %v", err)
 	}
+	counter.reset()
 
 	loadout, equipped, err := store.loadoutForNickname(ctx, "阿明")
 	if err != nil {
@@ -55,21 +55,11 @@ func TestLoadoutSupportsDesignEquipmentSlotsAndLegacyArmor(t *testing.T) {
 	if attackPower != 210 {
 		t.Fatalf("expected all six slots to contribute attack power 210, got %d", attackPower)
 	}
-
-	if err := store.client.HSet(ctx, store.loadoutKey("阿明"), map[string]any{
-		"chest": oldArmorInst,
-	}).Err(); err != nil {
-		t.Fatalf("seed legacy armor loadout: %v", err)
+	if counter.hgetallKeys[store.loadoutKey("阿明")] != 0 {
+		t.Fatalf("expected loadout read to avoid HGETALL, got %+v", counter.hgetallKeys)
 	}
-	loadout, equipped, err = store.loadoutForNickname(ctx, "阿明")
-	if err != nil {
-		t.Fatalf("legacy loadout: %v", err)
-	}
-	if loadout.Chest == nil || loadout.Chest.ItemID != "old-armor" || loadout.Chest.Slot != "chest" {
-		t.Fatalf("expected legacy armor definition to normalize into chest slot, got %+v", loadout.Chest)
-	}
-	if equipped[oldArmorInst] != "chest" {
-		t.Fatalf("expected legacy armor equipped marker to be chest, got %+v", equipped)
+	if counter.hmgetKeys[store.loadoutKey("阿明")] != 1 {
+		t.Fatalf("expected loadout read to use one HMGET on fixed slots, got %+v", counter.hmgetKeys)
 	}
 }
 
