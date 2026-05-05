@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { mergeBossState } from './bossState'
+import { applyBossPartStateDeltas, mergeBossState } from './bossState'
 
 describe('mergeBossState', () => {
   it('同一只活动 Boss 收到更高血量的旧消息时，不会把血量回退', () => {
@@ -147,6 +147,60 @@ describe('mergeBossState', () => {
     expect(mergeBossState(current, incoming)).toEqual({
       ...current,
       parts: [],
+    })
+  })
+})
+
+describe('applyBossPartStateDeltas', () => {
+  it('click_ack 的部位增量会同步部位血量和 Boss 总血量', () => {
+    const current = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 80,
+      maxHp: 100,
+      parts: [
+        {x: 0, y: 0, currentHp: 40, maxHp: 50, armor: 3, alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: 40, maxHp: 50, armor: 8, alive: true, type: 'heavy'},
+      ],
+    }
+
+    expect(applyBossPartStateDeltas(current, [
+      {x: 1, y: 0, beforeHp: 40, afterHp: 31, damage: 9, partType: 'heavy'},
+    ])).toEqual({
+      id: 'boss-1',
+      status: 'active',
+      currentHp: '71',
+      maxHp: '100',
+      parts: [
+        {x: 0, y: 0, currentHp: '40', maxHp: '50', armor: '3', alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: '31', maxHp: '50', armor: '8', alive: true, type: 'heavy'},
+      ],
+    })
+  })
+
+  it('过时的部位增量不会把血量回抬', () => {
+    const current = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 71,
+      maxHp: 100,
+      parts: [
+        {x: 0, y: 0, currentHp: 40, maxHp: 50, armor: 3, alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: 31, maxHp: 50, armor: 8, alive: true, type: 'heavy'},
+      ],
+    }
+
+    expect(applyBossPartStateDeltas(current, [
+      {x: 1, y: 0, beforeHp: 40, afterHp: 35, damage: 5, partType: 'heavy'},
+    ])).toEqual({
+      id: 'boss-1',
+      status: 'active',
+      currentHp: '71',
+      maxHp: '100',
+      parts: [
+        {x: 0, y: 0, currentHp: '40', maxHp: '50', armor: '3', alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: '31', maxHp: '50', armor: '8', alive: true, type: 'heavy'},
+      ],
     })
   })
 })

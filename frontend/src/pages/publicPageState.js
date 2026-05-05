@@ -1,6 +1,6 @@
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 
-import {mergeBossState} from '../utils/bossState'
+import {applyBossPartStateDeltas, mergeBossState} from '../utils/bossState'
 import {ratioPercent} from '../utils/formatNumber'
 import {formatDropRate} from '../utils/buttonBoard'
 import {mergeClickFallbackState} from '../utils/clickResponse'
@@ -1746,6 +1746,7 @@ function applyClickResult(payload) {
         },
         payload,
     )
+    nextClickState.boss = applyBossPartStateDeltas(nextClickState.boss, payload.partStateDeltas)
     userStats.value = nextClickState.userStats
     boss.value = nextClickState.boss
     bossLeaderboard.value = nextClickState.bossLeaderboard

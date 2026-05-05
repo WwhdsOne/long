@@ -59,6 +59,10 @@ function hpBigInt(value) {
   }
 }
 
+function bigIntToString(value) {
+  return value < 0n ? '0' : value.toString()
+}
+
 export function mergeBossState(currentBoss, incomingBoss) {
   if (!incomingBoss || typeof incomingBoss !== 'object') {
     return incomingBoss ?? null
@@ -86,5 +90,46 @@ export function mergeBossState(currentBoss, incomingBoss) {
     ...normalizedCurrent,
     ...normalizedIncoming,
     parts: mergeBossParts(normalizedCurrent.parts, normalizedIncoming.parts),
+  }
+}
+
+export function applyBossPartStateDeltas(currentBoss, deltas) {
+  if (!currentBoss || typeof currentBoss !== 'object') {
+    return currentBoss ?? null
+  }
+  if (!Array.isArray(deltas) || deltas.length === 0) {
+    return normalizeBossState(currentBoss)
+  }
+
+  const normalizedBoss = normalizeBossState(currentBoss)
+  if (!Array.isArray(normalizedBoss.parts) || normalizedBoss.parts.length === 0) {
+    return normalizedBoss
+  }
+
+  let nextBossHp = hpBigInt(normalizedBoss.currentHp)
+  const nextParts = normalizedBoss.parts.map((part) => {
+    const matched = deltas.find((delta) => Number(delta?.x) === Number(part.x) && Number(delta?.y) === Number(part.y))
+    if (!matched) {
+      return part
+    }
+
+    const currentPartHp = hpBigInt(part.currentHp)
+    const nextPartHp = hpBigInt(matched.afterHp)
+    if (nextPartHp >= currentPartHp) {
+      return part
+    }
+
+    nextBossHp -= currentPartHp - nextPartHp
+    return {
+      ...part,
+      currentHp: bigIntToString(nextPartHp),
+      alive: nextPartHp > 0n,
+    }
+  })
+
+  return {
+    ...normalizedBoss,
+    currentHp: bigIntToString(nextBossHp),
+    parts: nextParts,
   }
 }
