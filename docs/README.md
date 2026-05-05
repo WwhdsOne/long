@@ -40,6 +40,7 @@
 - 点击链路与天赋热路径优化：
   - [architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md](./architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md)
   - [architecture/2026-05-05-实时公共态广播节流与载荷收敛方案.md](./architecture/2026-05-05-实时公共态广播节流与载荷收敛方案.md)
+  - [architecture/2026-05-06-Redis-降载一期用户态与装备链路优化方案.md](./architecture/2026-05-06-Redis-降载一期用户态与装备链路优化方案.md)
   - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
 - 任务系统实施：
   - [implementation/2026-05-02-任务模型升级实施计划.md](./implementation/2026-05-02-任务模型升级实施计划.md)
