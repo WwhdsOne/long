@@ -31,6 +31,7 @@ export function createRealtimeTransport(options = {}) {
   const buildEventSourceUrl = options.buildEventSourceUrl || defaultEventSourceUrl
   const onSnapshot = options.onSnapshot || (() => {})
   const onPublicDelta = options.onPublicDelta || (() => {})
+  const onPublicMeta = options.onPublicMeta || (() => {})
   const onUserDelta = options.onUserDelta || (() => {})
   const onRoomState = options.onRoomState || (() => {})
   const onOnlineCount = options.onOnlineCount || (() => {})
@@ -139,6 +140,15 @@ export function createRealtimeTransport(options = {}) {
       case 'public_delta':
         clearReconnectTimer()
         onPublicDelta(message.payload ?? {})
+        updateState({
+          connected: true,
+          degraded: false,
+          mode: 'ws',
+        })
+        return
+      case 'public_meta':
+        clearReconnectTimer()
+        onPublicMeta(message.payload ?? {})
         updateState({
           connected: true,
           degraded: false,
@@ -254,6 +264,7 @@ export function createRealtimeTransport(options = {}) {
     }
 
     source.addEventListener('public_state', handleNamedEvent(onPublicDelta))
+    source.addEventListener('public_meta', handleNamedEvent(onPublicMeta))
     source.addEventListener('user_state', handleNamedEvent(onUserDelta))
     source.addEventListener('room_state', handleNamedEvent(onRoomState))
     source.addEventListener('online_count', handleNamedEvent(onOnlineCount))

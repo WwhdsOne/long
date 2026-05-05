@@ -317,6 +317,55 @@ describe('realtimeTransport', () => {
     expect(onlineCounts).toEqual([3, 4])
   })
 
+  it('public_meta 可通过 WebSocket 与 SSE 回调低频公共态', () => {
+    const sockets = []
+    const sources = []
+    const publicMetas = []
+    const transport = createRealtimeTransport({
+      createWebSocket(url) {
+        const socket = new FakeWebSocket(url)
+        sockets.push(socket)
+        return socket
+      },
+      createEventSource(url) {
+        const source = new FakeEventSource(url)
+        sources.push(source)
+        return source
+      },
+      onPublicMeta(payload) {
+        publicMetas.push(payload)
+      },
+    })
+
+    transport.connect({ nickname: '阿明' })
+    sockets[0].emitOpen()
+    const encoded = realtime.PublicMeta.encode(realtime.PublicMeta.create({
+      announcementVersion: 'ann-1',
+      leaderboard: [{ rank: 2, nickname: '小红', clickCount: 0 }],
+      bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 0 }],
+    })).finish()
+    const frame = new Uint8Array(1 + encoded.length)
+    frame[0] = realtimeBinaryType.publicMeta
+    frame.set(encoded, 1)
+    sockets[0].emitBinary(frame.buffer)
+
+    sockets[0].emitClose()
+    sources[0].emitEvent('public_meta', {
+      bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 66 }],
+    })
+
+    expect(publicMetas).toEqual([
+      {
+        announcementVersion: 'ann-1',
+        leaderboard: [{ rank: 2, nickname: '小红', clickCount: 0 }],
+        bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 0 }],
+      },
+      {
+        bossLeaderboard: [{ rank: 1, nickname: '阿明', damage: 66 }],
+      },
+    ])
+  })
+
   it('room_state 可通过 WebSocket 与 SSE 回调房间列表', () => {
     const sockets = []
     const sources = []
@@ -369,6 +418,74 @@ describe('realtimeTransport', () => {
         rooms: [{ id: '1', displayName: '一线', current: false, onlineCount: 2 }],
       },
     ])
+  })
+
+  it('user_delta 的 0 值不会在二进制解码时丢字段', () => {
+    const encoded = realtime.UserDelta.encode(realtime.UserDelta.create({
+      gold: 0,
+      stones: 0,
+      talentPoints: 0,
+      talentEvents: [
+        { talentId: 'doom-mark', partX: 0, partY: 2, extraDamage: 0 },
+      ],
+    })).finish()
+    const frame = new Uint8Array(1 + encoded.length)
+    frame[0] = realtimeBinaryType.userDelta
+    frame.set(encoded, 1)
+
+    expect(decodeRealtimeBinaryMessage(frame)).toEqual({
+      type: 'user_delta',
+      payload: {
+        gold: 0,
+        recentRewards: [],
+        stones: 0,
+        talentPoints: 0,
+        talentEvents: [
+          {
+            talentId: 'doom-mark',
+            extraDamage: 0,
+            partX: 0,
+            partY: 2,
+          },
+        ],
+      },
+    })
+  })
+
+  it('room_state 的 0 值不会在二进制解码时丢字段', () => {
+    const encoded = realtime.RoomState.encode(realtime.RoomState.create({
+      currentRoomId: '2',
+      switchCooldownRemainingSeconds: 0,
+      rooms: [{
+        id: '2',
+        displayName: '二线',
+        current: true,
+        onlineCount: 0,
+        currentBossHp: 0,
+        currentBossMaxHp: 0,
+        currentBossAvgHp: 0,
+      }],
+    })).finish()
+    const frame = new Uint8Array(1 + encoded.length)
+    frame[0] = realtimeBinaryType.roomState
+    frame.set(encoded, 1)
+
+    expect(decodeRealtimeBinaryMessage(frame)).toEqual({
+      type: 'room_state',
+      payload: {
+        currentRoomId: '2',
+        switchCooldownRemainingSeconds: 0,
+        rooms: [{
+          id: '2',
+          displayName: '二线',
+          current: true,
+          onlineCount: 0,
+          currentBossHp: 0,
+          currentBossMaxHp: 0,
+          currentBossAvgHp: 0,
+        }],
+      },
+    })
   })
 
   it('WebSocket 断开后会自动退回 SSE 并继续消费增量事件', () => {

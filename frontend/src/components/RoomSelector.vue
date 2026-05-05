@@ -1,6 +1,6 @@
 <script setup>
 import RoomSwitchCooldownTag from './RoomSwitchCooldownTag.vue'
-import { formatIntegerExact } from '../utils/formatNumber'
+import { formatCompact } from '../utils/formatNumber'
 
 const props = defineProps({
   rooms: {
@@ -79,7 +79,7 @@ function roomOnlineText(room) {
 }
 
 function roomAvgHpText(room) {
-  const value = formatIntegerExact(room?.currentBossAvgHp)
+  const value = formatCompact(Math.max(0, Number(room?.currentBossAvgHp || 0)))
   return value === '0' ? '--' : value
 }
 
@@ -136,14 +136,16 @@ function canJoin(room) {
           <span class="room-selector__badge">{{ roomStatusLabel(room) }}</span>
         </span>
         <span class="room-selector__name">{{ roomLabel(room) }}</span>
-        <span class="room-selector__boss">{{ roomBossName(room) }}</span>
+        <span class="room-selector__bossline">
+          <span class="room-selector__boss">{{ roomBossName(room) }}</span>
+        </span>
         <span class="room-selector__stats">
           <span>
             <small>在线</small>
             <strong>{{ roomOnlineText(room) }}</strong>
           </span>
           <span>
-            <small>房间内Boss平均血量</small>
+            <small>Boss平均血量</small>
             <strong>{{ roomAvgHpText(room) }}</strong>
           </span>
         </span>
@@ -314,12 +316,33 @@ function canJoin(room) {
   line-height: 1;
 }
 
-.room-selector__boss {
+.room-selector__bossline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   min-height: 2.1em;
+}
+
+.room-selector__boss {
+  flex: 1;
+  min-width: 0;
   color: #8ca1c0;
   font-size: 0.7rem;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+.room-selector__range {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid rgba(159, 198, 255, 0.25);
+  border-radius: 999px;
+  color: #9fc6ff;
+  background: rgba(22, 37, 56, 0.6);
+  font-size: 0.58rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .room-selector__stats {

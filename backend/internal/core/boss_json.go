@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+
+	"github.com/bytedance/sonic"
 )
 
 func parseFlexibleInt64Value(raw json.RawMessage) (int64, error) {
@@ -40,7 +42,7 @@ func (p BossPart) MarshalJSON() ([]byte, error) {
 		Armor       string   `json:"armor"`
 		Alive       bool     `json:"alive"`
 	}
-	return json.Marshal(bossPartJSON{
+	return sonic.Marshal(bossPartJSON{
 		X:           p.X,
 		Y:           p.Y,
 		Type:        p.Type,
@@ -66,7 +68,7 @@ func (p *BossPart) UnmarshalJSON(data []byte) error {
 		Alive       bool            `json:"alive"`
 	}
 	var aux bossPartJSON
-	if err := json.Unmarshal(data, &aux); err != nil {
+	if err := sonic.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	maxHP, err := parseFlexibleInt64Value(aux.MaxHP)
@@ -112,7 +114,7 @@ func (b Boss) MarshalJSON() ([]byte, error) {
 		StartedAt          int64      `json:"startedAt,omitempty"`
 		DefeatedAt         int64      `json:"defeatedAt,omitempty"`
 	}
-	return json.Marshal(bossJSON{
+	return sonic.Marshal(bossJSON{
 		ID:                 b.ID,
 		TemplateID:         b.TemplateID,
 		RoomID:             b.RoomID,
@@ -148,7 +150,7 @@ func (b *Boss) UnmarshalJSON(data []byte) error {
 		DefeatedAt         int64           `json:"defeatedAt,omitempty"`
 	}
 	var aux bossJSON
-	if err := json.Unmarshal(data, &aux); err != nil {
+	if err := sonic.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	maxHP, err := parseFlexibleInt64Value(aux.MaxHP)
@@ -189,7 +191,7 @@ func (t BossTemplate) MarshalJSON() ([]byte, error) {
 		Loot               []BossLootEntry `json:"loot"`
 		Layout             []BossPart      `json:"layout,omitempty"`
 	}
-	return json.Marshal(bossTemplateJSON{
+	return sonic.Marshal(bossTemplateJSON{
 		ID:                 t.ID,
 		Name:               t.Name,
 		MaxHP:              formatInt64String(t.MaxHP),
@@ -220,7 +222,7 @@ func (e BossHistoryEntry) MarshalJSON() ([]byte, error) {
 		Loot               []BossLootEntry        `json:"loot"`
 		Damage             []BossLeaderboardEntry `json:"damage"`
 	}
-	return json.Marshal(bossHistoryJSON{
+	return sonic.Marshal(bossHistoryJSON{
 		ID:                 e.ID,
 		TemplateID:         e.TemplateID,
 		RoomID:             e.RoomID,
@@ -260,7 +262,7 @@ func (e *BossHistoryEntry) UnmarshalJSON(data []byte) error {
 		Damage             []BossLeaderboardEntry `json:"damage"`
 	}
 	var aux bossHistoryJSON
-	if err := json.Unmarshal(data, &aux); err != nil {
+	if err := sonic.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	maxHP, err := parseFlexibleInt64Value(aux.MaxHP)
@@ -311,7 +313,7 @@ func (r RoomInfo) MarshalJSON() ([]byte, error) {
 		CurrentBossAvgHP   string `json:"currentBossAvgHp,omitempty"`
 		CooldownRemainingS int64  `json:"cooldownRemainingSeconds,omitempty"`
 	}
-	return json.Marshal(roomInfoJSON{
+	return sonic.Marshal(roomInfoJSON{
 		ID:                 r.ID,
 		DisplayName:        r.DisplayName,
 		Current:            r.Current,

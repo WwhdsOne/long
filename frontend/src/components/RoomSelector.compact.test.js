@@ -8,18 +8,17 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(path.resolve(currentDir, './RoomSelector.vue'), 'utf8')
 
 describe('RoomSelector 紧凑卡片', () => {
-  it('房间卡补充 Boss 均血并精简布局', () => {
+  it('房间卡仅展示 Boss 均血，不再展示战斗力准入', () => {
     expect(source).toContain("import RoomSwitchCooldownTag from './RoomSwitchCooldownTag.vue'")
     expect(source).toContain('<RoomSwitchCooldownTag :cooldown-remaining-seconds="cooldownRemainingSeconds" />')
     expect(source).toContain("const displayName = String(room?.displayName || '').trim()")
     expect(source).toContain("return defaultRoomLabel(room?.id)")
     expect(source).toContain("if (props.cooldownRemainingSeconds > 0) return '冷却未结束'")
     expect(source).toContain('function roomAvgHpText(room) {')
-    expect(source).toContain('formatIntegerExact(room?.currentBossAvgHp)')
-    expect(source).toContain('<small>房间内Boss平均血量</small>')
+    expect(source).toContain('<span class="room-selector__bossline">')
+    expect(source).toContain('<small>Boss平均血量</small>')
     expect(source).toContain('<span class="room-selector__action">{{ roomActionLabel(room) }}</span>')
-    expect(source).toContain('grid-template-columns: repeat(3, minmax(0, 1fr));')
-    expect(source).toContain('min-height: 74px;')
-    expect(source).toContain('padding: 8px;')
+    expect(source).not.toContain('roomBattlePowerRangeText')
+    expect(source).not.toContain('准入 ')
   })
 })

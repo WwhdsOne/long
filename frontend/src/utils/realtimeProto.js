@@ -6,6 +6,7 @@ export const realtimeBinaryType = {
   publicDelta: 3,
   userDelta: 4,
   roomState: 5,
+  publicMeta: 6,
 }
 
 const decodeOptions = {
@@ -113,6 +114,11 @@ export function decodeRealtimeBinaryMessage(frame) {
       return {
         type: 'room_state',
         payload: toPlain(realtime.RoomState, realtime.RoomState.decode(body)),
+      }
+    case realtimeBinaryType.publicMeta:
+      return {
+        type: 'public_meta',
+        payload: toPlain(realtime.PublicMeta, realtime.PublicMeta.decode(body)),
       }
     default:
       throw new Error('unsupported realtime binary message')

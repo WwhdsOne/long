@@ -42,6 +42,12 @@ message PublicDelta {
   string announcement_version = 6;
 }
 
+message PublicMeta {
+  repeated LeaderboardEntry leaderboard = 1;
+  repeated BossLeaderboardEntry boss_leaderboard = 2;
+  string announcement_version = 3;
+}
+
 message RoomInfo {
   string id = 1;
   string display_name = 2;

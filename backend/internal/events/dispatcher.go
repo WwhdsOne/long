@@ -14,9 +14,12 @@ type Dispatcher struct {
 	hub        *Hub
 	debounceMs int
 
-	mu          sync.Mutex
-	publicDirty bool
-	publicTimer *time.Timer
+	mu                sync.Mutex
+	publicDirty       bool
+	publicMeta        bool
+	publicRoomState   bool
+	publicTimer       *time.Timer
+	lastPublicFlushAt time.Time
 }
 
 // NewDispatcher 创建一个实时分发器。
@@ -39,13 +42,7 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change core.StateChange) 
 	}
 
 	if affectsPublicState(change.Type) {
-		d.mu.Lock()
-		d.publicDirty = true
-		if d.publicTimer != nil {
-			d.publicTimer.Stop()
-		}
-		d.publicTimer = time.AfterFunc(time.Duration(d.debounceMs)*time.Millisecond, d.flushPublic)
-		d.mu.Unlock()
+		d.schedulePublicFlush(change.Type)
 	}
 
 	targetNicknames := userTargetsForChange(change, d.hub.ActiveNicknames())
@@ -67,18 +64,46 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change core.StateChange) 
 	return nil
 }
 
+func (d *Dispatcher) schedulePublicFlush(changeType core.StateChangeType) {
+	d.mu.Lock()
+	d.publicDirty = true
+	d.publicMeta = d.publicMeta || shouldBroadcastPublicMeta(changeType)
+	d.publicRoomState = d.publicRoomState || shouldBroadcastRoomState(changeType)
+
+	window := time.Duration(d.debounceMs) * time.Millisecond
+	now := time.Now()
+	if d.lastPublicFlushAt.IsZero() || now.Sub(d.lastPublicFlushAt) >= window {
+		d.lastPublicFlushAt = now
+		d.mu.Unlock()
+		go d.flushPublic()
+		return
+	}
+
+	if d.publicTimer == nil {
+		delay := window - now.Sub(d.lastPublicFlushAt)
+		d.publicTimer = time.AfterFunc(delay, d.flushPublic)
+	}
+	d.mu.Unlock()
+}
+
 func (d *Dispatcher) flushPublic() {
 	d.mu.Lock()
 	if !d.publicDirty {
+		d.publicTimer = nil
 		d.mu.Unlock()
 		return
 	}
 	d.publicDirty = false
+	includeMeta := d.publicMeta
+	d.publicMeta = false
+	includeRoomState := d.publicRoomState
+	d.publicRoomState = false
 	d.publicTimer = nil
+	d.lastPublicFlushAt = time.Now()
 	d.mu.Unlock()
 
 	ctx := context.Background()
-	_ = d.broadcastPublic(ctx, false)
+	_ = d.broadcastPublic(ctx, includeMeta, includeRoomState, false)
 }
 
 // BroadcastLeaderboard 主动广播一份带点击总榜的公共态。
@@ -87,10 +112,10 @@ func (d *Dispatcher) BroadcastLeaderboard(ctx context.Context) error {
 		return nil
 	}
 
-	return d.broadcastPublic(ctx, true)
+	return d.broadcastPublic(ctx, true, true, true)
 }
 
-func (d *Dispatcher) broadcastPublic(ctx context.Context, includeLeaderboard bool) error {
+func (d *Dispatcher) broadcastPublic(ctx context.Context, includeMeta bool, includeRoomState bool, includeLeaderboard bool) error {
 	snapshot, err := d.cache.RefreshSnapshot(ctx)
 	if err != nil {
 		return err
@@ -98,8 +123,13 @@ func (d *Dispatcher) broadcastPublic(ctx context.Context, includeLeaderboard boo
 	if snapshot.Boss != nil {
 		_, _ = d.cache.RefreshBossResources(ctx)
 	}
-	if err := d.hub.BroadcastPublic(snapshot, includeLeaderboard); err != nil {
+	if err := d.hub.BroadcastPublic(snapshot); err != nil {
 		return err
+	}
+	if includeMeta {
+		if err := d.hub.BroadcastPublicMeta(snapshot, includeLeaderboard); err != nil {
+			return err
+		}
 	}
 
 	for _, nickname := range d.hub.ActiveNicknames() {
@@ -107,15 +137,22 @@ func (d *Dispatcher) broadcastPublic(ctx context.Context, includeLeaderboard boo
 		if err != nil {
 			return err
 		}
-		if err := d.hub.BroadcastPublicTo(nickname, snapshot, includeLeaderboard); err != nil {
+		if err := d.hub.BroadcastPublicTo(nickname, snapshot); err != nil {
 			return err
 		}
-		rooms, err := d.cache.ListRooms(ctx, nickname)
-		if err != nil {
-			return err
+		if includeMeta {
+			if err := d.hub.BroadcastPublicMetaTo(nickname, snapshot, includeLeaderboard); err != nil {
+				return err
+			}
 		}
-		if err := d.hub.BroadcastRoomState(nickname, rooms); err != nil {
-			return err
+		if includeRoomState {
+			rooms, err := d.cache.ListRooms(ctx, nickname)
+			if err != nil {
+				return err
+			}
+			if err := d.hub.BroadcastRoomState(nickname, rooms); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -152,5 +189,23 @@ func shouldBroadcastUserProfile(changeType core.StateChangeType) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func shouldBroadcastPublicMeta(changeType core.StateChangeType) bool {
+	switch changeType {
+	case core.StateChangeBossChanged, core.StateChangeAnnouncementChanged:
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldBroadcastRoomState(changeType core.StateChangeType) bool {
+	switch changeType {
+	case core.StateChangeButtonClicked:
+		return false
+	default:
+		return true
 	}
 }

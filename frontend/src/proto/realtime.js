@@ -1739,6 +1739,313 @@ export const realtime = $root.realtime = (() => {
         return PublicDelta;
     })();
 
+    realtime.PublicMeta = (function() {
+
+        /**
+         * Properties of a PublicMeta.
+         * @memberof realtime
+         * @interface IPublicMeta
+         * @property {Array.<realtime.ILeaderboardEntry>|null} [leaderboard] PublicMeta leaderboard
+         * @property {Array.<realtime.IBossLeaderboardEntry>|null} [bossLeaderboard] PublicMeta bossLeaderboard
+         * @property {string|null} [announcementVersion] PublicMeta announcementVersion
+         */
+
+        /**
+         * Constructs a new PublicMeta.
+         * @memberof realtime
+         * @classdesc Represents a PublicMeta.
+         * @implements IPublicMeta
+         * @constructor
+         * @param {realtime.IPublicMeta=} [properties] Properties to set
+         */
+        function PublicMeta(properties) {
+            this.leaderboard = [];
+            this.bossLeaderboard = [];
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * PublicMeta leaderboard.
+         * @member {Array.<realtime.ILeaderboardEntry>} leaderboard
+         * @memberof realtime.PublicMeta
+         * @instance
+         */
+        PublicMeta.prototype.leaderboard = $util.emptyArray;
+
+        /**
+         * PublicMeta bossLeaderboard.
+         * @member {Array.<realtime.IBossLeaderboardEntry>} bossLeaderboard
+         * @memberof realtime.PublicMeta
+         * @instance
+         */
+        PublicMeta.prototype.bossLeaderboard = $util.emptyArray;
+
+        /**
+         * PublicMeta announcementVersion.
+         * @member {string} announcementVersion
+         * @memberof realtime.PublicMeta
+         * @instance
+         */
+        PublicMeta.prototype.announcementVersion = "";
+
+        /**
+         * Creates a new PublicMeta instance using the specified properties.
+         * @function create
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {realtime.IPublicMeta=} [properties] Properties to set
+         * @returns {realtime.PublicMeta} PublicMeta instance
+         */
+        PublicMeta.create = function create(properties) {
+            return new PublicMeta(properties);
+        };
+
+        /**
+         * Encodes the specified PublicMeta message. Does not implicitly {@link realtime.PublicMeta.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {realtime.IPublicMeta} message PublicMeta message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        PublicMeta.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.leaderboard != null && message.leaderboard.length)
+                for (let i = 0; i < message.leaderboard.length; ++i)
+                    $root.realtime.LeaderboardEntry.encode(message.leaderboard[i], writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+            if (message.bossLeaderboard != null && message.bossLeaderboard.length)
+                for (let i = 0; i < message.bossLeaderboard.length; ++i)
+                    $root.realtime.BossLeaderboardEntry.encode(message.bossLeaderboard[i], writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+            if (message.announcementVersion != null && Object.hasOwnProperty.call(message, "announcementVersion"))
+                writer.uint32(/* id 3, wireType 2 =*/26).string(message.announcementVersion);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified PublicMeta message, length delimited. Does not implicitly {@link realtime.PublicMeta.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {realtime.IPublicMeta} message PublicMeta message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        PublicMeta.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a PublicMeta message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.PublicMeta} PublicMeta
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        PublicMeta.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.PublicMeta();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        if (!(message.leaderboard && message.leaderboard.length))
+                            message.leaderboard = [];
+                        message.leaderboard.push($root.realtime.LeaderboardEntry.decode(reader, reader.uint32(), undefined, long + 1));
+                        break;
+                    }
+                case 2: {
+                        if (!(message.bossLeaderboard && message.bossLeaderboard.length))
+                            message.bossLeaderboard = [];
+                        message.bossLeaderboard.push($root.realtime.BossLeaderboardEntry.decode(reader, reader.uint32(), undefined, long + 1));
+                        break;
+                    }
+                case 3: {
+                        message.announcementVersion = reader.string();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a PublicMeta message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.PublicMeta} PublicMeta
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        PublicMeta.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a PublicMeta message.
+         * @function verify
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        PublicMeta.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.leaderboard != null && message.hasOwnProperty("leaderboard")) {
+                if (!Array.isArray(message.leaderboard))
+                    return "leaderboard: array expected";
+                for (let i = 0; i < message.leaderboard.length; ++i) {
+                    let error = $root.realtime.LeaderboardEntry.verify(message.leaderboard[i], long + 1);
+                    if (error)
+                        return "leaderboard." + error;
+                }
+            }
+            if (message.bossLeaderboard != null && message.hasOwnProperty("bossLeaderboard")) {
+                if (!Array.isArray(message.bossLeaderboard))
+                    return "bossLeaderboard: array expected";
+                for (let i = 0; i < message.bossLeaderboard.length; ++i) {
+                    let error = $root.realtime.BossLeaderboardEntry.verify(message.bossLeaderboard[i], long + 1);
+                    if (error)
+                        return "bossLeaderboard." + error;
+                }
+            }
+            if (message.announcementVersion != null && message.hasOwnProperty("announcementVersion"))
+                if (!$util.isString(message.announcementVersion))
+                    return "announcementVersion: string expected";
+            return null;
+        };
+
+        /**
+         * Creates a PublicMeta message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.PublicMeta} PublicMeta
+         */
+        PublicMeta.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.PublicMeta)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.PublicMeta();
+            if (object.leaderboard) {
+                if (!Array.isArray(object.leaderboard))
+                    throw TypeError(".realtime.PublicMeta.leaderboard: array expected");
+                message.leaderboard = [];
+                for (let i = 0; i < object.leaderboard.length; ++i) {
+                    if (typeof object.leaderboard[i] !== "object")
+                        throw TypeError(".realtime.PublicMeta.leaderboard: object expected");
+                    message.leaderboard[i] = $root.realtime.LeaderboardEntry.fromObject(object.leaderboard[i], long + 1);
+                }
+            }
+            if (object.bossLeaderboard) {
+                if (!Array.isArray(object.bossLeaderboard))
+                    throw TypeError(".realtime.PublicMeta.bossLeaderboard: array expected");
+                message.bossLeaderboard = [];
+                for (let i = 0; i < object.bossLeaderboard.length; ++i) {
+                    if (typeof object.bossLeaderboard[i] !== "object")
+                        throw TypeError(".realtime.PublicMeta.bossLeaderboard: object expected");
+                    message.bossLeaderboard[i] = $root.realtime.BossLeaderboardEntry.fromObject(object.bossLeaderboard[i], long + 1);
+                }
+            }
+            if (object.announcementVersion != null)
+                message.announcementVersion = String(object.announcementVersion);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a PublicMeta message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {realtime.PublicMeta} message PublicMeta
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        PublicMeta.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.arrays || options.defaults) {
+                object.leaderboard = [];
+                object.bossLeaderboard = [];
+            }
+            if (options.defaults)
+                object.announcementVersion = "";
+            if (message.leaderboard && message.leaderboard.length) {
+                object.leaderboard = [];
+                for (let j = 0; j < message.leaderboard.length; ++j)
+                    object.leaderboard[j] = $root.realtime.LeaderboardEntry.toObject(message.leaderboard[j], options);
+            }
+            if (message.bossLeaderboard && message.bossLeaderboard.length) {
+                object.bossLeaderboard = [];
+                for (let j = 0; j < message.bossLeaderboard.length; ++j)
+                    object.bossLeaderboard[j] = $root.realtime.BossLeaderboardEntry.toObject(message.bossLeaderboard[j], options);
+            }
+            if (message.announcementVersion != null && message.hasOwnProperty("announcementVersion"))
+                object.announcementVersion = message.announcementVersion;
+            return object;
+        };
+
+        /**
+         * Converts this PublicMeta to JSON.
+         * @function toJSON
+         * @memberof realtime.PublicMeta
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        PublicMeta.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for PublicMeta
+         * @function getTypeUrl
+         * @memberof realtime.PublicMeta
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        PublicMeta.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.PublicMeta";
+        };
+
+        return PublicMeta;
+    })();
+
     realtime.RoomInfo = (function() {
 
         /**

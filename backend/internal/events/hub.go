@@ -16,6 +16,7 @@ import (
 
 const (
 	PublicStateEventName = "public_state"
+	PublicMetaEventName  = "public_meta"
 	UserStateEventName   = "user_state"
 	OnlineCountEventName = "online_count"
 	RoomStateEventName   = "room_state"
@@ -44,10 +45,13 @@ type realtimeUserStatePayload struct {
 }
 
 type publicStatePayload struct {
-	TotalVotes          int64                       `json:"totalVotes"`
+	TotalVotes int64      `json:"totalVotes"`
+	RoomID     string     `json:"roomId,omitempty"`
+	Boss       *core.Boss `json:"boss,omitempty"`
+}
+
+type publicMetaPayload struct {
 	Leaderboard         *[]core.LeaderboardEntry    `json:"leaderboard,omitempty"`
-	RoomID              string                      `json:"roomId,omitempty"`
-	Boss                *core.Boss                  `json:"boss,omitempty"`
 	BossLeaderboard     []core.BossLeaderboardEntry `json:"bossLeaderboard"`
 	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
 }
@@ -107,8 +111,8 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 	return client.ch, unsubscribe
 }
 
-func (h *Hub) BroadcastPublic(snapshot core.Snapshot, includeLeaderboard bool) error {
-	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot, includeLeaderboard))
+func (h *Hub) BroadcastPublic(snapshot core.Snapshot) error {
+	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot))
 	if err != nil {
 		return err
 	}
@@ -125,12 +129,12 @@ func (h *Hub) BroadcastPublic(snapshot core.Snapshot, includeLeaderboard bool) e
 	return nil
 }
 
-func (h *Hub) BroadcastPublicTo(nickname string, snapshot core.Snapshot, includeLeaderboard bool) error {
+func (h *Hub) BroadcastPublicTo(nickname string, snapshot core.Snapshot) error {
 	normalizedNickname := strings.TrimSpace(nickname)
 	if normalizedNickname == "" {
 		return nil
 	}
-	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot, includeLeaderboard))
+	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot))
 	if err != nil {
 		return err
 	}
@@ -147,11 +151,57 @@ func (h *Hub) BroadcastPublicTo(nickname string, snapshot core.Snapshot, include
 	return nil
 }
 
-func buildPublicStatePayload(snapshot core.Snapshot, includeLeaderboard bool) publicStatePayload {
+func (h *Hub) BroadcastPublicMeta(snapshot core.Snapshot, includeLeaderboard bool) error {
+	payload, err := sonic.Marshal(buildPublicMetaPayload(snapshot, includeLeaderboard))
+	if err != nil {
+		return err
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for client := range h.clients {
+		if client.nickname != "" {
+			continue
+		}
+		deliverEvent(client.ch, ServerEvent{Name: PublicMetaEventName, Payload: payload})
+	}
+
+	return nil
+}
+
+func (h *Hub) BroadcastPublicMetaTo(nickname string, snapshot core.Snapshot, includeLeaderboard bool) error {
+	normalizedNickname := strings.TrimSpace(nickname)
+	if normalizedNickname == "" {
+		return nil
+	}
+	payload, err := sonic.Marshal(buildPublicMetaPayload(snapshot, includeLeaderboard))
+	if err != nil {
+		return err
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for client := range h.clients {
+		if client.nickname != normalizedNickname {
+			continue
+		}
+		deliverEvent(client.ch, ServerEvent{Name: PublicMetaEventName, Payload: payload})
+	}
+
+	return nil
+}
+
+func buildPublicStatePayload(snapshot core.Snapshot) publicStatePayload {
 	payload := publicStatePayload{
-		TotalVotes:          snapshot.TotalVotes,
-		RoomID:              snapshot.RoomID,
-		Boss:                snapshot.Boss,
+		TotalVotes: snapshot.TotalVotes,
+		RoomID:     snapshot.RoomID,
+		Boss:       snapshot.Boss,
+	}
+	return payload
+}
+
+func buildPublicMetaPayload(snapshot core.Snapshot, includeLeaderboard bool) publicMetaPayload {
+	payload := publicMetaPayload{
 		BossLeaderboard:     snapshot.BossLeaderboard,
 		AnnouncementVersion: snapshot.AnnouncementVersion,
 	}
@@ -294,7 +344,10 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 		writer := sse.NewWriter(c)
 		defer writer.Close()
 
-		if err := writeEvent(writer, PublicStateEventName, snapshot); err != nil {
+		if err := writeEvent(writer, PublicStateEventName, buildPublicStatePayload(snapshot)); err != nil {
+			return
+		}
+		if err := writeEvent(writer, PublicMetaEventName, buildPublicMetaPayload(snapshot, true)); err != nil {
 			return
 		}
 

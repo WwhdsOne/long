@@ -1444,12 +1444,6 @@ function applyPublicState(payload) {
     if ('totalVotes' in payload) {
         buttonTotalVotes.value = Number(payload.totalVotes ?? buttonTotalVotes.value)
     }
-    if ('leaderboard' in payload) {
-        const nextLeaderboard = Array.isArray(payload.leaderboard) ? payload.leaderboard : null
-        if (nextLeaderboard && nextLeaderboard.length > 0) {
-            leaderboard.value = nextLeaderboard
-        }
-    }
     if ('roomId' in payload) {
         currentRoomId.value = String(payload.roomId || currentRoomId.value || '1')
     }
@@ -1457,13 +1451,7 @@ function applyPublicState(payload) {
     if ('boss' in payload) {
         boss.value = mergeBossState(boss.value, payload.boss)
     }
-    if ('bossLeaderboard' in payload) {
-        bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
-        bossLeaderboardCountValue.value = bossLeaderboard.value.length
-    }
-    if ('bossLeaderboardCount' in payload) {
-        bossLeaderboardCountValue.value = Math.max(0, Number(payload.bossLeaderboardCount ?? 0))
-    }
+    applyPublicMeta(payload)
     if ('bossGoldRange' in payload && payload.bossGoldRange) {
         bossGoldRange.value = payload.bossGoldRange
     }
@@ -1472,6 +1460,38 @@ function applyPublicState(payload) {
     }
     if ('bossTalentPointsOnKill' in payload) {
         bossTalentPointsOnKill.value = Math.max(0, Number(payload.bossTalentPointsOnKill ?? 0))
+    }
+    if (bossResourceVersion(previousBoss) !== bossResourceVersion()) {
+        void loadBossResources(true)
+        if (previousBoss?.id && boss.value?.id && previousBoss.id !== boss.value.id) {
+            clearTalentVisualState()
+            clearComboState()
+            talentCombatState.value = null
+        }
+    } else if (boss.value?.id && !lastBossResourceVersion) {
+        void loadBossResources(true)
+    }
+    syncing.value = false
+    markUpdated()
+}
+
+function applyPublicMeta(payload) {
+    if (!payload || typeof payload !== 'object') {
+        return
+    }
+
+    if ('leaderboard' in payload) {
+        const nextLeaderboard = Array.isArray(payload.leaderboard) ? payload.leaderboard : null
+        if (nextLeaderboard) {
+            leaderboard.value = nextLeaderboard
+        }
+    }
+    if ('bossLeaderboard' in payload) {
+        bossLeaderboard.value = Array.isArray(payload.bossLeaderboard) ? payload.bossLeaderboard : []
+        bossLeaderboardCountValue.value = bossLeaderboard.value.length
+    }
+    if ('bossLeaderboardCount' in payload) {
+        bossLeaderboardCountValue.value = Math.max(0, Number(payload.bossLeaderboardCount ?? 0))
     }
     if ('announcementVersion' in payload) {
         const nextVersion = String(payload.announcementVersion || '').trim()
@@ -1489,18 +1509,6 @@ function applyPublicState(payload) {
             void loadLatestAnnouncement(versionChanged)
         }
     }
-    if (bossResourceVersion(previousBoss) !== bossResourceVersion()) {
-        void loadBossResources(true)
-        if (previousBoss?.id && boss.value?.id && previousBoss.id !== boss.value.id) {
-            clearTalentVisualState()
-            clearComboState()
-            talentCombatState.value = null
-        }
-    } else if (boss.value?.id && !lastBossResourceVersion) {
-        void loadBossResources(true)
-    }
-    syncing.value = false
-    markUpdated()
 }
 
 function applyUserState(payload) {
@@ -2015,6 +2023,11 @@ function ensureRealtimeTransport() {
             loading.value = false
             errorMessage.value = ''
         },
+        onPublicMeta(payload) {
+            applyPublicMeta(payload)
+            loading.value = false
+            errorMessage.value = ''
+        },
         onUserDelta(payload) {
             applyUserState(payload)
             loading.value = false
@@ -2508,7 +2521,11 @@ async function joinRoom(roomId) {
         })
         if (!response.ok) {
             const payload = await response.json().catch(() => ({}))
-            const message = payload?.message || (payload?.error === 'ROOM_SWITCH_COOLDOWN' ? '切房冷却中。' : '切换房间失败。')
+            const message = payload?.message || (
+                payload?.error === 'ROOM_SWITCH_COOLDOWN'
+                    ? '切房冷却中。'
+                    : '切换房间失败。'
+            )
             throw new Error(message)
         }
         const payload = await response.json()
