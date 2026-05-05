@@ -44,6 +44,7 @@ type mockStore struct {
 	state                     core.State
 	talentState               *core.TalentState
 	snapshot                  core.Snapshot
+	leaderboard               []core.LeaderboardEntry
 	equipState                core.State
 	adminState                core.AdminState
 	bossResources             core.BossResources
@@ -87,6 +88,8 @@ type mockStore struct {
 	lastClickNickname         string
 	lastAutoClickNickname     string
 	lastGetStateNickname      string
+	lastLeaderboardLimit      int64
+	lastLeaderboardOffset     int64
 	saveTaskErr               error
 	activateTaskErr           error
 	deactivateTaskErr         error
@@ -128,6 +131,25 @@ func (m *mockStore) GetSnapshot(_ context.Context) (core.Snapshot, error) {
 	return core.Snapshot{
 		Leaderboard: m.state.Leaderboard,
 	}, nil
+}
+
+func (m *mockStore) ListLeaderboard(_ context.Context, limit int64) ([]core.LeaderboardEntry, error) {
+	m.lastLeaderboardLimit = limit
+	if len(m.leaderboard) > 0 {
+		return append([]core.LeaderboardEntry(nil), m.leaderboard...), nil
+	}
+	return append([]core.LeaderboardEntry(nil), m.state.Leaderboard...), nil
+}
+
+func (m *mockStore) ListLeaderboardIncludingZeroClickPlayers(_ context.Context, offset int64, limit int64) ([]core.LeaderboardEntry, error) {
+	m.lastLeaderboardOffset = offset
+	m.lastLeaderboardLimit = limit
+	if len(m.leaderboard) == 0 {
+		return append([]core.LeaderboardEntry(nil), m.state.Leaderboard...), nil
+	}
+	start := min(int(offset), len(m.leaderboard))
+	end := min(start+int(limit), len(m.leaderboard))
+	return append([]core.LeaderboardEntry(nil), m.leaderboard[start:end]...), nil
 }
 
 func (m *mockStore) GetBossResources(_ context.Context) (core.BossResources, error) {
@@ -1316,6 +1338,53 @@ func TestGetBossResourcesUsesReadNicknameRoom(t *testing.T) {
 	}
 	if payload.RoomID != "2" || payload.BossID != "room-2-boss" {
 		t.Fatalf("expected room 2 resources, got %+v", payload)
+	}
+}
+
+func TestGetLeaderboardSupportsOffsetAndLimit(t *testing.T) {
+	store := &mockStore{
+		leaderboard: []core.LeaderboardEntry{
+			{Rank: 1, Nickname: "玩家01", ClickCount: 120},
+			{Rank: 2, Nickname: "玩家02", ClickCount: 119},
+			{Rank: 3, Nickname: "玩家03", ClickCount: 118},
+			{Rank: 4, Nickname: "玩家04", ClickCount: 117},
+			{Rank: 5, Nickname: "玩家05", ClickCount: 116},
+			{Rank: 6, Nickname: "玩家06", ClickCount: 115},
+			{Rank: 7, Nickname: "玩家07", ClickCount: 114},
+			{Rank: 8, Nickname: "玩家08", ClickCount: 113},
+			{Rank: 9, Nickname: "玩家09", ClickCount: 112},
+			{Rank: 10, Nickname: "玩家10", ClickCount: 111},
+			{Rank: 11, Nickname: "玩家11", ClickCount: 110},
+			{Rank: 12, Nickname: "玩家12", ClickCount: 109},
+			{Rank: 13, Nickname: "玩家13", ClickCount: 108},
+			{Rank: 14, Nickname: "玩家14", ClickCount: 107},
+			{Rank: 15, Nickname: "玩家15", ClickCount: 106},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/leaderboard?offset=10&limit=40", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastLeaderboardOffset != 10 || store.lastLeaderboardLimit != 40 {
+		t.Fatalf("expected hall leaderboard route to pass offset=10 limit=40, got offset=%d limit=%d", store.lastLeaderboardOffset, store.lastLeaderboardLimit)
+	}
+	if strings.Contains(response.Body.String(), `"nickname":"玩家01"`) {
+		t.Fatalf("expected top 10 to be excluded, got %s", response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"nickname":"玩家11"`) {
+		t.Fatalf("expected leaderboard payload to start at rank 11, got %s", response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"nickname":"玩家15"`) {
+		t.Fatalf("expected leaderboard payload to include remaining players, got %s", response.Body.String())
 	}
 }
 

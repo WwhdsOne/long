@@ -118,7 +118,7 @@ export function decodeRealtimeBinaryMessage(frame) {
     case realtimeBinaryType.publicMeta:
       return {
         type: 'public_meta',
-        payload: toPlain(realtime.PublicMeta, realtime.PublicMeta.decode(body)),
+        payload: toPlain(realtime.PublicMeta, realtime.PublicMeta.decode(body), sparseDecodeOptions),
       }
     default:
       throw new Error('unsupported realtime binary message')

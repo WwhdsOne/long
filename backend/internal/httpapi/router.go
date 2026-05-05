@@ -19,6 +19,8 @@ import (
 type ButtonStore interface {
 	GetState(context.Context, string) (core.State, error)
 	GetSnapshot(context.Context) (core.Snapshot, error)
+	ListLeaderboard(context.Context, int64) ([]core.LeaderboardEntry, error)
+	ListLeaderboardIncludingZeroClickPlayers(context.Context, int64, int64) ([]core.LeaderboardEntry, error)
 	GetUserState(context.Context, string) (core.UserState, error)
 	GetPlayerResources(context.Context, string) (core.PlayerResources, error)
 	ClickButton(context.Context, string, string, int64) (core.ClickResult, error)

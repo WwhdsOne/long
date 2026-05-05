@@ -1404,6 +1404,57 @@ func (s *Store) ListLeaderboard(ctx context.Context, limit int64) ([]Leaderboard
 	return leaderboard, nil
 }
 
+// ListLeaderboardIncludingZeroClickPlayers 返回包含 0 点击玩家的排行榜窗口。
+func (s *Store) ListLeaderboardIncludingZeroClickPlayers(ctx context.Context, offset int64, limit int64) ([]LeaderboardEntry, error) {
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 40
+	}
+
+	clickedLeaderboard, err := s.ListLeaderboard(ctx, 1000000)
+	if err != nil {
+		return nil, err
+	}
+	clickedSet := make(map[string]struct{}, len(clickedLeaderboard))
+	allEntries := make([]LeaderboardEntry, 0, len(clickedLeaderboard))
+	for _, entry := range clickedLeaderboard {
+		if strings.TrimSpace(entry.Nickname) == "" {
+			continue
+		}
+		clickedSet[entry.Nickname] = struct{}{}
+		allEntries = append(allEntries, entry)
+	}
+
+	nicknames, err := s.listPlayerNicknames(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rank := len(allEntries) + 1
+	for _, nickname := range nicknames {
+		normalized := strings.TrimSpace(nickname)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := clickedSet[normalized]; ok {
+			continue
+		}
+		allEntries = append(allEntries, LeaderboardEntry{
+			Rank:       rank,
+			Nickname:   normalized,
+			ClickCount: 0,
+		})
+		rank++
+	}
+
+	if offset >= int64(len(allEntries)) {
+		return []LeaderboardEntry{}, nil
+	}
+	end := min(int(offset+limit), len(allEntries))
+	return append([]LeaderboardEntry(nil), allEntries[offset:end]...), nil
+}
+
 func (s *Store) totalClickCount(ctx context.Context) (int64, error) {
 	totalVotes, err := s.client.Get(ctx, s.totalVotesKey).Int64()
 	if err == nil {

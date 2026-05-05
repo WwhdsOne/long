@@ -22,7 +22,8 @@ describe('BattlePage 房间战斗页', () => {
     expect(battleSource).toContain("const displayName = String(currentRoom.value?.displayName || '').trim()")
     expect(battleSource).toContain('v-if="isHallRoom"')
     expect(battleSource).toContain('v-if="!isHallRoom"')
-    expect(battleSource).toContain('当前处于大厅。这里只显示战线分流和点击总榜，不显示 Boss 战斗区与 Boss 伤害榜。')
+    expect(battleSource).toContain('class="feedback-panel feedback-panel--compact hall-leaderboard-panel"')
+    expect(battleSource).toContain('大厅点击总榜')
   })
 
   it('战斗房间允许随时退出，并复用公共切房冷却标签', () => {

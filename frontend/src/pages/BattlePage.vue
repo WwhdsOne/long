@@ -16,6 +16,10 @@ const {
   currentRoomId,
   currentRoom,
   rooms,
+  hallLeaderboardSnapshot,
+  hallLeaderboardLoading,
+  hallLeaderboardError,
+  hallLeaderboardPage,
   roomSwitching,
   roomError,
   roomSwitchCooldownEndsAt,
@@ -59,6 +63,8 @@ const {
   equipmentNameClass,
   rewardModal,
   closeRewardModal,
+  loadHallLeaderboardSnapshot,
+  resetHallLeaderboardSnapshot,
   joinRoom,
   clickButton,
   globalStatusList,
@@ -75,6 +81,9 @@ const bossCursorVisible = ref(false)
 const bossCellSizePx = ref(56)
 const DEFAULT_BOSS_SWORD_CURSOR_URL = 'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png'
 const HALL_ROOM_ID = 'hall'
+const HALL_LEADERBOARD_START_RANK = 11
+const HALL_LEADERBOARD_PAGE_SIZE = 40
+const HALL_LEADERBOARD_COLUMN_COUNT = 4
 const bossSwordCursorUrl = computed(() => equippedBattleClickCursorImagePath.value || DEFAULT_BOSS_SWORD_CURSOR_URL)
 const isHallRoom = computed(() => String(currentRoomId.value || '') === HALL_ROOM_ID)
 const currentRoomDisplay = computed(() => {
@@ -91,6 +100,31 @@ const myBattlePower = computed(() => (
 ))
 const battlePowerLabel = computed(() => (
   isLoggedIn.value ? formatCompact(myBattlePower.value) : '登录后激活'
+))
+const hallLeaderboardPageEntries = computed(() => {
+  const start = hallLeaderboardPage.value * HALL_LEADERBOARD_PAGE_SIZE
+  return hallLeaderboardSnapshot.value.slice(start, start + HALL_LEADERBOARD_PAGE_SIZE)
+})
+const hallLeaderboardTotalPages = computed(() => (
+  Math.ceil(hallLeaderboardSnapshot.value.length / HALL_LEADERBOARD_PAGE_SIZE)
+))
+const hallLeaderboardHasPagination = computed(() => hallLeaderboardSnapshot.value.length > 0)
+const hallLeaderboardRangeStart = computed(() => (
+  HALL_LEADERBOARD_START_RANK + (hallLeaderboardPage.value * HALL_LEADERBOARD_PAGE_SIZE)
+))
+const hallLeaderboardRangeEnd = computed(() => (
+  hallLeaderboardRangeStart.value + Math.max(0, hallLeaderboardPageEntries.value.length - 1)
+))
+const hallLeaderboardColumns = computed(() => {
+  const columnSize = Math.max(1, Math.ceil(hallLeaderboardPageEntries.value.length / HALL_LEADERBOARD_COLUMN_COUNT))
+  return Array.from({ length: HALL_LEADERBOARD_COLUMN_COUNT }, (_, index) => (
+    hallLeaderboardPageEntries.value.slice(index * columnSize, (index + 1) * columnSize)
+  ))
+})
+const hallLeaderboardRangeLabel = computed(() => (
+  hallLeaderboardPageEntries.value.length > 0
+    ? `${hallLeaderboardRangeStart.value}-${hallLeaderboardRangeEnd.value}`
+    : '11-50'
 ))
 const bossBattlePower = computed(() => {
   if (!boss.value) return 0
@@ -138,6 +172,16 @@ watch(() => currentRoomId.value, (next, prev) => {
   window.scrollTo({top: 0, behavior: 'smooth'})
 })
 
+watch(() => currentRoomId.value, async (next, prev) => {
+  if (String(next || '') === HALL_ROOM_ID && String(prev || '') !== HALL_ROOM_ID) {
+    await loadHallLeaderboardSnapshot()
+    return
+  }
+  if (String(next || '') !== HALL_ROOM_ID && String(prev || '') === HALL_ROOM_ID) {
+    resetHallLeaderboardSnapshot()
+  }
+}, {immediate: true})
+
 const talentEffectOverlayRef = ref(null)
 let bossGridResizeObserver = null
 let bossGridRect = null
@@ -165,6 +209,15 @@ function exitCurrentRoom() {
   if (roomSwitching.value) return
   pendingScrollToTopAfterExit.value = true
   joinRoom(HALL_ROOM_ID)
+}
+
+function showPreviousHallLeaderboardPage() {
+  hallLeaderboardPage.value = Math.max(0, hallLeaderboardPage.value - 1)
+}
+
+function showNextHallLeaderboardPage() {
+  const lastPage = Math.max(0, hallLeaderboardTotalPages.value - 1)
+  hallLeaderboardPage.value = Math.min(lastPage, hallLeaderboardPage.value + 1)
 }
 
 function applyBossCursorTransform() {
@@ -1183,8 +1236,68 @@ const silverStormActive = computed(() => {
         </div>
       </section>
 
-      <section v-if="isHallRoom" class="feedback-panel feedback-panel--compact">
-        <p>当前处于大厅。这里只显示战线分流和点击总榜，不显示 Boss 战斗区与 Boss 伤害榜。</p>
+      <section v-if="isHallRoom" class="feedback-panel feedback-panel--compact hall-leaderboard-panel">
+        <div class="hall-leaderboard-panel__head">
+          <div>
+            <p class="vote-stage__eyebrow">大厅点击总榜</p>
+            <strong>第 {{ hallLeaderboardPage + 1 }} 页 · {{ hallLeaderboardRangeLabel }}</strong>
+          </div>
+          <span class="hall-leaderboard-panel__hint">这里包含 0 点击玩家。右侧仍保留前十实时榜，当前区域只在进入大厅时回源一次。</span>
+        </div>
+
+        <div v-if="hallLeaderboardLoading" class="leaderboard-list leaderboard-list--empty">
+          <p>大厅总榜加载中。</p>
+        </div>
+        <div v-else-if="hallLeaderboardError" class="leaderboard-list leaderboard-list--empty">
+          <p>{{ hallLeaderboardError }}</p>
+        </div>
+        <div v-else-if="!hallLeaderboardHasPagination" class="leaderboard-list leaderboard-list--empty">
+          <p>当前没有 11 名之后的排行榜数据。</p>
+        </div>
+        <div v-else class="hall-leaderboard-panel__body">
+          <div class="hall-leaderboard-panel__grid">
+            <div
+                v-for="(column, columnIndex) in hallLeaderboardColumns"
+                :key="`hall-column-${columnIndex}`"
+                class="hall-leaderboard-panel__column"
+            >
+              <ol v-if="column.length > 0" class="leaderboard-list">
+                <li
+                    v-for="entry in column"
+                    :key="entry.nickname"
+                    class="leaderboard-list__item"
+                    :class="{ 'leaderboard-list__item--me': entry.nickname === nickname }"
+                >
+                  <span class="leaderboard-list__rank">#{{ entry.rank }}</span>
+                  <span class="leaderboard-list__name">{{ entry.nickname }}</span>
+                  <strong class="leaderboard-list__count">{{ entry.clickCount }}</strong>
+                </li>
+              </ol>
+            </div>
+          </div>
+
+          <div class="hall-leaderboard-panel__actions">
+            <button
+                class="nickname-form__submit nickname-form__submit--ghost"
+                type="button"
+                :disabled="hallLeaderboardPage <= 0"
+                @click="showPreviousHallLeaderboardPage"
+            >
+              上一页
+            </button>
+            <span class="hall-leaderboard-panel__page-indicator">
+              {{ hallLeaderboardRangeStart }}-{{ hallLeaderboardRangeEnd }}
+            </span>
+            <button
+                class="nickname-form__submit nickname-form__submit--ghost"
+                type="button"
+                :disabled="hallLeaderboardPage >= hallLeaderboardTotalPages - 1"
+                @click="showNextHallLeaderboardPage"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
       </section>
 
       <section v-else class="feedback-panel feedback-panel--compact">

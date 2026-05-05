@@ -122,6 +122,11 @@ const publicPages = [
 
 const buttonTotalVotes = ref(0)
 const leaderboard = ref([])
+const hallLeaderboardSnapshot = ref([])
+const hallLeaderboardLoading = ref(false)
+const hallLeaderboardError = ref('')
+const hallLeaderboardPage = ref(0)
+const hallLeaderboardLoadedRoomId = ref('')
 const boss = ref(null)
 const currentRoomId = ref('1')
 const rooms = ref([])
@@ -2492,6 +2497,40 @@ async function loadRooms() {
     }
 }
 
+async function loadHallLeaderboardSnapshot() {
+    if (hallLeaderboardLoading.value || hallLeaderboardLoadedRoomId.value === 'hall') {
+        return hallLeaderboardSnapshot.value
+    }
+
+    hallLeaderboardLoading.value = true
+    hallLeaderboardError.value = ''
+
+    try {
+        const response = await fetch('/api/leaderboard?offset=10&limit=200')
+        if (!response.ok) {
+            throw new Error('大厅总榜加载失败')
+        }
+        const payload = await response.json()
+        hallLeaderboardSnapshot.value = Array.isArray(payload?.leaderboard) ? payload.leaderboard : []
+        hallLeaderboardPage.value = 0
+        hallLeaderboardLoadedRoomId.value = 'hall'
+        return hallLeaderboardSnapshot.value
+    } catch (error) {
+        hallLeaderboardError.value = error.message || '大厅总榜加载失败。'
+        return hallLeaderboardSnapshot.value
+    } finally {
+        hallLeaderboardLoading.value = false
+    }
+}
+
+function resetHallLeaderboardSnapshot() {
+    hallLeaderboardSnapshot.value = []
+    hallLeaderboardLoading.value = false
+    hallLeaderboardError.value = ''
+    hallLeaderboardPage.value = 0
+    hallLeaderboardLoadedRoomId.value = ''
+}
+
 async function joinRoom(roomId) {
     const targetRoomId = String(roomId || '').trim()
     if (!nickname.value) {
@@ -2806,6 +2845,7 @@ function clearPlayerSessionState() {
     nickname.value = ''
     nicknameDraft.value = ''
     passwordDraft.value = ''
+    resetHallLeaderboardSnapshot()
     clearUserRealtimeState()
     clearAutoClickLocalState()
     clearPendingClicks()
@@ -2981,6 +3021,10 @@ export function usePublicPageState() {
         publicPages,
         buttonTotalVotes,
         leaderboard,
+        hallLeaderboardSnapshot,
+        hallLeaderboardLoading,
+        hallLeaderboardError,
+        hallLeaderboardPage,
         boss,
         currentRoomId,
         currentRoom,
@@ -3106,6 +3150,7 @@ export function usePublicPageState() {
         closeAnnouncementModal,
         closeAfkSettlementModal,
         closeRewardModal,
+        loadHallLeaderboardSnapshot,
         loadMessages,
         loadShopItems,
         submitMessage,
@@ -3114,6 +3159,7 @@ export function usePublicPageState() {
         equipShopItem,
         unequipShopItem,
         toggleAutoClick,
+        resetHallLeaderboardSnapshot,
         loadRooms,
         joinRoom,
         clickButton,

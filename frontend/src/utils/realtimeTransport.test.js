@@ -284,6 +284,22 @@ describe('realtimeTransport', () => {
     })
   })
 
+  it('public_meta 未携带 leaderboard 时不会在二进制解码时补成空数组', () => {
+    const encoded = realtime.PublicMeta.encode(realtime.PublicMeta.create({
+      announcementVersion: 'ann-2',
+    })).finish()
+    const frame = new Uint8Array(1 + encoded.length)
+    frame[0] = realtimeBinaryType.publicMeta
+    frame.set(encoded, 1)
+
+    expect(decodeRealtimeBinaryMessage(frame)).toEqual({
+      type: 'public_meta',
+      payload: {
+        announcementVersion: 'ann-2',
+      },
+    })
+  })
+
   it('online_count 可通过 WebSocket 与 SSE 回调在线人数', () => {
     const sockets = []
     const sources = []
