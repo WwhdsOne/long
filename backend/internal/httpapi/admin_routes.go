@@ -209,13 +209,13 @@ func registerAdminBlacklistRoutes(router route.IRouter, options Options) {
 		}
 
 		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
-			Operator:   options.AdminAuthenticator.Username(),
-			Action:     "blacklist.unblock",
-			TargetType: "client",
-			TargetID:   clientID,
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "blacklist.unblock",
+			TargetType:  "client",
+			TargetID:    clientID,
 			RequestPath: requestPath(c),
-			RequestIP:  requestIP(c),
-			Result:     "success",
+			RequestIP:   requestIP(c),
+			Result:      "success",
 		})
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})

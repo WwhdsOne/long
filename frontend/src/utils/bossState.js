@@ -13,6 +13,34 @@ function normalizeBossPart(part) {
   }
 }
 
+function bossPartKey(part) {
+  if (!part || typeof part !== 'object') return ''
+  return `${Number(part.x)}:${Number(part.y)}`
+}
+
+function mergeBossParts(currentParts, incomingParts) {
+  const normalizedCurrent = Array.isArray(currentParts) ? currentParts.map(normalizeBossPart) : []
+  const normalizedIncoming = Array.isArray(incomingParts) ? incomingParts.map(normalizeBossPart) : []
+  if (normalizedCurrent.length === 0) {
+    return normalizedIncoming
+  }
+  if (normalizedIncoming.length === 0) {
+    return normalizedCurrent
+  }
+
+  const mergedByKey = new Map()
+  for (const part of normalizedCurrent) {
+    mergedByKey.set(bossPartKey(part), part)
+  }
+  for (const part of normalizedIncoming) {
+    const key = bossPartKey(part)
+    const current = mergedByKey.get(key)
+    mergedByKey.set(key, current ? {...current, ...part} : part)
+  }
+
+  return normalizedCurrent.map((part) => mergedByKey.get(bossPartKey(part)) || part)
+}
+
 export function normalizeBossState(boss) {
   if (!boss || typeof boss !== 'object') return boss ?? null
   return {
@@ -54,5 +82,9 @@ export function mergeBossState(currentBoss, incomingBoss) {
     return normalizedCurrent
   }
 
-  return normalizedIncoming
+  return {
+    ...normalizedCurrent,
+    ...normalizedIncoming,
+    parts: mergeBossParts(normalizedCurrent.parts, normalizedIncoming.parts),
+  }
 }

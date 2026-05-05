@@ -118,7 +118,7 @@ func newTestStoreWithRoomConfig(t *testing.T, roomCfg RoomConfig) (*Store, func(
 
 	return NewStore(client, "vote:", StoreOptions{
 			CriticalChancePercent: 5,
-			Room: roomCfg,
+			Room:                  roomCfg,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
 			_ = client.Close()
 			server.Close()

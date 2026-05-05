@@ -85,10 +85,10 @@ func registerAdminRoomRoutes(router route.IRouter, options Options) {
 }
 
 type adminRoomView struct {
-	ID          string `json:"id"`
-	DisplayName string `json:"displayName"`
+	ID              string `json:"id"`
+	DisplayName     string `json:"displayName"`
 	CurrentBossName string `json:"currentBossName,omitempty"`
-	CycleEnabled bool `json:"cycleEnabled"`
+	CycleEnabled    bool   `json:"cycleEnabled"`
 }
 
 func adminRoomViews(rooms []core.RoomInfo) []adminRoomView {

@@ -47,6 +47,67 @@ describe('mergeBossState', () => {
     })
   })
 
+  it('同一只活动 Boss 的后续增量没带 parts 时，保留现有部位数据', () => {
+    const current = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 80,
+      maxHp: 100,
+      parts: [
+        {x: 0, y: 0, currentHp: 40, maxHp: 50, armor: 3, alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: 20, maxHp: 50, armor: 8, alive: true, type: 'heavy'},
+      ],
+    }
+    const incoming = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 60,
+      maxHp: 100,
+    }
+
+    expect(mergeBossState(current, incoming)).toEqual({
+      ...incoming,
+      currentHp: '60',
+      maxHp: '100',
+      parts: [
+        {x: 0, y: 0, currentHp: '40', maxHp: '50', armor: '3', alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: '20', maxHp: '50', armor: '8', alive: true, type: 'heavy'},
+      ],
+    })
+  })
+
+  it('同一只活动 Boss 的后续增量只带部分 parts 时，按坐标合并并保留未更新部位', () => {
+    const current = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 80,
+      maxHp: 100,
+      parts: [
+        {x: 0, y: 0, currentHp: 40, maxHp: 50, armor: 3, alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: 20, maxHp: 50, armor: 8, alive: true, type: 'heavy'},
+      ],
+    }
+    const incoming = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 60,
+      maxHp: 100,
+      parts: [
+        {x: 1, y: 0, currentHp: 10, maxHp: 50, armor: 6, alive: true, type: 'heavy'},
+      ],
+    }
+
+    expect(mergeBossState(current, incoming)).toEqual({
+      ...incoming,
+      currentHp: '60',
+      maxHp: '100',
+      parts: [
+        {x: 0, y: 0, currentHp: '40', maxHp: '50', armor: '3', alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: '10', maxHp: '50', armor: '6', alive: true, type: 'heavy'},
+      ],
+    })
+  })
+
   it('切换到下一只 Boss 时，即使血量更高也要接受', () => {
     const current = {
       id: 'boss-1',
