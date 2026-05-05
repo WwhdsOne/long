@@ -742,3 +742,30 @@ func TestRealtimeSessionClickReturnsRateLimitError(t *testing.T) {
 		t.Fatalf("unexpected rate limit response: %+v", response)
 	}
 }
+
+func TestRealtimeSessionClickSkipsRateLimitForWhitelistedAuthenticatedNickname(t *testing.T) {
+	session := newRealtimeSession(realtimeSessionOptions{
+		stateView:                  &mockStore{},
+		store:                      &mockStore{},
+		hub:                        events.NewHub(),
+		clickGuard:                 &mockClickGuard{err: ratelimit.ErrTooManyRequests},
+		authenticatorEnabled:       true,
+		authenticatedNickname:      "压测账号",
+		rateLimitNicknameWhitelist: []string{"压测账号"},
+		clientID:                   "127.0.0.1",
+	})
+
+	frames := captureRealtimeFrames(t, func(send func(realtimeOutboundFrame) error) error {
+		return session.handleMessage(context.Background(), websocket.BinaryMessage, encodeRealtimeBinaryClickRequestForTest(t, "feel", 0), send)
+	})
+	if len(frames) != 1 {
+		t.Fatalf("expected one realtime frame, got %d", len(frames))
+	}
+	if frames[0].messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary click ack, got %d", frames[0].messageType)
+	}
+	ack := decodeRealtimeBinaryClickAckForTest(t, frames[0].payload)
+	if ack.GetDelta() != 1 {
+		t.Fatalf("expected click ack delta 1, got %+v", ack)
+	}
+}

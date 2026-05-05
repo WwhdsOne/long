@@ -109,29 +109,31 @@ type realtimePongMessage struct {
 }
 
 type realtimeSessionOptions struct {
-	stateView             StateView
-	store                 ButtonStore
-	hub                   RealtimeHub
-	changePublisher       ChangePublisher
-	clickGuard            ClickGuard
-	authenticatorEnabled  bool
-	authenticatedNickname string
-	clientID              string
+	stateView                  StateView
+	store                      ButtonStore
+	hub                        RealtimeHub
+	changePublisher            ChangePublisher
+	clickGuard                 ClickGuard
+	rateLimitNicknameWhitelist []string
+	authenticatorEnabled       bool
+	authenticatedNickname      string
+	clientID                   string
 }
 
 type realtimeSession struct {
-	stateView             StateView
-	store                 ButtonStore
-	hub                   RealtimeHub
-	changePublisher       ChangePublisher
-	clickGuard            ClickGuard
-	authenticatorEnabled  bool
-	authenticatedNickname string
-	clientID              string
-	nickname              string
-	updates               <-chan events.ServerEvent
-	unsubscribe           func()
-	lastActiveAt          time.Time
+	stateView                  StateView
+	store                      ButtonStore
+	hub                        RealtimeHub
+	changePublisher            ChangePublisher
+	clickGuard                 ClickGuard
+	rateLimitNicknameWhitelist []string
+	authenticatorEnabled       bool
+	authenticatedNickname      string
+	clientID                   string
+	nickname                   string
+	updates                    <-chan events.ServerEvent
+	unsubscribe                func()
+	lastActiveAt               time.Time
 }
 
 type realtimeInboundFrame struct {
@@ -146,14 +148,15 @@ type realtimeOutboundFrame struct {
 
 func newRealtimeSession(options realtimeSessionOptions) *realtimeSession {
 	return &realtimeSession{
-		stateView:             options.stateView,
-		store:                 options.store,
-		hub:                   options.hub,
-		changePublisher:       options.changePublisher,
-		clickGuard:            options.clickGuard,
-		authenticatorEnabled:  options.authenticatorEnabled,
-		authenticatedNickname: strings.TrimSpace(options.authenticatedNickname),
-		clientID:              strings.TrimSpace(options.clientID),
+		stateView:                  options.stateView,
+		store:                      options.store,
+		hub:                        options.hub,
+		changePublisher:            options.changePublisher,
+		clickGuard:                 options.clickGuard,
+		rateLimitNicknameWhitelist: append([]string(nil), options.rateLimitNicknameWhitelist...),
+		authenticatorEnabled:       options.authenticatorEnabled,
+		authenticatedNickname:      strings.TrimSpace(options.authenticatedNickname),
+		clientID:                   strings.TrimSpace(options.clientID),
 	}
 }
 
@@ -166,14 +169,15 @@ func newRealtimeSocketHandler(options Options) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		authenticatedNickname := authenticatedPlayerNickname(ctx, c, options.PlayerAuthenticator)
 		session := newRealtimeSession(realtimeSessionOptions{
-			stateView:             effectiveStateView(options),
-			store:                 options.Store,
-			hub:                   options.RealtimeHub,
-			changePublisher:       options.ChangePublisher,
-			clickGuard:            options.ClickGuard,
-			authenticatorEnabled:  options.PlayerAuthenticator != nil,
-			authenticatedNickname: authenticatedNickname,
-			clientID:              clientIdentifier(c),
+			stateView:                  effectiveStateView(options),
+			store:                      options.Store,
+			hub:                        options.RealtimeHub,
+			changePublisher:            options.ChangePublisher,
+			clickGuard:                 options.ClickGuard,
+			rateLimitNicknameWhitelist: options.RateLimitNicknameWhitelist,
+			authenticatorEnabled:       options.PlayerAuthenticator != nil,
+			authenticatedNickname:      authenticatedNickname,
+			clientID:                   clientIdentifier(c),
 		})
 
 		_ = upgrader.Upgrade(c, func(conn *websocket.Conn) {
@@ -283,9 +287,10 @@ func (s *realtimeSession) executeClick(ctx context.Context, slug string, comboCo
 	}
 
 	nickname, result, apiErr := executeButtonClick(ctx, Options{
-		Store:           s.store,
-		ClickGuard:      s.clickGuard,
-		ChangePublisher: s.changePublisher,
+		Store:                      s.store,
+		ClickGuard:                 s.clickGuard,
+		RateLimitNicknameWhitelist: s.rateLimitNicknameWhitelist,
+		ChangePublisher:            s.changePublisher,
 	}, clickRequestContext{
 		Slug:                  slug,
 		NicknameHint:          s.nickname,
