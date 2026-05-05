@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
@@ -37,6 +39,35 @@ func registerPublicRoutes(router route.IRouter, options Options, stateView State
 			count = options.RealtimeHub.SubscriberCount()
 		}
 		writeJSON(c, consts.StatusOK, map[string]int{"count": count})
+	})
+
+	router.GET("/api/leaderboard", func(ctx context.Context, c *app.RequestContext) {
+		offset := int64(0)
+		if rawOffset := strings.TrimSpace(c.Query("offset")); rawOffset != "" {
+			parsedOffset, err := strconv.ParseInt(rawOffset, 10, 64)
+			if err != nil || parsedOffset < 0 {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_LEADERBOARD_OFFSET"})
+				return
+			}
+			offset = parsedOffset
+		}
+
+		limit := int64(200)
+		if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
+			parsedLimit, err := strconv.ParseInt(rawLimit, 10, 64)
+			if err != nil || parsedLimit <= 0 {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_LEADERBOARD_LIMIT"})
+				return
+			}
+			limit = parsedLimit
+		}
+
+		leaderboard, err := options.Store.ListLeaderboardIncludingZeroClickPlayers(ctx, offset, limit)
+		if err != nil {
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "LEADERBOARD_FETCH_FAILED"})
+			return
+		}
+		writeJSON(c, consts.StatusOK, map[string]any{"leaderboard": leaderboard})
 	})
 
 	router.GET("/api/boss/history", func(ctx context.Context, c *app.RequestContext) {

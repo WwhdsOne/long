@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -2331,6 +2332,45 @@ func TestSnapshotTotalVotesUsesDedicatedCounterWhenPresent(t *testing.T) {
 	}
 	if snapshot.TotalVotes != 15 {
 		t.Fatalf("expected dedicated total votes counter to win, got %d", snapshot.TotalVotes)
+	}
+}
+
+func TestListLeaderboardIncludingZeroClickPlayers(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	for index := 1; index <= 15; index++ {
+		nickname := fmt.Sprintf("玩家%02d", index)
+		if err := store.client.ZAdd(ctx, store.playerIndexKey, redis.Z{
+			Score:  float64(200-index),
+			Member: nickname,
+		}).Err(); err != nil {
+			t.Fatalf("seed player index: %v", err)
+		}
+	}
+	if err := store.client.ZAdd(ctx, store.leaderboardKey,
+		redis.Z{Score: 15, Member: "玩家01"},
+		redis.Z{Score: 14, Member: "玩家02"},
+		redis.Z{Score: 13, Member: "玩家03"},
+		redis.Z{Score: 12, Member: "玩家04"},
+		redis.Z{Score: 11, Member: "玩家05"},
+	).Err(); err != nil {
+		t.Fatalf("seed leaderboard: %v", err)
+	}
+
+	entries, err := store.ListLeaderboardIncludingZeroClickPlayers(ctx, 10, 40)
+	if err != nil {
+		t.Fatalf("list inclusive leaderboard: %v", err)
+	}
+	if len(entries) != 5 {
+		t.Fatalf("expected 5 remaining players, got %d", len(entries))
+	}
+	if entries[0].Rank != 11 || entries[0].Nickname != "玩家11" || entries[0].ClickCount != 0 {
+		t.Fatalf("expected rank 11 zero-click player, got %+v", entries[0])
+	}
+	if entries[4].Rank != 15 || entries[4].Nickname != "玩家15" || entries[4].ClickCount != 0 {
+		t.Fatalf("expected rank 15 zero-click player, got %+v", entries[4])
 	}
 }
 
