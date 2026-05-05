@@ -33,6 +33,7 @@ defineProps({
         <li v-for="entry in blacklistPage.items" :key="entry.clientId" class="inventory-item inventory-item--stacked">
           <div>
             <strong>{{ entry.nickname }}</strong>
+            <p v-if="entry.clientId.startsWith('ip:')">IP：{{ entry.clientId.slice(3) }}</p>
             <p>封禁开始：{{ formatTime(entry.blockedAt) }}</p>
             <p>封禁结束：{{ formatTime(entry.blockedUntil) }}</p>
             <p>剩余时间：{{ formatDuration(entry.remainingSeconds) }}</p>

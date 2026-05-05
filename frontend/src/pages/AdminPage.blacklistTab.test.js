@@ -38,4 +38,9 @@ describe('AdminPage 黑名单管理接线', () => {
     expect(tabSource).toContain('剩余时间：{{ formatDuration(entry.remainingSeconds) }}')
     expect(tabSource).toContain('手动解封')
   })
+
+  it('IP 封禁条目展示具体 IP', () => {
+    expect(tabSource).toContain("entry.clientId.startsWith('ip:')")
+    expect(tabSource).toContain("IP：{{ entry.clientId.slice(3) }}")
+  })
 })
