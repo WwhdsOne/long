@@ -378,12 +378,31 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(realtimeOu
 		userState = &payload
 	}
 
-	return sendText(send, realtimeSnapshotMessage{
+	if err := sendText(send, realtimeSnapshotMessage{
 		Type:      realtimeMessageTypeSnapshot,
 		Public:    snapshot,
 		User:      userState,
 		RoomState: roomState,
-	})
+	}); err != nil {
+		return err
+	}
+	if roomState.Rooms != nil {
+		encoded, err := encodeRealtimeBinaryRoomState(realtimeRoomStatePayload{
+			CurrentRoomID:                  roomState.CurrentRoomID,
+			SwitchCooldownRemainingSeconds: roomState.SwitchCooldownRemainingSeconds,
+			Rooms:                          roomState.Rooms,
+		})
+		if err != nil {
+			return err
+		}
+		if err := send(realtimeOutboundFrame{
+			messageType: websocket.BinaryMessage,
+			payload:     encoded,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func buildRealtimeSnapshotUser(state core.UserState) realtimeSnapshotUser {

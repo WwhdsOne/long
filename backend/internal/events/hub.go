@@ -298,13 +298,10 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 			return
 		}
 
-		roomState, err := reader.ListRooms(ctx, nickname)
-		if err != nil {
-			c.JSON(consts.StatusInternalServerError, map[string]string{"error": "STATE_FETCH_FAILED"})
-			return
-		}
-		if err := writeEvent(writer, RoomStateEventName, roomState); err != nil {
-			return
+		if roomState, err := reader.ListRooms(ctx, nickname); err == nil {
+			if err := writeEvent(writer, RoomStateEventName, roomState); err != nil {
+				return
+			}
 		}
 
 		if nickname != "" {

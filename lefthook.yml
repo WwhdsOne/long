@@ -1,12 +1,6 @@
 pre-commit:
   parallel: false
   commands:
-    frontend-update:
-      run: ~/.bun/bin/bun --cwd=frontend install
-    backend-update:
-      run: |
-        go -C backend get -u ./...
-        go -C backend mod tidy
     backend-fix:
       run: go -C backend fix ./...
     backend-test:

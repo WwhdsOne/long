@@ -3,6 +3,8 @@ package httpapi
 import (
 	"errors"
 	"maps"
+	"strconv"
+	"strings"
 
 	"github.com/bytedance/sonic"
 	"google.golang.org/protobuf/proto"
@@ -42,6 +44,29 @@ type realtimeRoomStatePayload struct {
 	CurrentRoomID                  string          `json:"currentRoomId"`
 	SwitchCooldownRemainingSeconds int64           `json:"switchCooldownRemainingSeconds"`
 	Rooms                          []core.RoomInfo `json:"rooms"`
+}
+
+type realtimeRoomStateCompatPayload struct {
+	CurrentRoomID                  string                        `json:"currentRoomId"`
+	SwitchCooldownRemainingSeconds int64                         `json:"switchCooldownRemainingSeconds"`
+	Rooms                          []realtimeRoomInfoCompatEntry `json:"rooms"`
+}
+
+type realtimeRoomInfoCompatEntry struct {
+	ID                       string `json:"id"`
+	DisplayName              string `json:"displayName"`
+	Current                  bool   `json:"current"`
+	Joinable                 bool   `json:"joinable"`
+	OnlineCount              int    `json:"onlineCount"`
+	CycleEnabled             bool   `json:"cycleEnabled"`
+	QueueID                  string `json:"queueId"`
+	CurrentBossID            string `json:"currentBossId,omitempty"`
+	CurrentBossName          string `json:"currentBossName,omitempty"`
+	CurrentBossStatus        string `json:"currentBossStatus,omitempty"`
+	CurrentBossHP            string `json:"currentBossHp,omitempty"`
+	CurrentBossMaxHP         string `json:"currentBossMaxHp,omitempty"`
+	CurrentBossAvgHP         string `json:"currentBossAvgHp,omitempty"`
+	CooldownRemainingSeconds int64  `json:"cooldownRemainingSeconds,omitempty"`
 }
 
 const (
@@ -154,11 +179,54 @@ func encodeRealtimeBinaryUserDeltaFromJSON(raw []byte) ([]byte, error) {
 }
 
 func encodeRealtimeBinaryRoomStateFromJSON(raw []byte) ([]byte, error) {
-	var payload realtimeRoomStatePayload
+	var payload realtimeRoomStateCompatPayload
 	if err := sonic.Unmarshal(raw, &payload); err != nil {
 		return nil, err
 	}
-	return encodeRealtimeBinaryRoomState(payload)
+	rooms := make([]core.RoomInfo, 0, len(payload.Rooms))
+	for _, room := range payload.Rooms {
+		currentBossHP, err := parseRealtimeFlexibleInt64Value(room.CurrentBossHP)
+		if err != nil {
+			return nil, err
+		}
+		currentBossMaxHP, err := parseRealtimeFlexibleInt64Value(room.CurrentBossMaxHP)
+		if err != nil {
+			return nil, err
+		}
+		currentBossAvgHP, err := parseRealtimeFlexibleInt64Value(room.CurrentBossAvgHP)
+		if err != nil {
+			return nil, err
+		}
+		rooms = append(rooms, core.RoomInfo{
+			ID:                 room.ID,
+			DisplayName:        room.DisplayName,
+			Current:            room.Current,
+			Joinable:           room.Joinable,
+			OnlineCount:        room.OnlineCount,
+			CycleEnabled:       room.CycleEnabled,
+			QueueID:            room.QueueID,
+			CurrentBossID:      room.CurrentBossID,
+			CurrentBossName:    room.CurrentBossName,
+			CurrentBossStatus:  room.CurrentBossStatus,
+			CurrentBossHP:      currentBossHP,
+			CurrentBossMaxHP:   currentBossMaxHP,
+			CurrentBossAvgHP:   currentBossAvgHP,
+			CooldownRemainingS: room.CooldownRemainingSeconds,
+		})
+	}
+	return encodeRealtimeBinaryRoomState(realtimeRoomStatePayload{
+		CurrentRoomID:                  payload.CurrentRoomID,
+		SwitchCooldownRemainingSeconds: payload.SwitchCooldownRemainingSeconds,
+		Rooms:                          rooms,
+	})
+}
+
+func parseRealtimeFlexibleInt64Value(raw string) (int64, error) {
+	normalized := strings.TrimSpace(raw)
+	if normalized == "" {
+		return 0, nil
+	}
+	return strconv.ParseInt(normalized, 10, 64)
 }
 
 func toProtoUserDeltaPatch(delta *realtimeUserDelta) *realtimepb.UserDeltaPatch {
