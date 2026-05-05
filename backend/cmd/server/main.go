@@ -290,6 +290,7 @@ func run() error {
 		StateView:                   stateCache,
 		ChangePublisher:             changeBus,
 		ClickGuard:                  clickLimiter,
+		RateLimitNicknameWhitelist:  cfg.RateLimit.NicknameWhitelist,
 		Afk:                         afkService,
 		PlayerAuthenticator:         playerAuthenticator,
 		Events:                      eventHandler,

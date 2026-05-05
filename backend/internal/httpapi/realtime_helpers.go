@@ -108,6 +108,23 @@ func enforceClickRateLimitForClient(guard ClickGuard, clientID string, nickname 
 	return nil
 }
 
+func shouldSkipClickRateLimit(authenticatorEnabled bool, nickname string, nicknameWhitelist []string) bool {
+	if !authenticatorEnabled || len(nicknameWhitelist) == 0 {
+		return false
+	}
+
+	normalizedNickname := strings.TrimSpace(nickname)
+	if normalizedNickname == "" {
+		return false
+	}
+	for _, allowedNickname := range nicknameWhitelist {
+		if normalizedNickname == strings.TrimSpace(allowedNickname) {
+			return true
+		}
+	}
+	return false
+}
+
 func clickRequestError(err error) *apiResponseError {
 	switch {
 	case errors.Is(err, core.ErrBossPartNotFound):
@@ -149,8 +166,10 @@ func executeButtonClick(ctx context.Context, options Options, request clickReque
 		return "", core.ClickResult{}, apiErr
 	}
 
-	if apiErr := enforceClickRateLimitForClient(options.ClickGuard, request.ClientID, nickname); apiErr != nil {
-		return "", core.ClickResult{}, apiErr
+	if !shouldSkipClickRateLimit(request.AuthenticatorEnabled, nickname, options.RateLimitNicknameWhitelist) {
+		if apiErr := enforceClickRateLimitForClient(options.ClickGuard, request.ClientID, nickname); apiErr != nil {
+			return "", core.ClickResult{}, apiErr
+		}
 	}
 
 	result, err := options.Store.ClickButton(ctx, request.Slug, nickname, request.ComboCount)

@@ -34,6 +34,7 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               limit: 30
               window_ms: 2000
               blacklist_ms: 600000
+              nickname_whitelist: ["压测账号"]
             admin:
               username: "admin"
               password: "secret"
@@ -98,6 +99,9 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.RateLimit.Limit != 30 {
 		t.Fatalf("expected rate limit 30, got %d", cfg.RateLimit.Limit)
+	}
+	if len(cfg.RateLimit.NicknameWhitelist) != 1 || cfg.RateLimit.NicknameWhitelist[0] != "压测账号" {
+		t.Fatalf("expected rate limit nickname whitelist to contain 压测账号, got %v", cfg.RateLimit.NicknameWhitelist)
 	}
 	if cfg.Admin.Username != "admin" {
 		t.Fatalf("expected admin username admin, got %q", cfg.Admin.Username)

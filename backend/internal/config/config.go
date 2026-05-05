@@ -34,6 +34,7 @@ type RateLimitConfig struct {
 	Limit             int
 	Window            time.Duration
 	BlacklistDuration time.Duration
+	NicknameWhitelist []string
 }
 
 // AdminConfig 管理后台鉴权配置
@@ -133,9 +134,10 @@ type fileConfig struct {
 	} `yaml:"redis"`
 	RedisPrefix string `yaml:"redis_prefix"`
 	RateLimit   struct {
-		Limit       int `yaml:"limit"`
-		WindowMS    int `yaml:"window_ms"`
-		BlacklistMS int `yaml:"blacklist_ms"`
+		Limit             int      `yaml:"limit"`
+		WindowMS          int      `yaml:"window_ms"`
+		BlacklistMS       int      `yaml:"blacklist_ms"`
+		NicknameWhitelist []string `yaml:"nickname_whitelist"`
 	} `yaml:"rate_limit"`
 	Admin struct {
 		Username      string `yaml:"username"`
@@ -249,6 +251,7 @@ func loadFromConsul() (Config, consulSource, error) {
 			Limit:             parsed.RateLimit.Limit,
 			Window:            time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
 			BlacklistDuration: time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
+			NicknameWhitelist: normalizeStringList(parsed.RateLimit.NicknameWhitelist),
 		},
 		Admin: AdminConfig{
 			Username:      parsed.Admin.Username,
@@ -382,6 +385,30 @@ func normalizeRoomConfig(cfg RoomConfig) RoomConfig {
 		cfg.SwitchCooldown = 0
 	}
 	return cfg
+}
+
+func normalizeStringList(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+
+	normalized := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		normalized = append(normalized, trimmed)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
 }
 
 func normalizeLLMBaseURL(baseURL string) string {

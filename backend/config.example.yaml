@@ -13,6 +13,7 @@ rate_limit:
   limit: 60
   window_ms: 5000
   blacklist_ms: 600000
+  nickname_whitelist: ["压测账号"]
   blacklist_multiplier: 2.0
   offense_decay_ms: 86400000
   medium:

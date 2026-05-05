@@ -190,6 +190,7 @@ type Options struct {
 	Broadcaster                 Broadcaster
 	ChangePublisher             ChangePublisher
 	ClickGuard                  ClickGuard
+	RateLimitNicknameWhitelist  []string
 	AutoClick                   AutoClickController
 	Afk                         AfkController
 	PlayerAuthenticator         PlayerAuthenticator
