@@ -20,6 +20,13 @@ const sparseDecodeOptions = {
   objects: true,
 }
 
+const nestedDecodeOptions = {
+  longs: Number,
+  defaults: true,
+  arrays: true,
+  objects: true,
+}
+
 function packFrame(messageType, encoded) {
   const body = encoded instanceof Uint8Array ? encoded : new Uint8Array(encoded)
   const frame = new Uint8Array(1 + body.length)
@@ -39,8 +46,28 @@ function unpackFrame(frame) {
   }
 }
 
-function toPlain(messageType, message) {
-  return messageType.toObject(message, decodeOptions)
+function toPlain(messageType, message, options = decodeOptions) {
+  return messageType.toObject(message, options)
+}
+
+function normalizeBossPartsFromMessage(payload, message) {
+  if (!payload?.boss || !message?.boss?.parts) {
+    return payload
+  }
+  payload.boss.parts = message.boss.parts.map((part) => (
+    realtime.BossPart.toObject(part, nestedDecodeOptions)
+  ))
+  return payload
+}
+
+function normalizePartStateDeltasFromMessage(payload, message) {
+  if (!payload || !message?.partStateDeltas) {
+    return payload
+  }
+  payload.partStateDeltas = message.partStateDeltas.map((delta) => (
+    realtime.BossPartStateDelta.toObject(delta, nestedDecodeOptions)
+  ))
+  return payload
 }
 
 export function encodeRealtimeClickRequest({ slug, comboCount = 0 }) {
@@ -56,14 +83,26 @@ export function decodeRealtimeBinaryMessage(frame) {
 
   switch (messageType) {
     case realtimeBinaryType.clickAck:
-      return {
-        type: 'click_ack',
-        payload: toPlain(realtime.ClickAck, realtime.ClickAck.decode(body)),
+      {
+        const message = realtime.ClickAck.decode(body)
+        return {
+          type: 'click_ack',
+          payload: normalizePartStateDeltasFromMessage(
+            toPlain(realtime.ClickAck, message),
+            message,
+          ),
+        }
       }
     case realtimeBinaryType.publicDelta:
-      return {
-        type: 'public_delta',
-        payload: toPlain(realtime.PublicDelta, realtime.PublicDelta.decode(body), sparseDecodeOptions),
+      {
+        const message = realtime.PublicDelta.decode(body)
+        return {
+          type: 'public_delta',
+          payload: normalizeBossPartsFromMessage(
+            toPlain(realtime.PublicDelta, message, sparseDecodeOptions),
+            message,
+          ),
+        }
       }
     case realtimeBinaryType.userDelta:
       return {

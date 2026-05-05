@@ -49,25 +49,9 @@
 
 - 正式口径：
   - [designs/2026-04-30-天赋系统数值策划案-V2.0.md](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
-  - [designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md](./designs/2026-04-30-BattlePage-Buff栏与伤害链路V2改动评估.md)
-  - [reports/2026-04-28-天赋成本调整总结.md](./reports/2026-04-28-天赋成本调整总结.md)
-  - [reports/2026-05-04-V2天赋系统补丁记录.md](./reports/2026-05-04-V2天赋系统补丁记录.md)
-  - [superpowers/specs/2026-04-28-talent-system-rework-design.md](./superpowers/specs/2026-04-28-talent-system-rework-design.md)
-- 架构方案：
-  - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
-- 开发参考：
-  - [developer-reference/2026-04-26-天赋系统开发参考.md](./developer-reference/2026-04-26-天赋系统开发参考.md)
-  - [developer-reference/2026-04-27-均衡攻势工作原理.md](./developer-reference/2026-04-27-均衡攻势工作原理.md)
-  - [developer-reference/2026-04-27-碎盾攻坚工作原理.md](./developer-reference/2026-04-27-碎盾攻坚工作原理.md)
-  - [developer-reference/2026-04-30-V2伤害计算链路总览.md](./developer-reference/2026-04-30-V2伤害计算链路总览.md)
-  - [developer-reference/2026-04-30-天赋技能数值总览.md](./developer-reference/2026-04-30-天赋技能数值总览.md)
-
-### 实时链路与接入层
-
-- [architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md](./architecture/2026-05-04-WebSocket-Protobuf-点击链路优化方案.md)
-- [reports/2026-04-21-realtime-optimization-report.md](./reports/2026-04-21-realtime-optimization-report.md)
-- [reports/2026-04-28-点击伤害链路与优化总结.md](./reports/2026-04-28-点击伤害链路与优化总结.md)
-- [implementation/2026-04-26-ws-optimization.md](./implementation/2026-04-26-ws-optimization.md)
+- 相关实现：
+  - [implementation/2026-04-30-天赋系统第一阶段落地方案.md](./implementation/2026-04-30-天赋系统第一阶段落地方案.md)
+  - [implementation/2026-05-01-天赋系统第二阶段落地方案.md](./implementation/2026-05-01-天赋系统第二阶段落地方案.md)
 
 ### 房间分线
 
@@ -78,6 +62,7 @@
 
 ### 反滥用
 
+- [architecture/2026-05-05-实时点击官方客户端接入与挑战令牌方案.md](./architecture/2026-05-05-实时点击官方客户端接入与挑战令牌方案.md)
 - [superpowers/specs/2026-05-03-script-detection-design.md](./superpowers/specs/2026-05-03-script-detection-design.md)
 
 ### Boss 与战斗表现
@@ -87,6 +72,7 @@
 - [reports/2026-05-04-user-state-payload-optimization-summary.md](./reports/2026-05-04-user-state-payload-optimization-summary.md)
 - [implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md](./implementation/2026-04-29-Boss战斗区右侧信息与连击跳字布局调整.md)
 - [implementation/2026-04-29-伤害动画解析优先级.md](./implementation/2026-04-29-伤害动画解析优先级.md)
+- [implementation/2026-05-05-Boss房间部位显示与掉血同步Bug排查记录.md](./implementation/2026-05-05-Boss房间部位显示与掉血同步Bug排查记录.md)
 - [demos/](./demos/)
 
 ## 归档约定
