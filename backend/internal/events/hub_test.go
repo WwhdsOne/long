@@ -25,7 +25,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	drainEvents(aming)
 	drainEvents(xiaohong)
 
-	if err := hub.BroadcastPublic(core.Snapshot{}, true); err != nil {
+	if err := hub.BroadcastPublic(core.Snapshot{}); err != nil {
 		t.Fatalf("broadcast public snapshot: %v", err)
 	}
 
@@ -36,7 +36,7 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	assertNoEvent(t, aming, "阿明")
 	assertNoEvent(t, xiaohong, "小红")
 
-	if err := hub.BroadcastPublicTo("阿明", core.Snapshot{RoomID: "2"}, true); err != nil {
+	if err := hub.BroadcastPublicTo("阿明", core.Snapshot{RoomID: "2"}); err != nil {
 		t.Fatalf("broadcast public snapshot to 阿明: %v", err)
 	}
 
@@ -97,6 +97,35 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 		t.Fatalf("expected room_state for 阿明, got %s", string(roomEvent.Payload))
 	}
 	assertNoEvent(t, anonymous, "匿名")
+	assertNoEvent(t, xiaohong, "小红")
+
+	if err := hub.BroadcastPublicMeta(core.Snapshot{
+		AnnouncementVersion: "ann-1",
+		BossLeaderboard: []core.BossLeaderboardEntry{
+			{Rank: 1, Nickname: "阿明", Damage: 88},
+		},
+	}, false); err != nil {
+		t.Fatalf("broadcast public meta: %v", err)
+	}
+
+	metaEvent := readEventByName(t, anonymous, PublicMetaEventName)
+	if !strings.Contains(string(metaEvent.Payload), `"announcementVersion":"ann-1"`) {
+		t.Fatalf("expected announcement version in public_meta, got %s", string(metaEvent.Payload))
+	}
+	assertNoEvent(t, aming, "阿明")
+
+	if err := hub.BroadcastPublicMetaTo("阿明", core.Snapshot{
+		Leaderboard: []core.LeaderboardEntry{
+			{Rank: 1, Nickname: "阿明", ClickCount: 99},
+		},
+	}, true); err != nil {
+		t.Fatalf("broadcast public meta to 阿明: %v", err)
+	}
+
+	metaEvent = readEventByName(t, aming, PublicMetaEventName)
+	if !strings.Contains(string(metaEvent.Payload), `"leaderboard":[{"rank":1,"nickname":"阿明","clickCount":99}]`) {
+		t.Fatalf("expected leaderboard in public_meta, got %s", string(metaEvent.Payload))
+	}
 	assertNoEvent(t, xiaohong, "小红")
 }
 

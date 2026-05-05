@@ -22,6 +22,12 @@ type realtimePublicDeltaPayload struct {
 	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
 }
 
+type realtimePublicMetaPayload struct {
+	Leaderboard         *[]core.LeaderboardEntry    `json:"leaderboard,omitempty"`
+	BossLeaderboard     []core.BossLeaderboardEntry `json:"bossLeaderboard"`
+	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
+}
+
 type realtimeUserDeltaPayload struct {
 	UserStats                          *core.UserStats           `json:"userStats,omitempty"`
 	MyBossStats                        *core.BossUserStats       `json:"myBossStats,omitempty"`
@@ -75,6 +81,7 @@ const (
 	realtimeBinaryTypePublicDelta  byte = 3
 	realtimeBinaryTypeUserDelta    byte = 4
 	realtimeBinaryTypeRoomState    byte = 5
+	realtimeBinaryTypePublicMeta   byte = 6
 )
 
 var errRealtimeBinaryFrameInvalid = errors.New("invalid realtime binary frame")
@@ -134,6 +141,14 @@ func encodeRealtimeBinaryPublicDelta(payload realtimePublicDeltaPayload) ([]byte
 	})
 }
 
+func encodeRealtimeBinaryPublicMeta(payload realtimePublicMetaPayload) ([]byte, error) {
+	return packRealtimeBinaryMessage(realtimeBinaryTypePublicMeta, &realtimepb.PublicMeta{
+		Leaderboard:         toProtoLeaderboardEntries(payload.Leaderboard),
+		BossLeaderboard:     toProtoBossLeaderboardEntries(payload.BossLeaderboard),
+		AnnouncementVersion: payload.AnnouncementVersion,
+	})
+}
+
 func encodeRealtimeBinaryUserDelta(payload realtimeUserDeltaPayload) ([]byte, error) {
 	return packRealtimeBinaryMessage(realtimeBinaryTypeUserDelta, &realtimepb.UserDelta{
 		UserStats:                          toProtoUserStats(payload.UserStats),
@@ -168,6 +183,14 @@ func encodeRealtimeBinaryPublicDeltaFromJSON(raw []byte) ([]byte, error) {
 		return nil, err
 	}
 	return encodeRealtimeBinaryPublicDelta(payload)
+}
+
+func encodeRealtimeBinaryPublicMetaFromJSON(raw []byte) ([]byte, error) {
+	var payload realtimePublicMetaPayload
+	if err := sonic.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	return encodeRealtimeBinaryPublicMeta(payload)
 }
 
 func encodeRealtimeBinaryUserDeltaFromJSON(raw []byte) ([]byte, error) {

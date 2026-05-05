@@ -129,6 +129,16 @@ func decodeRealtimeBinaryRoomStateForTest(t *testing.T, payload []byte) *realtim
 	return message
 }
 
+func decodeRealtimeBinaryPublicMetaForTest(t *testing.T, payload []byte) *realtimepb.PublicMeta {
+	t.Helper()
+
+	message := &realtimepb.PublicMeta{}
+	if err := unpackRealtimeBinaryMessage(payload, realtimeBinaryTypePublicMeta, message); err != nil {
+		t.Fatalf("decode realtime binary public meta: %v", err)
+	}
+	return message
+}
+
 func readHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name string) events.ServerEvent {
 	t.Helper()
 
@@ -550,6 +560,36 @@ func TestRealtimeMessageFromRoomStateEventEncodesBinaryFrame(t *testing.T) {
 	}
 	if len(message.GetRooms()) != 1 || message.GetRooms()[0].GetDisplayName() != "二线" {
 		t.Fatalf("unexpected rooms payload: %+v", message.GetRooms())
+	}
+}
+
+func TestRealtimeMessageFromPublicMetaEventEncodesBinaryFrame(t *testing.T) {
+	frame, ok, err := realtimeMessageFromEvent(events.ServerEvent{
+		Name: events.PublicMetaEventName,
+		Payload: []byte(`{
+			"announcementVersion":"ann-1",
+			"bossLeaderboard":[{"rank":1,"nickname":"阿明","damage":66}],
+			"leaderboard":[{"rank":2,"nickname":"小红","clickCount":7}]
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("encode public_meta event: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected public_meta event to be encoded")
+	}
+	if frame.messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary frame, got %d", frame.messageType)
+	}
+	message := decodeRealtimeBinaryPublicMetaForTest(t, frame.payload)
+	if message.GetAnnouncementVersion() != "ann-1" {
+		t.Fatalf("expected announcement version in public_meta payload, got %+v", message)
+	}
+	if len(message.GetBossLeaderboard()) != 1 || message.GetBossLeaderboard()[0].GetDamage() != 66 {
+		t.Fatalf("expected boss leaderboard in public_meta payload, got %+v", message)
+	}
+	if len(message.GetLeaderboard()) != 1 || message.GetLeaderboard()[0].GetClickCount() != 7 {
+		t.Fatalf("expected leaderboard in public_meta payload, got %+v", message)
 	}
 }
 

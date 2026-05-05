@@ -22,6 +22,7 @@ const (
 
 	realtimeMessageTypeSnapshot    = "snapshot"
 	realtimeMessageTypePublicDelta = "public_delta"
+	realtimeMessageTypePublicMeta  = "public_meta"
 	realtimeMessageTypeUserDelta   = "user_delta"
 	realtimeMessageTypeRoomState   = "room_state"
 	realtimeMessageTypeOnlineCount = "online_count"
@@ -491,6 +492,15 @@ func realtimeMessageFromEvent(event events.ServerEvent) (realtimeOutboundFrame, 
 	switch event.Name {
 	case events.PublicStateEventName:
 		payload, err := encodeRealtimeBinaryPublicDeltaFromJSON(event.Payload)
+		if err != nil {
+			return realtimeOutboundFrame{}, false, err
+		}
+		return realtimeOutboundFrame{
+			messageType: websocket.BinaryMessage,
+			payload:     payload,
+		}, true, nil
+	case events.PublicMetaEventName:
+		payload, err := encodeRealtimeBinaryPublicMetaFromJSON(event.Payload)
 		if err != nil {
 			return realtimeOutboundFrame{}, false, err
 		}
