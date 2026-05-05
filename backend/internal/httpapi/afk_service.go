@@ -2,13 +2,13 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
 	"long/internal/core"
@@ -337,7 +337,7 @@ func (s *AfkService) loadPlayerState(ctx context.Context, nickname string) (afkP
 }
 
 func (s *AfkService) savePlayerState(ctx context.Context, nickname string, state afkPlayerState) error {
-	rewardsRaw, err := json.Marshal(state.Rewards)
+	rewardsRaw, err := sonic.Marshal(state.Rewards)
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func (s *AfkService) mergeSettlement(ctx context.Context, nickname string, delta
 		existing.Rewards = append(existing.Rewards, delta.Rewards...)
 	}
 
-	rewardsRaw, err := json.Marshal(existing.Rewards)
+	rewardsRaw, err := sonic.Marshal(existing.Rewards)
 	if err != nil {
 		return err
 	}
@@ -436,7 +436,7 @@ func parseRewardJSON(raw string) ([]core.Reward, error) {
 		return nil, nil
 	}
 	var rewards []core.Reward
-	if err := json.Unmarshal([]byte(raw), &rewards); err != nil {
+	if err := sonic.Unmarshal([]byte(raw), &rewards); err != nil {
 		return nil, err
 	}
 	return rewards, nil

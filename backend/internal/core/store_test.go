@@ -371,6 +371,50 @@ func TestSwitchPlayerRoomRejectsInactiveRoom(t *testing.T) {
 	}
 }
 
+func TestSwitchPlayerRoomRejectsBattlePowerTooHigh(t *testing.T) {
+	store, cleanup := newTestRoomStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "room-2-template-a",
+		Name:  "模板 A",
+		MaxHP: 1,
+		Layout: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 4, CurrentHP: 4, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("save template a: %v", err)
+	}
+	if err := store.SaveBossTemplate(ctx, BossTemplateUpsert{
+		ID:    "room-2-template-b",
+		Name:  "模板 B",
+		MaxHP: 1,
+		Layout: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 6, CurrentHP: 6, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("save template b: %v", err)
+	}
+	if _, err := store.SetBossCycleQueueForRoom(ctx, "2", []string{"room-2-template-a", "room-2-template-b"}); err != nil {
+		t.Fatalf("set room cycle queue: %v", err)
+	}
+	if _, err := store.ActivateBossInRoom(ctx, "2", BossUpsert{
+		ID:    "room-2-boss",
+		Name:  "二线 Boss",
+		MaxHP: 5,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 5, CurrentHP: 5, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate room 2 boss: %v", err)
+	}
+
+	if _, err := store.SwitchPlayerRoom(ctx, "阿明", "2"); err != nil {
+		t.Fatalf("switch room: %v", err)
+	}
+}
+
 func TestClickBossPartUsesPlayerRoom(t *testing.T) {
 	store, cleanup := newTestRoomStore(t)
 	defer cleanup()

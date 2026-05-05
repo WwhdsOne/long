@@ -2507,7 +2507,11 @@ async function joinRoom(roomId) {
         })
         if (!response.ok) {
             const payload = await response.json().catch(() => ({}))
-            const message = payload?.message || (payload?.error === 'ROOM_SWITCH_COOLDOWN' ? '切房冷却中。' : '切换房间失败。')
+            const message = payload?.message || (
+                payload?.error === 'ROOM_SWITCH_COOLDOWN'
+                    ? '切房冷却中。'
+                    : '切换房间失败。'
+            )
             throw new Error(message)
         }
         const payload = await response.json()
