@@ -25,6 +25,40 @@ describe('mergeBossState', () => {
     })
   })
 
+  it('同一只活动 Boss 总血量回退保护生效时，仍会接收部位血量向下变化', () => {
+    const current = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 80,
+      maxHp: 100,
+      parts: [
+        {x: 0, y: 0, currentHp: 40, maxHp: 50, armor: 3, alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: 20, maxHp: 50, armor: 8, alive: true, type: 'heavy'},
+      ],
+    }
+    const incoming = {
+      id: 'boss-1',
+      status: 'active',
+      currentHp: 90,
+      maxHp: 100,
+      parts: [
+        {x: 0, y: 0, currentHp: 40, maxHp: 50, armor: 3, alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: 10, maxHp: 50, armor: 8, alive: true, type: 'heavy'},
+      ],
+    }
+
+    expect(mergeBossState(current, incoming)).toEqual({
+      id: 'boss-1',
+      status: 'active',
+      currentHp: '80',
+      maxHp: '100',
+      parts: [
+        {x: 0, y: 0, currentHp: '40', maxHp: '50', armor: '3', alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: '10', maxHp: '50', armor: '8', alive: true, type: 'heavy'},
+      ],
+    })
+  })
+
   it('同一只活动 Boss 收到更低血量的新消息时，会继续向下更新', () => {
     const current = {
       id: 'boss-1',

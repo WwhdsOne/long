@@ -35,7 +35,20 @@ function mergeBossParts(currentParts, incomingParts) {
   for (const part of normalizedIncoming) {
     const key = bossPartKey(part)
     const current = mergedByKey.get(key)
-    mergedByKey.set(key, current ? {...current, ...part} : part)
+    if (!current) {
+      mergedByKey.set(key, part)
+      continue
+    }
+
+    const currentHp = hpBigInt(current.currentHp)
+    const incomingHp = hpBigInt(part.currentHp)
+    const useIncomingHp = incomingHp <= currentHp
+    mergedByKey.set(key, {
+      ...current,
+      ...part,
+      currentHp: useIncomingHp ? part.currentHp : current.currentHp,
+      alive: useIncomingHp ? incomingHp > 0n : currentHp > 0n,
+    })
   }
 
   return normalizedCurrent.map((part) => mergedByKey.get(bossPartKey(part)) || part)
@@ -82,13 +95,10 @@ export function mergeBossState(currentBoss, incomingBoss) {
 
   const currentHp = hpBigInt(normalizedCurrent.currentHp)
   const incomingHp = hpBigInt(normalizedIncoming.currentHp)
-  if (incomingHp > currentHp) {
-    return normalizedCurrent
-  }
-
   return {
     ...normalizedCurrent,
     ...normalizedIncoming,
+    currentHp: incomingHp > currentHp ? normalizedCurrent.currentHp : normalizedIncoming.currentHp,
     parts: mergeBossParts(normalizedCurrent.parts, normalizedIncoming.parts),
   }
 }
