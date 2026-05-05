@@ -203,4 +203,30 @@ describe('applyBossPartStateDeltas', () => {
       ],
     })
   })
+
+  it('旧 Boss 的击杀增量晚到时，不会把新 Boss 同坐标部位错误打成残血或死亡', () => {
+    const current = {
+      id: 'boss-2',
+      status: 'active',
+      currentHp: 200,
+      maxHp: 200,
+      parts: [
+        {x: 0, y: 0, currentHp: 100, maxHp: 100, armor: 0, alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: 100, maxHp: 100, armor: 0, alive: true, type: 'heavy'},
+      ],
+    }
+
+    expect(applyBossPartStateDeltas(current, [
+      {x: 1, y: 0, beforeHp: 8, afterHp: 0, damage: 8, partType: 'heavy'},
+    ])).toEqual({
+      id: 'boss-2',
+      status: 'active',
+      currentHp: '200',
+      maxHp: '200',
+      parts: [
+        {x: 0, y: 0, currentHp: '100', maxHp: '100', armor: '0', alive: true, type: 'soft'},
+        {x: 1, y: 0, currentHp: '100', maxHp: '100', armor: '0', alive: true, type: 'heavy'},
+      ],
+    })
+  })
 })

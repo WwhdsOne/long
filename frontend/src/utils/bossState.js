@@ -114,8 +114,9 @@ export function applyBossPartStateDeltas(currentBoss, deltas) {
     }
 
     const currentPartHp = hpBigInt(part.currentHp)
+    const beforePartHp = hpBigInt(matched.beforeHp)
     const nextPartHp = hpBigInt(matched.afterHp)
-    if (nextPartHp >= currentPartHp) {
+    if (currentPartHp > beforePartHp || nextPartHp >= currentPartHp) {
       return part
     }
 
