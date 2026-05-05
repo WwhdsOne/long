@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { encodeRealtimeClickRequest, realtimeBinaryType } from './realtimeProto'
+import { decodeRealtimeBinaryMessage, encodeRealtimeClickRequest, realtimeBinaryType } from './realtimeProto'
 import { createRealtimeTransport } from './realtimeTransport'
 import { realtime } from '../proto/realtime.js'
 
@@ -164,8 +164,6 @@ describe('realtimeTransport', () => {
       {
         totalVotes: 10,
         roomId: 'hall',
-        leaderboard: [],
-        bossLeaderboard: [],
       },
     ])
   })
@@ -219,6 +217,71 @@ describe('realtimeTransport', () => {
         talentEvents: [],
       },
     ])
+  })
+
+  it('click_ack 的 0 坐标部位增量不会在二进制解码时丢失 x/y', () => {
+    const encodedAck = realtime.ClickAck.encode(realtime.ClickAck.create({
+      button: { key: 'boss-part:0-2' },
+      delta: 1,
+      critical: false,
+      partStateDeltas: [
+        { x: 0, y: 2, damage: 9, beforeHp: 40, afterHp: 31, partType: 'soft' },
+      ],
+    })).finish()
+    const ackFrame = new Uint8Array(1 + encodedAck.length)
+    ackFrame[0] = realtimeBinaryType.clickAck
+    ackFrame.set(encodedAck, 1)
+
+    expect(decodeRealtimeBinaryMessage(ackFrame)).toEqual({
+      type: 'click_ack',
+      payload: {
+        button: { key: 'boss-part:0-2' },
+        delta: 1,
+        critical: false,
+        partStateDeltas: [
+          { x: 0, y: 2, damage: 9, beforeHp: 40, afterHp: 31, partType: 'soft' },
+        ],
+        talentEvents: [],
+      },
+    })
+  })
+
+  it('public_delta 的 0 坐标 Boss 部位不会在二进制解码时丢失 x/y', () => {
+    const encoded = realtime.PublicDelta.encode(realtime.PublicDelta.create({
+      totalVotes: 10,
+      roomId: '1',
+      boss: {
+        id: 'boss-1',
+        status: 'active',
+        maxHp: 100,
+        currentHp: 91,
+        parts: [
+          { x: 0, y: 0, type: 'soft', maxHp: 50, currentHp: 41, armor: 3, alive: true },
+          { x: 1, y: 0, type: 'heavy', maxHp: 50, currentHp: 50, armor: 8, alive: true },
+        ],
+      },
+    })).finish()
+    const frame = new Uint8Array(1 + encoded.length)
+    frame[0] = realtimeBinaryType.publicDelta
+    frame.set(encoded, 1)
+
+    expect(decodeRealtimeBinaryMessage(frame)).toMatchObject({
+      type: 'public_delta',
+      payload: {
+        totalVotes: 10,
+        roomId: '1',
+        boss: {
+          id: 'boss-1',
+          status: 'active',
+          maxHp: 100,
+          currentHp: 91,
+          parts: [
+            { x: 0, y: 0, type: 'soft', maxHp: 50, currentHp: 41, armor: 3, alive: true },
+            { x: 1, y: 0, type: 'heavy', maxHp: 50, currentHp: 50, armor: 8, alive: true },
+          ],
+        },
+      },
+    })
   })
 
   it('online_count 可通过 WebSocket 与 SSE 回调在线人数', () => {
