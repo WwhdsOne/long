@@ -163,7 +163,7 @@ func newRealtimeSession(options realtimeSessionOptions) *realtimeSession {
 func newRealtimeSocketHandler(options Options) app.HandlerFunc {
 	upgrader := websocket.HertzUpgrader{
 		CheckOrigin:       func(_ *app.RequestContext) bool { return true },
-		EnableCompression: true,
+		EnableCompression: false,
 	}
 
 	return func(ctx context.Context, c *app.RequestContext) {

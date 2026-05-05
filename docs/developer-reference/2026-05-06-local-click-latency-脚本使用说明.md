@@ -15,7 +15,17 @@
 - 单连接顺序点击时，每次点击从发出到收到 `click_ack` 要多久
 - 单连接顺序点击时，平均能打出多少次确认点击/秒
 
-它**不是**并发压测工具，也不会模拟多个连接。
+它也支持一个扩展模式：
+
+- 同一账号建立多条 `WebSocket`
+- 每条连接各自 1 个 goroutine 顺序发点击
+- 最后汇总整体吞吐和整体延迟
+
+但要注意：
+
+- 这个模式更接近“脚本侧并发探测”
+- 不等于正式容量压测方案
+- 如果账号没有进白名单，更容易直接撞到限流
 
 ## 点击哪里
 
@@ -92,6 +102,8 @@ go -C backend run ./cmd/local_click_latency \
 
 - `-base`
   - 站点地址
+- `-connections`
+  - WebSocket 连接数，默认 `1`
 - `-nickname`
   - 压测账号昵称
 - `-password`
@@ -99,7 +111,7 @@ go -C backend run ./cmd/local_click_latency \
 - `-slug`
   - 目标 Boss 部位，必须是 `boss-part:x-y`
 - `-count`
-  - 点击次数
+  - 每条连接发送点击次数
 - `-pause`
   - 每次点击之间的停顿，例如 `5ms`
 - `-timeout`
@@ -150,10 +162,29 @@ curl -c /tmp/long.cookies -b /tmp/long.cookies \
 ```bash
 go -C backend run ./cmd/local_click_latency \
   -base https://www.wclick.top \
+  -connections 1 \
   -nickname Wwhds \
   -password '123456' \
   -slug boss-part:0-0 \
   -count 500
+```
+
+如果你要试“单账号多连接”，例如 5 条连接、每条连接各发 500 次：
+
+```bash
+go -C backend run ./cmd/local_click_latency \
+  -base https://www.wclick.top \
+  -connections 5 \
+  -nickname Wwhds \
+  -password '123456' \
+  -slug boss-part:0-0 \
+  -count 500
+```
+
+这条命令的实际总样本数是：
+
+```text
+5 * 500 = 2500
 ```
 
 ## 输出含义
@@ -163,24 +194,29 @@ go -C backend run ./cmd/local_click_latency \
 ```text
 账号: Wwhds
 按钮: boss-part:0-0
-连接: 单个 WebSocket
-样本数: 500
+连接数: 5
+每连接样本数: 500
+总样本数: 2500
 总耗时: 4.2s
-平均吞吐: 118.73 次/秒
-最小延迟: 4.1ms
-平均延迟: 7.8ms
-p50 延迟: 7.2ms
-p95 延迟: 11.4ms
-p99 延迟: 16.9ms
-最大延迟: 24.0ms
+整体平均吞吐: 118.73 次/秒
+整体最小延迟: 4.1ms
+整体平均延迟: 7.8ms
+整体 p50 延迟: 7.2ms
+整体 p95 延迟: 11.4ms
+整体 p99 延迟: 16.9ms
+整体最大延迟: 24.0ms
+连接 1: qps=24.10 avg=7.9ms p95=11.5ms p99=16.4ms
+连接 2: qps=23.94 avg=7.7ms p95=11.1ms p99=16.7ms
 ```
 
 这里最有用的是：
 
-- `平均吞吐`
-  - 单连接顺序点击时，平均每秒确认多少次点击
-- `p50 / p95 / p99`
-  - 点击确认延迟分位
+- `整体平均吞吐`
+  - 当前所有连接合并后的平均每秒确认点击数
+- `整体 p50 / p95 / p99`
+  - 所有连接样本合并后的延迟分位
+- `连接 N: ...`
+  - 单条连接自己的 qps 和长尾延迟
 
 ## 常见报错
 
@@ -198,6 +234,7 @@ p99 延迟: 16.9ms
 ## 边界
 
 - 这是“单连接、顺序点击、逐个等确认”的延迟脚本
+- 现在也支持“单账号、多连接、每连接顺序点击”的实验模式
 - 它测的是 `click -> click_ack` 这一段用户体感最接近的链路
 - 它不代表多连接并发上限
 - 它不会自动切房间，也不会自动发现部位坐标

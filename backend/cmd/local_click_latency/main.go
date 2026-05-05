@@ -14,6 +14,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app/client"
@@ -37,6 +38,7 @@ type config struct {
 	password       string
 	slug           string
 	count          int
+	connections    int
 	pause          time.Duration
 	timeout        time.Duration
 	handshakeWait  time.Duration
@@ -67,6 +69,18 @@ type latencyStats struct {
 	QPS     float64
 }
 
+type workerResult struct {
+	connectionIndex int
+	latencies       []time.Duration
+	err             error
+}
+
+type runSummary struct {
+	overall       latencyStats
+	perConnection []latencyStats
+	totalSamples  int
+}
+
 func main() {
 	cfg := parseFlags()
 	if err := run(cfg); err != nil {
@@ -81,7 +95,8 @@ func parseFlags() config {
 	flag.StringVar(&cfg.nickname, "nickname", "", "压测账号昵称")
 	flag.StringVar(&cfg.password, "password", "", "压测账号密码")
 	flag.StringVar(&cfg.slug, "slug", "", "Boss 部位 slug，例如 boss-part:1-0")
-	flag.IntVar(&cfg.count, "count", 200, "发送点击次数")
+	flag.IntVar(&cfg.count, "count", 200, "每条连接发送点击次数")
+	flag.IntVar(&cfg.connections, "connections", 1, "WebSocket 连接数")
 	flag.DurationVar(&cfg.pause, "pause", 0, "每次点击之间的停顿，例如 5ms")
 	flag.DurationVar(&cfg.timeout, "timeout", 10*time.Second, "HTTP 和单次读写超时")
 	flag.DurationVar(&cfg.handshakeWait, "handshake-wait", 0, "建连后额外等待时间，例如 200ms")
@@ -101,11 +116,11 @@ func run(cfg config) error {
 		return err
 	}
 
-	conn, err := connectWebSocket(cfg, cookie)
+	connections, err := connectWebSockets(cfg, cookie)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer closeWebSockets(connections)
 
 	if cfg.handshakeWait > 0 {
 		time.Sleep(cfg.handshakeWait)
@@ -116,31 +131,41 @@ func run(cfg config) error {
 		return err
 	}
 
-	latencies := make([]time.Duration, 0, cfg.count)
+	results := make(chan workerResult, cfg.connections)
+	startCh := make(chan struct{})
+	var wg sync.WaitGroup
+	for index, conn := range connections {
+		wg.Add(1)
+		go func(connectionIndex int, conn *websocket.Conn) {
+			defer wg.Done()
+			results <- runConnectionWorker(connectionIndex, conn, frame, cfg, startCh)
+		}(index+1, conn)
+	}
+
 	startAll := time.Now()
-	for index := 0; index < cfg.count; index++ {
-		if err := conn.SetWriteDeadline(time.Now().Add(cfg.timeout)); err != nil {
-			return fmt.Errorf("设置写超时失败: %w", err)
-		}
-		start := time.Now()
-		if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
-			return fmt.Errorf("发送第 %d 次点击失败: %w", index+1, err)
-		}
+	close(startCh)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
-		latency, err := waitForClickAck(conn, cfg.timeout, start)
-		if err != nil {
-			return fmt.Errorf("等待第 %d 次点击确认失败: %w", index+1, err)
+	perConnectionLatencies := make([][]time.Duration, cfg.connections)
+	var firstErr error
+	for result := range results {
+		if result.connectionIndex > 0 && result.connectionIndex <= len(perConnectionLatencies) {
+			perConnectionLatencies[result.connectionIndex-1] = result.latencies
 		}
-
-		latencies = append(latencies, latency)
-		if cfg.pause > 0 {
-			time.Sleep(cfg.pause)
+		if result.err != nil && firstErr == nil {
+			firstErr = result.err
 		}
 	}
 	elapsed := time.Since(startAll)
+	if firstErr != nil {
+		return firstErr
+	}
 
-	stats := summarizeLatencies(latencies, elapsed)
-	printSummary(cfg, nickname, stats)
+	summary := buildRunSummary(perConnectionLatencies, elapsed)
+	printSummary(cfg, nickname, summary)
 	return nil
 }
 
@@ -158,6 +183,8 @@ func validateConfig(cfg config) error {
 		return errors.New("-slug 必须是 boss-part:x-y，例如 boss-part:1-0")
 	case cfg.count <= 0:
 		return errors.New("-count 必须大于 0")
+	case cfg.connections <= 0:
+		return errors.New("-connections 必须大于 0")
 	case cfg.timeout <= 0:
 		return errors.New("-timeout 必须大于 0")
 	}
@@ -246,6 +273,28 @@ func connectWebSocket(cfg config, cookie *http.Cookie) (*websocket.Conn, error) 
 	return conn, nil
 }
 
+func connectWebSockets(cfg config, cookie *http.Cookie) ([]*websocket.Conn, error) {
+	connections := make([]*websocket.Conn, 0, cfg.connections)
+	for index := 0; index < cfg.connections; index++ {
+		conn, err := connectWebSocket(cfg, cookie)
+		if err != nil {
+			closeWebSockets(connections)
+			return nil, fmt.Errorf("建立第 %d 条 WebSocket 失败: %w", index+1, err)
+		}
+		connections = append(connections, conn)
+	}
+	return connections, nil
+}
+
+func closeWebSockets(connections []*websocket.Conn) {
+	for _, conn := range connections {
+		if conn == nil {
+			continue
+		}
+		_ = conn.Close()
+	}
+}
+
 func toHandshakeURL(baseURL string) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil {
@@ -285,6 +334,49 @@ func unpackClickAck(frame []byte) (*realtimepb.ClickAck, error) {
 		return nil, err
 	}
 	return message, nil
+}
+
+func runConnectionWorker(connectionIndex int, conn *websocket.Conn, frame []byte, cfg config, startCh <-chan struct{}) workerResult {
+	<-startCh
+
+	latencies := make([]time.Duration, 0, cfg.count)
+	for clickIndex := 0; clickIndex < cfg.count; clickIndex++ {
+		if err := conn.SetWriteDeadline(time.Now().Add(cfg.timeout)); err != nil {
+			return workerResult{
+				connectionIndex: connectionIndex,
+				latencies:       latencies,
+				err:             fmt.Errorf("连接 %d 设置写超时失败: %w", connectionIndex, err),
+			}
+		}
+
+		start := time.Now()
+		if err := conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
+			return workerResult{
+				connectionIndex: connectionIndex,
+				latencies:       latencies,
+				err:             fmt.Errorf("连接 %d 第 %d 次点击发送失败: %w", connectionIndex, clickIndex+1, err),
+			}
+		}
+
+		latency, err := waitForClickAck(conn, cfg.timeout, start)
+		if err != nil {
+			return workerResult{
+				connectionIndex: connectionIndex,
+				latencies:       latencies,
+				err:             fmt.Errorf("连接 %d 第 %d 次点击确认失败: %w", connectionIndex, clickIndex+1, err),
+			}
+		}
+		latencies = append(latencies, latency)
+
+		if cfg.pause > 0 {
+			time.Sleep(cfg.pause)
+		}
+	}
+
+	return workerResult{
+		connectionIndex: connectionIndex,
+		latencies:       latencies,
+	}
 }
 
 func waitForClickAck(conn *websocket.Conn, timeout time.Duration, startedAt time.Time) (time.Duration, error) {
@@ -358,6 +450,29 @@ func summarizeLatencies(latencies []time.Duration, elapsed time.Duration) latenc
 	return stats
 }
 
+func buildRunSummary(perConnectionLatencies [][]time.Duration, elapsed time.Duration) runSummary {
+	perConnection := make([]latencyStats, 0, len(perConnectionLatencies))
+	allLatencies := make([]time.Duration, 0)
+	totalSamples := 0
+	for _, latencies := range perConnectionLatencies {
+		if len(latencies) == 0 {
+			continue
+		}
+		perConnection = append(perConnection, summarizeLatencies(latencies, elapsed))
+		allLatencies = append(allLatencies, latencies...)
+		totalSamples += len(latencies)
+	}
+
+	summary := runSummary{
+		perConnection: perConnection,
+		totalSamples:  totalSamples,
+	}
+	if len(allLatencies) > 0 {
+		summary.overall = summarizeLatencies(allLatencies, elapsed)
+	}
+	return summary
+}
+
 func percentileDuration(sorted []time.Duration, percentile float64) time.Duration {
 	if len(sorted) == 1 {
 		return sorted[0]
@@ -372,17 +487,21 @@ func percentileDuration(sorted []time.Duration, percentile float64) time.Duratio
 	return sorted[position-1]
 }
 
-func printSummary(cfg config, nickname string, stats latencyStats) {
+func printSummary(cfg config, nickname string, summary runSummary) {
 	fmt.Printf("账号: %s\n", nickname)
 	fmt.Printf("按钮: %s\n", cfg.slug)
-	fmt.Printf("连接: 单个 WebSocket\n")
-	fmt.Printf("样本数: %d\n", cfg.count)
-	fmt.Printf("总耗时: %s\n", stats.Elapsed)
-	fmt.Printf("平均吞吐: %.2f 次/秒\n", stats.QPS)
-	fmt.Printf("最小延迟: %s\n", stats.Min)
-	fmt.Printf("平均延迟: %s\n", stats.Avg)
-	fmt.Printf("p50 延迟: %s\n", stats.P50)
-	fmt.Printf("p95 延迟: %s\n", stats.P95)
-	fmt.Printf("p99 延迟: %s\n", stats.P99)
-	fmt.Printf("最大延迟: %s\n", stats.Max)
+	fmt.Printf("连接数: %d\n", cfg.connections)
+	fmt.Printf("每连接样本数: %d\n", cfg.count)
+	fmt.Printf("总样本数: %d\n", summary.totalSamples)
+	fmt.Printf("总耗时: %s\n", summary.overall.Elapsed)
+	fmt.Printf("整体平均吞吐: %.2f 次/秒\n", summary.overall.QPS)
+	fmt.Printf("整体最小延迟: %s\n", summary.overall.Min)
+	fmt.Printf("整体平均延迟: %s\n", summary.overall.Avg)
+	fmt.Printf("整体 p50 延迟: %s\n", summary.overall.P50)
+	fmt.Printf("整体 p95 延迟: %s\n", summary.overall.P95)
+	fmt.Printf("整体 p99 延迟: %s\n", summary.overall.P99)
+	fmt.Printf("整体最大延迟: %s\n", summary.overall.Max)
+	for index, stats := range summary.perConnection {
+		fmt.Printf("连接 %d: qps=%.2f avg=%s p95=%s p99=%s\n", index+1, stats.QPS, stats.Avg, stats.P95, stats.P99)
+	}
 }
