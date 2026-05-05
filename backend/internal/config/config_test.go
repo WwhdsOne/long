@@ -26,6 +26,8 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               username: ""
               password: "Wwh852456"
               db: 3
+              pool_size: 20
+              min_idle_conns: 5
               tls_enabled: false
             redis_prefix: "vote:"
             rate_limit:
@@ -87,6 +89,12 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.RedisPrefix != "vote:" {
 		t.Fatalf("expected redis prefix vote:button:, got %q", cfg.RedisPrefix)
+	}
+	if cfg.Redis.PoolSize != 20 {
+		t.Fatalf("expected redis pool size 20, got %d", cfg.Redis.PoolSize)
+	}
+	if cfg.Redis.MinIdleConns != 5 {
+		t.Fatalf("expected redis min idle conns 5, got %d", cfg.Redis.MinIdleConns)
 	}
 	if cfg.RateLimit.Limit != 30 {
 		t.Fatalf("expected rate limit 30, got %d", cfg.RateLimit.Limit)

@@ -68,10 +68,12 @@ func run() error {
 	}
 
 	redisOptions := &redis.Options{
-		Addr:     net.JoinHostPort(cfg.Redis.Host, fmt.Sprintf("%d", cfg.Redis.Port)),
-		Username: cfg.Redis.Username,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
+		Addr:         net.JoinHostPort(cfg.Redis.Host, fmt.Sprintf("%d", cfg.Redis.Port)),
+		Username:     cfg.Redis.Username,
+		Password:     cfg.Redis.Password,
+		DB:           cfg.Redis.DB,
+		PoolSize:     cfg.Redis.PoolSize,
+		MinIdleConns: cfg.Redis.MinIdleConns,
 	}
 	if cfg.Redis.TLSEnabled {
 		redisOptions.TLSConfig = &tls.Config{

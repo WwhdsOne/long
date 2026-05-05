@@ -19,12 +19,14 @@ import (
 
 // RedisConfig holds the connection settings for the Redis instance.
 type RedisConfig struct {
-	Host       string
-	Port       int
-	Username   string
-	Password   string
-	DB         int
-	TLSEnabled bool
+	Host         string
+	Port         int
+	Username     string
+	Password     string
+	DB           int
+	PoolSize     int
+	MinIdleConns int
+	TLSEnabled   bool
 }
 
 // RateLimitConfig controls the in-memory anti-abuse policy for click requests.
@@ -120,12 +122,14 @@ type Config struct {
 type fileConfig struct {
 	Port  int `yaml:"port"`
 	Redis struct {
-		Host       string `yaml:"host"`
-		Port       int    `yaml:"port"`
-		Username   string `yaml:"username"`
-		Password   string `yaml:"password"`
-		DB         int    `yaml:"db"`
-		TLSEnabled bool   `yaml:"tls_enabled"`
+		Host         string `yaml:"host"`
+		Port         int    `yaml:"port"`
+		Username     string `yaml:"username"`
+		Password     string `yaml:"password"`
+		DB           int    `yaml:"db"`
+		PoolSize     int    `yaml:"pool_size"`
+		MinIdleConns int    `yaml:"min_idle_conns"`
+		TLSEnabled   bool   `yaml:"tls_enabled"`
 	} `yaml:"redis"`
 	RedisPrefix string `yaml:"redis_prefix"`
 	RateLimit   struct {
@@ -232,12 +236,14 @@ func loadFromConsul() (Config, consulSource, error) {
 	config := Config{
 		Port: parsed.Port,
 		Redis: RedisConfig{
-			Host:       parsed.Redis.Host,
-			Port:       parsed.Redis.Port,
-			Username:   parsed.Redis.Username,
-			Password:   parsed.Redis.Password,
-			DB:         parsed.Redis.DB,
-			TLSEnabled: parsed.Redis.TLSEnabled,
+			Host:         parsed.Redis.Host,
+			Port:         parsed.Redis.Port,
+			Username:     parsed.Redis.Username,
+			Password:     parsed.Redis.Password,
+			DB:           parsed.Redis.DB,
+			PoolSize:     parsed.Redis.PoolSize,
+			MinIdleConns: parsed.Redis.MinIdleConns,
+			TLSEnabled:   parsed.Redis.TLSEnabled,
 		},
 		RateLimit: RateLimitConfig{
 			Limit:             parsed.RateLimit.Limit,
