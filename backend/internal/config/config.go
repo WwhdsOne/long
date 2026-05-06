@@ -36,12 +36,14 @@ type RateLimitWindowConfig struct {
 
 // RateLimitConfig controls the in-memory anti-abuse policy for click requests.
 type RateLimitConfig struct {
-	Limit             int
-	Window            time.Duration
-	BlacklistDuration time.Duration
-	Medium            RateLimitWindowConfig
-	Long              RateLimitWindowConfig
-	NicknameWhitelist []string
+	Limit               int
+	Window              time.Duration
+	BlacklistDuration   time.Duration
+	BlacklistMultiplier float64
+	OffenseDecay        time.Duration
+	Medium              RateLimitWindowConfig
+	Long                RateLimitWindowConfig
+	NicknameWhitelist   []string
 }
 
 // AdminConfig 管理后台鉴权配置
@@ -141,11 +143,13 @@ type fileConfig struct {
 	} `yaml:"redis"`
 	RedisPrefix string `yaml:"redis_prefix"`
 	RateLimit   struct {
-		Limit             int      `yaml:"limit"`
-		WindowMS          int      `yaml:"window_ms"`
-		BlacklistMS       int      `yaml:"blacklist_ms"`
-		NicknameWhitelist []string `yaml:"nickname_whitelist"`
-		Medium            struct {
+		Limit               int      `yaml:"limit"`
+		WindowMS            int      `yaml:"window_ms"`
+		BlacklistMS         int      `yaml:"blacklist_ms"`
+		BlacklistMultiplier float64  `yaml:"blacklist_multiplier"`
+		OffenseDecayMS      int      `yaml:"offense_decay_ms"`
+		NicknameWhitelist   []string `yaml:"nickname_whitelist"`
+		Medium              struct {
 			Limit    int `yaml:"limit"`
 			WindowMS int `yaml:"window_ms"`
 		} `yaml:"medium"`
@@ -263,9 +267,11 @@ func loadFromConsul() (Config, consulSource, error) {
 			TLSEnabled:   parsed.Redis.TLSEnabled,
 		},
 		RateLimit: RateLimitConfig{
-			Limit:             parsed.RateLimit.Limit,
-			Window:            time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
-			BlacklistDuration: time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
+			Limit:               parsed.RateLimit.Limit,
+			Window:              time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
+			BlacklistDuration:   time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
+			BlacklistMultiplier: defaultRateLimitBlacklistMultiplier(parsed.RateLimit.BlacklistMultiplier),
+			OffenseDecay:        defaultRateLimitOffenseDecay(parsed.RateLimit.OffenseDecayMS),
 			Medium: RateLimitWindowConfig{
 				Limit:  parsed.RateLimit.Medium.Limit,
 				Window: time.Duration(parsed.RateLimit.Medium.WindowMS) * time.Millisecond,
@@ -550,4 +556,18 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 		xlog.L().Info("consul config changed, exiting for restart")
 		exitProcess(0)
 	}
+}
+
+func defaultRateLimitBlacklistMultiplier(value float64) float64 {
+	if value <= 1 {
+		return 2
+	}
+	return value
+}
+
+func defaultRateLimitOffenseDecay(valueMS int) time.Duration {
+	if valueMS <= 0 {
+		return 24 * time.Hour
+	}
+	return time.Duration(valueMS) * time.Millisecond
 }

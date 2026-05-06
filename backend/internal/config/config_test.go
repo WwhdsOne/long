@@ -34,6 +34,8 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               limit: 30
               window_ms: 2000
               blacklist_ms: 600000
+              blacklist_multiplier: 2.0
+              offense_decay_ms: 86400000
               nickname_whitelist: ["压测账号"]
               medium:
                 limit: 1000
@@ -105,6 +107,12 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	}
 	if cfg.RateLimit.Limit != 30 {
 		t.Fatalf("expected rate limit 30, got %d", cfg.RateLimit.Limit)
+	}
+	if cfg.RateLimit.BlacklistMultiplier != 2 {
+		t.Fatalf("expected blacklist multiplier 2, got %v", cfg.RateLimit.BlacklistMultiplier)
+	}
+	if cfg.RateLimit.OffenseDecay != 24*time.Hour {
+		t.Fatalf("expected offense decay 24h, got %s", cfg.RateLimit.OffenseDecay)
 	}
 	if cfg.RateLimit.Medium.Limit != 1000 || cfg.RateLimit.Medium.Window != 10*time.Minute {
 		t.Fatalf("expected medium window 1000/10m, got %+v", cfg.RateLimit.Medium)

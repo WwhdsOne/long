@@ -17,30 +17,36 @@ type WindowConfig struct {
 
 // Config defines the burst window and blacklist duration for click abuse control.
 type Config struct {
-	Limit             int
-	Window            time.Duration
-	BlacklistDuration time.Duration
-	Medium            WindowConfig
-	Long              WindowConfig
-	Now               func() time.Time
+	Limit               int
+	Window              time.Duration
+	BlacklistDuration   time.Duration
+	BlacklistMultiplier float64
+	OffenseDecay        time.Duration
+	Medium              WindowConfig
+	Long                WindowConfig
+	Now                 func() time.Time
 }
 
 type clientState struct {
-	hits         []time.Time
-	blockedAt    time.Time
-	blockedUntil time.Time
+	hits                  []time.Time
+	blockedAt             time.Time
+	blockedUntil          time.Time
+	lastOffenseAt         time.Time
+	lastBlacklistDuration time.Duration
 }
 
 // Limiter tracks recent click bursts per client in memory.
 type Limiter struct {
-	mu                sync.Mutex
-	short             WindowConfig
-	medium            WindowConfig
-	long              WindowConfig
-	maxWindow         time.Duration
-	blacklistDuration time.Duration
-	now               func() time.Time
-	clients           map[string]*clientState
+	mu                  sync.Mutex
+	short               WindowConfig
+	medium              WindowConfig
+	long                WindowConfig
+	maxWindow           time.Duration
+	blacklistDuration   time.Duration
+	blacklistMultiplier float64
+	offenseDecay        time.Duration
+	now                 func() time.Time
+	clients             map[string]*clientState
 }
 
 func normalizeWindowConfig(limit int, window time.Duration, defaultLimit int, defaultWindow time.Duration) WindowConfig {
@@ -83,6 +89,14 @@ func NewLimiter(config Config) *Limiter {
 	if blacklistDuration <= 0 {
 		blacklistDuration = 10 * time.Minute
 	}
+	blacklistMultiplier := config.BlacklistMultiplier
+	if blacklistMultiplier <= 1 {
+		blacklistMultiplier = 2
+	}
+	offenseDecay := config.OffenseDecay
+	if offenseDecay <= 0 {
+		offenseDecay = 24 * time.Hour
+	}
 
 	now := config.Now
 	if now == nil {
@@ -90,14 +104,34 @@ func NewLimiter(config Config) *Limiter {
 	}
 
 	return &Limiter{
-		short:             short,
-		medium:            medium,
-		long:              long,
-		maxWindow:         maxDuration(short.Window, medium.Window, long.Window),
-		blacklistDuration: blacklistDuration,
-		now:               now,
-		clients:           make(map[string]*clientState),
+		short:               short,
+		medium:              medium,
+		long:                long,
+		maxWindow:           maxDuration(short.Window, medium.Window, long.Window),
+		blacklistDuration:   blacklistDuration,
+		blacklistMultiplier: blacklistMultiplier,
+		offenseDecay:        offenseDecay,
+		now:                 now,
+		clients:             make(map[string]*clientState),
 	}
+}
+
+func (l *Limiter) nextBlacklistDuration(state *clientState, now time.Time) time.Duration {
+	if state == nil {
+		return l.blacklistDuration
+	}
+	if state.lastOffenseAt.IsZero() || now.Sub(state.lastOffenseAt) >= l.offenseDecay {
+		return l.blacklistDuration
+	}
+	if state.lastBlacklistDuration <= 0 {
+		return l.blacklistDuration
+	}
+
+	duration := time.Duration(float64(state.lastBlacklistDuration) * l.blacklistMultiplier)
+	if duration < l.blacklistDuration {
+		return l.blacklistDuration
+	}
+	return duration
 }
 
 func countHitsInWindow(hits []time.Time, cutoff time.Time) int {
@@ -146,10 +180,13 @@ func (l *Limiter) Allow(clientID string) (time.Duration, error) {
 	if exceedsWindowLimit(state.hits, now, l.short) ||
 		exceedsWindowLimit(state.hits, now, l.medium) ||
 		exceedsWindowLimit(state.hits, now, l.long) {
+		nextDuration := l.nextBlacklistDuration(state, now)
 		state.hits = nil
 		state.blockedAt = now
-		state.blockedUntil = now.Add(l.blacklistDuration)
-		return l.blacklistDuration, ErrTooManyRequests
+		state.blockedUntil = now.Add(nextDuration)
+		state.lastOffenseAt = now
+		state.lastBlacklistDuration = nextDuration
+		return nextDuration, ErrTooManyRequests
 	}
 
 	return 0, nil
@@ -196,5 +233,7 @@ func (l *Limiter) Unblock(clientID string) bool {
 	state.hits = nil
 	state.blockedAt = time.Time{}
 	state.blockedUntil = time.Time{}
+	state.lastOffenseAt = time.Time{}
+	state.lastBlacklistDuration = 0
 	return true
 }

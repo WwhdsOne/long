@@ -45,6 +45,84 @@ func TestLimiterBlocksBurstingClientForTenMinutes(t *testing.T) {
 	}
 }
 
+func TestLimiterDoublesBlacklistDurationOnRepeatedOffense(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Limit:               1,
+		Window:              time.Second,
+		BlacklistDuration:   10 * time.Minute,
+		BlacklistMultiplier: 2,
+		OffenseDecay:        24 * time.Hour,
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	if _, err := limiter.Allow("203.0.113.77"); err != nil {
+		t.Fatalf("expected first request to pass, got %v", err)
+	}
+	retryAfter, err := limiter.Allow("203.0.113.77")
+	if err == nil {
+		t.Fatal("expected first offense to be blocked")
+	}
+	if retryAfter != 10*time.Minute {
+		t.Fatalf("expected first offense retryAfter 10m, got %s", retryAfter)
+	}
+
+	now = now.Add(10*time.Minute + time.Second)
+	if _, err := limiter.Allow("203.0.113.77"); err != nil {
+		t.Fatalf("expected client to recover after first block, got %v", err)
+	}
+	retryAfter, err = limiter.Allow("203.0.113.77")
+	if err == nil {
+		t.Fatal("expected second offense to be blocked")
+	}
+	if retryAfter != 20*time.Minute {
+		t.Fatalf("expected second offense retryAfter 20m, got %s", retryAfter)
+	}
+}
+
+func TestLimiterResetsBlacklistDurationAfterOneDayWithoutOffense(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Limit:               1,
+		Window:              time.Second,
+		BlacklistDuration:   10 * time.Minute,
+		BlacklistMultiplier: 2,
+		OffenseDecay:        24 * time.Hour,
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	if _, err := limiter.Allow("203.0.113.78"); err != nil {
+		t.Fatalf("expected first request to pass, got %v", err)
+	}
+	if _, err := limiter.Allow("203.0.113.78"); err == nil {
+		t.Fatal("expected first offense to be blocked")
+	}
+
+	now = now.Add(10*time.Minute + time.Second)
+	if _, err := limiter.Allow("203.0.113.78"); err != nil {
+		t.Fatalf("expected client to recover after first block, got %v", err)
+	}
+	if _, err := limiter.Allow("203.0.113.78"); err == nil {
+		t.Fatal("expected second offense to be blocked")
+	}
+
+	now = now.Add(24*time.Hour + 20*time.Minute + time.Second)
+	if _, err := limiter.Allow("203.0.113.78"); err != nil {
+		t.Fatalf("expected client to recover after offense decay window, got %v", err)
+	}
+	retryAfter, err := limiter.Allow("203.0.113.78")
+	if err == nil {
+		t.Fatal("expected post-decay offense to be blocked")
+	}
+	if retryAfter != 10*time.Minute {
+		t.Fatalf("expected post-decay retryAfter reset to 10m, got %s", retryAfter)
+	}
+}
+
 func TestLimiterKeepsDifferentIPsIndependent(t *testing.T) {
 	limiter := NewLimiter(Config{
 		Limit:             1,

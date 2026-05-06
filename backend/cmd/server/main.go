@@ -258,9 +258,11 @@ func run() error {
 		return httpapi.AuthenticatedPlayerNickname(ctx, c, playerAuthenticator)
 	})
 	clickLimiter := ratelimit.NewLimiter(ratelimit.Config{
-		Limit:             cfg.RateLimit.Limit,
-		Window:            cfg.RateLimit.Window,
-		BlacklistDuration: cfg.RateLimit.BlacklistDuration,
+		Limit:               cfg.RateLimit.Limit,
+		Window:              cfg.RateLimit.Window,
+		BlacklistDuration:   cfg.RateLimit.BlacklistDuration,
+		BlacklistMultiplier: cfg.RateLimit.BlacklistMultiplier,
+		OffenseDecay:        cfg.RateLimit.OffenseDecay,
 		Medium: ratelimit.WindowConfig{
 			Limit:  cfg.RateLimit.Medium.Limit,
 			Window: cfg.RateLimit.Medium.Window,
