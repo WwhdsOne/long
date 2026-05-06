@@ -119,6 +119,7 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 	router.POST("/api/equipment/:instanceId/enhance", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`
+			Levels   *int   `json:"levels"`
 		}
 		if !bindJSON(c, &body, map[string]string{
 			"error":   "INVALID_REQUEST",
@@ -131,7 +132,12 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 			return
 		}
 
-		state, err := options.Store.EnhanceItem(ctx, nickname, c.Param("instanceId"))
+		levels := 1
+		if body.Levels != nil {
+			levels = *body.Levels
+		}
+
+		state, err := options.Store.EnhanceItemBatch(ctx, nickname, c.Param("instanceId"), levels)
 		if err != nil {
 			if writeNicknameError(c, err) {
 				return
@@ -151,6 +157,13 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "EQUIPMENT_ENHANCE_MAX_LEVEL",
 					"message": "这件装备已达到强化上限。",
+				})
+				return
+			}
+			if errors.Is(err, core.ErrEquipmentEnhanceInvalidLevels) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_ENHANCE_INVALID_LEVELS",
+					"message": "强化等级必须大于 0。",
 				})
 				return
 			}

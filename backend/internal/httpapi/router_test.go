@@ -85,6 +85,8 @@ type mockStore struct {
 	lastSalvageQuantity       int64
 	lastLockItemID            string
 	lastLockState             bool
+	lastEnhanceItemID         string
+	lastEnhanceLevels         int
 	lastClickNickname         string
 	lastAutoClickNickname     string
 	lastGetStateNickname      string
@@ -944,6 +946,18 @@ func (m *mockStore) EnhanceItem(_ context.Context, _ string, _ string) (core.Sta
 	return m.equipState, nil
 }
 
+func (m *mockStore) EnhanceItemBatch(_ context.Context, _ string, itemID string, levels int) (core.State, error) {
+	m.lastEnhanceItemID = itemID
+	m.lastEnhanceLevels = levels
+	if m.enhanceErr != nil {
+		return core.State{}, m.enhanceErr
+	}
+	if m.equipState.Loadout.Weapon == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
 func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (core.SalvageResult, error) {
 	m.lastSalvageItemID = itemID
 	if m.salvageErr != nil {
@@ -1649,6 +1663,27 @@ func TestEquipItemReturnsUpdatedState(t *testing.T) {
 	}
 	if payload.CombatStats.NormalDamage != 3 || payload.CombatStats.CriticalDamage != 7 {
 		t.Fatalf("expected actual damage 3/7, got %+v", payload.CombatStats)
+	}
+}
+
+func TestEnhanceItemForwardsBatchLevels(t *testing.T) {
+	store := &mockStore{}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/enhance", strings.NewReader(`{"nickname":"阿明","levels":3}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastEnhanceItemID != "instance-wood-sword" || store.lastEnhanceLevels != 3 {
+		t.Fatalf("expected enhance item forwarded with levels, got item=%q levels=%d", store.lastEnhanceItemID, store.lastEnhanceLevels)
 	}
 }
 

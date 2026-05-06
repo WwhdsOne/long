@@ -1812,6 +1812,55 @@ select {
   font-size: 0.82rem;
 }
 
+.armory-enhance-panel {
+  gap: 12px;
+}
+
+.armory-enhance-panel__summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.armory-enhance-panel__range {
+  display: grid;
+  gap: 10px;
+}
+
+.armory-enhance-panel__range span {
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.armory-enhance-panel__range input[type="range"] {
+  width: 100%;
+}
+
+.armory-enhance-panel__scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.armory-enhance-preview {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.armory-enhance-preview__item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(183, 53, 97, 0.12);
+}
+
 .loadout-slot span.rarity-text--supreme {
   color: transparent;
 }

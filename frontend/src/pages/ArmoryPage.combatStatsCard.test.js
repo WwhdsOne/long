@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const pageSource = readFileSync(path.resolve(currentDir, './ArmoryPage.vue'), 'utf8')
+const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 
 describe('ArmoryPage 战斗属性与装备栏', () => {
   it('强化上限按当前稀有度规则展示', () => {
@@ -35,5 +36,15 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
     expect(pageSource).toContain('class="loadout-slot__placeholder"')
     expect(pageSource).toContain('class="armory-item-tooltip"')
     expect(pageSource).toContain('item.imagePath')
+  })
+
+  it('强化弹窗支持滑条预览与批量提交', () => {
+    expect(pageSource).toContain('type="range"')
+    expect(pageSource).toContain('enhancePreviewStatRows')
+    expect(pageSource).toContain('enhanceAffordableLevelsByStone')
+    expect(pageSource).toContain('enhanceSelectedLevels')
+    expect(pageSource).toContain('->')
+    expect(stateSource).toContain('async function enhanceItem(instanceId, levels = 1)')
+    expect(stateSource).toContain('JSON.stringify({nickname: nickname.value, levels})')
   })
 })

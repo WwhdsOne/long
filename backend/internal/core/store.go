@@ -29,6 +29,7 @@ var ErrEquipmentLocked = errors.New("equipment locked")
 var ErrEquipmentEnhanceMaxLevel = errors.New("equipment enhance max level")
 var ErrEquipmentEnhanceInsufficientGold = errors.New("equipment enhance insufficient gold")
 var ErrEquipmentEnhanceInsufficientStones = errors.New("equipment enhance insufficient stones")
+var ErrEquipmentEnhanceInvalidLevels = errors.New("equipment enhance invalid levels")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
@@ -1142,9 +1143,17 @@ func (s *Store) UnequipItem(ctx context.Context, nickname string, instanceID str
 
 // EnhanceItem 强化一件装备实例，消耗金币和强化石并提升等级。
 func (s *Store) EnhanceItem(ctx context.Context, nickname string, instanceID string) (State, error) {
+	return s.EnhanceItemBatch(ctx, nickname, instanceID, 1)
+}
+
+// EnhanceItemBatch 批量强化一件装备实例，按逐级成本累计消耗资源。
+func (s *Store) EnhanceItemBatch(ctx context.Context, nickname string, instanceID string, levels int) (State, error) {
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return State{}, err
+	}
+	if levels <= 0 {
+		return State{}, ErrEquipmentEnhanceInvalidLevels
 	}
 
 	instanceID = strings.TrimSpace(instanceID)
@@ -1163,29 +1172,44 @@ func (s *Store) EnhanceItem(ctx context.Context, nickname string, instanceID str
 	}
 
 	maxLevel := maxEnhanceLevel(definition.Rarity)
-	if instance.EnhanceLevel >= maxLevel {
-		return State{}, ErrEquipmentEnhanceMaxLevel
-	}
-
-	goldCost := enhanceGoldCost(instance.EnhanceLevel)
-	stoneCost := enhanceStoneCost(instance.EnhanceLevel)
 	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
 	if err != nil {
 		return State{}, err
 	}
-	if resources.Gold < goldCost {
-		return State{}, ErrEquipmentEnhanceInsufficientGold
-	}
-	if resources.Stones < stoneCost {
-		return State{}, ErrEquipmentEnhanceInsufficientStones
+
+	nextLevel := instance.EnhanceLevel
+	remainingGold := resources.Gold
+	remainingStones := resources.Stones
+	var totalGoldCost int64
+	var totalStoneCost int64
+
+	for i := 0; i < levels; i++ {
+		if nextLevel >= maxLevel {
+			return State{}, ErrEquipmentEnhanceMaxLevel
+		}
+
+		goldCost := enhanceGoldCost(nextLevel)
+		stoneCost := enhanceStoneCost(nextLevel)
+		if remainingGold < goldCost {
+			return State{}, ErrEquipmentEnhanceInsufficientGold
+		}
+		if remainingStones < stoneCost {
+			return State{}, ErrEquipmentEnhanceInsufficientStones
+		}
+
+		totalGoldCost += goldCost
+		totalStoneCost += stoneCost
+		remainingGold -= goldCost
+		remainingStones -= stoneCost
+		nextLevel++
 	}
 
 	now := time.Now().Unix()
 	pipe := s.client.TxPipeline()
-	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "gold", -goldCost)
-	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", -stoneCost)
-	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "spent_stones", stoneCost)
-	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "enhance_level", 1)
+	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "gold", -totalGoldCost)
+	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "stones", -totalStoneCost)
+	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "spent_stones", totalStoneCost)
+	pipe.HIncrBy(ctx, s.equipmentInstanceKey(instance.InstanceID), "enhance_level", int64(levels))
 	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
 		Score:  float64(now),
 		Member: normalizedNickname,

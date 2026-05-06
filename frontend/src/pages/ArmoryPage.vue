@@ -43,10 +43,14 @@ const contextMenu = ref({
 const salvageConfirmItem = ref(null)
 const enhanceConfirmItem = ref(null)
 const enhanceFeedback = ref('')
+const enhanceSelectedLevels = ref(0)
 const bulkSalvageConfirmData = ref(null)
 const bulkSalvageFeedback = ref('')
 const bulkSalvaging = ref(false)
 const salvageRuleModalOpen = ref(false)
+
+const enhanceAttackGrowth = 1.12
+const enhancePercentGrowth = 1.08
 
 function formatTrimmedNumber(value, digits = 2) {
   const normalized = Number(value ?? 0)
@@ -72,6 +76,16 @@ function formatCritDamageBonus(value) {
 
 function formatArmorPenPercent(value) {
   return formatRatioPercentValue(value)
+}
+
+function formatPreviewPercent(value) {
+  const normalized = Number(value ?? 0)
+  const display = Math.abs(normalized) <= 1 ? normalized * 100 : normalized
+  return `${formatTrimmedNumber(display, 2)}%`
+}
+
+function formatPreviewBonusPercent(value) {
+  return `+${formatPreviewPercent(value)}`
 }
 
 const combatStatSummaryItems = computed(() => [
@@ -150,6 +164,7 @@ function handleContextEnhance() {
   if (!item) return
   enhanceConfirmItem.value = item
   enhanceFeedback.value = ''
+  enhanceSelectedLevels.value = Math.min(1, maxAffordableEnhanceLevelsByStone(item))
   closeContextMenu()
 }
 
@@ -259,6 +274,19 @@ function enhanceStoneCost(level) {
   return Math.ceil(3 * (1.5 ** safeLevel))
 }
 
+function enhanceBatchCost(level, levels) {
+  const safeLevel = Math.max(0, Number(level || 0))
+  const safeLevels = Math.max(0, Number(levels || 0))
+  let goldCost = 0
+  let stoneCost = 0
+  for (let offset = 0; offset < safeLevels; offset += 1) {
+    const nextLevel = safeLevel + offset
+    goldCost += enhanceGoldCost(nextLevel)
+    stoneCost += enhanceStoneCost(nextLevel)
+  }
+  return { goldCost, stoneCost }
+}
+
 function maxEnhanceLevel(rarity) {
   switch (String(rarity || '').trim()) {
     case '优秀':
@@ -282,6 +310,128 @@ function isEnhanceMax(item) {
   return Number(item.enhanceLevel || 0) >= maxEnhanceLevel(item.rarity)
 }
 
+function maxAffordableEnhanceLevelsByStone(item) {
+  if (!item) return 0
+  const currentLevel = Math.max(0, Number(item.enhanceLevel || 0))
+  const maxLevel = maxEnhanceLevel(item.rarity)
+  let remainingStones = Math.max(0, Number(stones.value || 0))
+  let levels = 0
+  let nextLevel = currentLevel
+
+  while (nextLevel < maxLevel) {
+    const cost = enhanceStoneCost(nextLevel)
+    if (remainingStones < cost) break
+    remainingStones -= cost
+    levels += 1
+    nextLevel += 1
+  }
+
+  return levels
+}
+
+function recoverBaseAttackPower(currentAttackPower, currentLevel) {
+  const safeAttackPower = Math.max(0, Number(currentAttackPower || 0))
+  const safeLevel = Math.max(0, Number(currentLevel || 0))
+  if (safeLevel <= 0 || safeAttackPower <= 0) return safeAttackPower
+
+  const approx = safeAttackPower / (enhanceAttackGrowth ** safeLevel)
+  const minBase = Math.max(0, Math.floor(approx) - 8)
+  const maxBase = Math.max(minBase, Math.ceil(approx) + 8)
+  for (let baseAttackPower = minBase; baseAttackPower <= maxBase; baseAttackPower += 1) {
+    if (Math.round(baseAttackPower * (enhanceAttackGrowth ** safeLevel)) === safeAttackPower) {
+      return baseAttackPower
+    }
+  }
+  return Math.max(0, Math.round(approx))
+}
+
+function previewScaledStat(currentValue, currentLevel, targetLevel) {
+  const safeCurrentValue = Number(currentValue || 0)
+  const safeCurrentLevel = Math.max(0, Number(currentLevel || 0))
+  const safeTargetLevel = Math.max(safeCurrentLevel, Number(targetLevel || 0))
+  if (!Number.isFinite(safeCurrentValue) || safeCurrentValue === 0) return 0
+  if (safeTargetLevel === safeCurrentLevel) return safeCurrentValue
+
+  const baseValue = safeCurrentValue / (enhancePercentGrowth ** safeCurrentLevel)
+  return baseValue * (enhancePercentGrowth ** safeTargetLevel)
+}
+
+function buildEnhancePreviewItem(item, levels) {
+  if (!item) return null
+
+  const currentLevel = Math.max(0, Number(item.enhanceLevel || 0))
+  const targetLevel = currentLevel + Math.max(0, Number(levels || 0))
+  const preview = {
+    attackPower: Math.max(0, Number(item.attackPower || 0)),
+    armorPenPercent: Number(item.armorPenPercent || 0),
+    critRate: Number(item.critRate || 0),
+    critDamageMultiplier: Number(item.critDamageMultiplier || 0),
+    partTypeDamageSoft: Number(item.partTypeDamageSoft || 0),
+    partTypeDamageHeavy: Number(item.partTypeDamageHeavy || 0),
+    partTypeDamageWeak: Number(item.partTypeDamageWeak || 0),
+  }
+
+  if (targetLevel === currentLevel) {
+    return preview
+  }
+
+  if (preview.attackPower > 0) {
+    const baseAttackPower = recoverBaseAttackPower(preview.attackPower, currentLevel)
+    preview.attackPower = Math.round(baseAttackPower * (enhanceAttackGrowth ** targetLevel))
+  }
+  preview.armorPenPercent = previewScaledStat(preview.armorPenPercent, currentLevel, targetLevel)
+  preview.critRate = previewScaledStat(preview.critRate, currentLevel, targetLevel)
+  preview.critDamageMultiplier = previewScaledStat(preview.critDamageMultiplier, currentLevel, targetLevel)
+  preview.partTypeDamageSoft = previewScaledStat(preview.partTypeDamageSoft, currentLevel, targetLevel)
+  preview.partTypeDamageHeavy = previewScaledStat(preview.partTypeDamageHeavy, currentLevel, targetLevel)
+  preview.partTypeDamageWeak = previewScaledStat(preview.partTypeDamageWeak, currentLevel, targetLevel)
+
+  return preview
+}
+
+function pushEnhancePreviewRow(rows, label, currentValue, nextValue, formatter) {
+  const safeCurrentValue = Number(currentValue || 0)
+  const safeNextValue = Number(nextValue || 0)
+  if (safeCurrentValue === 0 && safeNextValue === 0) return
+  rows.push({
+    label,
+    currentText: formatter(safeCurrentValue),
+    nextText: formatter(safeNextValue),
+  })
+}
+
+const enhanceAffordableLevelsByStone = computed(() => maxAffordableEnhanceLevelsByStone(enhanceConfirmItem.value))
+
+const enhanceTargetLevel = computed(() => enhanceLevel.value + Math.max(0, Number(enhanceSelectedLevels.value || 0)))
+
+const enhanceBatchCostPreview = computed(() => enhanceBatchCost(enhanceLevel.value, enhanceSelectedLevels.value))
+
+const enhancePreviewItem = computed(() => buildEnhancePreviewItem(enhanceConfirmItem.value, enhanceSelectedLevels.value))
+
+const enhanceHasEnoughGold = computed(() => Number(gold.value || 0) >= enhanceBatchCostPreview.value.goldCost)
+
+const enhancePreviewStatRows = computed(() => {
+  const item = enhanceConfirmItem.value
+  const preview = enhancePreviewItem.value
+  if (!item || !preview) return []
+
+  const rows = []
+  pushEnhancePreviewRow(rows, '攻击力', item.attackPower, preview.attackPower, (value) => formatNumber(value))
+  pushEnhancePreviewRow(rows, '护甲穿透', item.armorPenPercent, preview.armorPenPercent, formatArmorPenPercent)
+  pushEnhancePreviewRow(rows, '暴击率', item.critRate, preview.critRate, formatRatioPercentValue)
+  pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatPreviewBonusPercent)
+  pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatPreviewPercent)
+  pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatPreviewPercent)
+  pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatPreviewPercent)
+  return rows
+})
+
+const enhanceCanConfirm = computed(() => (
+  enhanceSelectedLevels.value > 0
+  && enhanceSelectedLevels.value <= enhanceAffordableLevelsByStone.value
+  && enhanceHasEnoughGold.value
+))
+
 async function confirmEnhance() {
   const item = enhanceConfirmItem.value
   if (!item) return
@@ -289,18 +439,24 @@ async function confirmEnhance() {
     enhanceFeedback.value = '无法继续强化，强化已达上限'
     return
   }
-  const result = await enhanceItem(item.instanceId || item.itemId)
+  if (enhanceSelectedLevels.value <= 0) {
+    enhanceFeedback.value = '先选择要强化的等级。'
+    return
+  }
+  const result = await enhanceItem(item.instanceId || item.itemId, enhanceSelectedLevels.value)
   if (result?.ok === false) {
     enhanceFeedback.value = result.message || '强化失败，请稍后重试。'
     return
   }
   enhanceConfirmItem.value = null
   enhanceFeedback.value = ''
+  enhanceSelectedLevels.value = 0
 }
 
 function cancelEnhance() {
   enhanceConfirmItem.value = null
   enhanceFeedback.value = ''
+  enhanceSelectedLevels.value = 0
 }
 
 
@@ -312,6 +468,12 @@ const enhanceDisplayName = computed(() => {
 const enhanceLevel = computed(() => {
   const n = Number(enhanceConfirmItem.value?.enhanceLevel ?? 0)
   return Number.isFinite(n) ? n : 0
+})
+
+watch(enhanceAffordableLevelsByStone, (nextMax) => {
+  if (enhanceSelectedLevels.value > nextMax) {
+    enhanceSelectedLevels.value = nextMax
+  }
 })
 
 onMounted(() => {
@@ -514,20 +676,50 @@ onBeforeUnmount(() => {
             <strong>
               {{ enhanceDisplayName }} +{{ enhanceLevel }}
               →
-              {{ enhanceDisplayName }} +{{ enhanceLevel + 1 }}
+              {{ enhanceDisplayName }} +{{ enhanceTargetLevel }}
             </strong>
           </div>
           <button class="nickname-form__ghost" type="button" @click="cancelEnhance">关闭</button>
         </div>
-        <div class="leaderboard-list">
-          <p>金币：{{ enhanceGoldCost(enhanceConfirmItem.enhanceLevel) }}</p>
-          <p>强化石：{{ enhanceStoneCost(enhanceConfirmItem.enhanceLevel) }}</p>
+        <div class="leaderboard-list armory-enhance-panel">
           <p>强化上限：+{{ maxEnhanceLevel(enhanceConfirmItem.rarity) }}</p>
+          <p>可拖动强化：+0 ~ +{{ enhanceAffordableLevelsByStone }}</p>
+          <p>当前资源：金币 {{ gold }} · 强化石 {{ stones }}</p>
+          <div class="armory-enhance-panel__summary">
+            <strong>已选强化 +{{ enhanceSelectedLevels }} 级</strong>
+            <span>强化后等级 +{{ enhanceTargetLevel }}</span>
+          </div>
+          <label class="armory-enhance-panel__range" for="armory-enhance-range">
+            <span>强化滑条</span>
+            <input
+              id="armory-enhance-range"
+              v-model.number="enhanceSelectedLevels"
+              type="range"
+              min="0"
+              :max="enhanceAffordableLevelsByStone"
+              step="1"
+              @input="enhanceFeedback = ''"
+            />
+          </label>
+          <div class="armory-enhance-panel__scale">
+            <span>+0</span>
+            <span>+{{ enhanceAffordableLevelsByStone }}</span>
+          </div>
+          <p>累计金币：{{ enhanceBatchCostPreview.goldCost }}</p>
+          <p>累计强化石：{{ enhanceBatchCostPreview.stoneCost }}</p>
+          <ul v-if="enhancePreviewStatRows.length > 0" class="armory-enhance-preview">
+            <li v-for="row in enhancePreviewStatRows" :key="row.label" class="armory-enhance-preview__item">
+              {{ row.label }} {{ row.currentText }} -> {{ row.label }} {{ row.nextText }}
+            </li>
+          </ul>
+          <p v-else>这件装备暂无可预览词条。</p>
+          <p v-if="enhanceAffordableLevelsByStone === 0">当前强化石不足，无法继续强化。</p>
+          <p v-else-if="!enhanceHasEnoughGold">金币不足，当前选择无法强化。</p>
         </div>
         <p v-if="enhanceFeedback" class="feedback feedback--error">{{ enhanceFeedback }}</p>
         <div class="announcement-modal__actions">
           <button class="nickname-form__ghost" type="button" @click="cancelEnhance">取消</button>
-          <button class="nickname-form__submit" type="button" @click="confirmEnhance">确认强化</button>
+          <button class="nickname-form__submit" type="button" :disabled="!enhanceCanConfirm" @click="confirmEnhance">确认强化</button>
         </div>
       </article>
     </section>

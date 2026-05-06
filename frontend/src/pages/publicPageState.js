@@ -2735,7 +2735,7 @@ async function salvageUnequippedItems() {
     }
 }
 
-async function enhanceItem(instanceId) {
+async function enhanceItem(instanceId, levels = 1) {
     if (!nickname.value || !instanceId) {
         return
     }
@@ -2749,7 +2749,7 @@ async function enhanceItem(instanceId) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({nickname: nickname.value}),
+            body: JSON.stringify({nickname: nickname.value, levels}),
         })
 
         if (!response.ok) {
