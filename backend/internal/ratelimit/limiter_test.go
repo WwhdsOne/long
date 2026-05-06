@@ -120,3 +120,65 @@ func TestLimiterListsAndUnblocksBlacklistEntries(t *testing.T) {
 		t.Fatalf("expected client to pass after unblock, got %v", err)
 	}
 }
+
+func TestLimiterBlocksClientWhenMediumWindowExceedsLimit(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Limit:             10,
+		Window:            time.Second,
+		BlacklistDuration: 10 * time.Minute,
+		Medium: WindowConfig{
+			Limit:  5,
+			Window: 10 * time.Second,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	for i := range 5 {
+		if _, err := limiter.Allow("203.0.113.30"); err != nil {
+			t.Fatalf("expected request %d to pass before medium threshold, got %v", i+1, err)
+		}
+		now = now.Add(2 * time.Second)
+	}
+
+	retryAfter, err := limiter.Allow("203.0.113.30")
+	if err == nil {
+		t.Fatal("expected medium window overflow to be rate limited")
+	}
+	if retryAfter != 10*time.Minute {
+		t.Fatalf("expected retryAfter 10m, got %s", retryAfter)
+	}
+}
+
+func TestLimiterBlocksClientWhenLongWindowExceedsLimit(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Limit:             10,
+		Window:            time.Second,
+		BlacklistDuration: 10 * time.Minute,
+		Long: WindowConfig{
+			Limit:  3,
+			Window: time.Hour,
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	for i := range 3 {
+		if _, err := limiter.Allow("203.0.113.40"); err != nil {
+			t.Fatalf("expected request %d to pass before long threshold, got %v", i+1, err)
+		}
+		now = now.Add(20 * time.Minute)
+	}
+
+	retryAfter, err := limiter.Allow("203.0.113.40")
+	if err == nil {
+		t.Fatal("expected long window overflow to be rate limited")
+	}
+	if retryAfter != 10*time.Minute {
+		t.Fatalf("expected retryAfter 10m, got %s", retryAfter)
+	}
+}

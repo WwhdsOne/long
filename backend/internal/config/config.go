@@ -29,11 +29,18 @@ type RedisConfig struct {
 	TLSEnabled   bool
 }
 
+type RateLimitWindowConfig struct {
+	Limit  int
+	Window time.Duration
+}
+
 // RateLimitConfig controls the in-memory anti-abuse policy for click requests.
 type RateLimitConfig struct {
 	Limit             int
 	Window            time.Duration
 	BlacklistDuration time.Duration
+	Medium            RateLimitWindowConfig
+	Long              RateLimitWindowConfig
 	NicknameWhitelist []string
 }
 
@@ -138,6 +145,14 @@ type fileConfig struct {
 		WindowMS          int      `yaml:"window_ms"`
 		BlacklistMS       int      `yaml:"blacklist_ms"`
 		NicknameWhitelist []string `yaml:"nickname_whitelist"`
+		Medium            struct {
+			Limit    int `yaml:"limit"`
+			WindowMS int `yaml:"window_ms"`
+		} `yaml:"medium"`
+		Long struct {
+			Limit    int `yaml:"limit"`
+			WindowMS int `yaml:"window_ms"`
+		} `yaml:"long"`
 	} `yaml:"rate_limit"`
 	Admin struct {
 		Username      string `yaml:"username"`
@@ -251,6 +266,14 @@ func loadFromConsul() (Config, consulSource, error) {
 			Limit:             parsed.RateLimit.Limit,
 			Window:            time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
 			BlacklistDuration: time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
+			Medium: RateLimitWindowConfig{
+				Limit:  parsed.RateLimit.Medium.Limit,
+				Window: time.Duration(parsed.RateLimit.Medium.WindowMS) * time.Millisecond,
+			},
+			Long: RateLimitWindowConfig{
+				Limit:  parsed.RateLimit.Long.Limit,
+				Window: time.Duration(parsed.RateLimit.Long.WindowMS) * time.Millisecond,
+			},
 			NicknameWhitelist: normalizeStringList(parsed.RateLimit.NicknameWhitelist),
 		},
 		Admin: AdminConfig{

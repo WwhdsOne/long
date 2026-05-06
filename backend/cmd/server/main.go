@@ -261,6 +261,14 @@ func run() error {
 		Limit:             cfg.RateLimit.Limit,
 		Window:            cfg.RateLimit.Window,
 		BlacklistDuration: cfg.RateLimit.BlacklistDuration,
+		Medium: ratelimit.WindowConfig{
+			Limit:  cfg.RateLimit.Medium.Limit,
+			Window: cfg.RateLimit.Medium.Window,
+		},
+		Long: ratelimit.WindowConfig{
+			Limit:  cfg.RateLimit.Long.Limit,
+			Window: cfg.RateLimit.Long.Window,
+		},
 	})
 	afkService := httpapi.NewAfkService(store, changeBus, redisClient, cfg.RedisPrefix)
 	defer afkService.Close()
