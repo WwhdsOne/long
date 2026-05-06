@@ -63,8 +63,13 @@ function roomAccent(room, index) {
 }
 
 function roomStyle(room, index) {
+  const idIndex = Number.parseInt(room?.id, 10)
+  const offset = Math.max(0, Number.isFinite(idIndex) ? idIndex - 1 : index)
   return {
     '--room-accent-rgb': roomAccent(room, index),
+    '--room-orbit-delay': `${offset * -1.1}s`,
+    '--room-breathe-delay': `${offset * -0.7}s`,
+    '--room-orbit-duration': `${5.8 + (offset % 3) * 0.45}s`,
   }
 }
 
@@ -131,6 +136,7 @@ function canJoin(room) {
           :disabled="!canJoin(room)"
           @click="emit('join', room.id)"
       >
+        <span class="room-selector__surface" aria-hidden="true"></span>
         <span class="room-selector__top">
           <span class="room-selector__id">{{ String(room.id || '1').padStart(2, '0') }}</span>
           <span class="room-selector__badge">{{ roomStatusLabel(room) }}</span>
@@ -236,15 +242,14 @@ function canJoin(room) {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   color: #eef4ff;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
-    radial-gradient(circle at top right, rgba(var(--room-accent-rgb), 0.12), transparent 42%),
-    rgba(8, 14, 24, 0.72);
+  background: rgba(8, 14, 24, 0.72);
   text-align: left;
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  isolation: isolate;
   z-index: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -252,16 +257,78 @@ function canJoin(room) {
     opacity 180ms ease;
 }
 
+.room-selector__button > * {
+  position: relative;
+  z-index: 2;
+}
+
+.room-selector__surface {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(180deg, rgba(var(--room-accent-rgb), 0.14), rgba(var(--room-accent-rgb), 0.05) 34%, rgba(255, 255, 255, 0.03) 100%),
+    radial-gradient(circle at top right, rgba(var(--room-accent-rgb), 0.34), transparent 50%),
+    radial-gradient(circle at bottom left, rgba(var(--room-accent-rgb), 0.2), transparent 64%);
+  opacity: 0.5;
+  filter: brightness(0.98) saturate(1.12);
+  transform: scale(1);
+  transform-origin: center center;
+  animation: room-card-surface-breathe 4.8s ease-in-out infinite;
+  animation-delay: var(--room-breathe-delay);
+}
+
+.room-selector__button::before,
 .room-selector__button::after {
   content: '';
   position: absolute;
-  right: -26px;
-  bottom: -38px;
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(var(--room-accent-rgb), 0.28), transparent 70%);
   pointer-events: none;
+}
+
+.room-selector__button::before {
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background:
+    linear-gradient(115deg,
+      rgba(var(--room-accent-rgb), 0.08) 0%,
+      rgba(var(--room-accent-rgb), 0.32) 28%,
+      rgba(255, 255, 255, 0.18) 50%,
+      rgba(var(--room-accent-rgb), 0.28) 72%,
+      rgba(var(--room-accent-rgb), 0.08) 100%);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 8px rgba(var(--room-accent-rgb), 0.18));
+  opacity: 0.2;
+  animation: room-card-breathe 4.8s ease-in-out infinite;
+  animation-delay: var(--room-breathe-delay);
+  z-index: 1;
+}
+
+.room-selector__button::after {
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(var(--room-accent-rgb), 0.98);
+  box-shadow:
+    -2px 0 4px rgba(var(--room-accent-rgb), 0.96),
+    -22px 0 14px rgba(var(--room-accent-rgb), 0.42),
+    -100px 0 32px rgba(var(--room-accent-rgb), 0.08);
+  opacity: 0.96;
+  transform-origin: center center;
+  animation: room-card-orbit var(--room-orbit-duration) linear infinite;
+  animation-delay: var(--room-orbit-delay);
+  z-index: 999;
 }
 
 .room-selector__button:hover:not(:disabled) {
@@ -271,6 +338,14 @@ function canJoin(room) {
   box-shadow:
     0 10px 18px rgba(0, 0, 0, 0.26),
     inset 0 0 0 1px rgba(var(--room-accent-rgb), 0.08);
+}
+
+.room-selector__button:hover:not(:disabled)::before {
+  opacity: 0.26;
+}
+
+.room-selector__button:hover:not(:disabled) .room-selector__surface {
+  opacity: 0.58;
 }
 
 .room-selector__top {
@@ -390,6 +465,10 @@ function canJoin(room) {
     inset 0 0 0 1px rgba(255, 212, 107, 0.2);
 }
 
+.room-selector__button--active::before {
+  opacity: 0.24;
+}
+
 .room-selector__button--active .room-selector__badge {
   color: #fff1c0;
   border-color: rgba(255, 212, 107, 0.22);
@@ -402,6 +481,14 @@ function canJoin(room) {
 
 .room-selector__button--locked:not(.room-selector__button--active) {
   opacity: 0.62;
+}
+
+.room-selector__button--locked:not(.room-selector__button--active)::before {
+  opacity: 0.1;
+}
+
+.room-selector__button--locked:not(.room-selector__button--active)::after {
+  opacity: 0.34;
 }
 
 .room-selector__empty,
@@ -417,6 +504,83 @@ function canJoin(room) {
 
 .room-selector__error {
   color: #fecaca;
+}
+
+@keyframes room-card-breathe {
+  0%,
+  100% {
+    opacity: 0.14;
+    filter: drop-shadow(0 0 5px rgba(var(--room-accent-rgb), 0.12));
+  }
+
+  50% {
+    opacity: 0.36;
+    filter: drop-shadow(0 0 12px rgba(var(--room-accent-rgb), 0.24));
+  }
+}
+
+@keyframes room-card-surface-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    filter: brightness(0.98) saturate(1.12);
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.86;
+    filter: brightness(1.08) saturate(1.32);
+    transform: scale(1.018);
+  }
+}
+
+@keyframes room-card-orbit {
+  0% {
+    top: 1px;
+    left: 8px;
+    opacity: 0;
+    transform: rotate(0deg) scale(0.72);
+  }
+
+  6% {
+    opacity: 0.92;
+    transform: rotate(0deg) scale(1);
+  }
+
+  24% {
+    top: 1px;
+    left: calc(100% - 12px);
+    opacity: 0.82;
+    transform: rotate(0deg) scale(0.94);
+  }
+
+  49% {
+    top: calc(100% - 12px);
+    left: calc(100% - 12px);
+    opacity: 0.88;
+    transform: rotate(90deg) scale(1);
+  }
+
+  74% {
+    top: calc(100% - 12px);
+    left: 8px;
+    opacity: 0.78;
+    transform: rotate(180deg) scale(0.92);
+  }
+
+  94% {
+    top: 1px;
+    left: 8px;
+    opacity: 0.86;
+    transform: rotate(270deg) scale(0.96);
+  }
+
+  100% {
+    top: 1px;
+    left: 8px;
+    opacity: 0;
+    transform: rotate(360deg) scale(0.72);
+  }
 }
 
 @media (max-width: 720px) {
