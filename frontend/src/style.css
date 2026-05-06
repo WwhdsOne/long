@@ -200,10 +200,38 @@ select {
 .hero,
 .stats-band,
 .stage-layout,
-.boss-stage {
+.boss-stage,
+.site-footer {
   position: relative;
   width: min(1380px, 100%);
   margin: 0 auto;
+}
+
+.site-footer {
+  margin-top: 44px;
+  padding: 16px 0 8px;
+  text-align: center;
+  color: rgba(90, 22, 48, 0.68);
+  font-size: 0.92rem;
+}
+
+.site-footer__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1px solid rgba(183, 53, 97, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--primary-deep);
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(197, 37, 88, 0.08);
+}
+
+.site-footer__link:hover {
+  color: var(--primary-deep);
+  text-decoration: underline;
 }
 
 .hero {

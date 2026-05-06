@@ -165,5 +165,16 @@ async function handleLoginSubmit() {
     <TaskPage v-else-if="currentPublicPage === 'tasks'" />
     <ArmoryPage v-else-if="isArmoryPage(currentPublicPage)" :focus-section="currentPublicPage" />
     <MessagesPage v-else />
+
+    <footer class="site-footer" aria-label="网站备案信息">
+      <a
+          class="site-footer__link"
+          href="https://beian.miit.gov.cn/"
+          target="_blank"
+          rel="noreferrer"
+      >
+        京ICP备2025120689号-2
+      </a>
+    </footer>
   </main>
 </template>

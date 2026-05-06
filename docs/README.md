@@ -80,6 +80,10 @@
 - [implementation/2026-05-05-Boss房间部位显示与掉血同步Bug排查记录.md](./implementation/2026-05-05-Boss房间部位显示与掉血同步Bug排查记录.md)
 - [demos/](./demos/)
 
+### 展示材料
+
+- [reports/2026-05-06-大海世界课上展示提纲.md](./reports/2026-05-06-大海世界课上展示提纲.md)
+
 ## 归档约定
 
 - `archive/` 下的文档不再作为当前实现依据。
