@@ -1183,7 +1183,7 @@ func (s *Store) EnhanceItemBatch(ctx context.Context, nickname string, instanceI
 	var totalGoldCost int64
 	var totalStoneCost int64
 
-	for i := 0; i < levels; i++ {
+	for range levels {
 		if nextLevel >= maxLevel {
 			return State{}, ErrEquipmentEnhanceMaxLevel
 		}
