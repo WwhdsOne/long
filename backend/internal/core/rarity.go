@@ -47,7 +47,7 @@ var rarityStatTable = map[string]RarityStats{
 		ArmorPenMin: 0.01, ArmorPenMax: 0.03,
 		CritDamageMultMin: 0.05, CritDamageMultMax: 0.10,
 		BossDamageMin: 0, BossDamageMax: 0.02,
-		EnhanceCapExtra: 2, DropWeightMult: 0.8,
+		EnhanceCapExtra: 5, DropWeightMult: 0.8,
 		SalvageGemValue: 2,
 	},
 	"稀有": {
@@ -55,7 +55,7 @@ var rarityStatTable = map[string]RarityStats{
 		ArmorPenMin: 0.03, ArmorPenMax: 0.06,
 		CritDamageMultMin: 0.10, CritDamageMultMax: 0.20,
 		BossDamageMin: 0.02, BossDamageMax: 0.05,
-		EnhanceCapExtra: 5, DropWeightMult: 0.5,
+		EnhanceCapExtra: 10, DropWeightMult: 0.5,
 		SalvageGemValue: 5,
 	},
 	"史诗": {
@@ -63,7 +63,7 @@ var rarityStatTable = map[string]RarityStats{
 		ArmorPenMin: 0.05, ArmorPenMax: 0.10,
 		CritDamageMultMin: 0.20, CritDamageMultMax: 0.35,
 		BossDamageMin: 0.05, BossDamageMax: 0.10,
-		EnhanceCapExtra: 10, DropWeightMult: 0.3,
+		EnhanceCapExtra: 15, DropWeightMult: 0.3,
 		SalvageGemValue: 10,
 	},
 	"传说": {
@@ -71,7 +71,7 @@ var rarityStatTable = map[string]RarityStats{
 		ArmorPenMin: 0.08, ArmorPenMax: 0.15,
 		CritDamageMultMin: 0.35, CritDamageMultMax: 0.50,
 		BossDamageMin: 0.08, BossDamageMax: 0.15,
-		EnhanceCapExtra: 15, DropWeightMult: 0.15,
+		EnhanceCapExtra: 20, DropWeightMult: 0.15,
 		SalvageGemValue: 20,
 	},
 	"至臻": {
@@ -79,7 +79,7 @@ var rarityStatTable = map[string]RarityStats{
 		ArmorPenMin: 0.12, ArmorPenMax: 0.20,
 		CritDamageMultMin: 0.50, CritDamageMultMax: 0.80,
 		BossDamageMin: 0.12, BossDamageMax: 0.25,
-		EnhanceCapExtra: 20, DropWeightMult: 0.05,
+		EnhanceCapExtra: 30, DropWeightMult: 0.05,
 		SalvageGemValue: 50,
 	},
 }

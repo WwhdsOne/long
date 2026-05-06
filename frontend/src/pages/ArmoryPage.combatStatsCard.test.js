@@ -8,6 +8,15 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const pageSource = readFileSync(path.resolve(currentDir, './ArmoryPage.vue'), 'utf8')
 
 describe('ArmoryPage 战斗属性与装备栏', () => {
+  it('强化上限按当前稀有度规则展示', () => {
+    expect(pageSource).toContain("case '优秀':\n      return 10")
+    expect(pageSource).toContain("case '稀有':\n      return 15")
+    expect(pageSource).toContain("case '史诗':\n      return 20")
+    expect(pageSource).toContain("case '传说':\n      return 25")
+    expect(pageSource).toContain("case '至臻':\n      return 35")
+    expect(pageSource).toContain("default:\n      return 5")
+  })
+
   it('战斗属性改为紧凑两列摘要，不再拆分基础属性和强化属性', () => {
     expect(pageSource).not.toContain('基础属性')
     expect(pageSource).not.toContain('强化属性')

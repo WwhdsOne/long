@@ -262,15 +262,15 @@ function enhanceStoneCost(level) {
 function maxEnhanceLevel(rarity) {
   switch (String(rarity || '').trim()) {
     case '优秀':
-      return 7
-    case '稀有':
       return 10
-    case '史诗':
+    case '稀有':
       return 15
-    case '传说':
+    case '史诗':
       return 20
-    case '至臻':
+    case '传说':
       return 25
+    case '至臻':
+      return 35
     case '普通':
     default:
       return 5

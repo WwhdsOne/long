@@ -5,6 +5,24 @@ import (
 	"testing"
 )
 
+func TestMaxEnhanceLevelByRarity(t *testing.T) {
+	cases := map[string]int{
+		"普通": 5,
+		"优秀": 10,
+		"稀有": 15,
+		"史诗": 20,
+		"传说": 25,
+		"至臻": 35,
+		"未知": 5,
+	}
+
+	for rarity, want := range cases {
+		if got := maxEnhanceLevel(rarity); got != want {
+			t.Fatalf("rarity %q max enhance level = %d, want %d", rarity, got, want)
+		}
+	}
+}
+
 func TestEquipmentDefinitionDefaultsRarityToCommon(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
