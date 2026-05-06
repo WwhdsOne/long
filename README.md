@@ -1,6 +1,6 @@
 # Redis Vote Wall
 
-一个基于 `Vue 3 + Vite + Go(Hertz) + Redis + SSE` 的实时按钮计数墙项目。当前版本已经扩展出装备、英雄、Boss、天赋、任务、留言墙、后台管理和 Mongo 冷数据链路。
+一个基于 `Vue 3 + Vite + Go(Hertz) + Redis + SSE` 的实时打Boss项目。当前版本已经扩展出装备、英雄、Boss、天赋、任务、留言墙、后台管理和 Mongo 冷数据链路。
 
 ## 当前架构
 

@@ -274,6 +274,8 @@ type Reward struct {
 	ItemID    string `json:"itemId"`
 	ItemName  string `json:"itemName"`
 	GrantedAt int64  `json:"grantedAt"`
+	ImagePath string `json:"imagePath,omitempty"`
+	ImageAlt  string `json:"imageAlt,omitempty"`
 }
 
 // BossLootEntry Boss 掉落池条目
@@ -2579,6 +2581,8 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 				ItemID:    reward.ItemID,
 				ItemName:  reward.ItemName,
 				GrantedAt: now,
+				ImagePath: reward.ImagePath,
+				ImageAlt:  reward.ImageAlt,
 			})
 		}
 		if len(rewards) > 0 {

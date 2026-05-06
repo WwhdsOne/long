@@ -1724,6 +1724,8 @@ type Reward struct {
 	ItemId        string                 `protobuf:"bytes,3,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
 	ItemName      string                 `protobuf:"bytes,4,opt,name=item_name,json=itemName,proto3" json:"item_name,omitempty"`
 	GrantedAt     int64                  `protobuf:"varint,5,opt,name=granted_at,json=grantedAt,proto3" json:"granted_at,omitempty"`
+	ImagePath     string                 `protobuf:"bytes,6,opt,name=image_path,json=imagePath,proto3" json:"image_path,omitempty"`
+	ImageAlt      string                 `protobuf:"bytes,7,opt,name=image_alt,json=imageAlt,proto3" json:"image_alt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1791,6 +1793,20 @@ func (x *Reward) GetGrantedAt() int64 {
 		return x.GrantedAt
 	}
 	return 0
+}
+
+func (x *Reward) GetImagePath() string {
+	if x != nil {
+		return x.ImagePath
+	}
+	return ""
+}
+
+func (x *Reward) GetImageAlt() string {
+	if x != nil {
+		return x.ImageAlt
+	}
+	return ""
 }
 
 type TalentTriggerEvent struct {
@@ -2530,14 +2546,17 @@ const file_backend_internal_realtimepb_realtime_proto_rawDesc = "" +
 	"\x15part_type_damage_weak\x18\v \x01(\x01R\x12partTypeDamageWeak\x125\n" +
 	"\x17per_part_damage_percent\x18\f \x01(\x01R\x14perPartDamagePercent\x12*\n" +
 	"\x11low_hp_multiplier\x18\r \x01(\x01R\x0flowHpMultiplier\x12(\n" +
-	"\x10low_hp_threshold\x18\x0e \x01(\x01R\x0elowHpThreshold\"\x93\x01\n" +
+	"\x10low_hp_threshold\x18\x0e \x01(\x01R\x0elowHpThreshold\"\xcf\x01\n" +
 	"\x06Reward\x12\x17\n" +
 	"\aboss_id\x18\x01 \x01(\tR\x06bossId\x12\x1b\n" +
 	"\tboss_name\x18\x02 \x01(\tR\bbossName\x12\x17\n" +
 	"\aitem_id\x18\x03 \x01(\tR\x06itemId\x12\x1b\n" +
 	"\titem_name\x18\x04 \x01(\tR\bitemName\x12\x1d\n" +
 	"\n" +
-	"granted_at\x18\x05 \x01(\x03R\tgrantedAt\"\xd1\x01\n" +
+	"granted_at\x18\x05 \x01(\x03R\tgrantedAt\x12\x1d\n" +
+	"\n" +
+	"image_path\x18\x06 \x01(\tR\timagePath\x12\x1b\n" +
+	"\timage_alt\x18\a \x01(\tR\bimageAlt\"\xd1\x01\n" +
 	"\x12TalentTriggerEvent\x12\x1b\n" +
 	"\ttalent_id\x18\x01 \x01(\tR\btalentId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +

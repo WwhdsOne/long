@@ -7375,6 +7375,8 @@ export const realtime = $root.realtime = (() => {
          * @property {string|null} [itemId] Reward itemId
          * @property {string|null} [itemName] Reward itemName
          * @property {number|Long|null} [grantedAt] Reward grantedAt
+         * @property {string|null} [imagePath] Reward imagePath
+         * @property {string|null} [imageAlt] Reward imageAlt
          */
 
         /**
@@ -7433,6 +7435,22 @@ export const realtime = $root.realtime = (() => {
         Reward.prototype.grantedAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
 
         /**
+         * Reward imagePath.
+         * @member {string} imagePath
+         * @memberof realtime.Reward
+         * @instance
+         */
+        Reward.prototype.imagePath = "";
+
+        /**
+         * Reward imageAlt.
+         * @member {string} imageAlt
+         * @memberof realtime.Reward
+         * @instance
+         */
+        Reward.prototype.imageAlt = "";
+
+        /**
          * Creates a new Reward instance using the specified properties.
          * @function create
          * @memberof realtime.Reward
@@ -7466,6 +7484,10 @@ export const realtime = $root.realtime = (() => {
                 writer.uint32(/* id 4, wireType 2 =*/34).string(message.itemName);
             if (message.grantedAt != null && Object.hasOwnProperty.call(message, "grantedAt"))
                 writer.uint32(/* id 5, wireType 0 =*/40).int64(message.grantedAt);
+            if (message.imagePath != null && Object.hasOwnProperty.call(message, "imagePath"))
+                writer.uint32(/* id 6, wireType 2 =*/50).string(message.imagePath);
+            if (message.imageAlt != null && Object.hasOwnProperty.call(message, "imageAlt"))
+                writer.uint32(/* id 7, wireType 2 =*/58).string(message.imageAlt);
             return writer;
         };
 
@@ -7526,6 +7548,14 @@ export const realtime = $root.realtime = (() => {
                         message.grantedAt = reader.int64();
                         break;
                     }
+                case 6: {
+                        message.imagePath = reader.string();
+                        break;
+                    }
+                case 7: {
+                        message.imageAlt = reader.string();
+                        break;
+                    }
                 default:
                     reader.skipType(tag & 7, long);
                     break;
@@ -7580,6 +7610,12 @@ export const realtime = $root.realtime = (() => {
             if (message.grantedAt != null && message.hasOwnProperty("grantedAt"))
                 if (!$util.isInteger(message.grantedAt) && !(message.grantedAt && $util.isInteger(message.grantedAt.low) && $util.isInteger(message.grantedAt.high)))
                     return "grantedAt: integer|Long expected";
+            if (message.imagePath != null && message.hasOwnProperty("imagePath"))
+                if (!$util.isString(message.imagePath))
+                    return "imagePath: string expected";
+            if (message.imageAlt != null && message.hasOwnProperty("imageAlt"))
+                if (!$util.isString(message.imageAlt))
+                    return "imageAlt: string expected";
             return null;
         };
 
@@ -7616,6 +7652,10 @@ export const realtime = $root.realtime = (() => {
                     message.grantedAt = object.grantedAt;
                 else if (typeof object.grantedAt === "object")
                     message.grantedAt = new $util.LongBits(object.grantedAt.low >>> 0, object.grantedAt.high >>> 0).toNumber();
+            if (object.imagePath != null)
+                message.imagePath = String(object.imagePath);
+            if (object.imageAlt != null)
+                message.imageAlt = String(object.imageAlt);
             return message;
         };
 
@@ -7642,6 +7682,8 @@ export const realtime = $root.realtime = (() => {
                     object.grantedAt = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                 } else
                     object.grantedAt = options.longs === String ? "0" : 0;
+                object.imagePath = "";
+                object.imageAlt = "";
             }
             if (message.bossId != null && message.hasOwnProperty("bossId"))
                 object.bossId = message.bossId;
@@ -7656,6 +7698,10 @@ export const realtime = $root.realtime = (() => {
                     object.grantedAt = options.longs === String ? String(message.grantedAt) : message.grantedAt;
                 else
                     object.grantedAt = options.longs === String ? $util.Long.prototype.toString.call(message.grantedAt) : options.longs === Number ? new $util.LongBits(message.grantedAt.low >>> 0, message.grantedAt.high >>> 0).toNumber() : message.grantedAt;
+            if (message.imagePath != null && message.hasOwnProperty("imagePath"))
+                object.imagePath = message.imagePath;
+            if (message.imageAlt != null && message.hasOwnProperty("imageAlt"))
+                object.imageAlt = message.imageAlt;
             return object;
         };
 

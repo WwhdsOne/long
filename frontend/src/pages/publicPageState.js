@@ -1084,6 +1084,8 @@ function normalizeRewardList(list) {
             itemId: String(item.itemId || '').trim(),
             itemName: String(item.itemName || item.itemId || '').trim(),
             grantedAt: Number(item.grantedAt || 0),
+            imagePath: String(item.imagePath || '').trim(),
+            imageAlt: String(item.imageAlt || '').trim(),
         }))
 }
 
@@ -1111,8 +1113,8 @@ function rewardIconForItem(itemID) {
 function buildRewardEntries(rewards) {
     return normalizeRewardList(rewards).map((reward) => ({
         ...reward,
-        imagePath: rewardIconForItem(reward.itemId),
-        imageAlt: reward.itemName || reward.itemId || '装备图标',
+        imagePath: reward.imagePath || rewardIconForItem(reward.itemId),
+        imageAlt: reward.imageAlt || reward.itemName || reward.itemId || '装备图标',
     }))
 }
 

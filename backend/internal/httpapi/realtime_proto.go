@@ -452,6 +452,8 @@ func toProtoRewards(rewards []core.Reward) []*realtimepb.Reward {
 			ItemId:    reward.ItemID,
 			ItemName:  reward.ItemName,
 			GrantedAt: reward.GrantedAt,
+			ImagePath: reward.ImagePath,
+			ImageAlt:  reward.ImageAlt,
 		})
 	}
 	return result

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -2678,6 +2679,40 @@ func TestRecentRewardsForNicknameSupportsLegacyFields(t *testing.T) {
 	}
 	if rewards[0].BossID != "legacy-boss" || rewards[0].ItemID != "legacy-sword" {
 		t.Fatalf("expected legacy reward fields to stay available, got %+v", rewards[0])
+	}
+}
+
+func TestRecentRewardsForNicknamePreservesRewardImageFields(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	recentRewardsRaw := `[{"bossId":"boss-1","bossName":"测试 Boss","itemId":"loot-ring","itemName":"烈焰戒指","grantedAt":1713744000,"imagePath":"https://img.example.com/loot-ring.png","imageAlt":"烈焰戒指图标"}]`
+	if err := store.client.HSet(ctx, store.lastRewardKey(nickname), map[string]any{
+		"recent_rewards": recentRewardsRaw,
+	}).Err(); err != nil {
+		t.Fatalf("seed recent rewards: %v", err)
+	}
+
+	rewards, err := store.recentRewardsForNickname(ctx, nickname)
+	if err != nil {
+		t.Fatalf("recentRewardsForNickname: %v", err)
+	}
+	if len(rewards) != 1 {
+		t.Fatalf("expected one recent reward, got %+v", rewards)
+	}
+
+	encoded, err := sonic.Marshal(rewards)
+	if err != nil {
+		t.Fatalf("marshal rewards: %v", err)
+	}
+	text := string(encoded)
+	if !strings.Contains(text, `"imagePath":"https://img.example.com/loot-ring.png"`) {
+		t.Fatalf("expected reward imagePath to stay available, got %s", text)
+	}
+	if !strings.Contains(text, `"imageAlt":"烈焰戒指图标"`) {
+		t.Fatalf("expected reward imageAlt to stay available, got %s", text)
 	}
 }
 

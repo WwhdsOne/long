@@ -195,6 +195,8 @@ message Reward {
   string item_id = 3;
   string item_name = 4;
   int64 granted_at = 5;
+  string image_path = 6;
+  string image_alt = 7;
 }
 
 message TalentTriggerEvent {
