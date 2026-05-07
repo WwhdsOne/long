@@ -57,6 +57,9 @@ var ErrShopItemAlreadyOwned = errors.New("shop item already owned")
 var ErrShopItemNotOwned = errors.New("shop item not owned")
 var ErrShopInsufficientGold = errors.New("shop insufficient gold")
 var ErrShopUnsupportedItemType = errors.New("shop unsupported item type")
+var ErrStaminaRiskBanned = errors.New("stamina risk banned")
+var ErrStaminaAlreadyFull = errors.New("stamina already full")
+var ErrStaminaMaxLevelReached = errors.New("stamina max level reached")
 
 const (
 	bossStatusActive   = "active"
@@ -345,6 +348,7 @@ type UserState struct {
 	Tasks                              []PlayerTask         `json:"tasks,omitempty"`
 	TalentEvents                       []TalentTriggerEvent `json:"talentEvents,omitempty"`
 	TalentCombatState                  *TalentCombatState   `json:"talentCombatState,omitempty"`
+	Stamina                            StaminaState         `json:"stamina"`
 	EquippedBattleClickSkinID          string               `json:"equippedBattleClickSkinId"`
 	EquippedBattleClickCursorImagePath string               `json:"equippedBattleClickCursorImagePath"`
 }
@@ -370,6 +374,7 @@ type State struct {
 	Stones                             int64                  `json:"stones"`
 	TalentPoints                       int64                  `json:"talentPoints"`
 	RecentRewards                      []Reward               `json:"recentRewards,omitempty"`
+	Stamina                            StaminaState           `json:"stamina"`
 	EquippedBattleClickSkinID          string                 `json:"equippedBattleClickSkinId"`
 	EquippedBattleClickCursorImagePath string                 `json:"equippedBattleClickCursorImagePath"`
 }
@@ -425,6 +430,7 @@ type ClickResult struct {
 	RecentRewards        []Reward               `json:"recentRewards,omitempty"`
 	TalentEvents         []TalentTriggerEvent   `json:"talentEvents,omitempty"`
 	TalentCombatState    *TalentCombatState     `json:"talentCombatState,omitempty"`
+	Stamina              StaminaState           `json:"stamina"`
 	PartStateDeltas      []BossPartStateDelta   `json:"partStateDeltas,omitempty"`
 	BroadcastUserAll     bool                   `json:"-"`
 }
@@ -516,6 +522,9 @@ type StoreOptions struct {
 	ShopPurchaseLogStore interface {
 		WriteShopPurchaseLog(context.Context, ShopPurchaseLog) error
 	}
+	StaminaPurchaseLogStore interface {
+		WriteStaminaPurchaseLog(context.Context, StaminaPurchaseLog) error
+	}
 }
 
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
@@ -548,6 +557,10 @@ type Store struct {
 	playerInstancesPrefix         string
 	loadoutPrefix                 string
 	lastRewardPrefix              string
+	staminaPrefix                 string
+	staminaDailyBuyPrefix         string
+	staminaRiskBanPrefix          string
+	staminaRiskBanStrikePrefix    string
 	equipmentInstanceSeqKey       string
 	equipmentSpentPrefix          string
 	equipmentEnhancePrefix        string
@@ -601,6 +614,9 @@ type Store struct {
 	}
 	shopPurchaseLogStore interface {
 		WriteShopPurchaseLog(context.Context, ShopPurchaseLog) error
+	}
+	staminaPurchaseLogStore interface {
+		WriteStaminaPurchaseLog(context.Context, StaminaPurchaseLog) error
 	}
 
 	combatStatsCache   map[string]CombatStats
@@ -657,6 +673,10 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		playerInstancesPrefix:         namespace + "player-instances:",
 		loadoutPrefix:                 namespace + "user-loadout:",
 		lastRewardPrefix:              namespace + "user-last-reward:",
+		staminaPrefix:                 namespace + "player:stamina:",
+		staminaDailyBuyPrefix:         namespace + "player:stamina:buy-count:",
+		staminaRiskBanPrefix:          namespace + "player:stamina:risk-ban:",
+		staminaRiskBanStrikePrefix:    namespace + "player:stamina:risk-ban-strike:",
 		equipmentInstanceSeqKey:       namespace + "instance:seq",
 		equipmentSpentPrefix:          namespace + "user-equipment-spent:",
 		equipmentEnhancePrefix:        namespace + "user-equipment-enhance:",
@@ -684,6 +704,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		taskCycleArchiveStore:    options.TaskCycleArchiveStore,
 		shopCatalogStore:         options.ShopCatalogStore,
 		shopPurchaseLogStore:     options.ShopPurchaseLogStore,
+		staminaPurchaseLogStore:  options.StaminaPurchaseLogStore,
 		combatStatsCache:         make(map[string]CombatStats),
 		equipmentDefinitionCache: make(map[string]cachedEquipmentDefinition),
 		compiledTalentCache:      make(map[string]*CompiledTalentSet),
@@ -908,6 +929,12 @@ func (s *Store) getUserState(ctx context.Context, nickname string, includeProfil
 		CombatStats:   s.baseCombatStats(),
 		RecentRewards: []Reward{},
 		Tasks:         []PlayerTask{},
+		Stamina: StaminaState{
+			Current:            staminaBaseMax,
+			Max:                staminaBaseMax,
+			NextFullBuyPrice:   staminaFirstFullBuyPrice,
+			NextCapUpgradeCost: staminaUpgradeCost(1),
+		},
 	}
 	userState.RoomID = hallRoomID
 	totalBossKills, err := s.totalBossKills(ctx)
@@ -952,6 +979,12 @@ func (s *Store) getUserState(ctx context.Context, nickname string, includeProfil
 		return UserState{}, err
 	}
 	userState.UserStats = &userStats
+
+	staminaState, err := s.GetStaminaState(ctx, normalizedNickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	userState.Stamina = staminaState
 
 	if includeProfile {
 		instances, err := s.itemInstancesByIDForNickname(ctx, normalizedNickname)
@@ -1038,10 +1071,15 @@ func (s *Store) GetPlayerResources(ctx context.Context, nickname string) (Player
 	if err != nil {
 		return PlayerResources{}, err
 	}
+	staminaState, err := s.GetStaminaState(ctx, normalizedNickname)
+	if err != nil {
+		return PlayerResources{}, err
+	}
 	return PlayerResources{
 		Gold:         resources.Gold,
 		Stones:       resources.Stones,
 		TalentPoints: resources.TalentPoints,
+		Stamina:      staminaState,
 	}, nil
 }
 
@@ -1050,6 +1088,11 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string, c
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return ClickResult{}, err
+	}
+	if _, banned, err := s.GetStaminaRiskBanStatus(ctx, normalizedNickname); err != nil {
+		return ClickResult{}, err
+	} else if banned {
+		return ClickResult{}, ErrStaminaRiskBanned
 	}
 	slug = strings.TrimSpace(slug)
 	if !strings.HasPrefix(slug, bossPartClickSlugPrefix) {
@@ -1637,6 +1680,7 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Stones:                             userState.Stones,
 		TalentPoints:                       userState.TalentPoints,
 		RecentRewards:                      userState.RecentRewards,
+		Stamina:                            userState.Stamina,
 		EquippedBattleClickSkinID:          userState.EquippedBattleClickSkinID,
 		EquippedBattleClickCursorImagePath: userState.EquippedBattleClickCursorImagePath,
 	}
@@ -1826,16 +1870,29 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 		return ClickResult{}, ErrBossPartAlreadyDead
 	}
 
-	_, critical, err := s.nextIncrement(ctx, nickname)
+	staminaState, hasStamina, err := s.consumeManualStamina(ctx, nickname)
 	if err != nil {
 		return ClickResult{}, err
+	}
+
+	critical := false
+	if hasStamina {
+		_, critical, err = s.nextIncrement(ctx, nickname)
+		if err != nil {
+			return ClickResult{}, err
+		}
 	}
 	result, err := s.applyClickCountOnly(ctx, nickname, 1, critical)
 	if err != nil {
 		return ClickResult{}, err
 	}
 	result.RoomID = roomID
-	result, err = s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx, comboCount)
+	result.Stamina = staminaState
+	fixedDamage := int64(0)
+	if !hasStamina {
+		fixedDamage = 1
+	}
+	result, err = s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx, comboCount, fixedDamage)
 	if err != nil {
 		return ClickResult{}, err
 	}
@@ -1845,7 +1902,11 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	return result, nil
 }
 
-func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult, targetIdx int, comboCount int64) (ClickResult, error) {
+func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname string, critical bool, result ClickResult, targetIdx int, comboCount int64, fixedDamage int64) (ClickResult, error) {
+	if fixedDamage > 0 {
+		return s.applyFixedBossPartDamage(ctx, boss, nickname, result, targetIdx, fixedDamage)
+	}
+
 	loadout, _, err := s.loadoutForNickname(ctx, nickname)
 	if err != nil {
 		return result, nil
@@ -1915,9 +1976,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	partDamage = applyComboDamageAmplify(partDamage, comboCount)
 	if critical {
 		partDamage = damageStats.CriticalDamage
-
 	}
-
 	if inCollapse && compiledTalents.Armor.CollapseAmp > 1 {
 		partDamage = int64(float64(partDamage) * compiledTalents.Armor.CollapseAmp)
 	}
@@ -2150,6 +2209,90 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		result.Boss = nextBoss
 	}
 
+	return result, nil
+}
+
+func (s *Store) applyFixedBossPartDamage(ctx context.Context, boss *Boss, nickname string, result ClickResult, targetIdx int, fixedDamage int64) (ClickResult, error) {
+	if targetIdx < 0 {
+		targetIdx = s.selectTargetPart(boss.Parts, nickname)
+	}
+	if targetIdx < 0 {
+		return result, nil
+	}
+	part := &boss.Parts[targetIdx]
+	if !part.Alive || part.CurrentHP <= 0 {
+		return result, ErrBossPartAlreadyDead
+	}
+
+	beforeHP, actualDamage, _ := applyBossPartDamageDelta(boss, part, fixedDamage)
+	result.BossDamage = actualDamage
+	result.Critical = false
+	result.DamageType = resolveBossDamageType(resolveBossDamageTypeInput{
+		PartType:    part.Type,
+		Critical:    false,
+		BossDamage:  actualDamage,
+		BossMaxHP:   boss.MaxHP,
+		IsCollapsed: false,
+		IsAfkAttack: false,
+	})
+	result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
+		X:        part.X,
+		Y:        part.Y,
+		Damage:   actualDamage,
+		BeforeHP: beforeHP,
+		AfterHP:  part.CurrentHP,
+		PartType: string(part.Type),
+	})
+
+	allDead := true
+	for _, p := range boss.Parts {
+		if p.Alive {
+			allDead = false
+			break
+		}
+	}
+	if allDead {
+		boss.Status = bossStatusDefeated
+		boss.DefeatedAt = s.now().Unix()
+	}
+
+	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
+	if marshalErr != nil {
+		return result, nil
+	}
+	bossValues := map[string]any{
+		"parts":      string(partsRaw),
+		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
+		"status":     boss.Status,
+	}
+	if boss.DefeatedAt != 0 {
+		bossValues["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.bossCurrentKeyForRoom(boss.RoomID), bossValues)
+	if actualDamage > 0 {
+		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(actualDamage), nickname)
+	}
+	if _, execErr := pipe.Exec(ctx); execErr != nil {
+		return result, nil
+	}
+	if actualDamage > 0 {
+		if myBossDamage, summaryErr := s.client.ZScore(ctx, s.bossDamageKey(boss.ID), nickname).Result(); summaryErr == nil {
+			result.MyBossDamage = int64(math.Round(myBossDamage))
+		}
+		if bossLeaderboardCount, summaryErr := s.client.ZCard(ctx, s.bossDamageKey(boss.ID)).Result(); summaryErr == nil {
+			result.BossLeaderboardCount = int(bossLeaderboardCount)
+		}
+	}
+	result.Boss = boss
+	if allDead {
+		result.BroadcastUserAll = true
+		nextBoss, _, finalizeErr := s.finalizeBossKill(ctx, boss, false, "")
+		if finalizeErr == nil {
+			result.Boss = nextBoss
+		}
+	}
 	return result, nil
 }
 
@@ -3673,6 +3816,7 @@ type PlayerResources struct {
 	Gold         int64
 	Stones       int64
 	TalentPoints int64
+	Stamina      StaminaState
 }
 
 type BossKillBackfillStats struct {

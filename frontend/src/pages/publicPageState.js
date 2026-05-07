@@ -7,7 +7,7 @@ import {mergeClickFallbackState} from '../utils/clickResponse'
 import {formatRarityLabel, getRarityClassName, splitEquipmentName} from '../utils/rarity'
 import {EQUIPMENT_SLOTS, normalizeLoadout} from '../utils/equipmentSlots'
 import {createRealtimeTransport} from '../utils/realtimeTransport'
-import {playBattlePartSound, playBattleTriggerSound} from '../utils/soundEffects'
+import {playBattlePartSound, playBattleTriggerSound, playUiActionSound} from '../utils/soundEffects'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
@@ -183,6 +183,40 @@ function defaultTalentVisualState() {
         collapseDuration: 8,
         doomMarks: [],
         doomMarkCumDamage: {},
+    }
+}
+
+function defaultStaminaState() {
+    return {
+        current: 50,
+        maxLevel: 0,
+        max: 50,
+        clickProgress: 0,
+        nextRecoverAt: 0,
+        zeroAt: 0,
+        dailyFullBuyCount: 0,
+        nextFullBuyPrice: 200000,
+        nextCapUpgradeCost: 1000,
+        riskBanUntil: 0,
+    }
+}
+
+function normalizeStaminaState(payload) {
+    const base = defaultStaminaState()
+    if (!payload || typeof payload !== 'object') {
+        return base
+    }
+    return {
+        current: Math.max(0, Number(payload.current ?? base.current)),
+        maxLevel: Math.max(0, Number(payload.maxLevel ?? base.maxLevel)),
+        max: Math.max(1, Number(payload.max ?? base.max)),
+        clickProgress: Math.max(0, Number(payload.clickProgress ?? base.clickProgress)),
+        nextRecoverAt: Math.max(0, Number(payload.nextRecoverAt ?? base.nextRecoverAt)),
+        zeroAt: Math.max(0, Number(payload.zeroAt ?? base.zeroAt)),
+        dailyFullBuyCount: Math.max(0, Number(payload.dailyFullBuyCount ?? base.dailyFullBuyCount)),
+        nextFullBuyPrice: Math.max(0, Number(payload.nextFullBuyPrice ?? base.nextFullBuyPrice)),
+        nextCapUpgradeCost: Math.max(0, Number(payload.nextCapUpgradeCost ?? base.nextCapUpgradeCost)),
+        riskBanUntil: Math.max(0, Number(payload.riskBanUntil ?? base.riskBanUntil)),
     }
 }
 
@@ -673,6 +707,7 @@ const loadingShopItems = ref(false)
 const gold = ref(0)
 const stones = ref(0)
 const talentPoints = ref(0)
+const stamina = ref(defaultStaminaState())
 const equippedBattleClickSkinId = ref('')
 const equippedBattleClickCursorImagePath = ref('')
 const afkSettlement = ref(null)
@@ -959,6 +994,15 @@ async function loadPlayerProfile() {
 
     const payload = await response.json()
     applyPlayerProfileState(payload)
+}
+
+async function refreshProfileAndLoadAfkSettlement() {
+    if (!nickname.value) {
+        return
+    }
+
+    await loadPlayerProfile()
+    await loadAfkSettlement()
 }
 
 async function loadTasks() {
@@ -1628,6 +1672,9 @@ function applyPlayerProfileState(payload) {
     if ('talentPoints' in payload) {
         talentPoints.value = Number(payload.talentPoints ?? 0)
     }
+    if ('stamina' in payload) {
+        stamina.value = normalizeStaminaState(payload.stamina)
+    }
     if ('tasks' in payload) {
         tasks.value = Array.isArray(payload.tasks) ? payload.tasks : []
     }
@@ -1744,6 +1791,58 @@ async function unequipShopItem() {
     }
 }
 
+async function purchaseStaminaFull() {
+    if (!nickname.value) {
+        errorMessage.value = '先登录账号再购买。'
+        return {ok: false, message: errorMessage.value}
+    }
+
+    try {
+        const response = await fetch('/api/shop/stamina/full/purchase', {
+            method: 'POST',
+        })
+        if (!response.ok) {
+            const message = await readErrorMessage(response, '购买体力失败，请稍后重试。')
+            errorMessage.value = message
+            return {ok: false, message}
+        }
+        const payload = await response.json()
+        applyUserState(payload.userState)
+        errorMessage.value = ''
+        return {ok: true}
+    } catch (error) {
+        const message = error.message || '购买体力失败，请稍后重试。'
+        errorMessage.value = message
+        return {ok: false, message}
+    }
+}
+
+async function upgradeStaminaCap() {
+    if (!nickname.value) {
+        errorMessage.value = '先登录账号再升级。'
+        return {ok: false, message: errorMessage.value}
+    }
+
+    try {
+        const response = await fetch('/api/shop/stamina/cap/upgrade', {
+            method: 'POST',
+        })
+        if (!response.ok) {
+            const message = await readErrorMessage(response, '升级体力上限失败，请稍后重试。')
+            errorMessage.value = message
+            return {ok: false, message}
+        }
+        const payload = await response.json()
+        applyUserState(payload.userState)
+        errorMessage.value = ''
+        return {ok: true}
+    } catch (error) {
+        const message = error.message || '升级体力上限失败，请稍后重试。'
+        errorMessage.value = message
+        return {ok: false, message}
+    }
+}
+
 function applyClickResult(payload) {
     if (!payload || typeof payload !== 'object') {
         return
@@ -1759,6 +1858,13 @@ function applyClickResult(payload) {
         }
         if (payload.userDelta.talentPoints !== undefined) {
             talentPoints.value = Number(payload.userDelta.talentPoints)
+        }
+        stamina.value = {
+            ...stamina.value,
+            current: payload.userDelta.staminaCurrent !== undefined ? Number(payload.userDelta.staminaCurrent) : stamina.value.current,
+            max: payload.userDelta.staminaMax !== undefined ? Number(payload.userDelta.staminaMax) : stamina.value.max,
+            nextRecoverAt: payload.userDelta.staminaNextRecoverAt !== undefined ? Number(payload.userDelta.staminaNextRecoverAt) : stamina.value.nextRecoverAt,
+            riskBanUntil: payload.userDelta.staminaRiskBanUntil !== undefined ? Number(payload.userDelta.staminaRiskBanUntil) : stamina.value.riskBanUntil,
         }
     }
     const nextClickState = mergeClickFallbackState(
@@ -1969,6 +2075,7 @@ function clearUserRealtimeState() {
     gold.value = 0
     stones.value = 0
     talentPoints.value = 0
+    stamina.value = defaultStaminaState()
     equippedBattleClickSkinId.value = ''
     equippedBattleClickCursorImagePath.value = ''
     myBossStats.value = null
@@ -2657,6 +2764,7 @@ async function toggleItemEquip(instanceId, equipped) {
 
         await response.json()
         await loadPlayerProfile()
+        playUiActionSound(action === 'equip' ? 'equip' : 'unequip')
     } catch (error) {
         errorMessage.value = error.message || '装备操作失败，请稍后重试。'
     } finally {
@@ -2687,6 +2795,7 @@ async function salvageItem(instanceId) {
 
         await response.json()
         await loadPlayerProfile()
+        playUiActionSound('salvage')
     } catch (error) {
         errorMessage.value = error.message || '分解失败，请稍后重试。'
     } finally {
@@ -2747,6 +2856,7 @@ async function salvageUnequippedItems() {
 
         const payload = await response.json()
         await loadPlayerProfile()
+        playUiActionSound('salvage')
         return payload
     } catch (error) {
         errorMessage.value = error.message || '一键分解失败，请稍后重试。'
@@ -2779,6 +2889,7 @@ async function enhanceItem(instanceId, levels = 1) {
 
         await response.json()
         await loadPlayerProfile()
+        playUiActionSound('enhance')
         return {ok: true}
     } catch (error) {
         const message = error.message || '强化失败，请稍后重试。'
@@ -2824,9 +2935,8 @@ async function submitNickname() {
         nicknameDraft.value = resolvedNickname
         passwordDraft.value = ''
         await reportPresence(true)
-        await loadAfkSettlement()
         try {
-            await loadPlayerProfile()
+            await refreshProfileAndLoadAfkSettlement()
         } catch (error) {
             errorMessage.value = error.message || '资料加载失败，请稍后重试。'
         }
@@ -2891,9 +3001,8 @@ async function loadPlayerSession() {
         nickname.value = resolvedNickname
         nicknameDraft.value = resolvedNickname
         await reportPresence(true)
-        await loadAfkSettlement()
         try {
-            await loadPlayerProfile()
+            await refreshProfileAndLoadAfkSettlement()
         } catch (error) {
             errorMessage.value = error.message || '资料加载失败，请稍后重试。'
         }
@@ -2994,7 +3103,7 @@ function registerPublicPageLifecycle() {
         }
         void reportPresence(visible)
         if (visible) {
-            void loadAfkSettlement()
+            void refreshProfileAndLoadAfkSettlement()
         }
     }
 
@@ -3010,7 +3119,7 @@ function registerPublicPageLifecycle() {
         document.addEventListener('visibilitychange', handleVisibilityChange)
         startPresenceHeartbeat()
         void reportPresence(true)
-        void loadAfkSettlement()
+        void refreshProfileAndLoadAfkSettlement()
 
         // 实时通道建立前先给出保守值，连接后会被实时在线人数事件覆盖。
         onlineCount.value = 1
@@ -3126,6 +3235,7 @@ export function usePublicPageState() {
         gold,
         stones,
         talentPoints,
+        stamina,
         equippedBattleClickSkinId,
         equippedBattleClickCursorImagePath,
         afkSettlement,
@@ -3178,6 +3288,8 @@ export function usePublicPageState() {
         submitMessage,
         claimTask,
         purchaseShopItem,
+        purchaseStaminaFull,
+        upgradeStaminaCap,
         equipShopItem,
         unequipShopItem,
         toggleAutoClick,

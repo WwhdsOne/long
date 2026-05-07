@@ -1,0 +1,64 @@
+import {readFileSync} from 'node:fs'
+import path from 'node:path'
+import {fileURLToPath} from 'node:url'
+
+import {describe, expect, it} from 'vitest'
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url))
+const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
+const shopSource = readFileSync(path.resolve(currentDir, './ShopPage.vue'), 'utf8')
+const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
+const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
+
+describe('PublicPage 体力与风控展示', () => {
+    it('公共状态层暴露体力字段和购买升级动作', () => {
+        expect(stateSource).toContain('const stamina = ref(')
+        expect(stateSource).toContain("'stamina' in payload")
+        expect(stateSource).toContain('async function purchaseStaminaFull()')
+        expect(stateSource).toContain("fetch('/api/shop/stamina/full/purchase'")
+        expect(stateSource).toContain('async function upgradeStaminaCap()')
+        expect(stateSource).toContain("fetch('/api/shop/stamina/cap/upgrade'")
+    })
+
+    it('战斗页改为右下角悬浮体力入口并可跳转商店', () => {
+        expect(battleSource).toContain("class=\"stamina-float\"")
+        expect(battleSource).toContain("class=\"stamina-float__bubble\"")
+        expect(battleSource).toContain("class=\"stamina-float__plus\"")
+        expect(battleSource).toContain("class=\"stamina-float__tooltip\"")
+        expect(battleSource).toContain("navigatePublicPage('shop')")
+        expect(battleSource).toContain('下一点恢复还需要')
+        expect(battleSource).toContain('1 点体力 = 100 次点击')
+        expect(battleSource).toContain('手点伤害固定为 1')
+        expect(battleSource).toContain('挂机伤害不受体力系统限制')
+        expect(battleSource).toContain('当前不可手点/挂机/购买体力')
+        expect(styleSource).toContain('.stamina-float {')
+        expect(styleSource).toContain('position: fixed;')
+        expect(styleSource).toContain('.stamina-float__bubble {')
+        expect(styleSource).toContain('.stamina-float__plus {')
+    })
+
+    it('商店页展示买满体力、升级上限和确认弹窗', () => {
+        expect(shopSource).toContain('购买体力')
+        expect(shopSource).toContain('升级体力上限')
+        expect(shopSource).toContain('shop-stamina-card')
+        expect(shopSource).toContain('shop-panel__summary')
+        expect(shopSource).toContain('shop-stamina-card__actions')
+        expect(shopSource).toContain('shop-stamina-card__notice')
+        expect(shopSource).toContain('staminaConfirmOpen')
+        expect(shopSource).toContain('staminaCapConfirmOpen')
+        expect(shopSource).not.toContain('window.confirm')
+        expect(shopSource).toContain('确认购买体力')
+        expect(shopSource).toContain('确认购买体力上限')
+        expect(shopSource).toContain('取消购买')
+        expect(shopSource).toContain('1 点体力 = 100 次点击')
+        expect(shopSource).toContain('体力归零后点击伤害锁定为 1')
+        expect(shopSource).toContain('挂机时伤害不受体力系统限制')
+        expect(shopSource).toContain('本次消耗')
+        expect(shopSource).toContain('shop-stamina-modal')
+        expect(shopSource).toContain('账号异常，当前不可手点/挂机/购买体力')
+        expect(styleSource).toContain('.shop-stamina-card {')
+        expect(styleSource).toContain('.shop-stamina-card__notice {')
+        expect(styleSource).toContain('.shop-stamina-modal {')
+        expect(styleSource).toContain('place-items: center;')
+    })
+})

@@ -151,6 +151,12 @@ func clickRequestError(err error) *apiResponseError {
 			Code:    "SENSITIVE_NICKNAME",
 			Message: "昵称包含敏感词，请换一个试试。",
 		}
+	case errors.Is(err, core.ErrStaminaRiskBanned):
+		return &apiResponseError{
+			Status:  consts.StatusLocked,
+			Code:    "ACCOUNT_STAMINA_BANNED",
+			Message: "账号异常，8 小时内不可手点/挂机/购买体力。",
+		}
 	default:
 		return &apiResponseError{
 			Status:  consts.StatusInternalServerError,

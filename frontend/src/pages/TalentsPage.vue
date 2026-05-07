@@ -2,6 +2,7 @@
 import {computed, onMounted, reactive, ref, watch} from 'vue'
 import {usePublicPageState} from './publicPageState'
 import {effectAssetUrl} from '../utils/effectAssets'
+import {playUiActionSound} from '../utils/soundEffects'
 
 
 const {isLoggedIn, talentPoints: sharedTalentPoints} = usePublicPageState()
@@ -470,6 +471,7 @@ async function handleNodeClick(item) {
     applyTalentResponse({...(talentState.value || {}), ...data})
     talentEffectLines.value = data.effectLines || talentEffectLines.value
     talentEffectDescriptions.value = data.effectDescriptions || talentEffectDescriptions.value
+    playUiActionSound('upgrade')
   } catch (e) {
     showToast(e.message)
   } finally {
@@ -499,6 +501,7 @@ async function handleOverflowUpgrade() {
     }
     const data = await resp.json()
     applyTalentResponse({...(talentState.value || {}), ...data})
+    playUiActionSound('enhance')
   } catch (error) {
     showToast(error.message || '溢出强化失败')
   } finally {

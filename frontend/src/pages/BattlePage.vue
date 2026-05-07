@@ -55,6 +55,7 @@ const {
   myBossDamage,
   bossLeaderboardCount,
   combatStats,
+  stamina,
   bossStatusLabel,
   bossProgress,
   formatDropRate,
@@ -62,6 +63,7 @@ const {
   formatItemStatLines,
   equipmentNameParts,
   equipmentNameClass,
+  navigatePublicPage,
   rewardModal,
   closeRewardModal,
   loadHallLeaderboardSnapshot,
@@ -85,6 +87,7 @@ const HALL_ROOM_ID = 'hall'
 const HALL_LEADERBOARD_START_RANK = 11
 const HALL_LEADERBOARD_PAGE_SIZE = 40
 const HALL_LEADERBOARD_COLUMN_COUNT = 4
+const STAMINA_RECOVER_INTERVAL_SECONDS = 300
 const bossSwordCursorUrl = computed(() => equippedBattleClickCursorImagePath.value || DEFAULT_BOSS_SWORD_CURSOR_URL)
 const isHallRoom = computed(() => String(currentRoomId.value || '') === HALL_ROOM_ID)
 const currentRoomDisplay = computed(() => {
@@ -102,6 +105,61 @@ const myBattlePower = computed(() => (
 const battlePowerLabel = computed(() => (
     isLoggedIn.value ? formatCompact(myBattlePower.value) : '登录后激活'
 ))
+const staminaRecoveryPreview = computed(() => {
+  void nowTick.value
+  const state = stamina.value || {}
+  const max = Math.max(1, Number(state.max || 50))
+  const current = Math.max(0, Number(state.current || 0))
+  const nextRecoverAt = Number(state.nextRecoverAt || 0)
+  if (!nextRecoverAt || current >= max) {
+    return {
+      current,
+      nextRecoverAt: 0,
+      countdown: '已满',
+    }
+  }
+  const nowUnix = Date.now() / 1000
+  const elapsed = nowUnix - nextRecoverAt
+  if (elapsed < 0) {
+    const seconds = Math.max(0, Math.ceil(nextRecoverAt - nowUnix))
+    return {
+      current,
+      nextRecoverAt,
+      countdown: formatStaminaRecoverCountdown(seconds),
+    }
+  }
+  const recoveredPoints = 1 + Math.floor(elapsed / STAMINA_RECOVER_INTERVAL_SECONDS)
+  const previewCurrent = Math.min(max, current + recoveredPoints)
+  if (previewCurrent >= max) {
+    return {
+      current: max,
+      nextRecoverAt: 0,
+      countdown: '已满',
+    }
+  }
+  const previewNextRecoverAt = nextRecoverAt + (recoveredPoints * STAMINA_RECOVER_INTERVAL_SECONDS)
+  const seconds = Math.max(0, Math.ceil(previewNextRecoverAt - nowUnix))
+  return {
+    current: previewCurrent,
+    nextRecoverAt: previewNextRecoverAt,
+    countdown: formatStaminaRecoverCountdown(seconds),
+  }
+})
+const recoveredStamina = computed(() => staminaRecoveryPreview.value.current)
+const staminaRecoverCountdown = computed(() => {
+  return staminaRecoveryPreview.value.countdown
+})
+const staminaTooltipText = computed(() => {
+  if (recoveredStamina.value >= Number(stamina.value?.max || 50)) {
+    return '体力已满'
+  }
+  return `下一点恢复还需要 ${staminaRecoverCountdown.value}`
+})
+const isStaminaRiskBanned = computed(() => {
+  void nowTick.value
+  return Number(stamina.value?.riskBanUntil || 0) > Date.now() / 1000
+})
+const staminaFloatLabel = computed(() => `${recoveredStamina.value}/${stamina.value?.max || 50}`)
 const hallLeaderboardPageEntries = computed(() => {
   const start = hallLeaderboardPage.value * HALL_LEADERBOARD_PAGE_SIZE
   return hallLeaderboardSnapshot.value.slice(start, start + HALL_LEADERBOARD_PAGE_SIZE)
@@ -206,6 +264,12 @@ const roomJoinCooldownRemainingSeconds = computed(() => {
   return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
 })
 
+function formatStaminaRecoverCountdown(seconds) {
+  const minutes = Math.floor(seconds / 60)
+  const remain = seconds % 60
+  return `${minutes} 分 ${remain} 秒`
+}
+
 function exitCurrentRoom() {
   if (roomSwitching.value) return
   pendingScrollToTopAfterExit.value = true
@@ -219,6 +283,10 @@ function showPreviousHallLeaderboardPage() {
 function showNextHallLeaderboardPage() {
   const lastPage = Math.max(0, hallLeaderboardTotalPages.value - 1)
   hallLeaderboardPage.value = Math.min(lastPage, hallLeaderboardPage.value + 1)
+}
+
+function openStaminaShop() {
+  void navigatePublicPage('shop')
 }
 
 function applyBossCursorTransform() {
@@ -1252,6 +1320,7 @@ const silverStormActive = computed(() => {
             <span>奖励说明：金币和强化石获取减半，天赋点和装备正常掉落。</span>
             <span>结算方式：回到页面后自动弹出结算窗口，显示击杀数与收益。</span>
             <span>温馨提示：挂机最多持续 8 小时；<strong>关闭页面</strong>后挂机仍会继续，服务器维护不会丢失挂机状态。</span>
+            <span>体力相关：挂机时伤害不会受到<strong>体力系统为0时锁定为1</strong>的限制。</span>
           </div>
           <div v-if="talentTriggerFeed.length > 0" class="vote-stage__boss-note vote-stage__boss-note--rules">
             <strong>天赋触发</strong>
@@ -1528,5 +1597,31 @@ const silverStormActive = computed(() => {
 
 
     </section>
+
+    <aside
+        class="stamina-float"
+        :class="{ 'stamina-float--danger': isStaminaRiskBanned }"
+        :title="staminaTooltipText"
+        aria-label="体力悬浮入口"
+    >
+      <div class="stamina-float__bubble">
+        <span class="stamina-float__value">{{ staminaFloatLabel }}</span>
+        <button
+            class="stamina-float__plus"
+            type="button"
+            :aria-label="`打开商店购买体力，${staminaTooltipText}`"
+            @click="openStaminaShop"
+        >
+          +
+        </button>
+      </div>
+      <div class="stamina-float__tooltip">
+        <span>{{ staminaTooltipText }}</span>
+        <span>1 点体力 = 100 次点击</span>
+        <span v-if="recoveredStamina <= 0">手点伤害固定为 1</span>
+        <span>挂机伤害不受体力系统限制</span>
+        <span v-if="isStaminaRiskBanned">账号异常，当前不可手点/挂机/购买体力</span>
+      </div>
+    </aside>
   </div>
 </template>

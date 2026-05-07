@@ -33,6 +33,8 @@
 
 ### 当前主线
 
+- 玩家公告：
+  - [announcements/2026-05-07-天赋层满收益修复公告.md](./announcements/2026-05-07-天赋层满收益修复公告.md)
 - Mongo/任务系统演进：
   - [architecture/2026-05-01-任务系统与Mongo整合方案.md](./architecture/2026-05-01-任务系统与Mongo整合方案.md)
   - [architecture/2026-05-01-冷数据迁移与Mongo主存方案.md](./architecture/2026-05-01-冷数据迁移与Mongo主存方案.md)
@@ -52,6 +54,7 @@
 
 - 正式口径：
   - [designs/2026-04-30-天赋系统数值策划案-V2.0.md](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
+  - [designs/2026-05-08-魔法系列天赋策划案.md](./designs/2026-05-08-魔法系列天赋策划案.md)
 - 相关实现：
   - [architecture/2026-05-07-天赋溢出节点与MessagePack存储方案.md](./architecture/2026-05-07-天赋溢出节点与MessagePack存储方案.md)
   - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
