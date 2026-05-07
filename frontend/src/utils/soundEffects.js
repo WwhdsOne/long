@@ -10,6 +10,11 @@ const soundRegistry = new Map([
     ['battle.trigger.judgment-day', 'sfx/battle/trigger/judgment-day.wav'],
     ['battle.trigger.final-cut', 'sfx/battle/trigger/final-cut.wav'],
     ['battle.trigger.auto-strike', 'sfx/battle/trigger/auto-strike.wav'],
+    ['ui.action.equip', 'sfx/battle/trigger/action-equip.wav'],
+    ['ui.action.unequip', 'sfx/battle/trigger/action-equip.wav'],
+    ['ui.action.salvage', 'sfx/battle/trigger/action-salvage.wav'],
+    ['ui.action.enhance', 'sfx/battle/trigger/action-enhance.wav'],
+    ['ui.action.upgrade', 'sfx/battle/trigger/action-upgrade.wav'],
 ])
 
 const soundAliases = {
@@ -36,6 +41,16 @@ const soundAliases = {
     '终末血斩': 'battle.trigger.final-cut',
     auto_strike: 'battle.trigger.auto-strike',
     '自动锤击音效': 'battle.trigger.auto-strike',
+    equip: 'ui.action.equip',
+    unequip: 'ui.action.unequip',
+    salvage: 'ui.action.salvage',
+    enhance: 'ui.action.enhance',
+    upgrade: 'ui.action.upgrade',
+    '穿戴': 'ui.action.equip',
+    '卸下': 'ui.action.unequip',
+    '分解': 'ui.action.salvage',
+    '强化': 'ui.action.enhance',
+    '升级': 'ui.action.upgrade',
 }
 
 const triggerSoundPolicies = {
@@ -174,4 +189,12 @@ export function playBattleTriggerSound(effectType, options = {}) {
         }) || scheduled
     }
     return scheduled
+}
+
+export function playUiActionSound(action, options = {}) {
+    const effectKey = resolveSoundEffectId(action)
+    if (!effectKey || !effectKey.startsWith('ui.action.')) {
+        return false
+    }
+    return playSoundEffect(effectKey, options)
 }

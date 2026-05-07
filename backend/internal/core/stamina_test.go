@@ -20,7 +20,7 @@ func TestClickButtonConsumesStaminaAndLocksDamageAfterExhausted(t *testing.T) {
 
 	seedActiveBossForStaminaTest(t, store, ctx, "1")
 
-	for i := 0; i < 5000; i++ {
+	for i := range 5000 {
 		result, err := store.ClickButton(ctx, "boss-part:1-0", nickname, 0)
 		if err != nil {
 			t.Fatalf("click %d failed: %v", i+1, err)
@@ -271,7 +271,7 @@ func TestUpgradeStaminaCapUsesTieredCostAndCapsAt100(t *testing.T) {
 		t.Fatalf("seed gold: %v", err)
 	}
 
-	for i := int64(0); i < staminaMaxUpgradeLevels; i++ {
+	for i := range staminaMaxUpgradeLevels {
 		if _, err := store.UpgradeStaminaCap(ctx, nickname); err != nil {
 			t.Fatalf("upgrade %d failed: %v", i+1, err)
 		}

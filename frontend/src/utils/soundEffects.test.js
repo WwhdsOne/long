@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url'
 
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
 
-import {playBattlePartSound, playBattleTriggerSound, resolveSoundEffectUrl,} from './soundEffects'
+import {playBattlePartSound, playBattleTriggerSound, playUiActionSound, resolveSoundEffectUrl,} from './soundEffects'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const soundEffectsSource = readFileSync(path.resolve(currentDir, './soundEffects.js'), 'utf8')
@@ -32,13 +32,17 @@ describe('soundEffects', () => {
         expect(soundEffectsSource).toContain('battle.trigger.final-cut')
         expect(soundEffectsSource).toContain('battle.click.soft')
         expect(soundEffectsSource).toContain("'battle.trigger.pursuit'")
+        expect(soundEffectsSource).toContain("'ui.action.equip'")
+        expect(soundEffectsSource).toContain("'ui.action.salvage'")
         expect(soundEffectsSource).toContain('cooldownMs: 3200')
     })
 
-    it('能按名称解析战斗音效地址', () => {
+    it('能按名称解析战斗和操作音效地址', () => {
         expect(resolveSoundEffectUrl('白银风暴')).toBe('/sfx/battle/trigger/silver-storm.wav')
         expect(resolveSoundEffectUrl('storm_combo')).toBe('/sfx/battle/trigger/pursuit.wav')
         expect(resolveSoundEffectUrl('重甲')).toBe('/sfx/battle/click/heavy.wav')
+        expect(resolveSoundEffectUrl('穿戴')).toBe('/sfx/battle/trigger/action-equip.wav')
+        expect(resolveSoundEffectUrl('分解')).toBe('/sfx/battle/trigger/action-salvage.wav')
     })
 
     it('能按映射名称播放点击音效', () => {
@@ -96,5 +100,13 @@ describe('soundEffects', () => {
         vi.advanceTimersByTime(35)
         expect(globalThis.Audio).toHaveBeenCalledTimes(2)
         expect(globalThis.Audio.mock.results[1].value.volume).toBe(0.72)
+    })
+
+    it('能按操作名称播放 UI 音效', () => {
+        expect(playUiActionSound('强化')).toBe(true)
+        expect(globalThis.Audio).toHaveBeenCalledWith('/sfx/battle/trigger/action-enhance.wav')
+
+        expect(playUiActionSound('升级')).toBe(true)
+        expect(globalThis.Audio).toHaveBeenCalledWith('/sfx/battle/trigger/action-upgrade.wav')
     })
 })

@@ -31,6 +31,8 @@ describe('TalentsPage effectLines 响应链路', () => {
         expect(upgradeSegment).toContain("fetch('/api/talents/upgrade'")
         expect(upgradeSegment).toContain('talentEffectLines.value = data.effectLines || talentEffectLines.value')
         expect(upgradeSegment).toContain('talentEffectDescriptions.value = data.effectDescriptions || talentEffectDescriptions.value')
+        expect(upgradeSegment).toContain("playUiActionSound('upgrade')")
+        expect(upgradeSegment).toContain("playUiActionSound('enhance')")
         expect(upgradeSegment).not.toContain("showConfirm('确认升级'")
         expect(pageSource).toContain("showConfirm('确认洗点'")
     })
