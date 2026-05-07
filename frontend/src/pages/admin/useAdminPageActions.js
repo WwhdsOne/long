@@ -36,6 +36,7 @@ export function createAdminPageActions(state) {
         findBossTemplate,
         generatingEquipmentDraft,
         lootRows,
+        playerPage,
         readErrorMessage,
         saving,
         selectedBossTemplateId,
@@ -101,6 +102,59 @@ export function createAdminPageActions(state) {
             await fetchAdminRoomSettings()
         } catch (error) {
             errorMessage.value = error.message || '保存房间名失败'
+        } finally {
+            saving.value = false
+        }
+    }
+
+    async function grantPlayerEquipment(nickname, draft) {
+        const playerNickname = String(nickname || '').trim()
+        const itemId = String(draft?.itemId || '').trim()
+        const quantity = Number(draft?.quantity || 0)
+        if (!playerNickname) {
+            errorMessage.value = '缺少玩家昵称。'
+            return
+        }
+        if (!itemId) {
+            errorMessage.value = '先选一件装备。'
+            return
+        }
+        if (!Number.isInteger(quantity) || quantity <= 0) {
+            errorMessage.value = '发放数量必须大于 0。'
+            return
+        }
+
+        saving.value = true
+        try {
+            const response = await fetch(`/api/admin/players/${encodeURIComponent(playerNickname)}/equipment`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    itemId,
+                    quantity,
+                }),
+            })
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response, '发装备失败'))
+            }
+
+            const payload = await response.json()
+            const nextItems = Array.isArray(playerPage.value.items) ? [...playerPage.value.items] : []
+            const matchIndex = nextItems.findIndex((entry) => entry.nickname === playerNickname)
+            if (matchIndex >= 0) {
+                nextItems.splice(matchIndex, 1, {
+                    ...nextItems[matchIndex],
+                    inventory: Array.isArray(payload?.state?.inventory) ? payload.state.inventory : nextItems[matchIndex].inventory,
+                    loadout: payload?.state?.loadout || nextItems[matchIndex].loadout,
+                })
+                playerPage.value = {
+                    ...playerPage.value,
+                    items: nextItems,
+                }
+            }
+            setSuccess(`已给 ${playerNickname} 发放 ${quantity} 件装备。`)
+        } catch (error) {
+            errorMessage.value = error.message || '发装备失败'
         } finally {
             saving.value = false
         }
@@ -861,6 +915,7 @@ export function createAdminPageActions(state) {
         deleteAnnouncement,
         deleteBossTemplate,
         deleteEquipment,
+        grantPlayerEquipment,
         deleteMessage,
         unblockBlacklistEntry,
         disableBossCycle,

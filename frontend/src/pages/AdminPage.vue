@@ -251,9 +251,11 @@ const admin = reactive(useAdminPage())
         <AdminDashboardTab
             v-else
             :admin-state="admin.adminState"
+            :equipment-options="admin.equipmentOptions"
             :loading-players="admin.loadingPlayers"
             :player-page="admin.playerPage"
             :fetch-player-page="admin.fetchPlayerPage"
+            :grant-player-equipment="admin.grantPlayerEquipment"
             :reset-player-password="admin.resetPlayerPassword"
             :saving="admin.saving"
         />

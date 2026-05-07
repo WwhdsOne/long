@@ -737,6 +737,7 @@ export function useAdminPage() {
         taskDefinitions,
         taskForm,
         deleteShopItem: actions.deleteShopItem,
+        grantPlayerEquipment: actions.grantPlayerEquipment,
         uploadShopCursorImage: actions.uploadShopCursorImage,
         uploadShopImage: actions.uploadShopImage,
         uploadShopPreviewImage: actions.uploadShopPreviewImage,

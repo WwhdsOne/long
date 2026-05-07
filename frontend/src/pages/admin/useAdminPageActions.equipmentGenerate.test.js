@@ -8,6 +8,7 @@ function makeState() {
     const equipmentForm = ref(emptyEquipmentForm())
     const equipmentPage = ref({items: [], page: 1})
     const errorMessage = ref('')
+    const playerPage = ref({items: [], nextCursor: '', total: 0})
     const successMessage = ref('')
     const taskForm = ref(emptyTaskForm())
 
@@ -36,6 +37,7 @@ function makeState() {
         fetchButtonPage: vi.fn(),
         fetchEquipmentPage: vi.fn(),
         fetchMessages: vi.fn(),
+        fetchPlayerPage: vi.fn(),
         fetchTaskArchives: vi.fn(),
         fetchTaskCycleResults: vi.fn(),
         fetchTasks: vi.fn(),
@@ -45,11 +47,13 @@ function makeState() {
         loadingTaskResults: ref(false),
         loadingTasks: ref(false),
         lootRows: ref([]),
+        playerPage,
         readErrorMessage: vi.fn(async () => '生成失败'),
         saving: ref(false),
         selectedBossTemplateId: ref(''),
         selectedTaskCycleKey: ref(''),
         selectedTaskId: ref(''),
+        successMessage,
         setSuccess(message) {
             successMessage.value = message
             errorMessage.value = ''
@@ -248,5 +252,45 @@ describe('装备草稿生成动作', () => {
 
         expect(global.fetch).not.toHaveBeenCalled()
         expect(state.errorMessage.value).toContain('奖励')
+    })
+
+    it('给玩家发装备时会提交装备模板和数量，并回写该玩家背包', async () => {
+        const state = makeState()
+        state.playerPage.value = {
+            items: [
+                {
+                    nickname: '阿明',
+                    clickCount: 12,
+                    inventory: [],
+                    loadout: {},
+                },
+            ],
+            nextCursor: '',
+            total: 1,
+        }
+
+        global.fetch = vi.fn(async () => ({
+            ok: true,
+            json: async () => ({
+                ok: true,
+                state: {
+                    inventory: [
+                        {itemId: 'wood-sword', instanceId: 'inst-1', name: '木剑'},
+                        {itemId: 'wood-sword', instanceId: 'inst-2', name: '木剑'},
+                    ],
+                    loadout: {},
+                },
+            }),
+        }))
+
+        const actions = createAdminPageActions(state)
+        await actions.grantPlayerEquipment('阿明', {itemId: 'wood-sword', quantity: 2})
+
+        expect(global.fetch).toHaveBeenCalledWith('/api/admin/players/%E9%98%BF%E6%98%8E/equipment', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({itemId: 'wood-sword', quantity: 2}),
+        }))
+        expect(state.playerPage.value.items[0].inventory).toHaveLength(2)
+        expect(state.successMessage.value).toContain('阿明')
     })
 })
