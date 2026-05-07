@@ -785,7 +785,7 @@ const silverStormActive = computed(() => {
           aria-label="项目地址 GitHub 仓库"
         >
           <span class="hero-info-card__eyebrow">项目地址</span>
-          <strong class="hero-info-card__value">github.com/WwhdsOne/long</strong>
+          <strong class="hero-info-card__value">点击进入项目仓库</strong>
         </a>
       </div>
     </div>

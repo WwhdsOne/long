@@ -450,7 +450,7 @@ select {
   position: absolute;
   right: 0;
   bottom: calc(100% + 14px);
-  width: 188px;
+  width: 140px;
   padding: 8px;
   border-radius: 20px;
   opacity: 0;
@@ -3349,7 +3349,7 @@ select {
   .hero-info-card__preview {
     left: 0;
     right: auto;
-    width: min(220px, calc(100vw - 56px));
+    width: min(180px, calc(100vw - 56px));
     bottom: calc(100% + 10px);
     transform-origin: bottom left;
   }

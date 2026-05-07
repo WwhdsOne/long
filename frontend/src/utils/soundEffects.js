@@ -38,6 +38,29 @@ const soundAliases = {
   '自动锤击音效': 'battle.trigger.auto-strike',
 }
 
+const triggerSoundPolicies = {
+  'battle.trigger.pursuit': {
+    delayMs: 500,
+  },
+  'battle.trigger.silver-storm': {
+    cooldownMs: 3200,
+  },
+  'battle.trigger.judgment-day': {
+    delayMs: 1000,
+  },
+  'battle.trigger.final-cut': {
+    delayMs: 700,
+  },
+  'battle.trigger.auto-strike': {
+    delayMs: 1000,
+    layers: [
+      {delayMs: 35, volume: 0.72},
+    ],
+  },
+}
+
+const triggerSoundLastPlayedAt = new Map()
+
 function normalizeSoundKey(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -93,6 +116,16 @@ export function playSoundEffect(key, options = {}) {
   return true
 }
 
+function scheduleSoundEffect(key, options = {}) {
+  const delayMs = Math.max(0, Number(options.delayMs) || 0)
+  const invoke = () => playSoundEffect(key, options)
+  if (delayMs <= 0 || typeof setTimeout !== 'function') {
+    return invoke()
+  }
+  setTimeout(invoke, delayMs)
+  return true
+}
+
 export function playBattlePartSound(partType, options = {}) {
   const effectKey = resolveSoundEffectId(partType)
   const clickableKey = {
@@ -111,5 +144,33 @@ export function playBattleTriggerSound(effectType, options = {}) {
   if (!effectKey) {
     return false
   }
-  return playSoundEffect(effectKey, options)
+
+  const policy = triggerSoundPolicies[effectKey] || {}
+  const cooldownMs = Math.max(0, Number(options.cooldownMs ?? policy.cooldownMs) || 0)
+  if (cooldownMs > 0) {
+    const now = Date.now()
+    const lastPlayedAt = Number(triggerSoundLastPlayedAt.get(effectKey) || 0)
+    if (lastPlayedAt > 0 && now-lastPlayedAt < cooldownMs) {
+      return false
+    }
+    triggerSoundLastPlayedAt.set(effectKey, now)
+  }
+
+  const baseDelayMs = Math.max(0, Number(options.delayMs ?? policy.delayMs) || 0)
+  const baseVolume = options.volume ?? policy.volume ?? 1
+  const layers = Array.isArray(policy.layers) ? policy.layers : []
+
+  let scheduled = scheduleSoundEffect(effectKey, {
+    ...options,
+    delayMs: baseDelayMs,
+    volume: baseVolume,
+  })
+  for (const layer of layers) {
+    scheduled = scheduleSoundEffect(effectKey, {
+      ...options,
+      delayMs: baseDelayMs + Math.max(0, Number(layer?.delayMs) || 0),
+      volume: layer?.volume ?? baseVolume,
+    }) || scheduled
+  }
+  return scheduled
 }
