@@ -12,6 +12,7 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
+	"github.com/vmihailenco/msgpack/v5"
 
 	"long/internal/nickname"
 )
@@ -1021,6 +1022,241 @@ func TestLearnTalentRejectsWhenTalentPointsInsufficient(t *testing.T) {
 
 	if err := store.UpgradeTalent(ctx, nickname, "normal_core", 1); !errors.Is(err, ErrTalentPointsInsufficient) {
 		t.Fatalf("expected ErrTalentPointsInsufficient, got %v", err)
+	}
+}
+
+func TestGetTalentStateReadsMessagePackState(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "MessagePack天赋"
+
+	raw, err := msgpack.Marshal(&TalentState{
+		Talents: map[string]int{
+			"normal_core": 2,
+		},
+		OverflowLevel: 3,
+		OverflowBonuses: map[string]int{
+			"all_damage":  2,
+			"soft_damage": 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal msgpack state: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "state", raw).Err(); err != nil {
+		t.Fatalf("seed msgpack state: %v", err)
+	}
+
+	state, err := store.GetTalentState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get talent state: %v", err)
+	}
+	if state.OverflowLevel != 3 {
+		t.Fatalf("expected overflow level 3, got %d", state.OverflowLevel)
+	}
+	if state.Talents["normal_core"] != 2 {
+		t.Fatalf("expected normal_core lv2, got %+v", state.Talents)
+	}
+	if state.OverflowBonuses["all_damage"] != 2 || state.OverflowBonuses["soft_damage"] != 1 {
+		t.Fatalf("unexpected overflow bonuses: %+v", state.OverflowBonuses)
+	}
+}
+
+func TestGetTalentStateMigratesLegacyTalentsJSONToState(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "旧JSON迁移"
+
+	legacyTalents, err := sonic.Marshal(map[string]int{
+		"normal_core": 1,
+		"armor_core":  2,
+	})
+	if err != nil {
+		t.Fatalf("marshal legacy talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(legacyTalents)).Err(); err != nil {
+		t.Fatalf("seed legacy talents: %v", err)
+	}
+
+	state, err := store.GetTalentState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get talent state: %v", err)
+	}
+	if state.Talents["normal_core"] != 1 || state.Talents["armor_core"] != 2 {
+		t.Fatalf("unexpected talents after migration: %+v", state.Talents)
+	}
+	if state.OverflowLevel != 0 {
+		t.Fatalf("expected overflow level 0 after migration, got %d", state.OverflowLevel)
+	}
+	if len(state.OverflowBonuses) != 0 {
+		t.Fatalf("expected empty overflow bonuses after migration, got %+v", state.OverflowBonuses)
+	}
+
+	migratedRaw, err := store.client.HGet(ctx, store.talentKey(nickname), "state").Bytes()
+	if err != nil {
+		t.Fatalf("read migrated state: %v", err)
+	}
+	var migrated TalentState
+	if err := msgpack.Unmarshal(migratedRaw, &migrated); err != nil {
+		t.Fatalf("unmarshal migrated msgpack state: %v", err)
+	}
+	if migrated.Talents["normal_core"] != 1 || migrated.Talents["armor_core"] != 2 {
+		t.Fatalf("unexpected migrated talents: %+v", migrated.Talents)
+	}
+	if migrated.OverflowLevel != 0 || len(migrated.OverflowBonuses) != 0 {
+		t.Fatalf("unexpected migrated overflow state: %+v", migrated)
+	}
+}
+
+func TestGetTalentStateMigratesLegacyStringSliceToState(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "旧切片迁移"
+
+	legacyTalents, err := sonic.Marshal([]string{"normal_core", "crit_bleed"})
+	if err != nil {
+		t.Fatalf("marshal legacy talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(legacyTalents)).Err(); err != nil {
+		t.Fatalf("seed legacy string talents: %v", err)
+	}
+
+	state, err := store.GetTalentState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get talent state: %v", err)
+	}
+	if state.Talents["normal_core"] != 1 || state.Talents["crit_bleed"] != 1 {
+		t.Fatalf("expected legacy string slice to migrate to lv1 map, got %+v", state.Talents)
+	}
+}
+
+func TestUpgradeOverflowTalentConsumesPointsAndAccumulatesBonus(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "溢出升级测试"
+	store.roll = func(limit int) int {
+		if limit != len(talentOverflowBonusKeys) {
+			t.Fatalf("expected overflow roll limit %d, got %d", len(talentOverflowBonusKeys), limit)
+		}
+		return 4
+	}
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "2500").Err(); err != nil {
+		t.Fatalf("seed talent points: %v", err)
+	}
+	if err := store.UpgradeTalent(ctx, nickname, TalentOverflowSinkID, 99); err != nil {
+		t.Fatalf("upgrade overflow talent: %v", err)
+	}
+
+	state, err := store.GetTalentState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get talent state: %v", err)
+	}
+	if state.OverflowLevel != 1 {
+		t.Fatalf("expected overflow level 1, got %d", state.OverflowLevel)
+	}
+	if state.OverflowBonuses["attack_power"] != 1 {
+		t.Fatalf("expected attack_power bonus count 1, got %+v", state.OverflowBonuses)
+	}
+	if len(state.Talents) != 0 {
+		t.Fatalf("expected normal talents unchanged, got %+v", state.Talents)
+	}
+
+	resources, err := store.resourcesForNickname(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get resources: %v", err)
+	}
+	if resources.TalentPoints != 1500 {
+		t.Fatalf("expected remaining talent points 1500, got %d", resources.TalentPoints)
+	}
+}
+
+func TestUpgradeOverflowTalentRejectsWhenTalentPointsInsufficient(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "溢出点数不足"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "999").Err(); err != nil {
+		t.Fatalf("seed talent points: %v", err)
+	}
+	if err := store.UpgradeTalent(ctx, nickname, TalentOverflowSinkID, 1); !errors.Is(err, ErrTalentPointsInsufficient) {
+		t.Fatalf("expected ErrTalentPointsInsufficient, got %v", err)
+	}
+}
+
+func TestResetTalentsRefundsOverflowInvestment(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "洗点返还溢出"
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), "talent_points", "120").Err(); err != nil {
+		t.Fatalf("seed talent points: %v", err)
+	}
+
+	raw, err := msgpack.Marshal(&TalentState{
+		Talents: map[string]int{
+			"normal_core": 2,
+		},
+		OverflowLevel: 2,
+		OverflowBonuses: map[string]int{
+			"all_damage":  1,
+			"weak_damage": 1,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal state: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "state", raw).Err(); err != nil {
+		t.Fatalf("seed talent state: %v", err)
+	}
+
+	beforeStats, err := store.combatStatsForNickname(ctx, nickname, Loadout{})
+	if err != nil {
+		t.Fatalf("combat stats before reset: %v", err)
+	}
+	if beforeStats.AllDamageAmplify <= 0 || beforeStats.PartTypeDamageWeak <= 0 {
+		t.Fatalf("expected overflow bonuses applied before reset, got %+v", beforeStats)
+	}
+
+	if err := store.ResetTalents(ctx, nickname); err != nil {
+		t.Fatalf("reset talents: %v", err)
+	}
+
+	state, err := store.GetTalentState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get talent state after reset: %v", err)
+	}
+	if len(state.Talents) != 0 || state.OverflowLevel != 0 || len(state.OverflowBonuses) != 0 {
+		t.Fatalf("expected talent state cleared after reset, got %+v", state)
+	}
+
+	resources, err := store.resourcesForNickname(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get resources after reset: %v", err)
+	}
+	expectedRefund := int64(120) + TalentCumulativeCost(TalentCostTier0Main, 2) + 2*TalentOverflowUpgradeCost
+	if resources.TalentPoints != expectedRefund {
+		t.Fatalf("expected refunded talent points %d, got %d", expectedRefund, resources.TalentPoints)
+	}
+
+	afterStats, err := store.combatStatsForNickname(ctx, nickname, Loadout{})
+	if err != nil {
+		t.Fatalf("combat stats after reset: %v", err)
+	}
+	if afterStats.AllDamageAmplify != 0 || afterStats.PartTypeDamageWeak != 0 {
+		t.Fatalf("expected overflow bonuses removed after reset, got %+v", afterStats)
 	}
 }
 

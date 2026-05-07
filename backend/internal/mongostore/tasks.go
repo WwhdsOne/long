@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/internal/core"
 )
@@ -99,7 +99,7 @@ func (s *TaskDefinitionStore) UpsertTaskDefinition(ctx context.Context, item cor
 			"created_at":     item.CreatedAt,
 			"updated_at":     item.UpdatedAt,
 		}},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }

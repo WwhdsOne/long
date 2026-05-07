@@ -65,6 +65,15 @@ const arcStartAngle = 135
 const arcEndAngle = 45
 const talentCostLevelExponent = 0.85
 const talentCostMultiplier = 1.8
+const defaultOverflowUpgradeCost = 1000
+const overflowBonusLabels = {
+  soft_damage: '软组织增伤',
+  weak_damage: '弱点增伤',
+  heavy_damage: '重甲增伤',
+  crit_damage: '暴击伤害',
+  attack_power: '攻击力',
+  all_damage: '全伤害',
+}
 
 const learnedMap = reactive(talentState.value?.talents || {})
 
@@ -141,6 +150,23 @@ const availableTalentPoints = computed(() => {
   return Math.max(0, Number(sharedTalentPoints.value || 0))
 })
 
+const overflowLevel = computed(() => Math.max(0, Number(talentState.value?.overflowLevel || 0)))
+
+const overflowUpgradeCost = computed(() => Math.max(0, Number(talentState.value?.overflowUpgradeCost || defaultOverflowUpgradeCost)))
+
+const overflowTotalSpent = computed(() => overflowLevel.value * overflowUpgradeCost.value)
+
+const overflowBonusEntries = computed(() => {
+  const bonuses = talentState.value?.overflowBonuses || {}
+  return Object.entries(overflowBonusLabels)
+    .map(([key, label]) => ({
+      key,
+      label,
+      count: Math.max(0, Number(bonuses[key] || 0)),
+    }))
+    .filter((item) => item.count > 0)
+})
+
 const currentTreeDefs = computed(() => {
   if (!treeDefs.value?.trees) return []
   return treeDefs.value.trees[selectedTree.value]?.talents || []
@@ -148,6 +174,31 @@ const currentTreeDefs = computed(() => {
 
 function safeJSON(response) {
   return response.json().catch(() => null)
+}
+
+function normalizeTalentResponse(data) {
+  return {
+    ...(data || {}),
+    talents: data?.talents || {},
+    overflowBonuses: data?.overflowBonuses || {},
+    overflowLevel: Math.max(0, Number(data?.overflowLevel || 0)),
+    overflowUpgradeCost: Math.max(0, Number(data?.overflowUpgradeCost || defaultOverflowUpgradeCost)),
+  }
+}
+
+function applyTalentResponse(data) {
+  talentState.value = normalizeTalentResponse(data)
+  talentEffectLines.value = talentState.value?.effectLines || {}
+  talentEffectDescriptions.value = talentState.value?.effectDescriptions || {}
+  Object.keys(learnedMap).forEach(k => delete learnedMap[k])
+  if (talentState.value?.talents) {
+    Object.assign(learnedMap, talentState.value.talents)
+  }
+}
+
+function formatOverflowBonus(item) {
+  const percent = (item.count * 0.1).toFixed(1)
+  return `${item.label}：${item.count} 次（+${percent}%）`
 }
 
 function isLearned(id) {
@@ -373,14 +424,7 @@ async function loadState() {
       return
     }
 
-    talentState.value = await res.json()
-    talentEffectLines.value = talentState.value?.effectLines || {}
-    talentEffectDescriptions.value = talentState.value?.effectDescriptions || {}
-    // Sync learnedMap from API response (talents is now {talentId: level} object)
-    Object.keys(learnedMap).forEach(k => delete learnedMap[k])
-    if (talentState.value?.talents) {
-      Object.assign(learnedMap, talentState.value.talents)
-    }
+    applyTalentResponse(await res.json())
     if (!selectedTree.value) selectedTree.value = 'normal'
   } catch (error) {
     errorMsg.value = error.message || '加载天赋状态失败'
@@ -422,15 +466,40 @@ async function handleNodeClick(item) {
       throw new Error(data?.message || '升级失败')
     }
     const data = await resp.json()
-    talentState.value.talentPoints = data.talentPoints
-    if (data.talents) {
-      talentState.value.talents = data.talents
-    }
+    applyTalentResponse({ ...(talentState.value || {}), ...data })
     talentEffectLines.value = data.effectLines || talentEffectLines.value
     talentEffectDescriptions.value = data.effectDescriptions || talentEffectDescriptions.value
-    learnedMap[item.id] = targetLevel
   } catch (e) {
     showToast(e.message)
+  } finally {
+    learnLoading.value = false
+  }
+}
+
+async function handleOverflowUpgrade() {
+  if (!isLoggedIn.value || learnLoading.value) return
+  if (overflowUpgradeCost.value > availableTalentPoints.value) {
+    showToast('天赋点不足')
+    return
+  }
+
+  learnLoading.value = true
+  errorMsg.value = ''
+  try {
+    const resp = await fetch('/api/talents/upgrade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ talentId: 'overflow_sink', targetLevel: 1 }),
+    })
+    if (!resp.ok) {
+      const data = await safeJSON(resp)
+      throw new Error(data?.message || '溢出强化失败')
+    }
+    const data = await resp.json()
+    applyTalentResponse({ ...(talentState.value || {}), ...data })
+  } catch (error) {
+    showToast(error.message || '溢出强化失败')
   } finally {
     learnLoading.value = false
   }
@@ -442,7 +511,7 @@ function clearNode() {
 
 async function resetTalents() {
   if (!isLoggedIn.value) return
-  if (!(await showConfirm('确认洗点', '确定洗点并返还已消耗天赋点吗？'))) return
+  if (!(await showConfirm('确认洗点', '普通天赋与溢出强化都会被清空并返还，确定继续吗？'))) return
 
   loading.value = true
   errorMsg.value = ''
@@ -538,8 +607,61 @@ watch(isLoggedIn, (val) => {
           <ul class="talent-guide__list">
             <li>节点首次学习和后续升级都会消耗天赋点，等级越高消耗越多。</li>
             <li>层满加成在该层所有节点达到 Lv1 后立即生效，切换主系时会同步查看对应文案。</li>
-            <li>洗点会返还当前已投入的天赋点，但需要重新按层解锁。</li>
+            <li>洗点时普通天赋点与溢出强化消耗都会返还。</li>
           </ul>
+        </div>
+      </section>
+
+      <section class="talent-overflow">
+        <div class="talent-overflow__head">
+          <div>
+            <p class="vote-stage__eyebrow">独立节点</p>
+            <h3>天赋点溢出强化</h3>
+          </div>
+          <button
+            class="talent-overflow__button"
+            :disabled="learnLoading || overflowUpgradeCost > availableTalentPoints"
+            @click="handleOverflowUpgrade"
+          >
+            消耗 1000 点随机强化
+          </button>
+        </div>
+        <div class="talent-overflow__stats">
+          <div class="talent-overflow__stat">
+            <span>当前可用天赋点</span>
+            <strong>{{ availableTalentPoints }}</strong>
+          </div>
+          <div class="talent-overflow__stat">
+            <span>溢出等级</span>
+            <strong>{{ overflowLevel }}</strong>
+          </div>
+          <div class="talent-overflow__stat">
+            <span>累计消耗</span>
+            <strong>{{ overflowTotalSpent }}</strong>
+          </div>
+          <div class="talent-overflow__stat">
+            <span>单次消耗</span>
+            <strong>{{ overflowUpgradeCost }}</strong>
+          </div>
+        </div>
+        <div class="talent-overflow__body">
+          <div class="talent-overflow__panel">
+            <strong>随机池</strong>
+            <ul class="talent-guide__list">
+              <li>软组织 / 弱点 / 重甲 / 暴击伤害 / 攻击力 / 全伤害</li>
+              <li>每次命中固定获得 +0.1%</li>
+              <li>洗点时与普通天赋一起返还</li>
+            </ul>
+          </div>
+          <div class="talent-overflow__panel">
+            <strong>已获得属性汇总</strong>
+            <ul v-if="overflowBonusEntries.length > 0" class="talent-guide__list">
+              <li v-for="item in overflowBonusEntries" :key="item.key">
+                {{ formatOverflowBonus(item) }}
+              </li>
+            </ul>
+            <p v-else class="talent-overflow__empty">尚未进行溢出强化。</p>
+          </div>
         </div>
       </section>
 
@@ -772,6 +894,95 @@ watch(isLoggedIn, (val) => {
   margin-top: 0.22rem;
 }
 
+.talent-overflow {
+  margin-bottom: 0.75rem;
+  border: 1px solid #335064;
+  border-radius: 0.9rem;
+  background: linear-gradient(135deg, #16232c 0%, #0d171d 100%);
+  padding: 0.9rem;
+}
+
+.talent-overflow__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 0.8rem;
+}
+
+.talent-overflow__head h3 {
+  margin: 0.2rem 0 0;
+  color: #f4f9fc;
+}
+
+.talent-overflow__button {
+  border: 1px solid #e3b86a;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #f0cd92, #d28d2f);
+  color: #1f1305;
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 0.58rem 1rem;
+  cursor: pointer;
+}
+
+.talent-overflow__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.talent-overflow__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.talent-overflow__stat {
+  border: 1px solid #29404f;
+  border-radius: 0.8rem;
+  background: rgba(8, 17, 24, 0.72);
+  padding: 0.75rem 0.8rem;
+}
+
+.talent-overflow__stat span {
+  display: block;
+  color: #8ea6b6;
+  font-size: 0.76rem;
+  margin-bottom: 0.28rem;
+}
+
+.talent-overflow__stat strong {
+  color: #f9efcd;
+  font-size: 1.02rem;
+}
+
+.talent-overflow__body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.talent-overflow__panel {
+  border: 1px solid #253a48;
+  border-radius: 0.8rem;
+  background: rgba(11, 19, 26, 0.78);
+  padding: 0.8rem 0.9rem;
+}
+
+.talent-overflow__panel strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #f4f9fc;
+}
+
+.talent-overflow__empty {
+  margin: 0;
+  color: #a9bfcb;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
 .talent-plate {
   border: 1px solid #2c404a;
   border-radius: 0.8rem;
@@ -975,6 +1186,18 @@ watch(isLoggedIn, (val) => {
   .talent-head__actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .talent-overflow__head {
+    flex-direction: column;
+  }
+
+  .talent-overflow__body {
+    grid-template-columns: 1fr;
+  }
+
+  .talent-overflow__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .talent-half-ring {

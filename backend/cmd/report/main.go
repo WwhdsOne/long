@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/internal/report"
 )
@@ -95,9 +95,9 @@ func run() error {
 	defer cancel()
 
 	// 连接 MongoDB
-	mongoClient, err := mongo.Connect(ctx, options.Client().
+	mongoClient, err := mongo.Connect(options.Client().
 		ApplyURI(mongoURI).
-		SetConnectTimeout(10*time.Second)) // 使用环境变量中的 URI 连接
+		SetConnectTimeout(10 * time.Second)) // 使用环境变量中的 URI 连接
 	if err != nil {
 		return fmt.Errorf("连接 Mongo: %w", err)
 	}

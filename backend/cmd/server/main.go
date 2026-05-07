@@ -19,8 +19,8 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.uber.org/zap"
 
 	"long/internal/admin"
@@ -103,7 +103,7 @@ func run() error {
 	var domainEventWriter httpapi.DomainEventWriter
 	var accessLogQueue *archive.AsyncQueue[xlog.AccessLogEntry]
 	if cfg.Mongo.Enabled {
-		mongoClient, err = mongo.Connect(startupCtx, options.Client().
+		mongoClient, err = mongo.Connect(options.Client().
 			ApplyURI(cfg.Mongo.URI).
 			SetConnectTimeout(cfg.Mongo.ConnectTimeout))
 		if err != nil {

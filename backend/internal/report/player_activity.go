@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sort"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 // QueryPlayerActivity 查询玩家活跃度统计数据。
@@ -54,8 +54,8 @@ func QueryPlayerActivity(ctx context.Context, db *mongo.Database, from, to int64
 
 // countDistinct 返回某字段的去重计数。
 func countDistinct(ctx context.Context, coll *mongo.Collection, field string, filter bson.M) (int64, error) {
-	values, err := coll.Distinct(ctx, field, filter)
-	if err != nil {
+	var values []any
+	if err := coll.Distinct(ctx, field, filter).Decode(&values); err != nil {
 		return 0, err
 	}
 	return int64(len(values)), nil
@@ -63,16 +63,16 @@ func countDistinct(ctx context.Context, coll *mongo.Collection, field string, fi
 
 // countNewPlayers 统计区间内首次出现的 nickname 数。
 func countNewPlayers(ctx context.Context, coll *mongo.Collection, from, to int64) (int64, error) {
-	inRange, err := coll.Distinct(ctx, "nickname", timeFilter("created_at", from, to))
-	if err != nil {
+	var inRange []any
+	if err := coll.Distinct(ctx, "nickname", timeFilter("created_at", from, to)).Decode(&inRange); err != nil {
 		return 0, err
 	}
 	if len(inRange) == 0 {
 		return 0, nil
 	}
 
-	beforeRange, err := coll.Distinct(ctx, "nickname", bson.M{"created_at": bson.M{"$lt": from}})
-	if err != nil {
+	var beforeRange []any
+	if err := coll.Distinct(ctx, "nickname", bson.M{"created_at": bson.M{"$lt": from}}).Decode(&beforeRange); err != nil {
 		return 0, err
 	}
 

@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/internal/core"
 )
@@ -113,7 +113,7 @@ func (s *TaskCycleArchiveStore) UpsertTaskCycleArchive(ctx context.Context, item
 			"not_participated_total":  item.NotParticipatedTotal,
 			"archived_at":             item.ArchivedAt,
 		}},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }

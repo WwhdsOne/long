@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/internal/core"
 )
@@ -87,7 +87,7 @@ func parseArgs(args []string) (cliOptions, error) {
 }
 
 func runWithOptions(ctx context.Context, opts cliOptions) error {
-	client, err := mongo.Connect(ctx, options.Client().
+	client, err := mongo.Connect(options.Client().
 		ApplyURI(opts.mongoURI).
 		SetConnectTimeout(opts.connectTimeout))
 	if err != nil {

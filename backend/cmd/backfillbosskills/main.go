@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/cmd/internal/toolconfig"
 	"long/internal/config"
@@ -50,7 +50,7 @@ func run() error {
 
 	var mongoClient *mongo.Client
 	if cfg.Mongo.Enabled {
-		mongoClient, err = mongo.Connect(ctx, options.Client().
+		mongoClient, err = mongo.Connect(options.Client().
 			ApplyURI(cfg.Mongo.URI).
 			SetConnectTimeout(cfg.Mongo.ConnectTimeout))
 		if err != nil {
