@@ -1414,7 +1414,7 @@ func applyTierCompletionBonus(mods *TalentModifiers, treeStr string, tier int) {
 	case treeStr == "crit" && tier == 0:
 		mods.AllDamageAmplify += 0.10
 	case treeStr == "crit" && tier == 1:
-		mods.CritRateBonus += 0.10
+		mods.CritRateBonus += 10
 	case treeStr == "crit" && tier == 2:
 		mods.OmenKillThresholdRaise += 0.05
 	case treeStr == "crit" && tier == 3:

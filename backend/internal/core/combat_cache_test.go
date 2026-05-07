@@ -241,6 +241,30 @@ func TestArmorCoreCollapseTriggerCurveAndTierBonus(t *testing.T) {
 	}
 }
 
+func TestCritTierOneCompletionBonusAddsTenPercentCriticalChance(t *testing.T) {
+	compiled := compileTalentSet(&TalentState{
+		Talents: map[string]int{
+			"crit_cruel":         1,
+			"crit_skinner":       1,
+			"crit_doom_judgment": 1,
+			"crit_filler_t1a":    1,
+			"crit_filler_t1b":    1,
+		},
+	})
+	if compiled == nil {
+		t.Fatal("expected compiled talent set")
+	}
+	if !compiled.IsTierFull(TalentTreeCrit, 1) {
+		t.Fatalf("expected crit tier 1 to be full, got %+v", compiled.tierFull)
+	}
+	if compiled.Modifiers == nil {
+		t.Fatal("expected compiled modifiers")
+	}
+	if compiled.Modifiers.CritRateBonus != 10 {
+		t.Fatalf("expected crit tier 1 completion bonus to add 10 critical chance percent, got %.2f", compiled.Modifiers.CritRateBonus)
+	}
+}
+
 func TestCritOmenResonateRemovedAndDescriptionsUpdated(t *testing.T) {
 	if _, ok := GetTalentDef("crit_omen_resonate"); ok {
 		t.Fatal("expected crit_omen_resonate to be removed from talent defs")
