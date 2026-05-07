@@ -297,6 +297,13 @@ select {
   gap: 10px;
 }
 
+.hero__link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
 .live-pill {
   display: inline-flex;
   align-items: center;
@@ -387,6 +394,89 @@ select {
   font-size: clamp(1.3rem, 2vw, 1.9rem);
   line-height: 1;
   text-shadow: 0 1px 0 rgba(255, 248, 215, 0.92);
+}
+
+.hero-info-card {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-height: 92px;
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  text-decoration: none;
+  overflow: visible;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(255, 240, 227, 0.94)),
+    var(--surface-strong);
+  border: 1px solid rgba(183, 53, 97, 0.14);
+  box-shadow:
+    0 14px 28px rgba(130, 52, 20, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.hero-info-card:hover,
+.hero-info-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(183, 53, 97, 0.28);
+  box-shadow:
+    0 18px 34px rgba(130, 52, 20, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.hero-info-card__eyebrow {
+  color: rgba(120, 62, 7, 0.78);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero-info-card__value {
+  color: #7a3d08;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.hero-info-card--github .hero-info-card__value {
+  color: #8c184b;
+}
+
+.hero-info-card__preview {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 14px);
+  width: 140px;
+  padding: 8px;
+  border-radius: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px) scale(0.96);
+  transform-origin: bottom right;
+  background: rgba(255, 252, 247, 0.98);
+  border: 1px solid rgba(183, 53, 97, 0.18);
+  box-shadow: 0 22px 40px rgba(78, 34, 12, 0.2);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+  z-index: 8;
+}
+
+.hero-info-card__preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+
+.hero-info-card--community:hover .hero-info-card__preview,
+.hero-info-card--community:focus-within .hero-info-card__preview {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .stats-band {
@@ -3248,6 +3338,22 @@ select {
     width: 100%;
   }
 
+  .hero__link-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-info-card {
+    min-height: auto;
+  }
+
+  .hero-info-card__preview {
+    left: 0;
+    right: auto;
+    width: min(180px, calc(100vw - 56px));
+    bottom: calc(100% + 10px);
+    transform-origin: bottom left;
+  }
+
   .vote-stage {
     padding: 22px 18px;
     border-radius: 30px;
@@ -5924,6 +6030,43 @@ body:has(.battle-page-hud),
   gap: 10px;
 }
 
+.battle-page-hud__link-grid {
+  width: min(100%, 360px);
+}
+
+.battle-page-hud .power-glory-card,
+.battle-page-hud .hero__link-grid {
+  width: min(100%, 360px);
+}
+
+.battle-page-hud .hero-info-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(120, 216, 255, 0.06)),
+    rgba(8, 14, 24, 0.72);
+  border-color: rgba(132, 166, 214, 0.2);
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.battle-page-hud .hero-info-card__eyebrow {
+  color: #8ca1c0;
+}
+
+.battle-page-hud .hero-info-card__value {
+  color: #eef4ff;
+}
+
+.battle-page-hud .hero-info-card--github .hero-info-card__value {
+  color: #78d8ff;
+}
+
+.battle-page-hud .hero-info-card__preview {
+  background: rgba(7, 12, 20, 0.98);
+  border-color: rgba(132, 166, 214, 0.24);
+  box-shadow: 0 24px 42px rgba(0, 0, 0, 0.34);
+}
+
 .battle-page-hud .live-pill,
 .battle-page-hud__time,
 .battle-page-hud__admin-link {
@@ -6358,6 +6501,10 @@ body:has(.battle-page-hud),
 
   .battle-page-hud__status {
     justify-items: start;
+  }
+
+  .battle-page-hud .hero__link-grid {
+    width: 100%;
   }
 
   .battle-page-hud .stage-layout--battle,

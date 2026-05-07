@@ -8,6 +8,7 @@ import TaskPage from './TaskPage.vue'
 import TalentsPage from './TalentsPage.vue'
 import {usePublicPageState} from './publicPageState'
 import {formatCompact} from '../utils/formatNumber.js'
+import wechatGroupImage from '../assets/community/wechat-group.png'
 
 const {
   publicPages,
@@ -109,6 +110,25 @@ async function handleLoginSubmit() {
             <span class="power-glory-card__eyebrow">当前用户战斗力</span>
             <strong class="power-glory-card__value">{{ heroBattlePowerLabel }}</strong>
           </article>
+          <div class="hero__link-grid" aria-label="项目相关入口">
+            <article class="hero-info-card hero-info-card--community" aria-label="游戏交流群">
+              <span class="hero-info-card__eyebrow">游戏交流群</span>
+              <strong class="hero-info-card__value">鼠标悬停查看微信群</strong>
+              <div class="hero-info-card__preview" role="img" aria-label="微信群二维码预览">
+                <img :src="wechatGroupImage" alt="Hai-World 微信群二维码" />
+              </div>
+            </article>
+            <a
+              class="hero-info-card hero-info-card--github"
+              href="https://github.com/WwhdsOne/long"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="项目地址 GitHub 仓库"
+            >
+              <span class="hero-info-card__eyebrow">项目地址</span>
+              <strong class="hero-info-card__value">点击进入项目仓库</strong>
+            </a>
+          </div>
         </div>
       </section>
     </template>

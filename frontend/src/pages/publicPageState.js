@@ -7,6 +7,7 @@ import {mergeClickFallbackState} from '../utils/clickResponse'
 import {formatRarityLabel, getRarityClassName, splitEquipmentName} from '../utils/rarity'
 import {EQUIPMENT_SLOTS, normalizeLoadout} from '../utils/equipmentSlots'
 import {createRealtimeTransport} from '../utils/realtimeTransport'
+import {playBattlePartSound, playBattleTriggerSound} from '../utils/soundEffects'
 
 const ANNOUNCEMENT_READ_KEY = 'vote-wall-announcement-read'
 const ANNOUNCEMENT_CACHE_KEY = 'vote-wall-announcement-cache'
@@ -1910,6 +1911,9 @@ function appendTalentTriggerEvents(events) {
             partX: event.partX,
             partY: event.partY,
         }))
+    for (const event of events) {
+        playBattleTriggerSound(event?.effectType || event?.name || '')
+    }
     const mergedFeed = [
         ...nextEntries,
         ...talentTriggerFeed.value,
@@ -2596,6 +2600,7 @@ async function clickButton(key, options = {}) {
         return
     }
     const bossPartKey = `boss-part:${matched[1]}-${matched[2]}`
+    const part = findBossPartByKey(bossPartKey)
 
     const nextPending = new Set(pendingKeys.value)
     nextPending.add(key)
@@ -2607,6 +2612,9 @@ async function clickButton(key, options = {}) {
         const sent = ensureRealtimeTransport().sendClick(bossPartKey, comboCount.value)
         if (!sent) {
             throw new Error('实时连接尚未建立，正在重连，请稍后再试。')
+        }
+        if (options.source !== 'auto' && options.source !== 'afk') {
+            playBattlePartSound(part?.type || part?.displayName || '')
         }
     } catch (error) {
         clearPendingClicks(key)
