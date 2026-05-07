@@ -4,9 +4,10 @@ package core
 type TaskType string
 
 const (
-	TaskTypeDaily   TaskType = "daily"
-	TaskTypeWeekly  TaskType = "weekly"
-	TaskTypeLimited TaskType = "limited"
+	TaskTypeDaily    TaskType = "daily"
+	TaskTypeWeekly   TaskType = "weekly"
+	TaskTypeLimited  TaskType = "limited"
+	TaskTypeLongTerm TaskType = "long_term"
 )
 
 // TaskStatus 任务状态。
@@ -45,6 +46,7 @@ const (
 	TaskWindowDaily      TaskWindowKind = "daily"
 	TaskWindowWeekly     TaskWindowKind = "weekly"
 	TaskWindowFixedRange TaskWindowKind = "fixed_range"
+	TaskWindowLifetime   TaskWindowKind = "lifetime"
 )
 
 // TaskPlayerStatus 玩家在某个任务周期下的结果状态。
@@ -234,6 +236,8 @@ func taskWindowKindFromLegacy(taskType TaskType, conditionKind TaskConditionKind
 		return TaskWindowWeekly
 	case TaskTypeLimited:
 		return TaskWindowFixedRange
+	case TaskTypeLongTerm:
+		return TaskWindowLifetime
 	default:
 		return TaskWindowDaily
 	}
@@ -245,6 +249,8 @@ func legacyTaskTypeFromWindowKind(windowKind TaskWindowKind) TaskType {
 		return TaskTypeWeekly
 	case TaskWindowFixedRange:
 		return TaskTypeLimited
+	case TaskWindowLifetime:
+		return TaskTypeLongTerm
 	default:
 		return TaskTypeDaily
 	}

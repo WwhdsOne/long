@@ -266,6 +266,8 @@ func currentTaskCycleKey(task TaskDefinition, nowTime time.Time) string {
 		return fmt.Sprintf("%04d-W%02d", year, week)
 	case TaskWindowFixedRange:
 		return fmt.Sprintf("%s:%d:%d", task.TaskID, task.StartAt, task.EndAt)
+	case TaskWindowLifetime:
+		return task.TaskID
 	default:
 		return localNow.Format("2006-01-02")
 	}
@@ -366,6 +368,8 @@ func taskCycleTTL(task TaskDefinition, nowUnix int64) time.Duration {
 			return time.Until(time.Unix(task.EndAt, 0).Add(72 * time.Hour))
 		}
 		return 72 * time.Hour
+	case TaskWindowLifetime:
+		return 0
 	default:
 		return 72 * time.Hour
 	}

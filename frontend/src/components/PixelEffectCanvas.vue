@@ -1,19 +1,19 @@
 <template>
   <canvas
-    ref="canvasRef"
-    class="pixel-canvas"
-    :width="size"
-    :height="size"
+      ref="canvasRef"
+      class="pixel-canvas"
+      :width="size"
+      :height="size"
   />
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import {onBeforeUnmount, onMounted, ref, watch} from 'vue'
 
 const props = defineProps({
-  effect: { type: String, required: true },
-  size: { type: Number, default: 90 },
-  loop: { type: Boolean, default: true },
+  effect: {type: String, required: true},
+  size: {type: Number, default: 90},
+  loop: {type: Boolean, default: true},
 })
 
 const canvasRef = ref(null)
@@ -23,21 +23,21 @@ let renderer = null
 
 // ======= 盾牌图案 (collapse_trigger 用) =======
 const SHIELD = [
-  [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
-  [0,0,0,0,0,0,1,3,1,0,0,0,0,0,0],
-  [0,0,0,0,0,1,4,2,4,1,0,0,0,0,0],
-  [0,0,0,0,1,4,4,2,4,4,1,0,0,0,0],
-  [0,0,0,1,4,4,4,2,4,4,4,1,0,0,0],
-  [0,0,1,4,4,4,4,2,4,4,4,4,1,0,0],
-  [0,1,4,4,4,4,4,2,4,4,4,4,4,1,0],
-  [1,3,2,2,2,2,2,2,2,2,2,2,2,3,1],
-  [0,1,4,4,4,4,4,2,4,4,4,4,4,1,0],
-  [0,0,1,4,4,4,4,2,4,4,4,4,1,0,0],
-  [0,0,0,1,4,4,4,2,4,4,4,1,0,0,0],
-  [0,0,0,0,1,4,4,2,4,4,1,0,0,0,0],
-  [0,0,0,0,0,1,4,2,4,1,0,0,0,0,0],
-  [0,0,0,0,0,0,1,3,1,0,0,0,0,0,0],
-  [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+  [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 1, 4, 2, 4, 1, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 1, 4, 4, 2, 4, 4, 1, 0, 0, 0, 0],
+  [0, 0, 0, 1, 4, 4, 4, 2, 4, 4, 4, 1, 0, 0, 0],
+  [0, 0, 1, 4, 4, 4, 4, 2, 4, 4, 4, 4, 1, 0, 0],
+  [0, 1, 4, 4, 4, 4, 4, 2, 4, 4, 4, 4, 4, 1, 0],
+  [1, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 1],
+  [0, 1, 4, 4, 4, 4, 4, 2, 4, 4, 4, 4, 4, 1, 0],
+  [0, 0, 1, 4, 4, 4, 4, 2, 4, 4, 4, 4, 1, 0, 0],
+  [0, 0, 0, 1, 4, 4, 4, 2, 4, 4, 4, 1, 0, 0, 0],
+  [0, 0, 0, 0, 1, 4, 4, 2, 4, 4, 1, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 1, 4, 2, 4, 1, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 1, 3, 1, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
 ]
 const SHIELD_COLORS = ['#0000', '#1a1a1e', '#3a3a44', '#e8e8f4', '#e0e0ec']
 const GRID = 15
@@ -60,35 +60,38 @@ function shieldParticles(size) {
 }
 
 function makeParticle(x, y, vx, vy, life, size, color) {
-  return { x, y, vx, vy, life, maxLife: life, size, color }
+  return {x, y, vx, vy, life, maxLife: life, size, color}
 }
 
 // ======= 各特效渲染器 =======
 // 每个返回 { init, update, draw, isDone }
 
-function rnd(n) { return (Math.random() - 0.5) * n }
+function rnd(n) {
+  return (Math.random() - 0.5) * n
+}
 
 // ---- 1. storm_combo: 绿色像素斩击（加粗像素群） ----
 const stormComboRenderer = {
   init(size) {
-    return { phase: 'idle', timer: 0, parts: [], trails: [], sparks: [] }
+    return {phase: 'idle', timer: 0, parts: [], trails: [], sparks: []}
   },
   update(s, size) {
     s.timer += 16
     if (s.phase === 'idle' && s.timer > 600) {
-      s.phase = 'slash'; s.timer = 0
+      s.phase = 'slash';
+      s.timer = 0
       // 粗斩击：3条平行像素线，每条 16 个粒子
       for (let row = -3; row <= 3; row += 3) {
         for (let i = 0; i < 16; i++) {
           const t = i / 15
           const baseX = 4 + t * (size - 8)
           const baseY = size - 4 - t * (size - 8)
-          const greenShades = ['#22c55e','#4ade80','#16a34a','#86efac','#15803d','#166534']
+          const greenShades = ['#22c55e', '#4ade80', '#16a34a', '#86efac', '#15803d', '#166534']
           s.parts.push(makeParticle(
-            baseX + rnd(2), baseY + row + rnd(2),
-            2.5 + rnd(1.8), -2.5 + rnd(1.8),
-            0.5 + Math.random() * 0.5, 3 + Math.floor(Math.random() * 3),
-            greenShades[Math.floor(Math.random() * greenShades.length)]
+              baseX + rnd(2), baseY + row + rnd(2),
+              2.5 + rnd(1.8), -2.5 + rnd(1.8),
+              0.5 + Math.random() * 0.5, 3 + Math.floor(Math.random() * 3),
+              greenShades[Math.floor(Math.random() * greenShades.length)]
           ))
         }
       }
@@ -99,26 +102,52 @@ const stormComboRenderer = {
     }
     if (s.phase === 'slash') {
       for (const p of s.parts) {
-        p.x += p.vx; p.y += p.vy
+        p.x += p.vx;
+        p.y += p.vy
         p.life -= 0.014
         if (p.life > 0.2 && Math.random() < 0.5) s.trails.push(makeParticle(p.x, p.y, rnd(0.3), rnd(0.3), 0.3, 2, p.color))
       }
-      for (const sp of s.sparks) { sp.x += sp.vx; sp.y += sp.vy; sp.life -= 0.02 }
-      for (const t of s.trails) { t.life -= 0.04 }
+      for (const sp of s.sparks) {
+        sp.x += sp.vx;
+        sp.y += sp.vy;
+        sp.life -= 0.02
+      }
+      for (const t of s.trails) {
+        t.life -= 0.04
+      }
       s.trails = s.trails.filter(t => t.life > 0)
       s.sparks = s.sparks.filter(sp => sp.life > 0)
-      if (s.parts.every(p => p.life <= 0) && s.trails.length === 0 && s.sparks.length === 0) { s.phase = 'done'; s.timer = 0 }
+      if (s.parts.every(p => p.life <= 0) && s.trails.length === 0 && s.sparks.length === 0) {
+        s.phase = 'done';
+        s.timer = 0
+      }
     }
     if (s.phase === 'done' && s.timer > 900) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
-    for (const t of s.trails) { ctx.globalAlpha = t.life; ctx.fillStyle = t.color; ctx.fillRect(Math.round(t.x), Math.round(t.y), t.size, t.size) }
-    for (const p of s.parts) { if (p.life <= 0) continue; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size) }
-    for (const sp of s.sparks) { if (sp.life <= 0) continue; ctx.globalAlpha = sp.life; ctx.fillStyle = sp.color; ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sp.size, sp.size) }
+    for (const t of s.trails) {
+      ctx.globalAlpha = t.life;
+      ctx.fillStyle = t.color;
+      ctx.fillRect(Math.round(t.x), Math.round(t.y), t.size, t.size)
+    }
+    for (const p of s.parts) {
+      if (p.life <= 0) continue;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const sp of s.sparks) {
+      if (sp.life <= 0) continue;
+      ctx.globalAlpha = sp.life;
+      ctx.fillStyle = sp.color;
+      ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sp.size, sp.size)
+    }
     ctx.globalAlpha = 1
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 2. auto_strike: T形锤，锤柄底端在格子左侧边缘为圆心，绕90度砸向中心 ----
@@ -317,33 +346,49 @@ const bleedRenderer = {
     const parts = []
     for (let i = 0; i < 24; i++) {
       const ang = Math.random() * Math.PI * 2, dist = Math.random() * 20
-      parts.push(makeParticle(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, Math.cos(ang) * 0.24 + rnd(0.2), Math.sin(ang) * 0.24 + rnd(0.2), 0.5 + Math.random() * 0.25, 2 + Math.floor(Math.random() * 3), ['#7f1d1d','#991b1b','#450a0a','#b91c1c'][Math.floor(Math.random() * 4)]))
+      parts.push(makeParticle(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, Math.cos(ang) * 0.24 + rnd(0.2), Math.sin(ang) * 0.24 + rnd(0.2), 0.5 + Math.random() * 0.25, 2 + Math.floor(Math.random() * 3), ['#7f1d1d', '#991b1b', '#450a0a', '#b91c1c'][Math.floor(Math.random() * 4)]))
     }
-    return { phase: 'spread', timer: 0, parts }
+    return {phase: 'spread', timer: 0, parts}
   },
   update(s, size) {
     s.timer += 16
-    for (const p of s.parts) { p.x += p.vx; p.y += p.vy; p.vx *= 0.94; p.vy *= 0.94; p.life -= 0.006 }
+    for (const p of s.parts) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.94;
+      p.vy *= 0.94;
+      p.life -= 0.006
+    }
     if (s.timer > 2200) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
-    for (const p of s.parts) { if (p.life <= 0) continue; ctx.globalAlpha = Math.min(1, p.life); ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size) }
+    for (const p of s.parts) {
+      if (p.life <= 0) continue;
+      ctx.globalAlpha = Math.min(1, p.life);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
     ctx.globalAlpha = 1
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 4. omen_harvest: 镰刀逐步划过（像素量增大） ----
 const omenHarvestRenderer = {
   init(size) {
-    return { phase: 'idle', timer: 0, bladePixels: [], trailPixels: [], residue: [] }
+    return {phase: 'idle', timer: 0, bladePixels: [], trailPixels: [], residue: []}
   },
   update(s, size) {
     s.timer += 16
     const cx = size * 0.38, cy = size * 0.4
     const rOuter = size * 0.58, rInner = size * 0.42
-    if (s.phase === 'idle' && s.timer > 600) { s.phase = 'sweep'; s.timer = 0 }
+    if (s.phase === 'idle' && s.timer > 600) {
+      s.phase = 'sweep';
+      s.timer = 0
+    }
     if (s.phase === 'sweep') {
       const progress = Math.min(1, s.timer / 400)
       const sweepAngle = -0.5 + progress * 2.8  // 从左上扫到右下
@@ -353,27 +398,39 @@ const omenHarvestRenderer = {
       for (let a = -0.5; a < Math.min(sweepAngle + 0.15, 2.3); a += 0.04) {
         // 外弧
         const ox = cx + Math.cos(a) * rOuter, oy = cy + Math.sin(a) * rOuter
-        const purpleShades = ['#c084fc','#a855f7','#9333ea','#7e22ce','#d8b4fe']
+        const purpleShades = ['#c084fc', '#a855f7', '#9333ea', '#7e22ce', '#d8b4fe']
         const isEdge = a > sweepAngle - 0.1
-        s.bladePixels.push({ x: ox, y: oy, life: isEdge ? 0.7 : 1, size: isEdge ? 2 : 3, color: purpleShades[Math.floor(Math.random() * purpleShades.length)] })
+        s.bladePixels.push({
+          x: ox,
+          y: oy,
+          life: isEdge ? 0.7 : 1,
+          size: isEdge ? 2 : 3,
+          color: purpleShades[Math.floor(Math.random() * purpleShades.length)]
+        })
         // 内弧
         const ix = cx + Math.cos(a) * rInner, iy = cy + Math.sin(a) * rInner
-        s.bladePixels.push({ x: ix, y: iy, life: 1, size: 2, color: a < sweepAngle - 0.2 ? '#581c87' : '#a855f7' })
+        s.bladePixels.push({x: ix, y: iy, life: 1, size: 2, color: a < sweepAngle - 0.2 ? '#581c87' : '#a855f7'})
         // 中间填充
         for (let f = 0; f < 3; f++) {
           const frac = Math.random(), rx = ox + (ix - ox) * frac + rnd(2), ry = oy + (iy - oy) * frac + rnd(2)
-          s.bladePixels.push({ x: rx, y: ry, life: 0.85, size: 2, color: ['#7e22ce','#9333ea','#581c87'][Math.floor(Math.random() * 3)] })
+          s.bladePixels.push({
+            x: rx,
+            y: ry,
+            life: 0.85,
+            size: 2,
+            color: ['#7e22ce', '#9333ea', '#581c87'][Math.floor(Math.random() * 3)]
+          })
         }
         // 尾迹像素
         if (a < sweepAngle && Math.random() < 0.4) {
-          s.trailPixels.push({ x: ox + rnd(6), y: oy + rnd(6), life: 0.5, size: 2, color: '#c084fc' })
+          s.trailPixels.push({x: ox + rnd(6), y: oy + rnd(6), life: 0.5, size: 2, color: '#c084fc'})
         }
       }
       // 刀柄
       const handleAngle = -0.5
       for (let h = 0; h < 10; h++) {
         const hx = cx + Math.cos(handleAngle) * (rOuter + h * 3), hy = cy + Math.sin(handleAngle) * (rOuter + h * 3)
-        s.bladePixels.push({ x: hx, y: hy, life: 1, size: 3, color: h < 5 ? '#4a1942' : '#2d0a22' })
+        s.bladePixels.push({x: hx, y: hy, life: 1, size: 3, color: h < 5 ? '#4a1942' : '#2d0a22'})
       }
       if (progress >= 1) {
         // 完成后留大量紫色残粒逐步淡出（留在原位不动）
@@ -384,7 +441,7 @@ const omenHarvestRenderer = {
               x: p.x, y: p.y,
               life: 0.5 + Math.random() * 0.5,
               size: p.size,
-              color: ['#c084fc','#a855f7','#d8b4fe','#7e22ce'][Math.floor(Math.random() * 4)],
+              color: ['#c084fc', '#a855f7', '#d8b4fe', '#7e22ce'][Math.floor(Math.random() * 4)],
             })
           }
         }
@@ -395,10 +452,11 @@ const omenHarvestRenderer = {
             x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r,
             life: 0.25 + Math.random() * 0.45,
             size: 2 + Math.floor(Math.random() * 2),
-            color: ['#c084fc','#d8b4fe','#a855f7'][Math.floor(Math.random() * 3)],
+            color: ['#c084fc', '#d8b4fe', '#a855f7'][Math.floor(Math.random() * 3)],
           })
         }
-        s.phase = 'done'; s.timer = 0
+        s.phase = 'done';
+        s.timer = 0
       }
     }
     if (s.phase === 'done') {
@@ -409,24 +467,45 @@ const omenHarvestRenderer = {
     return s
   },
   draw(ctx, s, size) {
-    for (const tp of s.trailPixels) { if (tp.life <= 0) continue; ctx.globalAlpha = Math.min(1, tp.life); ctx.fillStyle = tp.color; ctx.fillRect(Math.round(tp.x), Math.round(tp.y), tp.size, tp.size) }
-    for (const p of s.bladePixels) { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size) }
-    for (const rp of s.residue) { if (rp.life <= 0) continue; ctx.globalAlpha = rp.life; ctx.fillStyle = rp.color; ctx.fillRect(Math.round(rp.x), Math.round(rp.y), rp.size, rp.size) }
+    for (const tp of s.trailPixels) {
+      if (tp.life <= 0) continue;
+      ctx.globalAlpha = Math.min(1, tp.life);
+      ctx.fillStyle = tp.color;
+      ctx.fillRect(Math.round(tp.x), Math.round(tp.y), tp.size, tp.size)
+    }
+    for (const p of s.bladePixels) {
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const rp of s.residue) {
+      if (rp.life <= 0) continue;
+      ctx.globalAlpha = rp.life;
+      ctx.fillStyle = rp.color;
+      ctx.fillRect(Math.round(rp.x), Math.round(rp.y), rp.size, rp.size)
+    }
     ctx.globalAlpha = 1
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 5. final_cut: 贯穿全战斗区的超长对角终结斩 ----
 const finalCutRenderer = {
   init(size) {
-    return { phase: 'idle', timer: 0, slashPixels: [], shockwave: [], sparks: [], screenFlash: 0 }
+    return {phase: 'idle', timer: 0, slashPixels: [], shockwave: [], sparks: [], screenFlash: 0}
   },
   update(s, size) {
     s.timer += 16
-    if (s.phase === 'idle' && s.timer > 440) { s.phase = 'anticipate'; s.timer = 0 }
+    if (s.phase === 'idle' && s.timer > 440) {
+      s.phase = 'anticipate';
+      s.timer = 0
+    }
     if (s.phase === 'anticipate' && s.timer > 90) {
-      s.phase = 'slash'; s.timer = 0; s.screenFlash = 1
+      s.phase = 'slash';
+      s.timer = 0;
+      s.screenFlash = 1
       const startX = -size * 0.32
       const startY = -size * 0.32
       const endX = size * 1.32
@@ -445,26 +524,26 @@ const finalCutRenderer = {
           const intensity = dist === 0 ? 1 : dist <= 2 ? 0.92 : dist <= 4 ? 0.68 : dist <= 6 ? 0.44 : 0.24
           const color = dist === 0 ? '#fff' : dist <= 2 ? '#fee2e2' : dist <= 4 ? '#f87171' : dist <= 6 ? '#dc2626' : '#7f1d1d'
           s.slashPixels.push(makeParticle(
-            sx + normalX * w * 4.8 + rnd(1.8),
-            sy + normalY * w * 4.8 + rnd(1.8),
-            0,
-            0,
-            0.5 + intensity * 0.5,
-            dist <= 1 ? 7 : dist <= 4 ? 6 : 4,
-            color,
+              sx + normalX * w * 4.8 + rnd(1.8),
+              sy + normalY * w * 4.8 + rnd(1.8),
+              0,
+              0,
+              0.5 + intensity * 0.5,
+              dist <= 1 ? 7 : dist <= 4 ? 6 : 4,
+              color,
           ))
         }
         if (i % 2 === 0) {
           for (let w = -14; w <= 14; w += 3) {
             if (Math.abs(w) <= 8) continue
             s.slashPixels.push(makeParticle(
-              sx + normalX * w * 3.8 + rnd(2.4),
-              sy + normalY * w * 3.8 + rnd(2.4),
-              rnd(1.4),
-              rnd(1.4),
-              0.36 + Math.random() * 0.34,
-              3,
-              ['#7f1d1d', '#991b1b', '#b91c1c', '#ef4444'][Math.floor(Math.random() * 4)],
+                sx + normalX * w * 3.8 + rnd(2.4),
+                sy + normalY * w * 3.8 + rnd(2.4),
+                rnd(1.4),
+                rnd(1.4),
+                0.36 + Math.random() * 0.34,
+                3,
+                ['#7f1d1d', '#991b1b', '#b91c1c', '#ef4444'][Math.floor(Math.random() * 4)],
             ))
           }
         }
@@ -487,22 +566,59 @@ const finalCutRenderer = {
     if (s.phase === 'slash') {
       s.screenFlash = Math.max(0, s.screenFlash - 0.06)
       for (const p of s.slashPixels) p.life -= 0.018
-      for (const sw of s.shockwave) { sw.x += sw.vx; sw.y += sw.vy; sw.vx *= 0.95; sw.vy *= 0.95; sw.life -= 0.022 }
-      for (const sp of s.sparks) { sp.x += sp.vx; sp.y += sp.vy; sp.vx *= 0.93; sp.vy *= 0.93; sp.life -= 0.026 }
-      if (s.slashPixels.every(p => p.life <= 0) && s.shockwave.every(sw => sw.life <= 0) && s.sparks.every(sp => sp.life <= 0)) { s.phase = 'done'; s.timer = 0 }
+      for (const sw of s.shockwave) {
+        sw.x += sw.vx;
+        sw.y += sw.vy;
+        sw.vx *= 0.95;
+        sw.vy *= 0.95;
+        sw.life -= 0.022
+      }
+      for (const sp of s.sparks) {
+        sp.x += sp.vx;
+        sp.y += sp.vy;
+        sp.vx *= 0.93;
+        sp.vy *= 0.93;
+        sp.life -= 0.026
+      }
+      if (s.slashPixels.every(p => p.life <= 0) && s.shockwave.every(sw => sw.life <= 0) && s.sparks.every(sp => sp.life <= 0)) {
+        s.phase = 'done';
+        s.timer = 0
+      }
     }
     if (s.phase === 'done' && s.timer > 1400) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
     // 屏幕闪白
-    if (s.screenFlash > 0) { ctx.globalAlpha = s.screenFlash * 0.15; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size); ctx.globalAlpha = 1 }
-    for (const p of s.slashPixels) { if (p.life <= 0) continue; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size) }
-    for (const sw of s.shockwave) { if (sw.life <= 0) continue; ctx.globalAlpha = sw.life; ctx.fillStyle = sw.color; ctx.fillRect(Math.round(sw.x), Math.round(sw.y), sw.size, sw.size) }
-    for (const sp of s.sparks) { if (sp.life <= 0) continue; ctx.globalAlpha = sp.life; ctx.fillStyle = sp.color; ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sp.size, sp.size) }
+    if (s.screenFlash > 0) {
+      ctx.globalAlpha = s.screenFlash * 0.15;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.globalAlpha = 1
+    }
+    for (const p of s.slashPixels) {
+      if (p.life <= 0) continue;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const sw of s.shockwave) {
+      if (sw.life <= 0) continue;
+      ctx.globalAlpha = sw.life;
+      ctx.fillStyle = sw.color;
+      ctx.fillRect(Math.round(sw.x), Math.round(sw.y), sw.size, sw.size)
+    }
+    for (const sp of s.sparks) {
+      if (sp.life <= 0) continue;
+      ctx.globalAlpha = sp.life;
+      ctx.fillStyle = sp.color;
+      ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sp.size, sp.size)
+    }
     ctx.globalAlpha = 1
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 6. collapse_trigger: 盾牌爆裂（方案9，删除裂纹残留） ----
@@ -512,13 +628,14 @@ const collapseTriggerSpreadRatio = 0.85
 
 const collapseTriggerRenderer = {
   init(size) {
-    return { phase: 'idle', timer: 0, parts: shieldParticles(size) }
+    return {phase: 'idle', timer: 0, parts: shieldParticles(size)}
   },
   update(s, size) {
     s.timer += collapseTriggerTickMs
     const cx = size / 2, cy = size / 2
     if (s.phase === 'idle' && s.timer > 800) {
-      s.phase = 'explode'; s.timer = 0
+      s.phase = 'explode';
+      s.timer = 0
       for (const p of s.parts) {
         const dx = p.x - cx, dy = p.y - cy
         const dist = Math.sqrt(dx * dx + dy * dy) || 1
@@ -532,23 +649,36 @@ const collapseTriggerRenderer = {
       let alive = 0
       for (const p of s.parts) {
         if (p.life <= 0) continue
-        p.x += p.vx; p.y += p.vy; p.vx *= 0.992; p.vy *= 0.992
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.992;
+        p.vy *= 0.992
         const distFromCenter = Math.hypot(p.x - cx, p.y - cy)
         if (p.x < -8 || p.x > size + 8 || p.y < -8 || p.y > size + 8) p.life -= 0.08
         else if (distFromCenter >= spreadRadius) p.life -= 0.02
         else if (s.timer > 520) p.life -= 0.006
         if (p.life > 0) alive++
       }
-      if (alive === 0) { s.phase = 'done'; s.timer = 0 }
+      if (alive === 0) {
+        s.phase = 'done';
+        s.timer = 0
+      }
     }
     if (s.phase === 'done' && s.timer > 1000) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
-    for (const p of s.parts) { if (p.life <= 0) continue; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.round(p.size), Math.round(p.size)) }
+    for (const p of s.parts) {
+      if (p.life <= 0) continue;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.round(p.size), Math.round(p.size))
+    }
     ctx.globalAlpha = 1
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 7. judgment_day: 圣洁黄金十字裁决（像素十字斩） ----
@@ -569,7 +699,7 @@ const judgmentDayRenderer = {
         const y = cx + wy
         if (y < 0 || y >= size) continue
         const d = Math.max(dx, Math.abs(wy) * 1.6)
-        px.push({ bx: x, by: y, d })
+        px.push({bx: x, by: y, d})
       }
     }
     // 竖臂：覆盖中心整列（跳过已覆盖的中心块）
@@ -580,7 +710,7 @@ const judgmentDayRenderer = {
         if (x < 0 || x >= size) continue
         if (Math.abs(x - cx) < barHw - spacing && Math.abs(y - cx) < barHw - spacing) continue
         const d = Math.max(Math.abs(wx) * 1.6, dy)
-        px.push({ bx: x, by: y, d })
+        px.push({bx: x, by: y, d})
       }
     }
     return {
@@ -623,8 +753,18 @@ const judgmentDayRenderer = {
 
     if (s.phase === 'hold') {
       s.holdTimer = s.timer
-      for (const sp of s.edgeSparks) { sp.x += sp.vx; sp.y += sp.vy; sp.vx *= 0.93; sp.vy *= 0.93; sp.life -= 0.017 }
-      if (s.timer > 2200) { s.phase = 'shatter'; s.timer = 0; s.flashA = 0.20 }
+      for (const sp of s.edgeSparks) {
+        sp.x += sp.vx;
+        sp.y += sp.vy;
+        sp.vx *= 0.93;
+        sp.vy *= 0.93;
+        sp.life -= 0.017
+      }
+      if (s.timer > 2200) {
+        s.phase = 'shatter';
+        s.timer = 0;
+        s.flashA = 0.20
+      }
     }
 
     if (s.phase === 'shatter') {
@@ -652,14 +792,25 @@ const judgmentDayRenderer = {
         }
       }
       // 碎片飞行 + 衰减
-      for (const sh of s.shardPx) { sh.x += sh.vx; sh.y += sh.vy; sh.vx *= 0.96; sh.vy *= 0.96; sh.life -= 0.016 }
+      for (const sh of s.shardPx) {
+        sh.x += sh.vx;
+        sh.y += sh.vy;
+        sh.vx *= 0.96;
+        sh.vy *= 0.96;
+        sh.life -= 0.016
+      }
       s.flashA = Math.max(0, s.flashA - 0.008)
-      if (s.shardPx.every(sh => sh.life <= 0)) { s.phase = 'done'; s.timer = 0 }
+      if (s.shardPx.every(sh => sh.life <= 0)) {
+        s.phase = 'done';
+        s.timer = 0
+      }
     }
 
     return s
   },
-  isDone(s) { return s.phase === 'done' && s.timer > 600 },
+  isDone(s) {
+    return s.phase === 'done' && s.timer > 600
+  },
   draw(ctx, s, size) {
     const cx = size / 2
 
@@ -677,11 +828,22 @@ const judgmentDayRenderer = {
 
         let color, sz
         const dNorm = p.d / (size * 0.5)
-        if (p.d < 3) { color = '#ffffff'; sz = 10 }
-        else if (dNorm < 0.18) { color = '#fef08a'; sz = 8 }
-        else if (dNorm < 0.40) { color = '#fcd34d'; sz = 6 }
-        else if (dNorm < 0.70) { color = '#f59e0b'; sz = 4 }
-        else { color = '#d97706'; sz = 4 }
+        if (p.d < 3) {
+          color = '#ffffff';
+          sz = 10
+        } else if (dNorm < 0.18) {
+          color = '#fef08a';
+          sz = 8
+        } else if (dNorm < 0.40) {
+          color = '#fcd34d';
+          sz = 6
+        } else if (dNorm < 0.70) {
+          color = '#f59e0b';
+          sz = 4
+        } else {
+          color = '#d97706';
+          sz = 4
+        }
 
         // 中心交叉区域额外白色高亮
         const cell = size / 5
@@ -725,7 +887,7 @@ const judgmentDayRenderer = {
 // ---- 8. doom_judgment: 断裂像素环 ----
 const doomJudgmentRenderer = {
   init(size) {
-    return { phase: 'build', timer: 0, ringPixels: [], cx: size / 2, cy: size / 2, r: size * 0.44 }
+    return {phase: 'build', timer: 0, ringPixels: [], cx: size / 2, cy: size / 2, r: size * 0.44}
   },
   update(s, size) {
     s.timer += 16
@@ -737,24 +899,39 @@ const doomJudgmentRenderer = {
       for (let i = 0; i < Math.min(built, totalSegments); i++) {
         if (gapIndices.has(i)) continue
         const ang = (i / totalSegments) * Math.PI * 2
-        s.ringPixels.push({ x: s.cx + Math.cos(ang) * s.r, y: s.cy + Math.sin(ang) * s.r, life: 1, size: 3, color: i % 4 === 0 ? '#f87171' : '#7f1d1d' })
+        s.ringPixels.push({
+          x: s.cx + Math.cos(ang) * s.r,
+          y: s.cy + Math.sin(ang) * s.r,
+          life: 1,
+          size: 3,
+          color: i % 4 === 0 ? '#f87171' : '#7f1d1d'
+        })
       }
-      if (built >= totalSegments) { s.phase = 'contract'; s.timer = 0 }
+      if (built >= totalSegments) {
+        s.phase = 'contract';
+        s.timer = 0
+      }
     }
     if (s.phase === 'contract') {
       const shrink = s.timer < 300 ? s.timer / 300 * 4 : 4
       for (const p of s.ringPixels) {
-        const dx = p.x - s.cx, dy = p.y - s.cy, dist = Math.sqrt(dx*dx+dy*dy) || 1
-        p.x -= (dx/dist) * shrink * 0.06; p.y -= (dy/dist) * shrink * 0.06
+        const dx = p.x - s.cx, dy = p.y - s.cy, dist = Math.sqrt(dx * dx + dy * dy) || 1
+        p.x -= (dx / dist) * shrink * 0.06;
+        p.y -= (dy / dist) * shrink * 0.06
       }
       if (s.timer > 3500) return this.init(size)
     }
     return s
   },
   draw(ctx, s, size) {
-    for (const p of s.ringPixels) { ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size) }
+    for (const p of s.ringPixels) {
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 9. silver_storm: 顶部到底部的多道随机银色刀光 ----
@@ -872,13 +1049,13 @@ const silverStormRenderer = {
               const ang = Math.random() * Math.PI * 2
               const spd = 0.8 + Math.random() * 2.2
               s.shardPixels.push(makeParticle(
-                px + w * 1.1 + rnd(0.6),
-                py + rnd(0.8),
-                Math.cos(ang) * spd,
-                Math.sin(ang) * spd,
-                0.34 + Math.random() * 0.28,
-                Math.abs(w) <= 1 ? 3 : 2,
-                Math.abs(w) === 0 ? '#ffffff' : Math.abs(w) <= 1 ? '#e2e8f0' : '#94a3b8',
+                  px + w * 1.1 + rnd(0.6),
+                  py + rnd(0.8),
+                  Math.cos(ang) * spd,
+                  Math.sin(ang) * spd,
+                  0.34 + Math.random() * 0.28,
+                  Math.abs(w) <= 1 ? 3 : 2,
+                  Math.abs(w) === 0 ? '#ffffff' : Math.abs(w) <= 1 ? '#e2e8f0' : '#94a3b8',
               ))
             }
           }
@@ -922,49 +1099,84 @@ const silverStormRenderer = {
       ctx.fillRect(0, 0, size, size)
       ctx.globalAlpha = 1
     }
-    for (const p of s.linePixels) { if (p.life <= 0) continue; ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size) }
-    for (const shard of s.shardPixels) { if (shard.life <= 0) continue; ctx.globalAlpha = shard.life; ctx.fillStyle = shard.color; ctx.fillRect(Math.round(shard.x), Math.round(shard.y), shard.size, shard.size) }
-    for (const sp of s.edgeSparks) { if (sp.life <= 0) continue; ctx.globalAlpha = sp.life; ctx.fillStyle = sp.color; ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sp.size, sp.size) }
+    for (const p of s.linePixels) {
+      if (p.life <= 0) continue;
+      ctx.globalAlpha = p.life;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const shard of s.shardPixels) {
+      if (shard.life <= 0) continue;
+      ctx.globalAlpha = shard.life;
+      ctx.fillStyle = shard.color;
+      ctx.fillRect(Math.round(shard.x), Math.round(shard.y), shard.size, shard.size)
+    }
+    for (const sp of s.edgeSparks) {
+      if (sp.life <= 0) continue;
+      ctx.globalAlpha = sp.life;
+      ctx.fillStyle = sp.color;
+      ctx.fillRect(Math.round(sp.x), Math.round(sp.y), sp.size, sp.size)
+    }
     ctx.globalAlpha = 1
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ---- 10. crosshair-mark: 准星标记 ----
 const crosshairMarkRenderer = {
   init(size) {
-    return { phase: 'idle', timer: 0, lines: [], centerDot: null, cx: size * 0.72, cy: size * 0.28 }
+    return {phase: 'idle', timer: 0, lines: [], centerDot: null, cx: size * 0.72, cy: size * 0.28}
   },
   update(s, size) {
     s.timer += 16
-    const { cx, cy } = s
-    if (s.phase === 'idle' && s.timer > 500) { s.phase = 'converge'; s.timer = 0 }
+    const {cx, cy} = s
+    if (s.phase === 'idle' && s.timer > 500) {
+      s.phase = 'converge';
+      s.timer = 0
+    }
     if (s.phase === 'converge') {
       const progress = Math.min(1, s.timer / 400)
       s.lines = []
-      const directions = [[0,-1],[0,1],[-1,0],[1,0]]
+      const directions = [[0, -1], [0, 1], [-1, 0], [1, 0]]
       for (const [dx, dy] of directions) {
         const len = 16, endX = cx + dx * len, endY = cy + dy * len
         const startX = cx + dx * len * 3, startY = cy + dy * len * 3
         const x = startX + (endX - startX) * progress
         const y = startY + (endY - startY) * progress
         for (let i = 0; i <= len; i += 2) {
-          s.lines.push({ x: Math.round(startX + (x - startX) * i / len), y: Math.round(startY + (y - startY) * i / len), life: 1, size: 2, color: '#f87171' })
+          s.lines.push({
+            x: Math.round(startX + (x - startX) * i / len),
+            y: Math.round(startY + (y - startY) * i / len),
+            life: 1,
+            size: 2,
+            color: '#f87171'
+          })
         }
       }
       if (progress >= 1) {
         s.centerDot = makeParticle(cx, cy, 0, 0, 999, 3, '#ef4444')
-        s.phase = 'freeze'; s.timer = 0
+        s.phase = 'freeze';
+        s.timer = 0
       }
     }
     if (s.phase === 'freeze' && s.timer > 3500) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
-    for (const l of s.lines) { ctx.fillStyle = l.color; ctx.fillRect(l.x, l.y, l.size, l.size) }
-    if (s.centerDot) { ctx.fillStyle = s.centerDot.color; ctx.fillRect(Math.round(s.centerDot.x - 1), Math.round(s.centerDot.y - 1), 3, 3) }
+    for (const l of s.lines) {
+      ctx.fillStyle = l.color;
+      ctx.fillRect(l.x, l.y, l.size, l.size)
+    }
+    if (s.centerDot) {
+      ctx.fillStyle = s.centerDot.color;
+      ctx.fillRect(Math.round(s.centerDot.x - 1), Math.round(s.centerDot.y - 1), 3, 3)
+    }
   },
-  isDone(s) { return false },
+  isDone(s) {
+    return false
+  },
 }
 
 // ======= 注册表（与后端 EffectType 对齐） =======
@@ -995,7 +1207,10 @@ function start() {
     state = r.update(state, props.size)
     if (r.isDone(state)) {
       if (props.loop) state = r.init(props.size)
-      else { draw(); return }
+      else {
+        draw();
+        return
+      }
     }
     draw()
     raf = requestAnimationFrame(frame)
@@ -1020,7 +1235,10 @@ function stop() {
 
 onMounted(start)
 onBeforeUnmount(stop)
-watch(() => props.effect, () => { stop(); start() })
+watch(() => props.effect, () => {
+  stop();
+  start()
+})
 </script>
 
 <style scoped>

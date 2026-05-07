@@ -1,9 +1,9 @@
 <script setup>
 defineProps({
-  bossHistoryPage: { type: Object, required: true },
-  loadingHistory: { type: Boolean, required: true },
-  formatItemStats: { type: Function, required: true },
-  fetchBossHistory: { type: Function, required: true },
+  bossHistoryPage: {type: Object, required: true},
+  loadingHistory: {type: Boolean, required: true},
+  formatItemStats: {type: Function, required: true},
+  fetchBossHistory: {type: Function, required: true},
 })
 </script>
 
@@ -31,7 +31,7 @@ defineProps({
             <li v-for="item in entry.loot" :key="item.itemId" class="inventory-item">
               <div>
                 <strong>{{ item.itemName || item.itemId }}</strong>
-              <p>{{ item.itemId }} · {{ item.slot }} · 掉落几率 {{ item.dropRatePercent }}%</p>
+                <p>{{ item.itemId }} · {{ item.slot }} · 掉落几率 {{ item.dropRatePercent }}%</p>
                 <p>{{ formatItemStats(item) }}</p>
               </div>
             </li>
@@ -51,19 +51,19 @@ defineProps({
       </section>
       <div class="admin-inline-actions" style="grid-column: 1 / -1;">
         <button
-          class="nickname-form__ghost"
-          type="button"
-          :disabled="loadingHistory || bossHistoryPage.page <= 1"
-          @click="fetchBossHistory(bossHistoryPage.page - 1)"
+            class="nickname-form__ghost"
+            type="button"
+            :disabled="loadingHistory || bossHistoryPage.page <= 1"
+            @click="fetchBossHistory(bossHistoryPage.page - 1)"
         >
           上一页
         </button>
         <span class="feedback">第 {{ bossHistoryPage.page }} / {{ Math.max(bossHistoryPage.totalPages, 1) }} 页</span>
         <button
-          class="nickname-form__ghost"
-          type="button"
-          :disabled="loadingHistory || bossHistoryPage.page >= bossHistoryPage.totalPages"
-          @click="fetchBossHistory(bossHistoryPage.page + 1)"
+            class="nickname-form__ghost"
+            type="button"
+            :disabled="loadingHistory || bossHistoryPage.page >= bossHistoryPage.totalPages"
+            @click="fetchBossHistory(bossHistoryPage.page + 1)"
         >
           下一页
         </button>

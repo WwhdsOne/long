@@ -1,16 +1,16 @@
 <script setup>
 defineProps({
-  announcementForm: { type: Object, required: true },
-  announcements: { type: Array, required: true },
-  loadingAnnouncements: { type: Boolean, required: true },
-  loadingMessages: { type: Boolean, required: true },
-  messagePage: { type: Object, required: true },
-  saving: { type: Boolean, required: true },
-  deleteAnnouncement: { type: Function, required: true },
-  deleteMessage: { type: Function, required: true },
-  fetchMessages: { type: Function, required: true },
-  formatTime: { type: Function, required: true },
-  saveAnnouncement: { type: Function, required: true },
+  announcementForm: {type: Object, required: true},
+  announcements: {type: Array, required: true},
+  loadingAnnouncements: {type: Boolean, required: true},
+  loadingMessages: {type: Boolean, required: true},
+  messagePage: {type: Object, required: true},
+  saving: {type: Boolean, required: true},
+  deleteAnnouncement: {type: Function, required: true},
+  deleteMessage: {type: Function, required: true},
+  fetchMessages: {type: Function, required: true},
+  formatTime: {type: Function, required: true},
+  saveAnnouncement: {type: Function, required: true},
 })
 </script>
 
@@ -24,10 +24,11 @@ defineProps({
         </div>
 
         <form class="admin-form" @submit.prevent="saveAnnouncement">
-          <input v-model="announcementForm.title" class="nickname-form__input" type="text" placeholder="公告标题" />
-          <textarea v-model="announcementForm.content" class="nickname-form__input admin-textarea" rows="5" placeholder="公告正文，首次进入前台时会弹一次提醒"></textarea>
+          <input v-model="announcementForm.title" class="nickname-form__input" type="text" placeholder="公告标题"/>
+          <textarea v-model="announcementForm.content" class="nickname-form__input admin-textarea" rows="5"
+                    placeholder="公告正文，首次进入前台时会弹一次提醒"></textarea>
           <label class="admin-check">
-            <input v-model="announcementForm.active" type="checkbox" />
+            <input v-model="announcementForm.active" type="checkbox"/>
             设为生效公告
           </label>
           <button class="nickname-form__submit" type="submit" :disabled="saving">发布公告</button>
@@ -69,11 +70,11 @@ defineProps({
         </ul>
 
         <button
-          v-if="messagePage.nextCursor"
-          class="nickname-form__ghost"
-          type="button"
-          :disabled="loadingMessages"
-          @click="fetchMessages(messagePage.nextCursor, true)"
+            v-if="messagePage.nextCursor"
+            class="nickname-form__ghost"
+            type="button"
+            :disabled="loadingMessages"
+            @click="fetchMessages(messagePage.nextCursor, true)"
         >
           加载更多留言
         </button>

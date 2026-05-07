@@ -363,6 +363,8 @@ func archiveCycleKeyForTask(task TaskDefinition, nowTime time.Time) (string, boo
 			return "", false
 		}
 		return fmt.Sprintf("%s:%d:%d", task.TaskID, task.StartAt, task.EndAt), true
+	case TaskWindowLifetime:
+		return "", false
 	default:
 		return "", false
 	}

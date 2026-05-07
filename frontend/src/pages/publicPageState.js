@@ -166,23 +166,24 @@ const pendingKeys = ref(new Set())
 const actioningItemId = ref('')
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
+
 function defaultTalentVisualState() {
-  return {
-    omenStacks: 0,
-    omenCap: 150,
-    silverStormActive: false,
-    silverStormRemaining: 0,
-    silverStormEndsAt: 0,
-    silverStormDuration: 0,
-    skinnerDurationByPart: {},
-    skinnerCooldownEndsAt: 0,
-    skinnerCooldownDuration: 0,
-    collapsePartKeys: [],
-    collapseEndsAt: 0,
-    collapseDuration: 8,
-    doomMarks: [],
-    doomMarkCumDamage: {},
-  }
+    return {
+        omenStacks: 0,
+        omenCap: 150,
+        silverStormActive: false,
+        silverStormRemaining: 0,
+        silverStormEndsAt: 0,
+        silverStormDuration: 0,
+        skinnerDurationByPart: {},
+        skinnerCooldownEndsAt: 0,
+        skinnerCooldownDuration: 0,
+        collapsePartKeys: [],
+        collapseEndsAt: 0,
+        collapseDuration: 8,
+        doomMarks: [],
+        doomMarkCumDamage: {},
+    }
 }
 
 const damageBursts = ref({})
@@ -221,420 +222,430 @@ let comboTickTimer = 0
 let taskPollingTimer = 0
 
 function partTypeForKey(key) {
-  if (!key || !boss.value?.parts) return ''
-  const m = String(key).match(/boss-part:(\d+)-(\d+)/)
-  if (!m) return ''
-  const x = parseInt(m[1]), y = parseInt(m[2])
-  const part = boss.value.parts.find(p => p.x === x && p.y === y)
-  return part?.type || ''
+    if (!key || !boss.value?.parts) return ''
+    const m = String(key).match(/boss-part:(\d+)-(\d+)/)
+    if (!m) return ''
+    const x = parseInt(m[1]), y = parseInt(m[2])
+    const part = boss.value.parts.find(p => p.x === x && p.y === y)
+    return part?.type || ''
 }
 
 function advanceCombo(key, partType) {
-  const now = Date.now()
-  if (now - comboLastClickAt.value > COMBO_TIMEOUT_MS) { comboCount.value = 0 }
-  comboCount.value++
-  stormCombo.value++
-  if (partType === 'heavy') armorCombo.value++
-  comboLastClickAt.value = now
-  scheduleComboClear()
-  startComboTick()
+    const now = Date.now()
+    if (now - comboLastClickAt.value > COMBO_TIMEOUT_MS) {
+        comboCount.value = 0
+    }
+    comboCount.value++
+    stormCombo.value++
+    if (partType === 'heavy') armorCombo.value++
+    comboLastClickAt.value = now
+    scheduleComboClear()
+    startComboTick()
 }
 
 function onStormComboTrigger() {
-  comboTriggerFlash.value = true
-  setTimeout(() => { comboTriggerFlash.value = false }, 800)
-  stormCombo.value = 0
+    comboTriggerFlash.value = true
+    setTimeout(() => {
+        comboTriggerFlash.value = false
+    }, 800)
+    stormCombo.value = 0
 }
 
 function onArmorTrigger() {
-  armorCombo.value = 0
+    armorCombo.value = 0
 }
 
 function clearComboState() {
-  clearTimeout(comboTimer)
-  clearInterval(comboTickTimer)
-  comboTimeoutPercent.value = 100
-  comboCount.value = 0
-  comboLastClickAt.value = 0
-  comboTriggerFlash.value = false
+    clearTimeout(comboTimer)
+    clearInterval(comboTickTimer)
+    comboTimeoutPercent.value = 100
+    comboCount.value = 0
+    comboLastClickAt.value = 0
+    comboTriggerFlash.value = false
 }
 
 function startComboTick() {
-  clearInterval(comboTickTimer)
-  comboTickTimer = setInterval(() => {
-    if (comboCount.value <= 0) { comboTimeoutPercent.value = 100; clearInterval(comboTickTimer); return }
-    const elapsed = Date.now() - comboLastClickAt.value
-    comboTimeoutPercent.value = Math.max(0, 100 - (elapsed / COMBO_TIMEOUT_MS) * 100)
-  }, 200)
+    clearInterval(comboTickTimer)
+    comboTickTimer = setInterval(() => {
+        if (comboCount.value <= 0) {
+            comboTimeoutPercent.value = 100;
+            clearInterval(comboTickTimer);
+            return
+        }
+        const elapsed = Date.now() - comboLastClickAt.value
+        comboTimeoutPercent.value = Math.max(0, 100 - (elapsed / COMBO_TIMEOUT_MS) * 100)
+    }, 200)
 }
 
 function scheduleComboClear() {
-  clearTimeout(comboTimer)
-  comboTimer = setTimeout(() => { if (Date.now() - comboLastClickAt.value >= COMBO_TIMEOUT_MS) clearComboState() }, COMBO_TIMEOUT_MS + 300)
+    clearTimeout(comboTimer)
+    comboTimer = setTimeout(() => {
+        if (Date.now() - comboLastClickAt.value >= COMBO_TIMEOUT_MS) clearComboState()
+    }, COMBO_TIMEOUT_MS + 300)
 }
 
 const stormProgress = computed(() => Math.min(100, Math.round((stormCombo.value / stormTrigger.value) * 100)))
 const armorProgress = computed(() => Math.min(100, Math.round((armorCombo.value / armorTrigger.value) * 100)))
 const autoStrikeCountdown = computed(() => {
-  void nowTick.value
-  const expiresAt = Number(talentCombatState.value?.autoStrikeExpiresAt) || 0
-  if (!expiresAt) return 0
-  return Math.max(0, expiresAt - Date.now() / 1000)
+    void nowTick.value
+    const expiresAt = Number(talentCombatState.value?.autoStrikeExpiresAt) || 0
+    if (!expiresAt) return 0
+    return Math.max(0, expiresAt - Date.now() / 1000)
 })
 const safeAutoStrikeCountdown = computed(() => Number.isFinite(autoStrikeCountdown.value) ? autoStrikeCountdown.value : 0)
 const autoStrikeTimeoutPercent = computed(() => {
-  const windowSec = autoStrikeWindowSec.value
-  if (windowSec <= 0) return 0
-  const ratio = safeAutoStrikeCountdown.value / windowSec
-  return Number.isFinite(ratio)
-    ? Math.min(100, Math.max(0, ratio * 100))
-    : 0
+    const windowSec = autoStrikeWindowSec.value
+    if (windowSec <= 0) return 0
+    const ratio = safeAutoStrikeCountdown.value / windowSec
+    return Number.isFinite(ratio)
+        ? Math.min(100, Math.max(0, ratio * 100))
+        : 0
 })
 const safeAutoStrikeTimeoutPercent = computed(() => Number.isFinite(autoStrikeTimeoutPercent.value) ? autoStrikeTimeoutPercent.value : 0)
 
 const partProgressList = computed(() => {
-  const parts = boss.value?.parts
-  const cs = talentCombatState.value
-  if (!Array.isArray(parts) || parts.length === 0) return []
-  const stormMap = cs?.partStormComboCount || {}
-  const heavyMap = cs?.partHeavyClickCount || {}
-  const judgmentDayMap = cs?.partJudgmentDayCount || {}
-  const jdUsedMap = cs?.judgmentDayUsed || {}
-  const jdCooldown = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
-  const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
-  const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
-  const jdTrigger = judgmentDayTrigger.value
-  const nowSec = Date.now() / 1000
-  const result = []
-  for (const part of parts) {
-    const key = `${part.x}-${part.y}`
-    const storm = Number(stormMap[key]) || 0
-    const armor = Number(heavyMap[key]) || 0
-    const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
-    const rawJudgmentDay = Number(judgmentDayMap[key]) || 0
-    const lastJdTrigger = Number(jdUsedMap[key]) || 0
-    const jdOnCooldown = part.type === 'heavy' && lastJdTrigger > 0 && jdCooldown > 0 && (nowSec - lastJdTrigger) < jdCooldown
-    const jdCount = (part.type === 'heavy' && !jdOnCooldown) ? rawJudgmentDay : 0
-    const jdProgress = jdTrigger > 0 ? Math.min(100, Math.round((jdCount / jdTrigger) * 100)) : 0
-    if (storm <= 0 && armor <= 0 && autoStrike <= 0 && jdCount <= 0) continue
-    if (!part.alive) continue
-    result.push({
-      key,
-      name: part.displayName || partTypeLabel(part.type),
-      type: part.type,
-      x: part.x,
-      y: part.y,
-      storm,
-      stormProgress: Math.min(100, Math.round((storm / stormTrigger.value) * 100)),
-      armor,
-      armorProgress: Math.min(100, Math.round((armor / armorTrigger.value) * 100)),
-      autoStrike,
-      autoStrikeProgress: autoStrikeTrigger.value > 0
-        ? Math.min(100, Math.round((autoStrike / autoStrikeTrigger.value) * 100))
-        : 0,
-      autoStrikeCountdown: autoStrike > 0 ? safeAutoStrikeCountdown.value : 0,
-      autoStrikeTimeoutPercent: autoStrike > 0 ? safeAutoStrikeTimeoutPercent.value : 0,
-      judgmentDay: jdCount,
-      judgmentDayTrigger: jdTrigger,
-      judgmentDayOnCooldown: jdOnCooldown,
-      judgmentDayProgress: jdOnCooldown ? 100 : jdProgress,
-      alive: part.alive,
-    })
-  }
-  return result
+    const parts = boss.value?.parts
+    const cs = talentCombatState.value
+    if (!Array.isArray(parts) || parts.length === 0) return []
+    const stormMap = cs?.partStormComboCount || {}
+    const heavyMap = cs?.partHeavyClickCount || {}
+    const judgmentDayMap = cs?.partJudgmentDayCount || {}
+    const jdUsedMap = cs?.judgmentDayUsed || {}
+    const jdCooldown = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
+    const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
+    const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
+    const jdTrigger = judgmentDayTrigger.value
+    const nowSec = Date.now() / 1000
+    const result = []
+    for (const part of parts) {
+        const key = `${part.x}-${part.y}`
+        const storm = Number(stormMap[key]) || 0
+        const armor = Number(heavyMap[key]) || 0
+        const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
+        const rawJudgmentDay = Number(judgmentDayMap[key]) || 0
+        const lastJdTrigger = Number(jdUsedMap[key]) || 0
+        const jdOnCooldown = part.type === 'heavy' && lastJdTrigger > 0 && jdCooldown > 0 && (nowSec - lastJdTrigger) < jdCooldown
+        const jdCount = (part.type === 'heavy' && !jdOnCooldown) ? rawJudgmentDay : 0
+        const jdProgress = jdTrigger > 0 ? Math.min(100, Math.round((jdCount / jdTrigger) * 100)) : 0
+        if (storm <= 0 && armor <= 0 && autoStrike <= 0 && jdCount <= 0) continue
+        if (!part.alive) continue
+        result.push({
+            key,
+            name: part.displayName || partTypeLabel(part.type),
+            type: part.type,
+            x: part.x,
+            y: part.y,
+            storm,
+            stormProgress: Math.min(100, Math.round((storm / stormTrigger.value) * 100)),
+            armor,
+            armorProgress: Math.min(100, Math.round((armor / armorTrigger.value) * 100)),
+            autoStrike,
+            autoStrikeProgress: autoStrikeTrigger.value > 0
+                ? Math.min(100, Math.round((autoStrike / autoStrikeTrigger.value) * 100))
+                : 0,
+            autoStrikeCountdown: autoStrike > 0 ? safeAutoStrikeCountdown.value : 0,
+            autoStrikeTimeoutPercent: autoStrike > 0 ? safeAutoStrikeTimeoutPercent.value : 0,
+            judgmentDay: jdCount,
+            judgmentDayTrigger: jdTrigger,
+            judgmentDayOnCooldown: jdOnCooldown,
+            judgmentDayProgress: jdOnCooldown ? 100 : jdProgress,
+            alive: part.alive,
+        })
+    }
+    return result
 })
 
 const partStatusList = computed(() => {
-  void nowTick.value
-  const parts = boss.value?.parts
-  const cs = talentCombatState.value
-  if (!Array.isArray(parts) || parts.length === 0) return []
-  const skinnerMap = cs?.skinnerParts || {}
-  const bleedMap = cs?.bleeds && typeof cs.bleeds === 'object' ? cs.bleeds : {}
-  const nowSec = Date.now() / 1000
-  const nowMs = Date.now()
-  const result = []
-  const collapseEndsAt = Number(talentVisualState.value?.collapseEndsAt) || 0
-  const collapsePartKeys = Array.isArray(talentVisualState.value?.collapsePartKeys)
-    ? talentVisualState.value.collapsePartKeys
-    : []
-  const collapseRemainingSec = collapseEndsAt > nowSec ? Math.max(0, Math.ceil(collapseEndsAt - nowSec)) : 0
-  const collapseRemainingMs = collapseEndsAt > nowSec ? Math.max(0, collapseEndsAt * 1000 - nowMs) : 0
-  const collapseDurationSec = Math.max(0, Number(talentVisualState.value?.collapseDuration) || 0)
-  const doomMarkKeys = Array.isArray(talentVisualState.value?.doomMarks)
-    ? talentVisualState.value.doomMarks
-    : []
-  for (const part of parts) {
-    if (!part.alive) continue
-    const key = `${part.x}-${part.y}`
-    if (collapseRemainingSec > 0 && collapsePartKeys.includes(key)) {
-      result.push({
-        key: `${key}:collapse`,
-        partKey: key,
-        name: part.displayName || partTypeLabel(part.type),
-        type: part.type,
-        statusKey: 'collapse',
-        statusLabel: '护甲崩塌',
-        remainingSec: collapseRemainingSec,
-        progress: collapseDurationSec > 0
-          ? Math.min(100, Math.max(0, (collapseRemainingMs / (collapseDurationSec * 1000)) * 100))
-          : 0,
-      })
+    void nowTick.value
+    const parts = boss.value?.parts
+    const cs = talentCombatState.value
+    if (!Array.isArray(parts) || parts.length === 0) return []
+    const skinnerMap = cs?.skinnerParts || {}
+    const bleedMap = cs?.bleeds && typeof cs.bleeds === 'object' ? cs.bleeds : {}
+    const nowSec = Date.now() / 1000
+    const nowMs = Date.now()
+    const result = []
+    const collapseEndsAt = Number(talentVisualState.value?.collapseEndsAt) || 0
+    const collapsePartKeys = Array.isArray(talentVisualState.value?.collapsePartKeys)
+        ? talentVisualState.value.collapsePartKeys
+        : []
+    const collapseRemainingSec = collapseEndsAt > nowSec ? Math.max(0, Math.ceil(collapseEndsAt - nowSec)) : 0
+    const collapseRemainingMs = collapseEndsAt > nowSec ? Math.max(0, collapseEndsAt * 1000 - nowMs) : 0
+    const collapseDurationSec = Math.max(0, Number(talentVisualState.value?.collapseDuration) || 0)
+    const doomMarkKeys = Array.isArray(talentVisualState.value?.doomMarks)
+        ? talentVisualState.value.doomMarks
+        : []
+    for (const part of parts) {
+        if (!part.alive) continue
+        const key = `${part.x}-${part.y}`
+        if (collapseRemainingSec > 0 && collapsePartKeys.includes(key)) {
+            result.push({
+                key: `${key}:collapse`,
+                partKey: key,
+                name: part.displayName || partTypeLabel(part.type),
+                type: part.type,
+                statusKey: 'collapse',
+                statusLabel: '护甲崩塌',
+                remainingSec: collapseRemainingSec,
+                progress: collapseDurationSec > 0
+                    ? Math.min(100, Math.max(0, (collapseRemainingMs / (collapseDurationSec * 1000)) * 100))
+                    : 0,
+            })
+        }
+        const bleedState = bleedMap[key]
+        const bleedEndsAtMs = Number(bleedState?.endsAtMs) || 0
+        if (bleedEndsAtMs > nowMs) {
+            const bleedDurationMs = Math.max(0, Number(bleedState?.durationMs) || 0)
+            const bleedRemainingMs = Math.max(0, bleedEndsAtMs - nowMs)
+            result.push({
+                key: `${key}:bleed`,
+                partKey: key,
+                name: part.displayName || partTypeLabel(part.type),
+                type: part.type,
+                statusKey: 'bleed',
+                statusLabel: '致命出血',
+                remainingSec: Math.max(0, Math.ceil(bleedRemainingMs / 1000)),
+                progress: bleedDurationMs > 0
+                    ? Math.min(100, Math.max(0, (bleedRemainingMs / bleedDurationMs) * 100))
+                    : 0,
+            })
+        }
+        const endsAt = Number(skinnerMap[key]) || 0
+        if (endsAt <= nowSec) continue
+        const remainingMs = Math.max(0, endsAt * 1000 - nowMs)
+        const skinnerDurationSec = Math.max(0, Number(cs?.skinnerDurationByPart?.[key]) || Number(talentVisualState.value?.skinnerDurationByPart?.[key]) || 0)
+        result.push({
+            key: `${key}:skinner`,
+            partKey: key,
+            name: part.displayName || partTypeLabel(part.type),
+            type: part.type,
+            statusKey: 'skinner',
+            statusLabel: '变为弱点',
+            remainingSec: Math.max(0, Math.ceil(endsAt - nowSec)),
+            showProgress: false,
+            progress: skinnerDurationSec > 0
+                ? Math.min(100, Math.max(0, (remainingMs / (skinnerDurationSec * 1000)) * 100))
+                : 0,
+        })
     }
-    const bleedState = bleedMap[key]
-    const bleedEndsAtMs = Number(bleedState?.endsAtMs) || 0
-    if (bleedEndsAtMs > nowMs) {
-      const bleedDurationMs = Math.max(0, Number(bleedState?.durationMs) || 0)
-      const bleedRemainingMs = Math.max(0, bleedEndsAtMs - nowMs)
-      result.push({
-        key: `${key}:bleed`,
-        partKey: key,
-        name: part.displayName || partTypeLabel(part.type),
-        type: part.type,
-        statusKey: 'bleed',
-        statusLabel: '致命出血',
-        remainingSec: Math.max(0, Math.ceil(bleedRemainingMs / 1000)),
-        progress: bleedDurationMs > 0
-          ? Math.min(100, Math.max(0, (bleedRemainingMs / bleedDurationMs) * 100))
-          : 0,
-      })
+    for (const part of parts) {
+        if (!part.alive) continue
+        const key = `${part.x}-${part.y}`
+        if (!doomMarkKeys.includes(key)) continue
+        result.push({
+            key: `${key}:doom-mark`,
+            partKey: key,
+            name: part.displayName || partTypeLabel(part.type),
+            type: part.type,
+            statusKey: 'doom-mark',
+            statusLabel: '末日审判',
+            statusMeta: '击碎后结算死兆',
+            showCountdown: false,
+            showProgress: false,
+            remainingSec: 0,
+            progress: 0,
+        })
     }
-    const endsAt = Number(skinnerMap[key]) || 0
-    if (endsAt <= nowSec) continue
-    const remainingMs = Math.max(0, endsAt * 1000 - nowMs)
-    const skinnerDurationSec = Math.max(0, Number(cs?.skinnerDurationByPart?.[key]) || Number(talentVisualState.value?.skinnerDurationByPart?.[key]) || 0)
-    result.push({
-      key: `${key}:skinner`,
-      partKey: key,
-      name: part.displayName || partTypeLabel(part.type),
-      type: part.type,
-      statusKey: 'skinner',
-      statusLabel: '变为弱点',
-      remainingSec: Math.max(0, Math.ceil(endsAt - nowSec)),
-      showProgress: false,
-      progress: skinnerDurationSec > 0
-        ? Math.min(100, Math.max(0, (remainingMs / (skinnerDurationSec * 1000)) * 100))
-        : 0,
-    })
-  }
-  for (const part of parts) {
-    if (!part.alive) continue
-    const key = `${part.x}-${part.y}`
-    if (!doomMarkKeys.includes(key)) continue
-    result.push({
-      key: `${key}:doom-mark`,
-      partKey: key,
-      name: part.displayName || partTypeLabel(part.type),
-      type: part.type,
-      statusKey: 'doom-mark',
-      statusLabel: '末日审判',
-      statusMeta: '击碎后结算死兆',
-      showCountdown: false,
-      showProgress: false,
-      remainingSec: 0,
-      progress: 0,
-    })
-  }
-	  // 审判日冷却状态
-	  const jdCooldownCheckMap = cs?.judgmentDayUsed || {}
-	  const jdCooldownCheckSec = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
-	  if (jdCooldownCheckSec > 0) {
-	    for (const part of parts) {
-	      if (!part.alive) continue
-	      if (part.type !== 'heavy') continue
-	      const key = `${part.x}-${part.y}`
-	      const lastTrigger = Number(jdCooldownCheckMap[key]) || 0
-	      if (lastTrigger <= 0) continue
-	      const remaining = Math.max(0, lastTrigger + jdCooldownCheckSec - nowSec)
-	      if (remaining <= 0) continue
-	      result.push({
-	        key: `${key}:jd-cooldown`,
-	        partKey: key,
-	        name: part.displayName || partTypeLabel(part.type),
-	        type: part.type,
-	        statusKey: 'judgment-day',
-	        statusLabel: '审判日',
-	        statusMeta: '冷却中',
-	        remainingSec: Math.ceil(remaining),
-	        progress: Math.min(100, Math.max(0, ((jdCooldownCheckSec - remaining) / jdCooldownCheckSec) * 100)),
-	        showCountdown: true,
-	        showProgress: true,
-	      })
-	    }
-	  }
-  return result
+    // 审判日冷却状态
+    const jdCooldownCheckMap = cs?.judgmentDayUsed || {}
+    const jdCooldownCheckSec = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
+    if (jdCooldownCheckSec > 0) {
+        for (const part of parts) {
+            if (!part.alive) continue
+            if (part.type !== 'heavy') continue
+            const key = `${part.x}-${part.y}`
+            const lastTrigger = Number(jdCooldownCheckMap[key]) || 0
+            if (lastTrigger <= 0) continue
+            const remaining = Math.max(0, lastTrigger + jdCooldownCheckSec - nowSec)
+            if (remaining <= 0) continue
+            result.push({
+                key: `${key}:jd-cooldown`,
+                partKey: key,
+                name: part.displayName || partTypeLabel(part.type),
+                type: part.type,
+                statusKey: 'judgment-day',
+                statusLabel: '审判日',
+                statusMeta: '冷却中',
+                remainingSec: Math.ceil(remaining),
+                progress: Math.min(100, Math.max(0, ((jdCooldownCheckSec - remaining) / jdCooldownCheckSec) * 100)),
+                showCountdown: true,
+                showProgress: true,
+            })
+        }
+    }
+    return result
 })
 
 const globalStatusList = computed(() => {
-  void nowTick.value
-  const result = []
+    void nowTick.value
+    const result = []
 
-  const comboValue = Number(comboCount.value) || 0
-  const comboBonus = Math.floor(comboValue / 25) * 10
-  const comboT = Math.min(comboValue / 200, 1)
-  const comboHue = 120 - Math.min(comboValue / 200, 1) * 120
-  const comboColor = `hsl(${comboHue}, 90%, ${55 - Math.min(comboValue / 200, 1) * 15}%)`
-  const comboIsGold = comboValue >= 200
-  const comboGoldGradientStops = ['#fde047', '#fbbf24', '#f59e0b', '#fef08a', '#fde047']
-  const comboGoldGradient = `linear-gradient(135deg, ${comboGoldGradientStops.join(', ')})`
-  const comboPanelStyle = comboValue > 0
-    ? {
-        borderColor: comboIsGold ? 'rgba(251, 191, 36, 0.6)' : `${comboColor}40`,
-        boxShadow: comboIsGold
-          ? '0 0 16px rgba(251, 191, 36, 0.2), inset 0 0 10px rgba(251, 191, 36, 0.06)'
-          : `0 0 16px ${comboColor}22`,
-      }
-    : null
-  const comboPrimaryStyle = comboValue > 0
-    ? {
-        background: comboIsGold ? comboGoldGradient : undefined,
-        backgroundSize: comboIsGold ? '300% 300%' : undefined,
-        WebkitBackgroundClip: comboIsGold ? 'text' : undefined,
-        backgroundClip: comboIsGold ? 'text' : undefined,
-        color: comboIsGold ? 'transparent' : comboColor,
-        textShadow: comboIsGold ? 'none' : `0 0 14px ${comboColor}80`,
-        filter: comboIsGold ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.6)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.3))' : undefined,
-        animation: comboIsGold ? 'combo-gold-shimmer 2s linear infinite' : undefined,
-      }
-    : null
-  const comboHintStyle = comboValue > 0
-    ? {
-        background: comboIsGold ? comboGoldGradient : undefined,
-        backgroundSize: comboIsGold ? '300% 300%' : undefined,
-        WebkitBackgroundClip: comboIsGold ? 'text' : undefined,
-        backgroundClip: comboIsGold ? 'text' : undefined,
-        color: comboIsGold ? 'transparent' : comboColor,
-        textShadow: comboIsGold ? 'none' : `0 0 10px ${comboColor}55`,
-        filter: comboIsGold ? 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.45))' : undefined,
-        animation: comboIsGold ? 'combo-gold-shimmer 2s linear infinite' : undefined,
-      }
-    : null
-  const comboSecondaryStyle = comboBonus > 0
-    ? {
-        background: comboIsGold ? comboGoldGradient : undefined,
-        backgroundSize: comboIsGold ? '300% 300%' : undefined,
-        WebkitBackgroundClip: comboIsGold ? 'text' : undefined,
-        backgroundClip: comboIsGold ? 'text' : undefined,
-        color: comboIsGold ? 'transparent' : comboColor,
-        textShadow: comboIsGold ? 'none' : `0 0 10px ${comboColor}55`,
-        filter: comboIsGold ? 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.45))' : undefined,
-        animation: comboIsGold ? 'combo-gold-shimmer 2s linear infinite' : undefined,
-      }
-    : null
-  const comboBarStyle = comboValue > 0
-    ? {
-        background: comboIsGold ? `linear-gradient(90deg, ${comboGoldGradientStops.join(', ')})` : `linear-gradient(90deg, ${comboColor}, ${comboColor}cc)`,
-        backgroundSize: '300% 300%',
-        boxShadow: comboIsGold ? '0 0 10px rgba(251, 191, 36, 0.65)' : `0 0 8px ${comboColor}80`,
-        animation: 'combo-gold-shimmer 2s linear infinite',
-      }
-    : null
-  result.push({
-    key: 'combo',
-    kind: 'combo',
-    title: '连击',
-    primary: `x${comboValue}`,
-    secondary: comboBonus > 0 ? `伤害 +${comboBonus}%` : '',
-    hint: comboValue > 0 ? `${Math.ceil(comboTimeoutPercent.value / 20)}s` : '待命',
-    progress: comboValue > 0 ? Math.max(0, Number(comboTimeoutPercent.value) || 0) : 0,
-    isGold: comboIsGold,
-    panelStyle: comboPanelStyle,
-    primaryStyle: comboPrimaryStyle,
-    hintStyle: comboHintStyle,
-    secondaryStyle: comboSecondaryStyle,
-    barStyle: comboBarStyle,
-  })
-
-  const omenStacks = Math.max(0, Number(talentVisualState.value?.omenStacks) || 0)
-  const omenCap = Math.max(1, Number(talentVisualState.value?.omenCap) || 150)
-  const skinnerCooldownEndsAt = Math.max(0, Number(talentVisualState.value?.skinnerCooldownEndsAt) || 0)
-  const skinnerCooldownRemaining = skinnerCooldownEndsAt > 0
-    ? Math.max(0, Math.ceil(skinnerCooldownEndsAt - Date.now() / 1000))
-    : 0
-  const skinnerCooldownRemainingMs = skinnerCooldownEndsAt > 0
-    ? Math.max(0, skinnerCooldownEndsAt * 1000 - Date.now())
-    : 0
-  const skinnerCooldownDuration = Math.max(0, Number(talentVisualState.value?.skinnerCooldownDuration) || 0)
-  const skinnerActiveCount = partStatusList.value.filter((status) => status.statusKey === 'skinner').length
-  if (skinnerCooldownRemaining > 0 || skinnerActiveCount > 0) {
+    const comboValue = Number(comboCount.value) || 0
+    const comboBonus = Math.floor(comboValue / 25) * 10
+    const comboT = Math.min(comboValue / 200, 1)
+    const comboHue = 120 - Math.min(comboValue / 200, 1) * 120
+    const comboColor = `hsl(${comboHue}, 90%, ${55 - Math.min(comboValue / 200, 1) * 15}%)`
+    const comboIsGold = comboValue >= 200
+    const comboGoldGradientStops = ['#fde047', '#fbbf24', '#f59e0b', '#fef08a', '#fde047']
+    const comboGoldGradient = `linear-gradient(135deg, ${comboGoldGradientStops.join(', ')})`
+    const comboPanelStyle = comboValue > 0
+        ? {
+            borderColor: comboIsGold ? 'rgba(251, 191, 36, 0.6)' : `${comboColor}40`,
+            boxShadow: comboIsGold
+                ? '0 0 16px rgba(251, 191, 36, 0.2), inset 0 0 10px rgba(251, 191, 36, 0.06)'
+                : `0 0 16px ${comboColor}22`,
+        }
+        : null
+    const comboPrimaryStyle = comboValue > 0
+        ? {
+            background: comboIsGold ? comboGoldGradient : undefined,
+            backgroundSize: comboIsGold ? '300% 300%' : undefined,
+            WebkitBackgroundClip: comboIsGold ? 'text' : undefined,
+            backgroundClip: comboIsGold ? 'text' : undefined,
+            color: comboIsGold ? 'transparent' : comboColor,
+            textShadow: comboIsGold ? 'none' : `0 0 14px ${comboColor}80`,
+            filter: comboIsGold ? 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.6)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.3))' : undefined,
+            animation: comboIsGold ? 'combo-gold-shimmer 2s linear infinite' : undefined,
+        }
+        : null
+    const comboHintStyle = comboValue > 0
+        ? {
+            background: comboIsGold ? comboGoldGradient : undefined,
+            backgroundSize: comboIsGold ? '300% 300%' : undefined,
+            WebkitBackgroundClip: comboIsGold ? 'text' : undefined,
+            backgroundClip: comboIsGold ? 'text' : undefined,
+            color: comboIsGold ? 'transparent' : comboColor,
+            textShadow: comboIsGold ? 'none' : `0 0 10px ${comboColor}55`,
+            filter: comboIsGold ? 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.45))' : undefined,
+            animation: comboIsGold ? 'combo-gold-shimmer 2s linear infinite' : undefined,
+        }
+        : null
+    const comboSecondaryStyle = comboBonus > 0
+        ? {
+            background: comboIsGold ? comboGoldGradient : undefined,
+            backgroundSize: comboIsGold ? '300% 300%' : undefined,
+            WebkitBackgroundClip: comboIsGold ? 'text' : undefined,
+            backgroundClip: comboIsGold ? 'text' : undefined,
+            color: comboIsGold ? 'transparent' : comboColor,
+            textShadow: comboIsGold ? 'none' : `0 0 10px ${comboColor}55`,
+            filter: comboIsGold ? 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.45))' : undefined,
+            animation: comboIsGold ? 'combo-gold-shimmer 2s linear infinite' : undefined,
+        }
+        : null
+    const comboBarStyle = comboValue > 0
+        ? {
+            background: comboIsGold ? `linear-gradient(90deg, ${comboGoldGradientStops.join(', ')})` : `linear-gradient(90deg, ${comboColor}, ${comboColor}cc)`,
+            backgroundSize: '300% 300%',
+            boxShadow: comboIsGold ? '0 0 10px rgba(251, 191, 36, 0.65)' : `0 0 8px ${comboColor}80`,
+            animation: 'combo-gold-shimmer 2s linear infinite',
+        }
+        : null
     result.push({
-      key: 'skinner',
-      kind: 'skinner',
-      title: '剥皮',
-      primary: skinnerCooldownRemaining > 0 ? `${skinnerCooldownRemaining}s` : '待命',
-      secondary: skinnerActiveCount > 0 ? `临时弱点 ${skinnerActiveCount} 处` : '暴击触发',
-      hint: skinnerCooldownRemaining > 0 ? '冷却中' : '命中后制造弱点',
-      showProgress: false,
-      progress: skinnerCooldownDuration > 0
-        ? Math.min(100, Math.max(0, (skinnerCooldownRemainingMs / (skinnerCooldownDuration * 1000)) * 100))
-        : 0,
+        key: 'combo',
+        kind: 'combo',
+        title: '连击',
+        primary: `x${comboValue}`,
+        secondary: comboBonus > 0 ? `伤害 +${comboBonus}%` : '',
+        hint: comboValue > 0 ? `${Math.ceil(comboTimeoutPercent.value / 20)}s` : '待命',
+        progress: comboValue > 0 ? Math.max(0, Number(comboTimeoutPercent.value) || 0) : 0,
+        isGold: comboIsGold,
+        panelStyle: comboPanelStyle,
+        primaryStyle: comboPrimaryStyle,
+        hintStyle: comboHintStyle,
+        secondaryStyle: comboSecondaryStyle,
+        barStyle: comboBarStyle,
     })
-  }
-  if (omenStacks > 0) {
-    result.push({
-      key: 'omen',
-      kind: 'omen',
-      title: '死兆',
-      primary: `${omenStacks} / ${omenCap}`,
-      secondary: '',
-      hint: `${omenCap} 层自动触发终末血斩`,
-      progress: Math.min(100, Math.max(0, (omenStacks / omenCap) * 100)),
-    })
-  }
 
-  const finalCutLastTriggerAt = Math.max(0, Number(talentCombatState.value?.lastFinalCutAt) || 0)
-  const finalCutRecentWindowSec = 3
-  const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0
-    ? Math.max(0, Math.ceil(finalCutLastTriggerAt + finalCutRecentWindowSec - Date.now() / 1000))
-    : 0
+    const omenStacks = Math.max(0, Number(talentVisualState.value?.omenStacks) || 0)
+    const omenCap = Math.max(1, Number(talentVisualState.value?.omenCap) || 150)
+    const skinnerCooldownEndsAt = Math.max(0, Number(talentVisualState.value?.skinnerCooldownEndsAt) || 0)
+    const skinnerCooldownRemaining = skinnerCooldownEndsAt > 0
+        ? Math.max(0, Math.ceil(skinnerCooldownEndsAt - Date.now() / 1000))
+        : 0
+    const skinnerCooldownRemainingMs = skinnerCooldownEndsAt > 0
+        ? Math.max(0, skinnerCooldownEndsAt * 1000 - Date.now())
+        : 0
+    const skinnerCooldownDuration = Math.max(0, Number(talentVisualState.value?.skinnerCooldownDuration) || 0)
+    const skinnerActiveCount = partStatusList.value.filter((status) => status.statusKey === 'skinner').length
+    if (skinnerCooldownRemaining > 0 || skinnerActiveCount > 0) {
+        result.push({
+            key: 'skinner',
+            kind: 'skinner',
+            title: '剥皮',
+            primary: skinnerCooldownRemaining > 0 ? `${skinnerCooldownRemaining}s` : '待命',
+            secondary: skinnerActiveCount > 0 ? `临时弱点 ${skinnerActiveCount} 处` : '暴击触发',
+            hint: skinnerCooldownRemaining > 0 ? '冷却中' : '命中后制造弱点',
+            showProgress: false,
+            progress: skinnerCooldownDuration > 0
+                ? Math.min(100, Math.max(0, (skinnerCooldownRemainingMs / (skinnerCooldownDuration * 1000)) * 100))
+                : 0,
+        })
+    }
+    if (omenStacks > 0) {
+        result.push({
+            key: 'omen',
+            kind: 'omen',
+            title: '死兆',
+            primary: `${omenStacks} / ${omenCap}`,
+            secondary: '',
+            hint: `${omenCap} 层自动触发终末血斩`,
+            progress: Math.min(100, Math.max(0, (omenStacks / omenCap) * 100)),
+        })
+    }
 
-  const silverStormEndsAt = Number(talentVisualState.value?.silverStormEndsAt) || 0
-  const silverStormRemaining = silverStormEndsAt
-    ? Math.max(0, Math.ceil(silverStormEndsAt - Date.now() / 1000))
-    : Math.max(0, Number(talentVisualState.value?.silverStormRemaining) || 0)
-  const silverStormRemainingMs = silverStormEndsAt
-    ? Math.max(0, silverStormEndsAt * 1000 - Date.now())
-    : Math.max(0, Number(talentVisualState.value?.silverStormRemaining) || 0) * 1000
-  const silverStormDuration = Math.max(0, Number(talentVisualState.value?.silverStormDuration) || 0)
-  const silverStormActive = Boolean(talentVisualState.value?.silverStormActive) && silverStormRemaining > 0
-  if (silverStormActive) {
-    result.push({
-      key: 'silver-storm',
-      kind: 'silver_storm',
-      title: '白银风暴',
-      primary: `${silverStormRemaining}s`,
-      secondary: '最终伤害额外追加白银风暴',
-      hint: '',
-      progress: silverStormDuration > 0
-        ? Math.min(100, Math.max(0, (silverStormRemainingMs / (silverStormDuration * 1000)) * 100))
-        : 0,
-      panelStyle: {
-        borderColor: 'rgba(191, 219, 254, 0.36)',
-        boxShadow: '0 0 16px rgba(191, 219, 254, 0.16)',
-      },
-      primaryStyle: {
-        color: '#f8fafc',
-        textShadow: '0 0 12px rgba(191, 219, 254, 0.5)',
-      },
-      secondaryStyle: {
-        color: '#bfdbfe',
-        textShadow: '0 0 10px rgba(125, 211, 252, 0.35)',
-      },
-      barStyle: {
-        background: 'linear-gradient(90deg, #e2e8f0, #bfdbfe, #7dd3fc, #e2e8f0)',
-        backgroundSize: '300% 300%',
-        boxShadow: '0 0 10px rgba(125, 211, 252, 0.45)',
-        animation: 'combo-gold-shimmer 2s linear infinite',
-      },
-    })
-  }
+    const finalCutLastTriggerAt = Math.max(0, Number(talentCombatState.value?.lastFinalCutAt) || 0)
+    const finalCutRecentWindowSec = 3
+    const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0
+        ? Math.max(0, Math.ceil(finalCutLastTriggerAt + finalCutRecentWindowSec - Date.now() / 1000))
+        : 0
 
-  return result
+    const silverStormEndsAt = Number(talentVisualState.value?.silverStormEndsAt) || 0
+    const silverStormRemaining = silverStormEndsAt
+        ? Math.max(0, Math.ceil(silverStormEndsAt - Date.now() / 1000))
+        : Math.max(0, Number(talentVisualState.value?.silverStormRemaining) || 0)
+    const silverStormRemainingMs = silverStormEndsAt
+        ? Math.max(0, silverStormEndsAt * 1000 - Date.now())
+        : Math.max(0, Number(talentVisualState.value?.silverStormRemaining) || 0) * 1000
+    const silverStormDuration = Math.max(0, Number(talentVisualState.value?.silverStormDuration) || 0)
+    const silverStormActive = Boolean(talentVisualState.value?.silverStormActive) && silverStormRemaining > 0
+    if (silverStormActive) {
+        result.push({
+            key: 'silver-storm',
+            kind: 'silver_storm',
+            title: '白银风暴',
+            primary: `${silverStormRemaining}s`,
+            secondary: '最终伤害额外追加白银风暴',
+            hint: '',
+            progress: silverStormDuration > 0
+                ? Math.min(100, Math.max(0, (silverStormRemainingMs / (silverStormDuration * 1000)) * 100))
+                : 0,
+            panelStyle: {
+                borderColor: 'rgba(191, 219, 254, 0.36)',
+                boxShadow: '0 0 16px rgba(191, 219, 254, 0.16)',
+            },
+            primaryStyle: {
+                color: '#f8fafc',
+                textShadow: '0 0 12px rgba(191, 219, 254, 0.5)',
+            },
+            secondaryStyle: {
+                color: '#bfdbfe',
+                textShadow: '0 0 10px rgba(125, 211, 252, 0.35)',
+            },
+            barStyle: {
+                background: 'linear-gradient(90deg, #e2e8f0, #bfdbfe, #7dd3fc, #e2e8f0)',
+                backgroundSize: '300% 300%',
+                boxShadow: '0 0 10px rgba(125, 211, 252, 0.45)',
+                animation: 'combo-gold-shimmer 2s linear infinite',
+            },
+        })
+    }
+
+    return result
 })
 
 function partTypeLabel(type) {
-  const labels = { soft: '软组织', heavy: '重甲', weak: '弱点' }
-  return labels[type] || type || '未知'
+    const labels = {soft: '软组织', heavy: '重甲', weak: '弱点'}
+    return labels[type] || type || '未知'
 }
 
 const onlineCount = ref(null)
@@ -1773,68 +1784,68 @@ function applyClickResult(payload) {
     triggerTalentEventDamageBursts(payload.talentEvents)
     appendTalentTriggerEvents(payload.talentEvents)
     if (payload.talentCombatState) {
-      applyTalentCombatState(payload.talentCombatState)
+        applyTalentCombatState(payload.talentCombatState)
     }
     syncing.value = false
     markUpdated()
 }
 
 function indexToPartKey(index) {
-  const parts = boss.value?.parts
-  if (!Array.isArray(parts) || index < 0 || index >= parts.length) return null
-  return `${parts[index].x}-${parts[index].y}`
+    const parts = boss.value?.parts
+    if (!Array.isArray(parts) || index < 0 || index >= parts.length) return null
+    return `${parts[index].x}-${parts[index].y}`
 }
 
 function applyTalentCombatState(state) {
-  if (!state || typeof state !== 'object') return
-  talentCombatState.value = state
-  const vs = talentVisualState.value
-  vs.omenStacks = Number(state.omenStacks) || 0
-  vs.omenCap = 150
+    if (!state || typeof state !== 'object') return
+    talentCombatState.value = state
+    const vs = talentVisualState.value
+    vs.omenStacks = Number(state.omenStacks) || 0
+    vs.omenCap = 150
 
-  const prevSilverStormEndsAt = Number(vs.silverStormEndsAt) || 0
-  const prevSilverStormActive = Boolean(vs.silverStormActive)
-  vs.silverStormEndsAt = Number(state.silverStormEndsAt) || 0
-  vs.silverStormActive = Boolean(state.silverStormActive) && (!vs.silverStormEndsAt || vs.silverStormEndsAt > Date.now() / 1000)
-  vs.silverStormRemaining = vs.silverStormEndsAt
-    ? Math.max(0, Math.ceil(vs.silverStormEndsAt - Date.now() / 1000))
-    : (Number(state.silverStormRemaining) || 0)
-  const shouldResetSilverStormDuration = vs.silverStormActive && (!prevSilverStormActive || vs.silverStormEndsAt > prevSilverStormEndsAt)
-  vs.silverStormDuration = vs.silverStormActive
-    ? (shouldResetSilverStormDuration
-        ? Math.max(Number(state.silverStormRemaining) || 0, vs.silverStormRemaining)
-        : Math.max(Number(vs.silverStormDuration) || 0, Number(state.silverStormRemaining) || 0, vs.silverStormRemaining))
-    : 0
+    const prevSilverStormEndsAt = Number(vs.silverStormEndsAt) || 0
+    const prevSilverStormActive = Boolean(vs.silverStormActive)
+    vs.silverStormEndsAt = Number(state.silverStormEndsAt) || 0
+    vs.silverStormActive = Boolean(state.silverStormActive) && (!vs.silverStormEndsAt || vs.silverStormEndsAt > Date.now() / 1000)
+    vs.silverStormRemaining = vs.silverStormEndsAt
+        ? Math.max(0, Math.ceil(vs.silverStormEndsAt - Date.now() / 1000))
+        : (Number(state.silverStormRemaining) || 0)
+    const shouldResetSilverStormDuration = vs.silverStormActive && (!prevSilverStormActive || vs.silverStormEndsAt > prevSilverStormEndsAt)
+    vs.silverStormDuration = vs.silverStormActive
+        ? (shouldResetSilverStormDuration
+            ? Math.max(Number(state.silverStormRemaining) || 0, vs.silverStormRemaining)
+            : Math.max(Number(vs.silverStormDuration) || 0, Number(state.silverStormRemaining) || 0, vs.silverStormRemaining))
+        : 0
 
-  vs.skinnerCooldownEndsAt = Number(state.skinnerCooldownEndsAt) || 0
-  vs.skinnerCooldownDuration = Number(state.skinnerCooldownDuration) || 0
-  const skinnerParts = state.skinnerParts && typeof state.skinnerParts === 'object' ? state.skinnerParts : {}
-  const skinnerDurationByPart = state.skinnerDurationByPart && typeof state.skinnerDurationByPart === 'object'
-    ? state.skinnerDurationByPart
-    : {}
-  const nextSkinnerDurationByPart = {}
-  const nowSec = Date.now() / 1000
-  for (const [partKey, endsAtRaw] of Object.entries(skinnerParts)) {
-    const endsAt = Number(endsAtRaw) || 0
-    if (endsAt <= nowSec) continue
-    const incomingDurationSec = Math.max(0, Number(skinnerDurationByPart[partKey]) || 0)
-    const cachedDurationSec = Math.max(0, Number(vs.skinnerDurationByPart?.[partKey]) || 0)
-    const observedRemainingSec = Math.max(0, Math.ceil(endsAt - nowSec))
-    nextSkinnerDurationByPart[partKey] = incomingDurationSec || cachedDurationSec || observedRemainingSec
-  }
-  vs.skinnerDurationByPart = nextSkinnerDurationByPart
-  vs.doomMarkCumDamage = state.doomMarkCumDamage || {}
+    vs.skinnerCooldownEndsAt = Number(state.skinnerCooldownEndsAt) || 0
+    vs.skinnerCooldownDuration = Number(state.skinnerCooldownDuration) || 0
+    const skinnerParts = state.skinnerParts && typeof state.skinnerParts === 'object' ? state.skinnerParts : {}
+    const skinnerDurationByPart = state.skinnerDurationByPart && typeof state.skinnerDurationByPart === 'object'
+        ? state.skinnerDurationByPart
+        : {}
+    const nextSkinnerDurationByPart = {}
+    const nowSec = Date.now() / 1000
+    for (const [partKey, endsAtRaw] of Object.entries(skinnerParts)) {
+        const endsAt = Number(endsAtRaw) || 0
+        if (endsAt <= nowSec) continue
+        const incomingDurationSec = Math.max(0, Number(skinnerDurationByPart[partKey]) || 0)
+        const cachedDurationSec = Math.max(0, Number(vs.skinnerDurationByPart?.[partKey]) || 0)
+        const observedRemainingSec = Math.max(0, Math.ceil(endsAt - nowSec))
+        nextSkinnerDurationByPart[partKey] = incomingDurationSec || cachedDurationSec || observedRemainingSec
+    }
+    vs.skinnerDurationByPart = nextSkinnerDurationByPart
+    vs.doomMarkCumDamage = state.doomMarkCumDamage || {}
 
-  // doomMarks: indices → "x-y" keys
-  vs.doomMarks = Array.isArray(state.doomMarks)
-    ? state.doomMarks.map(indexToPartKey).filter(Boolean)
-    : []
-  // collapsePartKeys: indices → "x-y" keys
-  vs.collapsePartKeys = Array.isArray(state.collapseParts)
-    ? state.collapseParts.map(indexToPartKey).filter(Boolean)
-    : []
-  vs.collapseEndsAt = Number(state.collapseEndsAt) || 0
-  vs.collapseDuration = Number(state.collapseDuration) || 8
+    // doomMarks: indices → "x-y" keys
+    vs.doomMarks = Array.isArray(state.doomMarks)
+        ? state.doomMarks.map(indexToPartKey).filter(Boolean)
+        : []
+    // collapsePartKeys: indices → "x-y" keys
+    vs.collapsePartKeys = Array.isArray(state.collapseParts)
+        ? state.collapseParts.map(indexToPartKey).filter(Boolean)
+        : []
+    vs.collapseEndsAt = Number(state.collapseEndsAt) || 0
+    vs.collapseDuration = Number(state.collapseDuration) || 8
 }
 
 function applyTalentVisualState(events) {
@@ -1902,15 +1913,15 @@ function appendTalentTriggerEvents(events) {
     }
     const now = Date.now()
     const nextEntries = events.map((event, index) => ({
-            id: `${now}-${index}-${event.talentId || 'talent'}`,
-            name: event.name || event.talentId || '天赋',
-            message: event.message || '天赋触发',
-            extraDamage: Number(event.extraDamage || 0),
-            triggeredAt: Number(event.triggeredAt || now),
-            effectType: event.effectType || '',
-            partX: event.partX,
-            partY: event.partY,
-        }))
+        id: `${now}-${index}-${event.talentId || 'talent'}`,
+        name: event.name || event.talentId || '天赋',
+        message: event.message || '天赋触发',
+        extraDamage: Number(event.extraDamage || 0),
+        triggeredAt: Number(event.triggeredAt || now),
+        effectType: event.effectType || '',
+        partX: event.partX,
+        partY: event.partY,
+    }))
     for (const event of events) {
         playBattleTriggerSound(event?.effectType || event?.name || '')
     }
@@ -2355,16 +2366,16 @@ function triggerDamageBurst(key, payload = {}) {
     burst.particleColors = config.colors || []
     burst.particles = []
     for (let i = 0; i < burst.particleCount; i++) {
-      const angle = Math.random() * Math.PI * 2
-      const dist = 18 + Math.random() * 48
-      const size = 2 + Math.random() * 4
-      burst.particles.push({
-        id: `${burst.id}-p${i}`,
-        color: burst.particleColors[Math.floor(Math.random() * burst.particleColors.length)],
-        x: Math.cos(angle) * dist,
-        y: Math.sin(angle) * dist,
-        size,
-      })
+        const angle = Math.random() * Math.PI * 2
+        const dist = 18 + Math.random() * 48
+        const size = 2 + Math.random() * 4
+        burst.particles.push({
+            id: `${burst.id}-p${i}`,
+            color: burst.particleColors[Math.floor(Math.random() * burst.particleColors.length)],
+            x: Math.cos(angle) * dist,
+            y: Math.sin(angle) * dist,
+            size,
+        })
     }
     const currentBursts = damageBursts.value[normalizedKey] || []
     const nextBursts = [...currentBursts, burst]
@@ -2843,11 +2854,11 @@ async function resetNickname() {
     stopPresenceHeartbeat()
     await reportPresence(false)
     clearPlayerSessionState()
-        if (currentPublicPage.value === 'shop') {
-            void loadShopItems()
-        }
-        void loadRooms()
-        connectRealtime('')
+    if (currentPublicPage.value === 'shop') {
+        void loadShopItems()
+    }
+    void loadRooms()
+    connectRealtime('')
 }
 
 function clearPlayerSessionState() {
@@ -2988,10 +2999,10 @@ function registerPublicPageLifecycle() {
     }
 
     onMounted(async () => {
-         restoreCachedLatestAnnouncement()
-         window.addEventListener('popstate', handlePublicRouteChange)
-         startTalentTick()
-         await loadPlayerSession()
+        restoreCachedLatestAnnouncement()
+        window.addEventListener('popstate', handlePublicRouteChange)
+        startTalentTick()
+        await loadPlayerSession()
         await loadState()
         await loadRooms()
         await activatePublicPage(currentPublicPage.value)
@@ -3005,13 +3016,13 @@ function registerPublicPageLifecycle() {
         onlineCount.value = 1
     })
 
-     onBeforeUnmount(() => {
-         window.removeEventListener('popstate', handlePublicRouteChange)
-         document.removeEventListener('visibilitychange', handleVisibilityChange)
-         window.clearInterval(talentTickTimer)
-         talentTickTimer = 0
-         stopPresenceHeartbeat()
-         stopTaskPolling()
+    onBeforeUnmount(() => {
+        window.removeEventListener('popstate', handlePublicRouteChange)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.clearInterval(talentTickTimer)
+        talentTickTimer = 0
+        stopPresenceHeartbeat()
+        stopTaskPolling()
         realtimeTransport?.close()
         burstTimers.forEach((timer) => window.clearTimeout(timer))
         burstTimers.clear()

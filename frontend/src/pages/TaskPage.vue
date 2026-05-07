@@ -1,8 +1,8 @@
 <script setup>
-import { computed, ref } from 'vue'
+import {computed, ref} from 'vue'
 
-import { getRarityClassName } from '../utils/rarity'
-import { usePublicPageState } from './publicPageState'
+import {getRarityClassName} from '../utils/rarity'
+import {usePublicPageState} from './publicPageState'
 
 const {
   tasks,
@@ -14,8 +14,35 @@ const {
 
 const claimingTaskId = ref('')
 const claimingAllTasks = ref(false)
+const selectedTaskGroup = ref('routine')
 
 const claimableTasks = computed(() => tasks.value.filter((task) => Boolean(task?.canClaim)))
+const taskGroups = [
+  {key: 'routine', title: '日常 / 周常'},
+  {key: 'activity', title: '活动'},
+  {key: 'longTerm', title: '长期有效'},
+]
+
+const groupedTasks = computed(() => taskGroups.map((group) => ({
+  ...group,
+  items: tasks.value.filter((task) => taskGroupKey(task) === group.key),
+})).filter((group) => group.items.length > 0))
+
+const visibleTaskGroups = computed(() => taskGroups.filter((group) =>
+    tasks.value.some((task) => taskGroupKey(task) === group.key),
+))
+
+const activeTaskGroup = computed(() => {
+  const selected = visibleTaskGroups.value.find((group) => group.key === selectedTaskGroup.value)
+  return selected || visibleTaskGroups.value[0] || null
+})
+
+const activeTasks = computed(() => {
+  if (!activeTaskGroup.value) {
+    return []
+  }
+  return tasks.value.filter((task) => taskGroupKey(task) === activeTaskGroup.value.key)
+})
 
 function taskStatusLabel(status) {
   switch (status) {
@@ -52,10 +79,26 @@ function windowLabel(windowKind) {
       return '按周累计'
     case 'fixed_range':
       return '固定时间窗'
+    case 'lifetime':
+      return '长期有效'
     case 'daily':
     default:
       return '按天累计'
   }
+}
+
+function taskGroupKey(task) {
+  if (task?.windowKind === 'fixed_range') {
+    return 'activity'
+  }
+  if (task?.windowKind === 'lifetime') {
+    return 'longTerm'
+  }
+  return 'routine'
+}
+
+function selectTaskGroup(groupKey) {
+  selectedTaskGroup.value = groupKey
 }
 
 function formatTaskRewards(rewards, equipDetails) {
@@ -133,10 +176,10 @@ function claimButtonLabel(task) {
           <strong>{{ tasks.length > 0 ? `${tasks.length} 条进行中` : '暂无可见任务' }}</strong>
         </div>
         <button
-          class="nickname-form__submit"
-          type="button"
-          :disabled="claimableTasks.length === 0 || claimingAllTasks"
-          @click="handleClaimAllTasks"
+            class="nickname-form__submit"
+            type="button"
+            :disabled="claimableTasks.length === 0 || claimingAllTasks"
+            @click="handleClaimAllTasks"
         >
           {{ claimingAllTasks ? '领取中...' : '一键领取' }}
         </button>
@@ -144,58 +187,85 @@ function claimButtonLabel(task) {
       <div v-if="tasks.length === 0" class="leaderboard-list leaderboard-list--empty">
         <p>当前没有生效任务，晚点再来看看。</p>
       </div>
-      <div v-else class="task-card__grid">
-        <article
-          v-for="task in tasks"
-          :key="`${task.taskId}-${task.cycleKey}`"
-          class="social-card task-card__item"
-        >
+      <div v-else>
+        <div class="task-card__tabs">
+          <button
+              v-for="group in visibleTaskGroups"
+              :key="group.key"
+              class="task-card__tab"
+              :class="{ 'task-card__tab--active': activeTaskGroup?.key === group.key }"
+              type="button"
+              @click="selectTaskGroup(group.key)"
+          >
+            {{ group.title }}
+          </button>
+        </div>
+        <section v-if="activeTaskGroup" class="task-card__group">
           <div class="social-card__head">
             <div>
-              <p class="vote-stage__eyebrow">{{ eventLabel(task.eventKind) }} · {{ windowLabel(task.windowKind) }} · {{ taskStatusLabel(task.status) }}</p>
-              <strong>{{ task.title }}</strong>
+              <p class="vote-stage__eyebrow">任务分类</p>
+              <strong>{{ activeTaskGroup.title }}</strong>
             </div>
-            <strong>{{ task.progress }}/{{ task.targetValue }}</strong>
+            <strong>{{ activeTasks.length }} 条</strong>
           </div>
-          <p class="social-card__copy">{{ task.description || '未填写任务描述' }}</p>
-          <p class="social-card__copy">奖励：{{ formatTaskRewards(task.rewards, task.equipmentRewardDetails) }}</p>
-          <div v-if="equipmentRewardChips(task).length > 0" class="task-equipment-chips">
-            <span
-              v-for="detail in equipmentRewardChips(task)"
-              :key="detail.itemId"
-              class="task-equipment-chip"
+          <div class="task-card__grid">
+            <article
+                v-for="task in activeTasks"
+                :key="`${task.taskId}-${task.cycleKey}`"
+                class="social-card task-card__item"
             >
-              <img
-                v-if="detail.imagePath"
-                class="task-equipment-chip__image"
-                :src="detail.imagePath"
-                :alt="detail.imageAlt || detail.name"
-              />
-              <strong class="task-equipment-chip__name" :class="equipmentNameClass(detail)">{{ detail.name }}</strong>
-              <span class="task-equipment-chip__rarity" :class="getRarityClassName(detail.rarity)">{{ formatRarityLabel(detail.rarity) }}</span>
-              <article class="armory-item-tooltip task-equipment-tooltip" aria-label="装备属性">
-                <p class="vote-stage__eyebrow">装备属性</p>
-                <strong :class="equipmentNameClass(detail)">{{ detail.name }}</strong>
-                <p>{{ formatRarityLabel(detail.rarity) }} · 装备</p>
-                <ul v-if="formatItemStatLines(detail).length > 0" class="armory-item-tooltip__stats">
-                  <li v-for="line in formatItemStatLines(detail)" :key="line">{{ line }}</li>
-                </ul>
-                <p v-else>暂无词条</p>
-              </article>
-            </span>
+              <div class="social-card__head">
+                <div>
+                  <p class="vote-stage__eyebrow">{{ eventLabel(task.eventKind) }} · {{ windowLabel(task.windowKind) }} ·
+                    {{ taskStatusLabel(task.status) }}</p>
+                  <strong>{{ task.title }}</strong>
+                </div>
+                <strong>{{ task.progress }}/{{ task.targetValue }}</strong>
+              </div>
+              <p class="social-card__copy">{{ task.description || '未填写任务描述' }}</p>
+              <p class="social-card__copy">奖励：{{ formatTaskRewards(task.rewards, task.equipmentRewardDetails) }}</p>
+              <div v-if="equipmentRewardChips(task).length > 0" class="task-equipment-chips">
+                <span
+                    v-for="detail in equipmentRewardChips(task)"
+                    :key="detail.itemId"
+                    class="task-equipment-chip"
+                >
+                  <img
+                      v-if="detail.imagePath"
+                      class="task-equipment-chip__image"
+                      :src="detail.imagePath"
+                      :alt="detail.imageAlt || detail.name"
+                  />
+                  <strong class="task-equipment-chip__name" :class="equipmentNameClass(detail)">{{
+                      detail.name
+                    }}</strong>
+                  <span class="task-equipment-chip__rarity"
+                        :class="getRarityClassName(detail.rarity)">{{ formatRarityLabel(detail.rarity) }}</span>
+                  <article class="armory-item-tooltip task-equipment-tooltip" aria-label="装备属性">
+                    <p class="vote-stage__eyebrow">装备属性</p>
+                    <strong :class="equipmentNameClass(detail)">{{ detail.name }}</strong>
+                    <p>{{ formatRarityLabel(detail.rarity) }} · 装备</p>
+                    <ul v-if="formatItemStatLines(detail).length > 0" class="armory-item-tooltip__stats">
+                      <li v-for="line in formatItemStatLines(detail)" :key="line">{{ line }}</li>
+                    </ul>
+                    <p v-else>暂无词条</p>
+                  </article>
+                </span>
+              </div>
+              <div class="announcement-modal__actions" style="justify-content: flex-start;">
+                <button
+                    class="nickname-form__submit"
+                    :class="{ 'nickname-form__submit--claimed': task.status === 'claimed' }"
+                    type="button"
+                    :disabled="!task.canClaim || claimingTaskId === task.taskId || claimingAllTasks"
+                    @click="handleClaimTask(task.taskId)"
+                >
+                  {{ claimButtonLabel(task) }}
+                </button>
+              </div>
+            </article>
           </div>
-          <div class="announcement-modal__actions" style="justify-content: flex-start;">
-            <button
-              class="nickname-form__submit"
-              :class="{ 'nickname-form__submit--claimed': task.status === 'claimed' }"
-              type="button"
-              :disabled="!task.canClaim || claimingTaskId === task.taskId || claimingAllTasks"
-              @click="handleClaimTask(task.taskId)"
-            >
-              {{ claimButtonLabel(task) }}
-            </button>
-          </div>
-        </article>
+        </section>
       </div>
     </section>
   </section>

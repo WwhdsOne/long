@@ -1,6 +1,6 @@
 <script setup>
 import RoomSwitchCooldownTag from './RoomSwitchCooldownTag.vue'
-import { formatCompact } from '../utils/formatNumber'
+import {formatCompact} from '../utils/formatNumber'
 
 const props = defineProps({
   rooms: {
@@ -53,7 +53,7 @@ function currentRoomSummary(roomId) {
   const normalized = String(roomId || '').trim()
   if (normalized === 'hall') return '当前大厅'
   if (normalized === '') return '当前大厅'
-  return `当前 ${roomLabel({ id: normalized })}`
+  return `当前 ${roomLabel({id: normalized})}`
 }
 
 function roomAccent(room, index) {
@@ -75,7 +75,7 @@ function roomStyle(room, index) {
 
 function roomBossName(room) {
   if (!room) return '等待 Boss'
-  else if (room.currentBossName === "" || room.currentBossName === undefined)return room.cycleEnabled ? 'Boss循环待命' : '未开启Boss循环'
+  else if (room.currentBossName === "" || room.currentBossName === undefined) return room.cycleEnabled ? 'Boss循环待命' : '未开启Boss循环'
   return '当前Boss : ' + room.currentBossName
 }
 
@@ -120,7 +120,7 @@ function canJoin(room) {
         <strong>战线分流</strong>
         <small>{{ currentRoomSummary(currentRoomId) }}</small>
       </div>
-      <RoomSwitchCooldownTag :cooldown-remaining-seconds="cooldownRemainingSeconds" />
+      <RoomSwitchCooldownTag :cooldown-remaining-seconds="cooldownRemainingSeconds"/>
     </div>
     <div class="room-selector__list">
       <button
@@ -166,21 +166,21 @@ function canJoin(room) {
 <style scoped>
 .room-selector {
   display: grid;
-  gap: 15px 6px;   /* 行间距15px，列间距6px（此处列间距其实没有用，但保留无妨） */
+  gap: 15px 6px; /* 行间距15px，列间距6px（此处列间距其实没有用，但保留无妨） */
   padding: 8px 10px;
   border: 1px solid rgba(132, 166, 214, 0.18);
   border-radius: 18px;
-  background:
-    radial-gradient(circle at top right, rgba(120, 216, 255, 0.1), transparent 36%),
-    rgba(12, 21, 35, 0.78);
+  background: radial-gradient(circle at top right, rgba(120, 216, 255, 0.1), transparent 36%),
+  rgba(12, 21, 35, 0.78);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(18px);
   /* 改为：第一行头部20px，第二行占满剩余空间 */
   grid-template-rows: 20px 1fr;
   /* 给整体一个最大高度（按需调整），防止无限撑高 */
-  max-height: 600px;       /* 也可用 height: 100% 继承父级高度 */
+  max-height: 600px; /* 也可用 height: 100% 继承父级高度 */
 
-  overflow: hidden;        /* 溢出交给内部列表处理 */}
+  overflow: hidden; /* 溢出交给内部列表处理 */
+}
 
 .room-selector__head {
   display: flex;
@@ -219,19 +219,19 @@ function canJoin(room) {
 .room-selector__list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-content: start;          /* 保持网格项从顶部开始，不拉伸 */
+  align-content: start; /* 保持网格项从顶部开始，不拉伸 */
   gap: 6px;
   padding-top: 6px;
   margin-top: -6px;
 
   /* 关键：行高跟随内容，不要按比例平分 */
-  grid-auto-rows: auto;          /* 或 min-content，默认就是 auto，可显式写出 */
+  grid-auto-rows: auto; /* 或 min-content，默认就是 auto，可显式写出 */
 
   /* 让这个区域可滚动 */
   overflow-y: auto;
 
   /* 可选：保证滚动时头部不动 */
-  min-height: 0;                 /* 防止网格子项默认最小高度撑开 */
+  min-height: 0; /* 防止网格子项默认最小高度撑开 */
 }
 
 .room-selector__button {
@@ -250,11 +250,10 @@ function canJoin(room) {
   isolation: isolate;
   z-index: 0;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-  transition:
-    transform 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    opacity 180ms ease;
+  transition: transform 180ms ease,
+  border-color 180ms ease,
+  box-shadow 180ms ease,
+  opacity 180ms ease;
 }
 
 .room-selector__button > * {
@@ -268,10 +267,9 @@ function canJoin(room) {
   border-radius: inherit;
   pointer-events: none;
   z-index: 0;
-  background:
-    linear-gradient(180deg, rgba(var(--room-accent-rgb), 0.14), rgba(var(--room-accent-rgb), 0.05) 34%, rgba(255, 255, 255, 0.03) 100%),
-    radial-gradient(circle at top right, rgba(var(--room-accent-rgb), 0.34), transparent 50%),
-    radial-gradient(circle at bottom left, rgba(var(--room-accent-rgb), 0.2), transparent 64%);
+  background: linear-gradient(180deg, rgba(var(--room-accent-rgb), 0.14), rgba(var(--room-accent-rgb), 0.05) 34%, rgba(255, 255, 255, 0.03) 100%),
+  radial-gradient(circle at top right, rgba(var(--room-accent-rgb), 0.34), transparent 50%),
+  radial-gradient(circle at bottom left, rgba(var(--room-accent-rgb), 0.2), transparent 64%);
   opacity: 0.5;
   filter: brightness(0.98) saturate(1.12);
   transform: scale(1);
@@ -291,20 +289,17 @@ function canJoin(room) {
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background:
-    linear-gradient(115deg,
-      rgba(var(--room-accent-rgb), 0.08) 0%,
-      rgba(var(--room-accent-rgb), 0.32) 28%,
-      rgba(255, 255, 255, 0.18) 50%,
-      rgba(var(--room-accent-rgb), 0.28) 72%,
-      rgba(var(--room-accent-rgb), 0.08) 100%);
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
+  background: linear-gradient(115deg,
+  rgba(var(--room-accent-rgb), 0.08) 0%,
+  rgba(var(--room-accent-rgb), 0.32) 28%,
+  rgba(255, 255, 255, 0.18) 50%,
+  rgba(var(--room-accent-rgb), 0.28) 72%,
+  rgba(var(--room-accent-rgb), 0.08) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box,
+  linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box,
+  linear-gradient(#fff 0 0);
   mask-composite: exclude;
   filter: drop-shadow(0 0 8px rgba(var(--room-accent-rgb), 0.18));
   opacity: 0.2;
@@ -320,10 +315,9 @@ function canJoin(room) {
   height: 6px;
   border-radius: 999px;
   background: rgba(var(--room-accent-rgb), 0.98);
-  box-shadow:
-    -2px 0 4px rgba(var(--room-accent-rgb), 0.96),
-    -22px 0 14px rgba(var(--room-accent-rgb), 0.42),
-    -100px 0 32px rgba(var(--room-accent-rgb), 0.08);
+  box-shadow: -2px 0 4px rgba(var(--room-accent-rgb), 0.96),
+  -22px 0 14px rgba(var(--room-accent-rgb), 0.42),
+  -100px 0 32px rgba(var(--room-accent-rgb), 0.08);
   opacity: 0.96;
   transform-origin: center center;
   animation: room-card-orbit var(--room-orbit-duration) linear infinite;
@@ -335,9 +329,8 @@ function canJoin(room) {
   transform: translateY(-2px);
   z-index: 2;
   border-color: rgba(var(--room-accent-rgb), 0.42);
-  box-shadow:
-    0 10px 18px rgba(0, 0, 0, 0.26),
-    inset 0 0 0 1px rgba(var(--room-accent-rgb), 0.08);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.26),
+  inset 0 0 0 1px rgba(var(--room-accent-rgb), 0.08);
 }
 
 .room-selector__button:hover:not(:disabled)::before {
@@ -460,9 +453,8 @@ function canJoin(room) {
 
 .room-selector__button--active {
   border-color: rgba(255, 212, 107, 0.5);
-  box-shadow:
-    0 18px 44px rgba(255, 154, 85, 0.16),
-    inset 0 0 0 1px rgba(255, 212, 107, 0.2);
+  box-shadow: 0 18px 44px rgba(255, 154, 85, 0.16),
+  inset 0 0 0 1px rgba(255, 212, 107, 0.2);
 }
 
 .room-selector__button--active::before {

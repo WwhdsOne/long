@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import {computed, ref} from 'vue'
 
 function toDatetimeLocal(ts) {
   if (!ts || ts <= 0) return ''
@@ -14,30 +14,30 @@ function fromDatetimeLocal(str) {
 }
 
 const props = defineProps({
-  taskDefinitions: { type: Array, required: true },
-  taskForm: { type: Object, required: true },
-  taskArchives: { type: Array, required: true },
-  taskCycleResults: { type: Object, required: true },
-  equipmentOptions: { type: Array, required: true },
-  selectedTaskId: { type: String, required: true },
-  selectedTaskCycleKey: { type: String, required: true },
-  loadingTasks: { type: Boolean, required: true },
-  loadingTaskArchives: { type: Boolean, required: true },
-  loadingTaskResults: { type: Boolean, required: true },
-  saving: { type: Boolean, required: true },
-  fetchTasks: { type: Function, required: true },
-  fetchTaskArchives: { type: Function, required: true },
-  fetchTaskCycleResults: { type: Function, required: true },
-  saveTaskDefinition: { type: Function, required: true },
-  activateTaskDefinition: { type: Function, required: true },
-  deactivateTaskDefinition: { type: Function, required: true },
-  duplicateTaskDefinition: { type: Function, required: true },
-  archiveExpiredTasks: { type: Function, required: true },
-  editTaskDefinition: { type: Function, required: true },
-  openNewTask: { type: Function, required: true },
-  addTaskEquipmentReward: { type: Function, required: true },
-  removeTaskEquipmentReward: { type: Function, required: true },
-  formatTime: { type: Function, required: true },
+  taskDefinitions: {type: Array, required: true},
+  taskForm: {type: Object, required: true},
+  taskArchives: {type: Array, required: true},
+  taskCycleResults: {type: Object, required: true},
+  equipmentOptions: {type: Array, required: true},
+  selectedTaskId: {type: String, required: true},
+  selectedTaskCycleKey: {type: String, required: true},
+  loadingTasks: {type: Boolean, required: true},
+  loadingTaskArchives: {type: Boolean, required: true},
+  loadingTaskResults: {type: Boolean, required: true},
+  saving: {type: Boolean, required: true},
+  fetchTasks: {type: Function, required: true},
+  fetchTaskArchives: {type: Function, required: true},
+  fetchTaskCycleResults: {type: Function, required: true},
+  saveTaskDefinition: {type: Function, required: true},
+  activateTaskDefinition: {type: Function, required: true},
+  deactivateTaskDefinition: {type: Function, required: true},
+  duplicateTaskDefinition: {type: Function, required: true},
+  archiveExpiredTasks: {type: Function, required: true},
+  editTaskDefinition: {type: Function, required: true},
+  openNewTask: {type: Function, required: true},
+  addTaskEquipmentReward: {type: Function, required: true},
+  removeTaskEquipmentReward: {type: Function, required: true},
+  formatTime: {type: Function, required: true},
 })
 
 const taskStatusFilter = ref('all')
@@ -45,24 +45,20 @@ const taskWindowFilter = ref('all')
 const archiveStatusFilter = ref('all')
 
 const filteredTaskDefinitions = computed(() =>
-  props.taskDefinitions.filter((item) => {
-    if (taskStatusFilter.value !== 'all' && item.status !== taskStatusFilter.value) {
-      return false
-    }
-    if (taskWindowFilter.value !== 'all' && item.windowKind !== taskWindowFilter.value) {
-      return false
-    }
-    return true
-  }),
+    props.taskDefinitions.filter((item) => {
+      if (taskStatusFilter.value !== 'all' && item.status !== taskStatusFilter.value) {
+        return false
+      }
+      return !(taskWindowFilter.value !== 'all' && item.windowKind !== taskWindowFilter.value);
+
+    }),
 )
 
 const filteredTaskCycleResults = computed(() =>
-  props.taskCycleResults.items.filter((item) => {
-    if (archiveStatusFilter.value !== 'all' && item.status !== archiveStatusFilter.value) {
-      return false
-    }
-    return true
-  }),
+    props.taskCycleResults.items.filter((item) => {
+      return !(archiveStatusFilter.value !== 'all' && item.status !== archiveStatusFilter.value);
+
+    }),
 )
 
 function taskStatusLabel(status) {
@@ -97,6 +93,8 @@ function windowLabel(kind) {
       return '按周累计'
     case 'fixed_range':
       return '固定时间窗'
+    case 'lifetime':
+      return '长期有效'
     case 'daily':
     default:
       return '按天累计'
@@ -149,7 +147,8 @@ function equipmentOptionLabel(item) {
     <div class="admin-inline-actions" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 10px;">
       <button class="nickname-form__submit" type="button" :disabled="saving" @click="openNewTask">新建任务</button>
       <button class="nickname-form__ghost" type="button" :disabled="loadingTasks" @click="fetchTasks">刷新任务</button>
-      <button class="nickname-form__ghost" type="button" :disabled="saving" @click="archiveExpiredTasks">归档过期任务</button>
+      <button class="nickname-form__ghost" type="button" :disabled="saving" @click="archiveExpiredTasks">归档过期任务
+      </button>
 
       <!-- Filter Selects -->
       <select v-model="taskWindowFilter" class="nickname-form__input" style="max-width: 140px;">
@@ -157,6 +156,7 @@ function equipmentOptionLabel(item) {
         <option value="daily">日常</option>
         <option value="weekly">周常</option>
         <option value="fixed_range">限时</option>
+        <option value="lifetime">长期有效</option>
       </select>
 
       <select v-model="taskStatusFilter" class="nickname-form__input" style="max-width: 140px;">
@@ -181,10 +181,13 @@ function equipmentOptionLabel(item) {
           <p>暂无任务配置。</p>
         </div>
         <div v-else class="leaderboard-list">
-          <article v-for="item in filteredTaskDefinitions" :key="item.taskId" class="social-card" style="margin-bottom: 0.75rem;">
+          <article v-for="item in filteredTaskDefinitions" :key="item.taskId" class="social-card"
+                   style="margin-bottom: 0.75rem;">
             <div class="social-card__head">
               <div>
-                <p class="vote-stage__eyebrow">{{ windowLabel(item.windowKind) }} · {{ taskStatusLabel(item.status) }}</p>
+                <p class="vote-stage__eyebrow">{{ windowLabel(item.windowKind) }} · {{
+                    taskStatusLabel(item.status)
+                  }}</p>
                 <strong>{{ item.title || item.taskId }}</strong>
               </div>
               <strong>{{ item.taskId }}</strong>
@@ -193,20 +196,21 @@ function equipmentOptionLabel(item) {
             <p class="social-card__copy">{{ taskMetaLabel(item) }} ≥ {{ item.targetValue }}</p>
             <div class="admin-inline-actions">
               <button class="nickname-form__ghost" type="button" @click="editTaskDefinition(item)">编辑</button>
-              <button class="nickname-form__ghost" type="button" @click="duplicateTaskDefinition(item.taskId)">复制</button>
+              <button class="nickname-form__ghost" type="button" @click="duplicateTaskDefinition(item.taskId)">复制
+              </button>
               <button
-                v-if="item.status !== 'active'"
-                class="nickname-form__ghost"
-                type="button"
-                @click="activateTaskDefinition(item.taskId)"
+                  v-if="item.status !== 'active'"
+                  class="nickname-form__ghost"
+                  type="button"
+                  @click="activateTaskDefinition(item.taskId)"
               >
                 上线
               </button>
               <button
-                v-else
-                class="nickname-form__ghost"
-                type="button"
-                @click="deactivateTaskDefinition(item.taskId)"
+                  v-else
+                  class="nickname-form__ghost"
+                  type="button"
+                  @click="deactivateTaskDefinition(item.taskId)"
               >
                 下线
               </button>
@@ -224,12 +228,12 @@ function equipmentOptionLabel(item) {
         <form class="admin-form" @submit.prevent="saveTaskDefinition">
           <div class="form-group">
             <label for="taskId">任务 ID</label>
-            <input id="taskId" v-model="taskForm.taskId" class="nickname-form__input" type="text" />
+            <input id="taskId" v-model="taskForm.taskId" class="nickname-form__input" type="text"/>
           </div>
 
           <div class="form-group">
             <label for="title">标题</label>
-            <input id="title" v-model="taskForm.title" class="nickname-form__input" type="text" />
+            <input id="title" v-model="taskForm.title" class="nickname-form__input" type="text"/>
           </div>
 
           <div class="form-group">
@@ -252,27 +256,33 @@ function equipmentOptionLabel(item) {
               <option value="daily">按天累计</option>
               <option value="weekly">按周累计</option>
               <option value="fixed_range">固定时间窗</option>
+              <option value="lifetime">长期有效</option>
             </select>
           </div>
 
           <div class="form-group">
             <label for="targetValue">目标值</label>
-            <input id="targetValue" v-model="taskForm.targetValue" class="nickname-form__input" type="number" min="1" />
+            <input id="targetValue" v-model="taskForm.targetValue" class="nickname-form__input" type="number" min="1"/>
           </div>
 
           <div class="form-group">
             <label for="displayOrder">展示顺序</label>
-            <input id="displayOrder" v-model="taskForm.displayOrder" class="nickname-form__input" type="number" min="0" />
+            <input id="displayOrder" v-model="taskForm.displayOrder" class="nickname-form__input" type="number"
+                   min="0"/>
           </div>
 
           <div v-if="taskForm.windowKind === 'fixed_range'">
             <div class="form-group">
               <label for="startAt">开始时间</label>
-              <input id="startAt" :value="toDatetimeLocal(taskForm.startAt)" @input="taskForm.startAt = fromDatetimeLocal($event.target.value)" class="nickname-form__input" type="datetime-local" />
+              <input id="startAt" :value="toDatetimeLocal(taskForm.startAt)"
+                     @input="taskForm.startAt = fromDatetimeLocal($event.target.value)" class="nickname-form__input"
+                     type="datetime-local"/>
             </div>
             <div class="form-group">
               <label for="endAt">结束时间</label>
-              <input id="endAt" :value="toDatetimeLocal(taskForm.endAt)" @input="taskForm.endAt = fromDatetimeLocal($event.target.value)" class="nickname-form__input" type="datetime-local" />
+              <input id="endAt" :value="toDatetimeLocal(taskForm.endAt)"
+                     @input="taskForm.endAt = fromDatetimeLocal($event.target.value)" class="nickname-form__input"
+                     type="datetime-local"/>
             </div>
           </div>
 
@@ -280,15 +290,16 @@ function equipmentOptionLabel(item) {
             <p>奖励配置</p>
             <div class="form-group">
               <label for="gold">金币</label>
-              <input id="gold" v-model="taskForm.rewards.gold" class="nickname-form__input" type="number" min="0" />
+              <input id="gold" v-model="taskForm.rewards.gold" class="nickname-form__input" type="number" min="0"/>
             </div>
             <div class="form-group">
               <label for="stones">强化石</label>
-              <input id="stones" v-model="taskForm.rewards.stones" class="nickname-form__input" type="number" min="0" />
+              <input id="stones" v-model="taskForm.rewards.stones" class="nickname-form__input" type="number" min="0"/>
             </div>
             <div class="form-group">
               <label for="talentPoints">天赋点</label>
-              <input id="talentPoints" v-model="taskForm.rewards.talentPoints" class="nickname-form__input" type="number" min="0" />
+              <input id="talentPoints" v-model="taskForm.rewards.talentPoints" class="nickname-form__input"
+                     type="number" min="0"/>
             </div>
 
             <div
@@ -307,14 +318,17 @@ function equipmentOptionLabel(item) {
               </div>
               <div class="form-group">
                 <label for="quantity">数量</label>
-                <input v-model="entry.quantity" class="nickname-form__input" type="number" min="1" />
+                <input v-model="entry.quantity" class="nickname-form__input" type="number" min="1"/>
               </div>
               <button class="nickname-form__ghost" type="button" @click="removeTaskEquipmentReward(index)">移除</button>
             </div>
             <button class="nickname-form__ghost" type="button" @click="addTaskEquipmentReward">添加装备奖励</button>
           </div>
 
-          <button class="nickname-form__submit" type="submit" :disabled="saving">{{ saving ? '保存中...' : '保存任务' }}</button>
+          <button class="nickname-form__submit" type="submit" :disabled="saving">{{
+              saving ? '保存中...' : '保存任务'
+            }}
+          </button>
         </form>
       </article>
     </section>
@@ -332,13 +346,16 @@ function equipmentOptionLabel(item) {
           <p>当前任务暂无归档。</p>
         </div>
         <div v-else class="leaderboard-list">
-          <article v-for="archive in taskArchives" :key="archive.cycleKey" class="social-card" style="margin-bottom: 0.75rem;">
+          <article v-for="archive in taskArchives" :key="archive.cycleKey" class="social-card"
+                   style="margin-bottom: 0.75rem;">
             <div class="social-card__head">
               <div>
                 <p class="vote-stage__eyebrow">{{ archive.cycleKey }}</p>
                 <strong>{{ taskMetaLabel(archive) }}</strong>
               </div>
-              <button class="nickname-form__ghost" type="button" @click="fetchTaskCycleResults(archive.taskId, archive.cycleKey)">查看明细</button>
+              <button class="nickname-form__ghost" type="button"
+                      @click="fetchTaskCycleResults(archive.taskId, archive.cycleKey)">查看明细
+              </button>
             </div>
             <p class="social-card__copy">
               参与 {{ archive.participantsTotal }} · 完成 {{ archive.completedTotal }} · 已领 {{ archive.claimedTotal }}
@@ -369,7 +386,8 @@ function equipmentOptionLabel(item) {
               <option value="not_participated">未参与</option>
             </select>
           </div>
-          <article v-for="item in filteredTaskCycleResults" :key="`${item.nickname}-${item.taskId}-${item.cycleKey}`" class="leaderboard-list__item">
+          <article v-for="item in filteredTaskCycleResults" :key="`${item.nickname}-${item.taskId}-${item.cycleKey}`"
+                   class="leaderboard-list__item">
             <span class="leaderboard-list__name">{{ item.nickname }}</span>
             <span>{{ archiveStatusLabel(item.status) }}</span>
             <strong class="leaderboard-list__count">{{ item.progress }}/{{ item.targetValue }}</strong>

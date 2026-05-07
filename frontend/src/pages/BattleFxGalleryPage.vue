@@ -2,12 +2,66 @@
 import PixelEffectCanvas from '../components/PixelEffectCanvas.vue'
 
 const smallEffects = [
-  { key: 'storm_combo',      name: '风暴连击',   skill: '风暴追击',    trigger: 'storm_combo',      layer: 'L3',       tag: '斩击',     tagClass: 'tag--soft',    note: '绿色像素斩击沿左下→右上快速展开，末端渐隐。短促清晰可叠加。' },
-  { key: 'auto_strike',       name: '自动重击',   skill: '碎甲重击',    trigger: 'auto_strike',      layer: 'L3 + L1',  tag: '打击',     tagClass: 'tag--heavy',   note: 'T形锤从左侧边缘立起，绕支点旋转90°砸向中心，命中产生碎片。' },
-  { key: 'bleed',             name: '流血',        skill: '致命出血',    trigger: 'bleed',            layer: 'L1',       tag: '残留',     tagClass: 'tag--weak',    note: '暗红像素向周围微扩散后定格为血迹群，不漂浮不下落。' },
-  { key: 'collapse_trigger',  name: '护甲崩塌',   skill: '护甲崩塌',    trigger: 'collapse_trigger', layer: 'L2+L1+L3', tag: '崩塌',     tagClass: 'tag--best',    note: '方案9像素盾牌爆裂四散：盾牌→每个像素从中心向外爆开→全部消散后重置。' },
-  { key: 'doom_mark',         name: '末日标记',   skill: '末日审判',    trigger: 'doom_mark',        layer: 'L2',       tag: '标记',     tagClass: 'tag--heavy',   note: '暗红断裂像素环逐段出现后轻微收缩定格，不闭合不成光滑圆。末日审判天赋触发。' },
-  { key: 'silver_storm',      name: '银色风暴',   skill: '白银风暴',    trigger: 'silver_storm',     layer: 'L3',       tag: '连斩',     tagClass: 'tag--soft',    note: '从顶部到底部快速刷出更多、更粗的随机银色刀光，落底后短暂残留并伴随轻微闪白。' },
+  {
+    key: 'storm_combo',
+    name: '风暴连击',
+    skill: '风暴追击',
+    trigger: 'storm_combo',
+    layer: 'L3',
+    tag: '斩击',
+    tagClass: 'tag--soft',
+    note: '绿色像素斩击沿左下→右上快速展开，末端渐隐。短促清晰可叠加。'
+  },
+  {
+    key: 'auto_strike',
+    name: '自动重击',
+    skill: '碎甲重击',
+    trigger: 'auto_strike',
+    layer: 'L3 + L1',
+    tag: '打击',
+    tagClass: 'tag--heavy',
+    note: 'T形锤从左侧边缘立起，绕支点旋转90°砸向中心，命中产生碎片。'
+  },
+  {
+    key: 'bleed',
+    name: '流血',
+    skill: '致命出血',
+    trigger: 'bleed',
+    layer: 'L1',
+    tag: '残留',
+    tagClass: 'tag--weak',
+    note: '暗红像素向周围微扩散后定格为血迹群，不漂浮不下落。'
+  },
+  {
+    key: 'collapse_trigger',
+    name: '护甲崩塌',
+    skill: '护甲崩塌',
+    trigger: 'collapse_trigger',
+    layer: 'L2+L1+L3',
+    tag: '崩塌',
+    tagClass: 'tag--best',
+    note: '方案9像素盾牌爆裂四散：盾牌→每个像素从中心向外爆开→全部消散后重置。'
+  },
+  {
+    key: 'doom_mark',
+    name: '末日标记',
+    skill: '末日审判',
+    trigger: 'doom_mark',
+    layer: 'L2',
+    tag: '标记',
+    tagClass: 'tag--heavy',
+    note: '暗红断裂像素环逐段出现后轻微收缩定格，不闭合不成光滑圆。末日审判天赋触发。'
+  },
+  {
+    key: 'silver_storm',
+    name: '银色风暴',
+    skill: '白银风暴',
+    trigger: 'silver_storm',
+    layer: 'L3',
+    tag: '连斩',
+    tagClass: 'tag--soft',
+    note: '从顶部到底部快速刷出更多、更粗的随机银色刀光，落底后短暂残留并伴随轻微闪白。'
+  },
 ]
 
 const ultimateSkills = [
@@ -43,39 +97,39 @@ const ultimateSkills = [
 
 const ultimateRows = [
   [
-    { type: 'heavy', name: '左肩甲', hp: 82 },
-    { type: 'soft', name: '锁骨', hp: 76 },
-    { type: 'heavy', name: '头甲', hp: 88 },
-    { type: 'soft', name: '右肩', hp: 71 },
-    { type: 'heavy', name: '臂盾', hp: 67 },
+    {type: 'heavy', name: '左肩甲', hp: 82},
+    {type: 'soft', name: '锁骨', hp: 76},
+    {type: 'heavy', name: '头甲', hp: 88},
+    {type: 'soft', name: '右肩', hp: 71},
+    {type: 'heavy', name: '臂盾', hp: 67},
   ],
   [
-    { type: 'soft', name: '左臂', hp: 74 },
-    { type: 'weak', name: '左肺', hp: 45 },
-    { type: 'soft', name: '咽喉', hp: 63 },
-    { type: 'weak', name: '右肺', hp: 41 },
-    { type: 'soft', name: '右臂', hp: 72 },
+    {type: 'soft', name: '左臂', hp: 74},
+    {type: 'weak', name: '左肺', hp: 45},
+    {type: 'soft', name: '咽喉', hp: 63},
+    {type: 'weak', name: '右肺', hp: 41},
+    {type: 'soft', name: '右臂', hp: 72},
   ],
   [
-    { type: 'heavy', name: '左肋甲', hp: 69 },
-    { type: 'soft', name: '胸腔', hp: 58 },
-    { type: 'weak', name: '胸甲核心', hp: 33, center: true },
-    { type: 'soft', name: '心室', hp: 52 },
-    { type: 'heavy', name: '右肋甲', hp: 64 },
+    {type: 'heavy', name: '左肋甲', hp: 69},
+    {type: 'soft', name: '胸腔', hp: 58},
+    {type: 'weak', name: '胸甲核心', hp: 33, center: true},
+    {type: 'soft', name: '心室', hp: 52},
+    {type: 'heavy', name: '右肋甲', hp: 64},
   ],
   [
-    { type: 'soft', name: '左腹', hp: 57 },
-    { type: 'heavy', name: '盆骨甲', hp: 61 },
-    { type: 'soft', name: '腹腔', hp: 49 },
-    { type: 'heavy', name: '髋甲', hp: 65 },
-    { type: 'soft', name: '右腹', hp: 55 },
+    {type: 'soft', name: '左腹', hp: 57},
+    {type: 'heavy', name: '盆骨甲', hp: 61},
+    {type: 'soft', name: '腹腔', hp: 49},
+    {type: 'heavy', name: '髋甲', hp: 65},
+    {type: 'soft', name: '右腹', hp: 55},
   ],
   [
-    { type: 'heavy', name: '左腿甲', hp: 73 },
-    { type: 'soft', name: '左膝', hp: 62 },
-    { type: 'heavy', name: '脊柱甲', hp: 79 },
-    { type: 'soft', name: '右膝', hp: 59 },
-    { type: 'heavy', name: '右腿甲', hp: 75 },
+    {type: 'heavy', name: '左腿甲', hp: 73},
+    {type: 'soft', name: '左膝', hp: 62},
+    {type: 'heavy', name: '脊柱甲', hp: 79},
+    {type: 'soft', name: '右膝', hp: 59},
+    {type: 'heavy', name: '右腿甲', hp: 75},
   ],
 ]
 </script>
@@ -101,7 +155,7 @@ const ultimateRows = [
           <article v-for="fx in smallEffects" :key="fx.key" class="bfxg__card">
             <div class="bfxg__card-preview">
               <div class="bfxg__canvas-wrap">
-                <PixelEffectCanvas :effect="fx.key" :size="90" :loop="true" />
+                <PixelEffectCanvas :effect="fx.key" :size="90" :loop="true"/>
               </div>
             </div>
             <div class="bfxg__card-body">
@@ -134,21 +188,23 @@ const ultimateRows = [
               <div class="boss-part-grid bfxg__ultimate-grid">
                 <div v-for="(row, yi) in ultimateRows" :key="yi" class="boss-part-grid__row">
                   <button
-                    v-for="(zone, xi) in row"
-                    :key="`${yi}-${xi}`"
-                    class="boss-part-cell boss-zone-button"
-                    :class="{
+                      v-for="(zone, xi) in row"
+                      :key="`${yi}-${xi}`"
+                      class="boss-part-cell boss-zone-button"
+                      :class="{
                       'boss-part-cell--alive': true,
                       'boss-part-cell--soft': zone.type === 'soft',
                       'boss-part-cell--heavy': zone.type === 'heavy',
                       'boss-part-cell--weak': zone.type === 'weak',
                       'boss-part-cell--center': !!zone.center,
                     }"
-                    :style="{ '--part-color': zone.type === 'weak' ? '#ef4444' : zone.type === 'heavy' ? '#9ca3af' : '#4ade80' }"
-                    type="button"
-                    disabled
+                      :style="{ '--part-color': zone.type === 'weak' ? '#ef4444' : zone.type === 'heavy' ? '#9ca3af' : '#4ade80' }"
+                      type="button"
+                      disabled
                   >
-                    <div class="boss-part-cell__type">{{ zone.type === 'weak' ? '弱点' : zone.type === 'heavy' ? '重甲' : '软组织' }}</div>
+                    <div class="boss-part-cell__type">
+                      {{ zone.type === 'weak' ? '弱点' : zone.type === 'heavy' ? '重甲' : '软组织' }}
+                    </div>
                     <strong class="boss-zone-button__label">{{ zone.name }}</strong>
                     <div class="boss-part-cell__bar">
                       <span class="boss-part-cell__fill" :style="{ width: `${zone.hp}%` }"></span>
@@ -160,7 +216,7 @@ const ultimateRows = [
                   </button>
                 </div>
                 <div class="bfxg__ultimate-overlay" aria-hidden="true">
-                  <PixelEffectCanvas :effect="ultimate.key" :size="ultimate.size || 90" :loop="true" />
+                  <PixelEffectCanvas :effect="ultimate.key" :size="ultimate.size || 90" :loop="true"/>
                 </div>
               </div>
             </div>
