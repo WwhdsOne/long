@@ -92,6 +92,58 @@ func registerAdminEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, map[string]bool{"ok": true})
 	})
 
+	router.POST("/api/admin/players/:nickname/equipment", func(ctx context.Context, c *app.RequestContext) {
+		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
+			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
+			return
+		}
+
+		var body struct {
+			ItemID   string `json:"itemId"`
+			Quantity int64  `json:"quantity"`
+		}
+		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
+			return
+		}
+		if body.Quantity <= 0 {
+			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_QUANTITY"})
+			return
+		}
+
+		nickname := strings.TrimSpace(c.Param("nickname"))
+		state, err := options.Store.GrantEquipmentToPlayer(ctx, nickname, body.ItemID, body.Quantity)
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			if errors.Is(err, core.ErrEquipmentNotFound) {
+				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, core.ErrInvalidQuantity) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_QUANTITY"})
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "EQUIPMENT_GRANT_FAILED"})
+			return
+		}
+
+		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
+			Operator:    options.AdminAuthenticator.Username(),
+			Action:      "equipment.grant",
+			TargetType:  "player",
+			TargetID:    nickname,
+			RequestPath: requestPath(c),
+			RequestIP:   requestIP(c),
+			Result:      "success",
+		})
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, map[string]any{
+			"ok":    true,
+			"state": state,
+		})
+	})
+
 	router.PUT("/api/admin/equipment/:itemId", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})

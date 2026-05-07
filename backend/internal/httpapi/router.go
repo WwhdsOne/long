@@ -41,6 +41,7 @@ type ButtonStore interface {
 	ListAdminBossHistoryPage(context.Context, int64, int64) (core.AdminBossHistoryPage, error)
 	ListAdminPlayers(context.Context, string, int64) (core.AdminPlayerPage, error)
 	GetAdminPlayer(context.Context, string) (*core.AdminPlayerOverview, error)
+	GrantEquipmentToPlayer(context.Context, string, string, int64) (core.UserState, error)
 	SaveEquipmentDefinition(context.Context, core.EquipmentDefinition) error
 	DeleteEquipmentDefinition(context.Context, string) error
 	ActivateBoss(context.Context, core.BossUpsert) (*core.Boss, error)

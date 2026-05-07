@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // GetAdminState 返回后台页面所需的聚合数据。
@@ -149,6 +151,51 @@ func (s *Store) DeleteEquipmentDefinition(ctx context.Context, itemID string) er
 		s.invalidateAllCombatStatsCaches()
 	}
 	return err
+}
+
+// GrantEquipmentToPlayer 向指定玩家发放若干件同类装备。
+func (s *Store) GrantEquipmentToPlayer(ctx context.Context, nickname string, itemID string, quantity int64) (UserState, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return UserState{}, err
+	}
+	itemID = strings.TrimSpace(itemID)
+	if itemID == "" {
+		return UserState{}, ErrEquipmentNotFound
+	}
+	if quantity <= 0 {
+		return UserState{}, ErrInvalidQuantity
+	}
+	if _, err := s.getEquipmentDefinition(ctx, itemID); err != nil {
+		return UserState{}, err
+	}
+
+	nowUnix := s.now().Unix()
+	pipe := s.client.TxPipeline()
+	for count := int64(0); count < quantity; count++ {
+		instanceID, createErr := s.newEquipmentInstanceID(ctx)
+		if createErr != nil {
+			return UserState{}, createErr
+		}
+		pipe.HSet(ctx, s.equipmentInstanceKey(instanceID), map[string]any{
+			"item_id":       itemID,
+			"enhance_level": "0",
+			"spent_stones":  "0",
+			"bound":         "0",
+			"locked":        "0",
+			"created_at":    strconv.FormatInt(nowUnix, 10),
+		})
+		pipe.SAdd(ctx, s.playerInstancesKey(normalizedNickname), instanceID)
+	}
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(nowUnix),
+		Member: normalizedNickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
+		return UserState{}, err
+	}
+
+	return s.GetUserState(ctx, normalizedNickname)
 }
 
 // ActivateBoss 覆盖当前活动 Boss。

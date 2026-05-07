@@ -73,6 +73,9 @@ type mockStore struct {
 	lastArchiveNow            time.Time
 	lastTemplateLootID        string
 	lastTemplateLoot          []core.BossLootEntry
+	lastGrantNickname         string
+	lastGrantItemID           string
+	lastGrantQuantity         int64
 	lastCycleQueue            []string
 	lastCycleEnabled          bool
 	lastCycleRoomID           string
@@ -92,6 +95,7 @@ type mockStore struct {
 	lastGetStateNickname      string
 	lastLeaderboardLimit      int64
 	lastLeaderboardOffset     int64
+	grantEquipmentState       core.UserState
 	saveTaskErr               error
 	activateTaskErr           error
 	deactivateTaskErr         error
@@ -1031,6 +1035,16 @@ func (m *mockStore) ListAdminPlayers(_ context.Context, _ string, _ int64) (core
 
 func (m *mockStore) GetAdminPlayer(_ context.Context, _ string) (*core.AdminPlayerOverview, error) {
 	return m.adminPlayer, nil
+}
+
+func (m *mockStore) GrantEquipmentToPlayer(_ context.Context, nickname string, itemID string, quantity int64) (core.UserState, error) {
+	m.lastGrantNickname = nickname
+	m.lastGrantItemID = itemID
+	m.lastGrantQuantity = quantity
+	if m.equipErr != nil {
+		return core.UserState{}, m.equipErr
+	}
+	return m.grantEquipmentState, nil
 }
 
 func (m *mockStore) SaveEquipmentDefinition(_ context.Context, definition core.EquipmentDefinition) error {
