@@ -16,7 +16,7 @@ export const realtime = $root.realtime = (() => {
      */
     const realtime = {};
 
-    realtime.ClickRequest = (function() {
+    realtime.ClickRequest = (function () {
 
         /**
          * Properties of a ClickRequest.
@@ -55,7 +55,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.ClickRequest
          * @instance
          */
-        ClickRequest.prototype.comboCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        ClickRequest.prototype.comboCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new ClickRequest instance using the specified properties.
@@ -119,23 +119,24 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.ClickRequest();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.ClickRequest();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.slug = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.comboCount = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -271,7 +272,7 @@ export const realtime = $root.realtime = (() => {
         return ClickRequest;
     })();
 
-    realtime.ClickAck = (function() {
+    realtime.ClickAck = (function () {
 
         /**
          * Properties of a ClickAck.
@@ -313,7 +314,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.ClickAck
          * @instance
          */
-        ClickAck.prototype.delta = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        ClickAck.prototype.delta = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * ClickAck critical.
@@ -329,7 +330,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.ClickAck
          * @instance
          */
-        ClickAck.prototype.bossDamage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        ClickAck.prototype.bossDamage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * ClickAck myBossDamage.
@@ -337,7 +338,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.ClickAck
          * @instance
          */
-        ClickAck.prototype.myBossDamage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        ClickAck.prototype.myBossDamage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * ClickAck bossLeaderboardCount.
@@ -483,57 +484,57 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.delta = reader.int64();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.critical = reader.bool();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.bossDamage = reader.int64();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.myBossDamage = reader.int64();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.bossLeaderboardCount = reader.int32();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.damageType = reader.string();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         if (!(message.talentEvents && message.talentEvents.length))
                             message.talentEvents = [];
                         message.talentEvents.push($root.realtime.TalentTriggerEvent.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 8: {
+                    case 8: {
                         if (!(message.partStateDeltas && message.partStateDeltas.length))
                             message.partStateDeltas = [];
                         message.partStateDeltas.push($root.realtime.BossPartStateDelta.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.talentCombatState = $root.realtime.TalentCombatState.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 10: {
+                    case 10: {
                         message.userDelta = $root.realtime.UserDeltaPatch.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 11: {
+                    case 11: {
                         message.button = $root.realtime.ButtonRef.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -820,7 +821,7 @@ export const realtime = $root.realtime = (() => {
         return ClickAck;
     })();
 
-    realtime.UserDeltaPatch = (function() {
+    realtime.UserDeltaPatch = (function () {
 
         /**
          * Properties of a UserDeltaPatch.
@@ -852,7 +853,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDeltaPatch
          * @instance
          */
-        UserDeltaPatch.prototype.gold = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDeltaPatch.prototype.gold = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * UserDeltaPatch stones.
@@ -860,7 +861,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDeltaPatch
          * @instance
          */
-        UserDeltaPatch.prototype.stones = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDeltaPatch.prototype.stones = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * UserDeltaPatch talentPoints.
@@ -868,7 +869,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDeltaPatch
          * @instance
          */
-        UserDeltaPatch.prototype.talentPoints = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDeltaPatch.prototype.talentPoints = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new UserDeltaPatch instance using the specified properties.
@@ -934,27 +935,28 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.UserDeltaPatch();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.UserDeltaPatch();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.gold = reader.int64();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.stones = reader.int64();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.talentPoints = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -1126,7 +1128,7 @@ export const realtime = $root.realtime = (() => {
         return UserDeltaPatch;
     })();
 
-    realtime.ButtonRef = (function() {
+    realtime.ButtonRef = (function () {
 
         /**
          * Properties of a ButtonRef.
@@ -1224,13 +1226,13 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.key = reader.string();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -1343,7 +1345,7 @@ export const realtime = $root.realtime = (() => {
         return ButtonRef;
     })();
 
-    realtime.PublicDelta = (function() {
+    realtime.PublicDelta = (function () {
 
         /**
          * Properties of a PublicDelta.
@@ -1380,7 +1382,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.PublicDelta
          * @instance
          */
-        PublicDelta.prototype.totalVotes = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        PublicDelta.prototype.totalVotes = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * PublicDelta leaderboard.
@@ -1494,43 +1496,44 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.PublicDelta();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.PublicDelta();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.totalVotes = reader.int64();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         if (!(message.leaderboard && message.leaderboard.length))
                             message.leaderboard = [];
                         message.leaderboard.push($root.realtime.LeaderboardEntry.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.roomId = reader.string();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.boss = $root.realtime.Boss.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 5: {
+                    case 5: {
                         if (!(message.bossLeaderboard && message.bossLeaderboard.length))
                             message.bossLeaderboard = [];
                         message.bossLeaderboard.push($root.realtime.BossLeaderboardEntry.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.announcementVersion = reader.string();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -1739,7 +1742,7 @@ export const realtime = $root.realtime = (() => {
         return PublicDelta;
     })();
 
-    realtime.PublicMeta = (function() {
+    realtime.PublicMeta = (function () {
 
         /**
          * Properties of a PublicMeta.
@@ -1857,31 +1860,32 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.PublicMeta();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.PublicMeta();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         if (!(message.leaderboard && message.leaderboard.length))
                             message.leaderboard = [];
                         message.leaderboard.push($root.realtime.LeaderboardEntry.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 2: {
+                    case 2: {
                         if (!(message.bossLeaderboard && message.bossLeaderboard.length))
                             message.bossLeaderboard = [];
                         message.bossLeaderboard.push($root.realtime.BossLeaderboardEntry.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.announcementVersion = reader.string();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -2046,7 +2050,7 @@ export const realtime = $root.realtime = (() => {
         return PublicMeta;
     })();
 
-    realtime.RoomInfo = (function() {
+    realtime.RoomInfo = (function () {
 
         /**
          * Properties of a RoomInfo.
@@ -2169,7 +2173,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.RoomInfo
          * @instance
          */
-        RoomInfo.prototype.currentBossHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        RoomInfo.prototype.currentBossHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * RoomInfo currentBossMaxHp.
@@ -2177,7 +2181,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.RoomInfo
          * @instance
          */
-        RoomInfo.prototype.currentBossMaxHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        RoomInfo.prototype.currentBossMaxHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * RoomInfo currentBossAvgHp.
@@ -2185,7 +2189,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.RoomInfo
          * @instance
          */
-        RoomInfo.prototype.currentBossAvgHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        RoomInfo.prototype.currentBossAvgHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * RoomInfo cooldownRemainingSeconds.
@@ -2193,7 +2197,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.RoomInfo
          * @instance
          */
-        RoomInfo.prototype.cooldownRemainingSeconds = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        RoomInfo.prototype.cooldownRemainingSeconds = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new RoomInfo instance using the specified properties.
@@ -2287,65 +2291,65 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.id = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.displayName = reader.string();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.current = reader.bool();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.joinable = reader.bool();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.onlineCount = reader.int32();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.cycleEnabled = reader.bool();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.queueId = reader.string();
                         break;
                     }
-                case 8: {
+                    case 8: {
                         message.currentBossId = reader.string();
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.currentBossName = reader.string();
                         break;
                     }
-                case 10: {
+                    case 10: {
                         message.currentBossStatus = reader.string();
                         break;
                     }
-                case 11: {
+                    case 11: {
                         message.currentBossHp = reader.int64();
                         break;
                     }
-                case 12: {
+                    case 12: {
                         message.currentBossMaxHp = reader.int64();
                         break;
                     }
-                case 13: {
+                    case 13: {
                         message.currentBossAvgHp = reader.int64();
                         break;
                     }
-                case 14: {
+                    case 14: {
                         message.cooldownRemainingSeconds = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -2619,7 +2623,7 @@ export const realtime = $root.realtime = (() => {
         return RoomInfo;
     })();
 
-    realtime.RoomState = (function() {
+    realtime.RoomState = (function () {
 
         /**
          * Properties of a RoomState.
@@ -2660,7 +2664,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.RoomState
          * @instance
          */
-        RoomState.prototype.switchCooldownRemainingSeconds = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        RoomState.prototype.switchCooldownRemainingSeconds = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * RoomState rooms.
@@ -2741,23 +2745,23 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.currentRoomId = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.switchCooldownRemainingSeconds = reader.int64();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         if (!(message.rooms && message.rooms.length))
                             message.rooms = [];
                         message.rooms.push($root.realtime.RoomInfo.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -2919,7 +2923,7 @@ export const realtime = $root.realtime = (() => {
         return RoomState;
     })();
 
-    realtime.UserDelta = (function() {
+    realtime.UserDelta = (function () {
 
         /**
          * Properties of a UserDelta.
@@ -2981,7 +2985,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDelta
          * @instance
          */
-        UserDelta.prototype.myBossKills = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDelta.prototype.myBossKills = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * UserDelta totalBossKills.
@@ -2989,7 +2993,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDelta
          * @instance
          */
-        UserDelta.prototype.totalBossKills = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDelta.prototype.totalBossKills = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * UserDelta roomId.
@@ -3021,7 +3025,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDelta
          * @instance
          */
-        UserDelta.prototype.gold = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDelta.prototype.gold = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * UserDelta stones.
@@ -3029,7 +3033,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDelta
          * @instance
          */
-        UserDelta.prototype.stones = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDelta.prototype.stones = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * UserDelta talentPoints.
@@ -3037,7 +3041,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserDelta
          * @instance
          */
-        UserDelta.prototype.talentPoints = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserDelta.prototype.talentPoints = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * UserDelta recentRewards.
@@ -3175,73 +3179,73 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.userStats = $root.realtime.UserStats.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.myBossStats = $root.realtime.BossUserStats.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.myBossKills = reader.int64();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.totalBossKills = reader.int64();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.roomId = reader.string();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.loadout = $root.realtime.Loadout.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.combatStats = $root.realtime.CombatStats.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 8: {
+                    case 8: {
                         message.gold = reader.int64();
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.stones = reader.int64();
                         break;
                     }
-                case 10: {
+                    case 10: {
                         message.talentPoints = reader.int64();
                         break;
                     }
-                case 11: {
+                    case 11: {
                         if (!(message.recentRewards && message.recentRewards.length))
                             message.recentRewards = [];
                         message.recentRewards.push($root.realtime.Reward.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 12: {
+                    case 12: {
                         if (!(message.talentEvents && message.talentEvents.length))
                             message.talentEvents = [];
                         message.talentEvents.push($root.realtime.TalentTriggerEvent.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 13: {
+                    case 13: {
                         message.talentCombatState = $root.realtime.TalentCombatState.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 14: {
+                    case 14: {
                         message.equippedBattleClickSkinId = reader.string();
                         break;
                     }
-                case 15: {
+                    case 15: {
                         message.equippedBattleClickCursorImagePath = reader.string();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -3598,7 +3602,7 @@ export const realtime = $root.realtime = (() => {
         return UserDelta;
     })();
 
-    realtime.UserStats = (function() {
+    realtime.UserStats = (function () {
 
         /**
          * Properties of a UserStats.
@@ -3637,7 +3641,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.UserStats
          * @instance
          */
-        UserStats.prototype.clickCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        UserStats.prototype.clickCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new UserStats instance using the specified properties.
@@ -3707,17 +3711,17 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.nickname = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.clickCount = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -3853,7 +3857,7 @@ export const realtime = $root.realtime = (() => {
         return UserStats;
     })();
 
-    realtime.LeaderboardEntry = (function() {
+    realtime.LeaderboardEntry = (function () {
 
         /**
          * Properties of a LeaderboardEntry.
@@ -3901,7 +3905,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.LeaderboardEntry
          * @instance
          */
-        LeaderboardEntry.prototype.clickCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        LeaderboardEntry.prototype.clickCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new LeaderboardEntry instance using the specified properties.
@@ -3967,27 +3971,28 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.LeaderboardEntry();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.LeaderboardEntry();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.rank = reader.int32();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.nickname = reader.string();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.clickCount = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -4131,7 +4136,7 @@ export const realtime = $root.realtime = (() => {
         return LeaderboardEntry;
     })();
 
-    realtime.BossPart = (function() {
+    realtime.BossPart = (function () {
 
         /**
          * Properties of a BossPart.
@@ -4209,7 +4214,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossPart
          * @instance
          */
-        BossPart.prototype.maxHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossPart.prototype.maxHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * BossPart currentHp.
@@ -4217,7 +4222,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossPart
          * @instance
          */
-        BossPart.prototype.currentHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossPart.prototype.currentHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * BossPart armor.
@@ -4225,7 +4230,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossPart
          * @instance
          */
-        BossPart.prototype.armor = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossPart.prototype.armor = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * BossPart alive.
@@ -4317,45 +4322,45 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.x = reader.int32();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.y = reader.int32();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.type = reader.string();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.displayName = reader.string();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.imagePath = reader.string();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.maxHp = reader.int64();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.currentHp = reader.int64();
                         break;
                     }
-                case 8: {
+                    case 8: {
                         message.armor = reader.int64();
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.alive = reader.bool();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -4575,7 +4580,7 @@ export const realtime = $root.realtime = (() => {
         return BossPart;
     })();
 
-    realtime.Boss = (function() {
+    realtime.Boss = (function () {
 
         /**
          * Properties of a Boss.
@@ -4667,7 +4672,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Boss
          * @instance
          */
-        Boss.prototype.maxHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Boss.prototype.maxHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Boss currentHp.
@@ -4675,7 +4680,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Boss
          * @instance
          */
-        Boss.prototype.currentHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Boss.prototype.currentHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Boss goldOnKill.
@@ -4683,7 +4688,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Boss
          * @instance
          */
-        Boss.prototype.goldOnKill = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Boss.prototype.goldOnKill = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Boss stoneOnKill.
@@ -4691,7 +4696,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Boss
          * @instance
          */
-        Boss.prototype.stoneOnKill = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Boss.prototype.stoneOnKill = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Boss talentPointsOnKill.
@@ -4699,7 +4704,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Boss
          * @instance
          */
-        Boss.prototype.talentPointsOnKill = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Boss.prototype.talentPointsOnKill = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Boss parts.
@@ -4715,7 +4720,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Boss
          * @instance
          */
-        Boss.prototype.startedAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Boss.prototype.startedAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Boss defeatedAt.
@@ -4723,7 +4728,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Boss
          * @instance
          */
-        Boss.prototype.defeatedAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Boss.prototype.defeatedAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new Boss instance using the specified properties.
@@ -4818,67 +4823,67 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.id = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.templateId = reader.string();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.roomId = reader.string();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.queueId = reader.string();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.name = reader.string();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.status = reader.string();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.maxHp = reader.int64();
                         break;
                     }
-                case 8: {
+                    case 8: {
                         message.currentHp = reader.int64();
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.goldOnKill = reader.int64();
                         break;
                     }
-                case 10: {
+                    case 10: {
                         message.stoneOnKill = reader.int64();
                         break;
                     }
-                case 11: {
+                    case 11: {
                         message.talentPointsOnKill = reader.int64();
                         break;
                     }
-                case 12: {
+                    case 12: {
                         if (!(message.parts && message.parts.length))
                             message.parts = [];
                         message.parts.push($root.realtime.BossPart.decode(reader, reader.uint32(), undefined, long + 1));
                         break;
                     }
-                case 13: {
+                    case 13: {
                         message.startedAt = reader.int64();
                         break;
                     }
-                case 14: {
+                    case 14: {
                         message.defeatedAt = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -5212,7 +5217,7 @@ export const realtime = $root.realtime = (() => {
         return Boss;
     })();
 
-    realtime.BossLeaderboardEntry = (function() {
+    realtime.BossLeaderboardEntry = (function () {
 
         /**
          * Properties of a BossLeaderboardEntry.
@@ -5260,7 +5265,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossLeaderboardEntry
          * @instance
          */
-        BossLeaderboardEntry.prototype.damage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossLeaderboardEntry.prototype.damage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new BossLeaderboardEntry instance using the specified properties.
@@ -5326,27 +5331,28 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossLeaderboardEntry();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.BossLeaderboardEntry();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.rank = reader.int32();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.nickname = reader.string();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.damage = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -5490,7 +5496,7 @@ export const realtime = $root.realtime = (() => {
         return BossLeaderboardEntry;
     })();
 
-    realtime.BossUserStats = (function() {
+    realtime.BossUserStats = (function () {
 
         /**
          * Properties of a BossUserStats.
@@ -5530,7 +5536,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossUserStats
          * @instance
          */
-        BossUserStats.prototype.damage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossUserStats.prototype.damage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * BossUserStats rank.
@@ -5604,27 +5610,28 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossUserStats();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.BossUserStats();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.nickname = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.damage = reader.int64();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.rank = reader.int32();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -5768,7 +5775,7 @@ export const realtime = $root.realtime = (() => {
         return BossUserStats;
     })();
 
-    realtime.InventoryItem = (function() {
+    realtime.InventoryItem = (function () {
 
         /**
          * Properties of an InventoryItem.
@@ -5872,7 +5879,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.InventoryItem
          * @instance
          */
-        InventoryItem.prototype.quantity = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        InventoryItem.prototype.quantity = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * InventoryItem equipped.
@@ -5912,7 +5919,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.InventoryItem
          * @instance
          */
-        InventoryItem.prototype.attackPower = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        InventoryItem.prototype.attackPower = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * InventoryItem armorPenPercent.
@@ -6058,91 +6065,92 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.InventoryItem();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.InventoryItem();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.itemId = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.instanceId = reader.string();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.name = reader.string();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.slot = reader.string();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.rarity = reader.string();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.imagePath = reader.string();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.imageAlt = reader.string();
                         break;
                     }
-                case 8: {
+                    case 8: {
                         message.quantity = reader.int64();
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.equipped = reader.bool();
                         break;
                     }
-                case 10: {
+                    case 10: {
                         message.enhanceLevel = reader.int32();
                         break;
                     }
-                case 11: {
+                    case 11: {
                         message.bound = reader.bool();
                         break;
                     }
-                case 12: {
+                    case 12: {
                         message.locked = reader.bool();
                         break;
                     }
-                case 13: {
+                    case 13: {
                         message.attackPower = reader.int64();
                         break;
                     }
-                case 14: {
+                    case 14: {
                         message.armorPenPercent = reader.double();
                         break;
                     }
-                case 15: {
+                    case 15: {
                         message.critRate = reader.double();
                         break;
                     }
-                case 16: {
+                    case 16: {
                         message.critDamageMultiplier = reader.double();
                         break;
                     }
-                case 17: {
+                    case 17: {
                         message.partTypeDamageSoft = reader.double();
                         break;
                     }
-                case 18: {
+                    case 18: {
                         message.partTypeDamageHeavy = reader.double();
                         break;
                     }
-                case 19: {
+                    case 19: {
                         message.partTypeDamageWeak = reader.double();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -6428,7 +6436,7 @@ export const realtime = $root.realtime = (() => {
         return InventoryItem;
     })();
 
-    realtime.Loadout = (function() {
+    realtime.Loadout = (function () {
 
         /**
          * Properties of a Loadout.
@@ -6581,33 +6589,33 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.weapon = $root.realtime.InventoryItem.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.helmet = $root.realtime.InventoryItem.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.chest = $root.realtime.InventoryItem.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.gloves = $root.realtime.InventoryItem.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.legs = $root.realtime.InventoryItem.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.accessory = $root.realtime.InventoryItem.decode(reader, reader.uint32(), undefined, long + 1);
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -6791,7 +6799,7 @@ export const realtime = $root.realtime = (() => {
         return Loadout;
     })();
 
-    realtime.CombatStats = (function() {
+    realtime.CombatStats = (function () {
 
         /**
          * Properties of a CombatStats.
@@ -6834,7 +6842,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.CombatStats
          * @instance
          */
-        CombatStats.prototype.effectiveIncrement = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        CombatStats.prototype.effectiveIncrement = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * CombatStats normalDamage.
@@ -6842,7 +6850,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.CombatStats
          * @instance
          */
-        CombatStats.prototype.normalDamage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        CombatStats.prototype.normalDamage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * CombatStats criticalChancePercent.
@@ -6858,7 +6866,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.CombatStats
          * @instance
          */
-        CombatStats.prototype.criticalDamage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        CombatStats.prototype.criticalDamage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * CombatStats attackPower.
@@ -6866,7 +6874,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.CombatStats
          * @instance
          */
-        CombatStats.prototype.attackPower = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        CombatStats.prototype.attackPower = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * CombatStats armorPenPercent.
@@ -7026,71 +7034,72 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.CombatStats();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.CombatStats();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.effectiveIncrement = reader.int64();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.normalDamage = reader.int64();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.criticalChancePercent = reader.double();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.criticalDamage = reader.int64();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.attackPower = reader.int64();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.armorPenPercent = reader.double();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.critDamageMultiplier = reader.double();
                         break;
                     }
-                case 8: {
+                    case 8: {
                         message.allDamageAmplify = reader.double();
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.partTypeDamageSoft = reader.double();
                         break;
                     }
-                case 10: {
+                    case 10: {
                         message.partTypeDamageHeavy = reader.double();
                         break;
                     }
-                case 11: {
+                    case 11: {
                         message.partTypeDamageWeak = reader.double();
                         break;
                     }
-                case 12: {
+                    case 12: {
                         message.perPartDamagePercent = reader.double();
                         break;
                     }
-                case 13: {
+                    case 13: {
                         message.lowHpMultiplier = reader.double();
                         break;
                     }
-                case 14: {
+                    case 14: {
                         message.lowHpThreshold = reader.double();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -7364,7 +7373,7 @@ export const realtime = $root.realtime = (() => {
         return CombatStats;
     })();
 
-    realtime.Reward = (function() {
+    realtime.Reward = (function () {
 
         /**
          * Properties of a Reward.
@@ -7432,7 +7441,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.Reward
          * @instance
          */
-        Reward.prototype.grantedAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        Reward.prototype.grantedAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Reward imagePath.
@@ -7528,37 +7537,37 @@ export const realtime = $root.realtime = (() => {
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.bossId = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.bossName = reader.string();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.itemId = reader.string();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.itemName = reader.string();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.grantedAt = reader.int64();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.imagePath = reader.string();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.imageAlt = reader.string();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -7734,7 +7743,7 @@ export const realtime = $root.realtime = (() => {
         return Reward;
     })();
 
-    realtime.TalentTriggerEvent = (function() {
+    realtime.TalentTriggerEvent = (function () {
 
         /**
          * Properties of a TalentTriggerEvent.
@@ -7794,7 +7803,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentTriggerEvent
          * @instance
          */
-        TalentTriggerEvent.prototype.extraDamage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentTriggerEvent.prototype.extraDamage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentTriggerEvent message.
@@ -7892,43 +7901,44 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.TalentTriggerEvent();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.TalentTriggerEvent();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.talentId = reader.string();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.name = reader.string();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.effectType = reader.string();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.extraDamage = reader.int64();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.message = reader.string();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.partX = reader.int32();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.partY = reader.int32();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -8104,7 +8114,7 @@ export const realtime = $root.realtime = (() => {
         return TalentTriggerEvent;
     })();
 
-    realtime.BossPartStateDelta = (function() {
+    realtime.BossPartStateDelta = (function () {
 
         /**
          * Properties of a BossPartStateDelta.
@@ -8155,7 +8165,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossPartStateDelta
          * @instance
          */
-        BossPartStateDelta.prototype.damage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossPartStateDelta.prototype.damage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * BossPartStateDelta beforeHp.
@@ -8163,7 +8173,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossPartStateDelta
          * @instance
          */
-        BossPartStateDelta.prototype.beforeHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossPartStateDelta.prototype.beforeHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * BossPartStateDelta afterHp.
@@ -8171,7 +8181,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.BossPartStateDelta
          * @instance
          */
-        BossPartStateDelta.prototype.afterHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        BossPartStateDelta.prototype.afterHp = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * BossPartStateDelta partType.
@@ -8251,39 +8261,40 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossPartStateDelta();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.BossPartStateDelta();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.x = reader.int32();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.y = reader.int32();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.damage = reader.int64();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.beforeHp = reader.int64();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.afterHp = reader.int64();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.partType = reader.string();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -8479,7 +8490,7 @@ export const realtime = $root.realtime = (() => {
         return BossPartStateDelta;
     })();
 
-    realtime.TalentBleedState = (function() {
+    realtime.TalentBleedState = (function () {
 
         /**
          * Properties of a TalentBleedState.
@@ -8517,7 +8528,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.startedAtMs = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.startedAtMs = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState nextTickAtMs.
@@ -8525,7 +8536,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.nextTickAtMs = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.nextTickAtMs = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState endsAtMs.
@@ -8533,7 +8544,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.endsAtMs = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.endsAtMs = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState durationMs.
@@ -8541,7 +8552,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.durationMs = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.durationMs = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState tickIntervalMs.
@@ -8549,7 +8560,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.tickIntervalMs = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.tickIntervalMs = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState totalTicks.
@@ -8557,7 +8568,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.totalTicks = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.totalTicks = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState appliedTicks.
@@ -8565,7 +8576,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.appliedTicks = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.appliedTicks = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState totalDamage.
@@ -8573,7 +8584,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.totalDamage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.totalDamage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentBleedState appliedDamage.
@@ -8581,7 +8592,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentBleedState
          * @instance
          */
-        TalentBleedState.prototype.appliedDamage = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentBleedState.prototype.appliedDamage = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new TalentBleedState instance using the specified properties.
@@ -8659,51 +8670,52 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.TalentBleedState();
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.TalentBleedState();
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.startedAtMs = reader.int64();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         message.nextTickAtMs = reader.int64();
                         break;
                     }
-                case 3: {
+                    case 3: {
                         message.endsAtMs = reader.int64();
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.durationMs = reader.int64();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.tickIntervalMs = reader.int64();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         message.totalTicks = reader.int64();
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.appliedTicks = reader.int64();
                         break;
                     }
-                case 8: {
+                    case 8: {
                         message.totalDamage = reader.int64();
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.appliedDamage = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -9007,7 +9019,7 @@ export const realtime = $root.realtime = (() => {
         return TalentBleedState;
     })();
 
-    realtime.TalentCombatState = (function() {
+    realtime.TalentCombatState = (function () {
 
         /**
          * Properties of a TalentCombatState.
@@ -9101,7 +9113,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.collapseEndsAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.collapseEndsAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState collapseDuration.
@@ -9109,7 +9121,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.collapseDuration = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.collapseDuration = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState doomMarks.
@@ -9149,7 +9161,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.silverStormEndsAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.silverStormEndsAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState silverStormActive.
@@ -9173,7 +9185,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.autoStrikeComboCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.autoStrikeComboCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState autoStrikeExpiresAt.
@@ -9181,7 +9193,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.autoStrikeExpiresAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.autoStrikeExpiresAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState lastFinalCutAt.
@@ -9189,7 +9201,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.lastFinalCutAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.lastFinalCutAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState judgmentDayUsed.
@@ -9205,7 +9217,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.judgmentDayCooldownSec = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.judgmentDayCooldownSec = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState partHeavyClickCount.
@@ -9261,7 +9273,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.skinnerCooldownEndsAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.skinnerCooldownEndsAt = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState skinnerCooldownDuration.
@@ -9269,7 +9281,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.skinnerCooldownDuration = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.skinnerCooldownDuration = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState normalTriggerCount.
@@ -9277,7 +9289,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.normalTriggerCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.normalTriggerCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState armorTriggerCount.
@@ -9285,7 +9297,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.armorTriggerCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.armorTriggerCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState judgmentDayTriggerCount.
@@ -9293,7 +9305,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.judgmentDayTriggerCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.judgmentDayTriggerCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState autoStrikeTriggerCount.
@@ -9301,7 +9313,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.autoStrikeTriggerCount = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.autoStrikeTriggerCount = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * TalentCombatState autoStrikeWindowSec.
@@ -9309,7 +9321,7 @@ export const realtime = $root.realtime = (() => {
          * @memberof realtime.TalentCombatState
          * @instance
          */
-        TalentCombatState.prototype.autoStrikeWindowSec = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+        TalentCombatState.prototype.autoStrikeWindowSec = $util.Long ? $util.Long.fromBits(0, 0, false) : 0;
 
         /**
          * Creates a new TalentCombatState instance using the specified properties.
@@ -9448,17 +9460,18 @@ export const realtime = $root.realtime = (() => {
                 long = 0;
             if (long > $Reader.recursionLimit)
                 throw Error("maximum nesting depth exceeded");
-            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.TalentCombatState(), key, value;
+            let end = length === undefined ? reader.len : reader.pos + length,
+                message = new $root.realtime.TalentCombatState(), key, value;
             while (reader.pos < end) {
                 let tag = reader.uint32();
                 if (tag === error)
                     break;
                 switch (tag >>> 3) {
-                case 1: {
+                    case 1: {
                         message.omenStacks = reader.int32();
                         break;
                     }
-                case 2: {
+                    case 2: {
                         if (message.bleeds === $util.emptyObject)
                             message.bleeds = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9467,15 +9480,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = $root.realtime.TalentBleedState.decode(reader, reader.uint32(), undefined, long + 1);
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = $root.realtime.TalentBleedState.decode(reader, reader.uint32(), undefined, long + 1);
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9483,7 +9496,7 @@ export const realtime = $root.realtime = (() => {
                         message.bleeds[key] = value;
                         break;
                     }
-                case 3: {
+                    case 3: {
                         if (!(message.collapseParts && message.collapseParts.length))
                             message.collapseParts = [];
                         if ((tag & 7) === 2) {
@@ -9494,15 +9507,15 @@ export const realtime = $root.realtime = (() => {
                             message.collapseParts.push(reader.int32());
                         break;
                     }
-                case 4: {
+                    case 4: {
                         message.collapseEndsAt = reader.int64();
                         break;
                     }
-                case 5: {
+                    case 5: {
                         message.collapseDuration = reader.int64();
                         break;
                     }
-                case 6: {
+                    case 6: {
                         if (!(message.doomMarks && message.doomMarks.length))
                             message.doomMarks = [];
                         if ((tag & 7) === 2) {
@@ -9513,11 +9526,11 @@ export const realtime = $root.realtime = (() => {
                             message.doomMarks.push(reader.int32());
                         break;
                     }
-                case 7: {
+                    case 7: {
                         message.hasTriggeredDoom = reader.bool();
                         break;
                     }
-                case 8: {
+                    case 8: {
                         if (message.doomMarkCumDamage === $util.emptyObject)
                             message.doomMarkCumDamage = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9526,15 +9539,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9542,35 +9555,35 @@ export const realtime = $root.realtime = (() => {
                         message.doomMarkCumDamage[key] = value;
                         break;
                     }
-                case 9: {
+                    case 9: {
                         message.silverStormRemaining = reader.int32();
                         break;
                     }
-                case 10: {
+                    case 10: {
                         message.silverStormEndsAt = reader.int64();
                         break;
                     }
-                case 11: {
+                    case 11: {
                         message.silverStormActive = reader.bool();
                         break;
                     }
-                case 12: {
+                    case 12: {
                         message.autoStrikeTargetPart = reader.string();
                         break;
                     }
-                case 13: {
+                    case 13: {
                         message.autoStrikeComboCount = reader.int64();
                         break;
                     }
-                case 14: {
+                    case 14: {
                         message.autoStrikeExpiresAt = reader.int64();
                         break;
                     }
-                case 15: {
+                    case 15: {
                         message.lastFinalCutAt = reader.int64();
                         break;
                     }
-                case 16: {
+                    case 16: {
                         if (message.judgmentDayUsed === $util.emptyObject)
                             message.judgmentDayUsed = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9579,15 +9592,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9595,11 +9608,11 @@ export const realtime = $root.realtime = (() => {
                         message.judgmentDayUsed[key] = value;
                         break;
                     }
-                case 17: {
+                    case 17: {
                         message.judgmentDayCooldownSec = reader.int64();
                         break;
                     }
-                case 18: {
+                    case 18: {
                         if (message.partHeavyClickCount === $util.emptyObject)
                             message.partHeavyClickCount = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9608,15 +9621,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9624,7 +9637,7 @@ export const realtime = $root.realtime = (() => {
                         message.partHeavyClickCount[key] = value;
                         break;
                     }
-                case 19: {
+                    case 19: {
                         if (message.partJudgmentDayCount === $util.emptyObject)
                             message.partJudgmentDayCount = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9633,15 +9646,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9649,7 +9662,7 @@ export const realtime = $root.realtime = (() => {
                         message.partJudgmentDayCount[key] = value;
                         break;
                     }
-                case 20: {
+                    case 20: {
                         if (message.partRetainedClicks === $util.emptyObject)
                             message.partRetainedClicks = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9658,15 +9671,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9674,7 +9687,7 @@ export const realtime = $root.realtime = (() => {
                         message.partRetainedClicks[key] = value;
                         break;
                     }
-                case 21: {
+                    case 21: {
                         if (message.partStormComboCount === $util.emptyObject)
                             message.partStormComboCount = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9683,15 +9696,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9699,7 +9712,7 @@ export const realtime = $root.realtime = (() => {
                         message.partStormComboCount[key] = value;
                         break;
                     }
-                case 22: {
+                    case 22: {
                         if (message.skinnerParts === $util.emptyObject)
                             message.skinnerParts = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9708,15 +9721,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9724,7 +9737,7 @@ export const realtime = $root.realtime = (() => {
                         message.skinnerParts[key] = value;
                         break;
                     }
-                case 23: {
+                    case 23: {
                         if (message.skinnerDurationByPart === $util.emptyObject)
                             message.skinnerDurationByPart = {};
                         let end2 = reader.uint32() + reader.pos;
@@ -9733,15 +9746,15 @@ export const realtime = $root.realtime = (() => {
                         while (reader.pos < end2) {
                             let tag2 = reader.uint32();
                             switch (tag2 >>> 3) {
-                            case 1:
-                                key = reader.string();
-                                break;
-                            case 2:
-                                value = reader.int64();
-                                break;
-                            default:
-                                reader.skipType(tag2 & 7, long);
-                                break;
+                                case 1:
+                                    key = reader.string();
+                                    break;
+                                case 2:
+                                    value = reader.int64();
+                                    break;
+                                default:
+                                    reader.skipType(tag2 & 7, long);
+                                    break;
                             }
                         }
                         if (key === "__proto__")
@@ -9749,37 +9762,37 @@ export const realtime = $root.realtime = (() => {
                         message.skinnerDurationByPart[key] = value;
                         break;
                     }
-                case 24: {
+                    case 24: {
                         message.skinnerCooldownEndsAt = reader.int64();
                         break;
                     }
-                case 25: {
+                    case 25: {
                         message.skinnerCooldownDuration = reader.int64();
                         break;
                     }
-                case 26: {
+                    case 26: {
                         message.normalTriggerCount = reader.int64();
                         break;
                     }
-                case 27: {
+                    case 27: {
                         message.armorTriggerCount = reader.int64();
                         break;
                     }
-                case 28: {
+                    case 28: {
                         message.judgmentDayTriggerCount = reader.int64();
                         break;
                     }
-                case 29: {
+                    case 29: {
                         message.autoStrikeTriggerCount = reader.int64();
                         break;
                     }
-                case 30: {
+                    case 30: {
                         message.autoStrikeWindowSec = reader.int64();
                         break;
                     }
-                default:
-                    reader.skipType(tag & 7, long);
-                    break;
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
                 }
             }
             return message;
@@ -10608,4 +10621,4 @@ export const realtime = $root.realtime = (() => {
     return realtime;
 })();
 
-export { $root as default };
+export {$root as default};

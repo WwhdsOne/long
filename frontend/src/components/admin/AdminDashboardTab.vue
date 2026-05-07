@@ -1,19 +1,19 @@
 <script setup>
-import { EQUIPMENT_SLOTS } from '../../utils/equipmentSlots'
+import {EQUIPMENT_SLOTS} from '../../utils/equipmentSlots'
 
 defineProps({
-  adminState: { type: Object, required: true },
-  loadingPlayers: { type: Boolean, required: true },
-  playerPage: { type: Object, required: true },
-  fetchPlayerPage: { type: Function, required: true },
-  resetPlayerPassword: { type: Function, required: true },
-  saving: { type: Boolean, required: true },
+  adminState: {type: Object, required: true},
+  loadingPlayers: {type: Boolean, required: true},
+  playerPage: {type: Object, required: true},
+  fetchPlayerPage: {type: Function, required: true},
+  resetPlayerPassword: {type: Function, required: true},
+  saving: {type: Boolean, required: true},
 })
 
 function formatPlayerLoadout(loadout) {
   return EQUIPMENT_SLOTS
-    .map((slot) => loadout?.[slot.value]?.name || `空${slot.label}`)
-    .join(' / ')
+      .map((slot) => loadout?.[slot.value]?.name || `空${slot.label}`)
+      .join(' / ')
 }
 </script>
 
@@ -56,18 +56,19 @@ function formatPlayerLoadout(loadout) {
                 {{ formatPlayerLoadout(player.loadout) }}
               </p>
             </div>
-            <button class="nickname-form__ghost" type="button" :disabled="saving" @click="resetPlayerPassword(player.nickname)">
+            <button class="nickname-form__ghost" type="button" :disabled="saving"
+                    @click="resetPlayerPassword(player.nickname)">
               重置密码
             </button>
           </li>
         </ul>
 
         <button
-          v-if="playerPage.nextCursor"
-          class="nickname-form__ghost"
-          type="button"
-          :disabled="loadingPlayers"
-          @click="fetchPlayerPage(playerPage.nextCursor, true)"
+            v-if="playerPage.nextCursor"
+            class="nickname-form__ghost"
+            type="button"
+            :disabled="loadingPlayers"
+            @click="fetchPlayerPage(playerPage.nextCursor, true)"
         >
           加载更多玩家
         </button>

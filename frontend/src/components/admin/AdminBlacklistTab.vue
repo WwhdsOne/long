@@ -1,12 +1,12 @@
 <script setup>
 defineProps({
-  blacklistPage: { type: Object, required: true },
-  loadingBlacklist: { type: Boolean, required: true },
-  saving: { type: Boolean, required: true },
-  fetchBlacklist: { type: Function, required: true },
-  unblockBlacklistEntry: { type: Function, required: true },
-  formatDuration: { type: Function, required: true },
-  formatTime: { type: Function, required: true },
+  blacklistPage: {type: Object, required: true},
+  loadingBlacklist: {type: Boolean, required: true},
+  saving: {type: Boolean, required: true},
+  fetchBlacklist: {type: Function, required: true},
+  unblockBlacklistEntry: {type: Function, required: true},
+  formatDuration: {type: Function, required: true},
+  formatTime: {type: Function, required: true},
 })
 </script>
 
@@ -39,10 +39,10 @@ defineProps({
             <p>剩余时间：{{ formatDuration(entry.remainingSeconds) }}</p>
           </div>
           <button
-            class="nickname-form__ghost"
-            type="button"
-            :disabled="saving"
-            @click="unblockBlacklistEntry(entry.clientId, entry.nickname)"
+              class="nickname-form__ghost"
+              type="button"
+              :disabled="saving"
+              @click="unblockBlacklistEntry(entry.clientId, entry.nickname)"
           >
             手动解封
           </button>

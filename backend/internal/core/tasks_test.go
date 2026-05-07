@@ -323,6 +323,128 @@ func TestRecordTaskEventUpdatesFixedRangeTaskProgress(t *testing.T) {
 	}
 }
 
+func TestSaveTaskDefinitionSupportsLifetimeWindow(t *testing.T) {
+	baseStore, cleanup := newTestStore(t)
+	defer cleanup()
+
+	taskDefStore := &stubTaskDefinitionStore{}
+	store := NewStore(baseStore.client, "vote:", StoreOptions{
+		CriticalChancePercent: 5,
+		TaskDefinitionStore:   taskDefStore,
+		TaskClaimLogStore:     stubTaskClaimLogStore{},
+	}, nickname.NewValidator([]string{"习近平", "xjp"}))
+
+	err := store.SaveTaskDefinition(context.Background(), TaskDefinition{
+		TaskID:      "longterm-click",
+		Title:       "长期点击",
+		Status:      TaskStatusDraft,
+		EventKind:   TaskEventClick,
+		WindowKind:  TaskWindowLifetime,
+		TargetValue: 100,
+		Rewards: TaskRewards{
+			Gold: 100,
+		},
+	})
+	if err != nil {
+		t.Fatalf("save lifetime task definition: %v", err)
+	}
+	if len(taskDefStore.upserted) != 1 {
+		t.Fatalf("expected one upserted task, got %d", len(taskDefStore.upserted))
+	}
+	item := taskDefStore.upserted[0]
+	if item.WindowKind != TaskWindowLifetime {
+		t.Fatalf("expected window kind lifetime, got %q", item.WindowKind)
+	}
+	if item.TaskType != TaskTypeLongTerm {
+		t.Fatalf("expected task type long_term, got %q", item.TaskType)
+	}
+}
+
+func TestRecordTaskEventUpdatesLifetimeTaskProgress(t *testing.T) {
+	store, cleanup := newTaskTestStore(t, []TaskDefinition{{
+		TaskID:      "longterm-click-1",
+		Title:       "长期点击",
+		Status:      TaskStatusActive,
+		EventKind:   TaskEventClick,
+		WindowKind:  TaskWindowLifetime,
+		TargetValue: 2,
+	}})
+	defer cleanup()
+
+	nowTime := time.Date(2026, 5, 3, 10, 0, 0, 0, taskTimeLocation)
+	store.now = func() time.Time { return nowTime }
+	ctx := context.Background()
+
+	if err := store.recordTaskEvent(ctx, "阿明", TaskEventClick, 1); err != nil {
+		t.Fatalf("record first event: %v", err)
+	}
+	if err := store.recordTaskEvent(ctx, "阿明", TaskEventClick, 1); err != nil {
+		t.Fatalf("record second event: %v", err)
+	}
+
+	items, err := store.ListTasksForPlayer(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one task, got %+v", items)
+	}
+	if items[0].Progress != 2 || items[0].Status != TaskPlayerStatusCompletedUnclaimed {
+		t.Fatalf("unexpected lifetime task progress after events: %+v", items[0])
+	}
+	if items[0].CycleKey != "longterm-click-1" {
+		t.Fatalf("expected lifetime cycle key to use task id, got %q", items[0].CycleKey)
+	}
+}
+
+func TestEnhanceItemBatchRecordsEnhanceTaskProgressByLevels(t *testing.T) {
+	store, cleanup := newTaskTestStore(t, []TaskDefinition{{
+		TaskID:        "enhance-3",
+		Title:         "强化三次",
+		Status:        TaskStatusActive,
+		EventKind:     TaskEventEnhance,
+		ConditionKind: TaskConditionEnhanceCount,
+		WindowKind:    TaskWindowDaily,
+		TargetValue:   3,
+		Rewards: TaskRewards{
+			Gold: 100,
+		},
+	}})
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	nowTime := time.Date(2026, 5, 8, 10, 0, 0, 0, taskTimeLocation)
+	store.now = func() time.Time { return nowTime }
+	seedEquipmentDefinitionWithRarity(t, store, ctx, "wood-sword", "weapon", "普通", 10)
+	instanceID := seedOwnedInstance(t, store, ctx, nickname, "wood-sword")
+
+	if err := store.client.HSet(ctx, store.resourceKey(nickname), map[string]any{
+		"gold":   "5000",
+		"stones": "30",
+	}).Err(); err != nil {
+		t.Fatalf("seed resource: %v", err)
+	}
+
+	if _, err := store.EnhanceItemBatch(ctx, nickname, instanceID, 3); err != nil {
+		t.Fatalf("enhance item batch: %v", err)
+	}
+
+	items, err := store.ListTasksForPlayer(ctx, nickname)
+	if err != nil {
+		t.Fatalf("list tasks: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected one task, got %+v", items)
+	}
+	if items[0].Progress != 3 {
+		t.Fatalf("expected enhance task progress 3, got %+v", items[0])
+	}
+	if items[0].Status != TaskPlayerStatusCompletedUnclaimed || !items[0].CanClaim {
+		t.Fatalf("expected enhance task claimable after batch enhance, got %+v", items[0])
+	}
+}
+
 func TestDuplicateTaskDefinitionRejectsExistingTargetID(t *testing.T) {
 	store, cleanup := newTaskTestStore(t, []TaskDefinition{
 		{

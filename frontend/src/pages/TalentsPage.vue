@@ -1,11 +1,10 @@
 <script setup>
-import { computed, onMounted, ref, reactive } from 'vue'
-import { usePublicPageState } from './publicPageState'
-import { effectAssetUrl } from '../utils/effectAssets'
-import { watch } from 'vue'
+import {computed, onMounted, reactive, ref, watch} from 'vue'
+import {usePublicPageState} from './publicPageState'
+import {effectAssetUrl} from '../utils/effectAssets'
 
 
-const { isLoggedIn, talentPoints: sharedTalentPoints } = usePublicPageState()
+const {isLoggedIn, talentPoints: sharedTalentPoints} = usePublicPageState()
 
 const loading = ref(false)
 const learnLoading = ref(false)
@@ -16,7 +15,9 @@ let toastTimer = 0
 function showToast(msg) {
   toastMsg.value = msg
   clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => { toastMsg.value = '' }, 2500)
+  toastTimer = setTimeout(() => {
+    toastMsg.value = ''
+  }, 2500)
 }
 
 const treeDefs = ref(null)
@@ -24,7 +25,7 @@ const talentState = ref(null)
 const talentEffectLines = ref({})
 const talentEffectDescriptions = ref({})
 const selectedTree = ref('normal')
-const selectedMarker = ref({ panel: 'main', id: '' })
+const selectedMarker = ref({panel: 'main', id: ''})
 
 const confirmModal = reactive({
   show: false,
@@ -53,13 +54,13 @@ function confirmCancel() {
 }
 
 const treeConfig = {
-  normal: { name: '均衡攻势', color: '#2bb873' },
-  armor: { name: '碎盾攻坚', color: '#c48a33' },
-  crit: { name: '致命洞察', color: '#ca3e59' },
+  normal: {name: '均衡攻势', color: '#2bb873'},
+  armor: {name: '碎盾攻坚', color: '#c48a33'},
+  crit: {name: '致命洞察', color: '#ca3e59'},
 }
 
-const tierLabels = { 0: '基石', 1: '一阶', 2: '二阶', 3: '三阶', 4: '终极' }
-const tierRadiusPercent = { 0: 14, 1: 28, 2: 42, 3: 56, 4: 70 }
+const tierLabels = {0: '基石', 1: '一阶', 2: '二阶', 3: '三阶', 4: '终极'}
+const tierRadiusPercent = {0: 14, 1: 28, 2: 42, 3: 56, 4: 70}
 const trees = ['normal', 'armor', 'crit']
 const arcStartAngle = 135
 const arcEndAngle = 45
@@ -159,12 +160,12 @@ const overflowTotalSpent = computed(() => overflowLevel.value * overflowUpgradeC
 const overflowBonusEntries = computed(() => {
   const bonuses = talentState.value?.overflowBonuses || {}
   return Object.entries(overflowBonusLabels)
-    .map(([key, label]) => ({
-      key,
-      label,
-      count: Math.max(0, Number(bonuses[key] || 0)),
-    }))
-    .filter((item) => item.count > 0)
+      .map(([key, label]) => ({
+        key,
+        label,
+        count: Math.max(0, Number(bonuses[key] || 0)),
+      }))
+      .filter((item) => item.count > 0)
 })
 
 const currentTreeDefs = computed(() => {
@@ -236,10 +237,10 @@ function stateLabel(def) {
 
 function effectDescription(def) {
   return talentEffectDescriptions.value?.[def?.id]
-    || def?.effectDescription
-    || def?.description
-    || def?.effect
-    || '暂无效果说明'
+      || def?.effectDescription
+      || def?.description
+      || def?.effect
+      || '暂无效果说明'
 }
 
 function effectLines(def, curLv) {
@@ -399,7 +400,7 @@ const activePlateTitle = computed(() => treeConfig[selectedTree.value]?.name || 
 const activePlateHint = computed(() => '点击节点可学习，或查看浮层说明')
 
 function selectNode(def) {
-  selectedMarker.value = { panel: 'main', id: def.id }
+  selectedMarker.value = {panel: 'main', id: def.id}
 }
 
 async function loadDefs() {
@@ -415,7 +416,7 @@ async function loadDefs() {
 async function loadState() {
   if (!isLoggedIn.value) return
   try {
-    const res = await fetch('/api/talents/state', { credentials: 'include' })
+    const res = await fetch('/api/talents/state', {credentials: 'include'})
     if (!res.ok) {
       if (res.status !== 401) {
         const payload = await safeJSON(res)
@@ -433,7 +434,7 @@ async function loadState() {
 
 async function selectTree(tree) {
   selectedTree.value = tree
-  selectedMarker.value = { panel: 'main', id: '' }
+  selectedMarker.value = {panel: 'main', id: ''}
   await loadState()
 }
 
@@ -457,16 +458,16 @@ async function handleNodeClick(item) {
   try {
     const resp = await fetch('/api/talents/upgrade', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type': 'application/json'},
       credentials: 'include',
-      body: JSON.stringify({ talentId: item.id, targetLevel }),
+      body: JSON.stringify({talentId: item.id, targetLevel}),
     })
     if (!resp.ok) {
       const data = await safeJSON(resp)
       throw new Error(data?.message || '升级失败')
     }
     const data = await resp.json()
-    applyTalentResponse({ ...(talentState.value || {}), ...data })
+    applyTalentResponse({...(talentState.value || {}), ...data})
     talentEffectLines.value = data.effectLines || talentEffectLines.value
     talentEffectDescriptions.value = data.effectDescriptions || talentEffectDescriptions.value
   } catch (e) {
@@ -488,16 +489,16 @@ async function handleOverflowUpgrade() {
   try {
     const resp = await fetch('/api/talents/upgrade', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {'Content-Type': 'application/json'},
       credentials: 'include',
-      body: JSON.stringify({ talentId: 'overflow_sink', targetLevel: 1 }),
+      body: JSON.stringify({talentId: 'overflow_sink', targetLevel: 1}),
     })
     if (!resp.ok) {
       const data = await safeJSON(resp)
       throw new Error(data?.message || '溢出强化失败')
     }
     const data = await resp.json()
-    applyTalentResponse({ ...(talentState.value || {}), ...data })
+    applyTalentResponse({...(talentState.value || {}), ...data})
   } catch (error) {
     showToast(error.message || '溢出强化失败')
   } finally {
@@ -506,7 +507,7 @@ async function handleOverflowUpgrade() {
 }
 
 function clearNode() {
-  selectedMarker.value = { panel: 'main', id: '' }
+  selectedMarker.value = {panel: 'main', id: ''}
 }
 
 async function resetTalents() {
@@ -619,9 +620,9 @@ watch(isLoggedIn, (val) => {
             <h3>天赋点溢出强化</h3>
           </div>
           <button
-            class="talent-overflow__button"
-            :disabled="learnLoading || overflowUpgradeCost > availableTalentPoints"
-            @click="handleOverflowUpgrade"
+              class="talent-overflow__button"
+              :disabled="learnLoading || overflowUpgradeCost > availableTalentPoints"
+              @click="handleOverflowUpgrade"
           >
             消耗 1000 点随机强化
           </button>
@@ -720,7 +721,9 @@ watch(isLoggedIn, (val) => {
                 alt=""
             />
             <span class="talent-dot__name">{{ item.name }}</span>
-            <span class="talent-dot__meta">{{ tierLabels[item.tier] || '' }} · {{ talentCostForLevel(item, 1) }}点</span>
+            <span class="talent-dot__meta">{{ tierLabels[item.tier] || '' }} · {{
+                talentCostForLevel(item, 1)
+              }}点</span>
           </button>
 
           <div v-if="selectedNode" class="talent-float" :style="detailFloatStyle()">
@@ -734,7 +737,8 @@ watch(isLoggedIn, (val) => {
             </p>
             <p>{{ effectDescription(selectedNode) }}</p>
             <div class="talent-float__effects">
-              <div v-for="line in effectLines(selectedNode, nodeLevel(selectedNode.id))" :key="line.label" class="talent-float__effect-line">
+              <div v-for="line in effectLines(selectedNode, nodeLevel(selectedNode.id))" :key="line.label"
+                   class="talent-float__effect-line">
                 <span class="talent-float__effect-label">{{ line.label }}</span>
                 <span class="talent-float__effect-value">{{ line.text }}</span>
               </div>
@@ -1211,19 +1215,42 @@ watch(isLoggedIn, (val) => {
 }
 
 /* Level brightness progression */
-.talent-dot--lv1 { filter: brightness(1.0); }
-.talent-dot--lv2 { filter: brightness(1.1); box-shadow: 0 0 8px var(--active-color); }
-.talent-dot--lv3 { filter: brightness(1.2); box-shadow: 0 0 14px var(--active-color), 0 0 28px color-mix(in srgb, var(--active-color) 30%, transparent); }
-.talent-dot--lv4 { filter: brightness(1.35); box-shadow: 0 0 22px var(--active-color), 0 0 44px color-mix(in srgb, var(--active-color) 40%, transparent); }
-.talent-dot--lv5 { filter: brightness(1.5); box-shadow: 0 0 30px var(--active-color), 0 0 60px color-mix(in srgb, var(--active-color) 50%, transparent); animation: lv5-pulse 2s ease-in-out infinite; }
+.talent-dot--lv1 {
+  filter: brightness(1.0);
+}
+
+.talent-dot--lv2 {
+  filter: brightness(1.1);
+  box-shadow: 0 0 8px var(--active-color);
+}
+
+.talent-dot--lv3 {
+  filter: brightness(1.2);
+  box-shadow: 0 0 14px var(--active-color), 0 0 28px color-mix(in srgb, var(--active-color) 30%, transparent);
+}
+
+.talent-dot--lv4 {
+  filter: brightness(1.35);
+  box-shadow: 0 0 22px var(--active-color), 0 0 44px color-mix(in srgb, var(--active-color) 40%, transparent);
+}
+
+.talent-dot--lv5 {
+  filter: brightness(1.5);
+  box-shadow: 0 0 30px var(--active-color), 0 0 60px color-mix(in srgb, var(--active-color) 50%, transparent);
+  animation: lv5-pulse 2s ease-in-out infinite;
+}
 
 .talent-dot--maxed {
   border-color: #f0cd92 !important;
 }
 
 @keyframes lv5-pulse {
-  0%, 100% { box-shadow: 0 0 28px var(--active-color), 0 0 56px color-mix(in srgb, var(--active-color) 45%, transparent); }
-  50% { box-shadow: 0 0 34px var(--active-color), 0 0 68px color-mix(in srgb, var(--active-color) 60%, transparent); }
+  0%, 100% {
+    box-shadow: 0 0 28px var(--active-color), 0 0 56px color-mix(in srgb, var(--active-color) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 34px var(--active-color), 0 0 68px color-mix(in srgb, var(--active-color) 60%, transparent);
+  }
 }
 
 .talent-dot__level {
@@ -1326,10 +1353,23 @@ watch(isLoggedIn, (val) => {
   white-space: nowrap;
 }
 
-.toast-enter-active { transition: opacity 0.2s, transform 0.2s; }
-.toast-leave-active { transition: opacity 0.35s, transform 0.35s; }
-.toast-enter-from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
-.toast-leave-to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+.toast-enter-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.toast-leave-active {
+  transition: opacity 0.35s, transform 0.35s;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
+}
 
 /* 效果数值列表 */
 .talent-float__effects {

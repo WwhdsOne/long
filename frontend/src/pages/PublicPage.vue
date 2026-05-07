@@ -38,12 +38,12 @@ const loginModalOpen = ref(false)
 const armoryPageIDs = new Set(['resources', 'inventory', 'stats', 'loadout'])
 const isBattlePage = computed(() => currentPublicPage.value === 'battle')
 const myBattlePower = computed(() => (
-  Math.max(0, Number(combatStats.value?.attackPower || 0)) +
-  Math.max(0, Number(combatStats.value?.normalDamage || 0)) +
-  Math.max(0, Number(combatStats.value?.criticalDamage || 0))
+    Math.max(0, Number(combatStats.value?.attackPower || 0)) +
+    Math.max(0, Number(combatStats.value?.normalDamage || 0)) +
+    Math.max(0, Number(combatStats.value?.criticalDamage || 0))
 ))
 const heroBattlePowerLabel = computed(() => (
-  isLoggedIn.value ? formatCompact(myBattlePower.value) : '登录后激活'
+    isLoggedIn.value ? formatCompact(myBattlePower.value) : '登录后激活'
 ))
 
 function isArmoryPage(pageID) {
@@ -79,7 +79,8 @@ async function handleLoginSubmit() {
         @click="navigatePublicPage(page.id)"
     >
       <span>{{ page.label }}</span>
-      <span v-if="page.id === 'tasks' && hasClaimableTasks" class="public-nav__task-dot" aria-label="有可领取任务"></span>
+      <span v-if="page.id === 'tasks' && hasClaimableTasks" class="public-nav__task-dot"
+            aria-label="有可领取任务"></span>
     </button>
     <button
         class="public-nav__item public-nav__auth"
@@ -115,15 +116,15 @@ async function handleLoginSubmit() {
               <span class="hero-info-card__eyebrow">游戏交流群</span>
               <strong class="hero-info-card__value">鼠标悬停查看微信群</strong>
               <div class="hero-info-card__preview" role="img" aria-label="微信群二维码预览">
-                <img :src="wechatGroupImage" alt="Hai-World 微信群二维码" />
+                <img :src="wechatGroupImage" alt="Hai-World 微信群二维码"/>
               </div>
             </article>
             <a
-              class="hero-info-card hero-info-card--github"
-              href="https://github.com/WwhdsOne/long"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="项目地址 GitHub 仓库"
+                class="hero-info-card hero-info-card--github"
+                href="https://github.com/WwhdsOne/long"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="项目地址 GitHub 仓库"
             >
               <span class="hero-info-card__eyebrow">项目地址</span>
               <strong class="hero-info-card__value">点击进入项目仓库</strong>
@@ -179,12 +180,12 @@ async function handleLoginSubmit() {
       </div>
     </section>
 
-    <BattlePage v-if="currentPublicPage === 'battle'" />
-    <ShopPage v-else-if="currentPublicPage === 'shop'" />
-    <TalentsPage v-else-if="currentPublicPage === 'talents'" />
-    <TaskPage v-else-if="currentPublicPage === 'tasks'" />
-    <ArmoryPage v-else-if="isArmoryPage(currentPublicPage)" :focus-section="currentPublicPage" />
-    <MessagesPage v-else />
+    <BattlePage v-if="currentPublicPage === 'battle'"/>
+    <ShopPage v-else-if="currentPublicPage === 'shop'"/>
+    <TalentsPage v-else-if="currentPublicPage === 'talents'"/>
+    <TaskPage v-else-if="currentPublicPage === 'tasks'"/>
+    <ArmoryPage v-else-if="isArmoryPage(currentPublicPage)" :focus-section="currentPublicPage"/>
+    <MessagesPage v-else/>
 
     <footer class="site-footer" aria-label="网站备案信息">
       <a

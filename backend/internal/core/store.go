@@ -1098,9 +1098,6 @@ func (s *Store) EquipItem(ctx context.Context, nickname string, instanceID strin
 		return State{}, err
 	}
 	s.invalidatePlayerCombatCaches(normalizedNickname)
-	if err := s.recordTaskEvent(ctx, normalizedNickname, TaskEventEnhance, 1); err != nil {
-		return State{}, err
-	}
 
 	return s.GetState(ctx, normalizedNickname)
 }
@@ -1218,6 +1215,9 @@ func (s *Store) EnhanceItemBatch(ctx context.Context, nickname string, instanceI
 		return State{}, err
 	}
 	s.invalidatePlayerCombatCaches(normalizedNickname)
+	if err := s.recordTaskEvent(ctx, normalizedNickname, TaskEventEnhance, int64(levels)); err != nil {
+		return State{}, err
+	}
 
 	return s.GetState(ctx, normalizedNickname)
 }

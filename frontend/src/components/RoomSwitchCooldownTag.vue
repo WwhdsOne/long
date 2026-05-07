@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import {computed} from 'vue'
 
 const props = defineProps({
   cooldownRemainingSeconds: {
@@ -38,9 +38,8 @@ const formattedCooldown = computed(() => {
   border-radius: 999px;
   color: #c9a45a;
   background: linear-gradient(180deg, rgba(62, 43, 16, 0.92), rgba(24, 17, 8, 0.9));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 220, 151, 0.12),
-    0 6px 18px rgba(0, 0, 0, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 151, 0.12),
+  0 6px 18px rgba(0, 0, 0, 0.22);
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.08em;

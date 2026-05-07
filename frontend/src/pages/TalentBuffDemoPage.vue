@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import {computed, onBeforeUnmount, ref} from 'vue'
 
 const nowSec = ref(Date.now() / 1000)
 const tickTimer = window.setInterval(() => {
@@ -165,7 +165,8 @@ onBeforeUnmount(() => {
         <button type="button" class="nickname-form__submit" @click="applyPreset('doom')">死兆预设</button>
         <button type="button" class="nickname-form__submit" @click="applyPreset('armor')">破甲预设</button>
         <button type="button" class="nickname-form__submit" @click="applyPreset('all')">全开预设</button>
-        <button type="button" class="nickname-form__submit nickname-form__submit--ghost" @click="resetDemo">重置</button>
+        <button type="button" class="nickname-form__submit nickname-form__submit--ghost" @click="resetDemo">重置
+        </button>
       </div>
 
       <div class="talent-buff-demo__layout">
@@ -174,27 +175,34 @@ onBeforeUnmount(() => {
             <div class="part-progress-panel">
               <div class="part-progress-panel__title">部位累计进度</div>
               <div v-for="p in partProgressList" :key="p.key" class="part-progress-panel__item">
-                <span class="part-progress-panel__name" :class="`part-progress-panel__name--${p.type}`">{{ p.name }}</span>
+                <span class="part-progress-panel__name" :class="`part-progress-panel__name--${p.type}`">{{
+                    p.name
+                  }}</span>
                 <span class="part-progress-panel__track part-progress-panel__track--storm">
                   追击 {{ p.storm }}/{{ stormTrigger }}
                   <span class="part-progress-panel__bar">
-                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--storm" :style="{ width: p.stormProgress + '%' }"></span>
+                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--storm"
+                          :style="{ width: p.stormProgress + '%' }"></span>
                   </span>
                 </span>
                 <span v-if="p.type === 'heavy'" class="part-progress-panel__track part-progress-panel__track--armor">
                   破甲 {{ p.armor }}/{{ armorTrigger }}
                   <span class="part-progress-panel__bar">
-                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor" :style="{ width: p.armorProgress + '%' }"></span>
+                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor"
+                          :style="{ width: p.armorProgress + '%' }"></span>
                   </span>
                 </span>
-                <span v-if="p.type === 'heavy' && p.autoStrike > 0" class="part-progress-panel__track part-progress-panel__track--auto-strike">
+                <span v-if="p.type === 'heavy' && p.autoStrike > 0"
+                      class="part-progress-panel__track part-progress-panel__track--auto-strike">
                   碎甲重击 {{ p.autoStrike }}/{{ autoStrikeTrigger }}
                   <span class="part-progress-panel__bar">
-                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--auto-strike" :style="{ width: p.autoStrikeProgress + '%' }"></span>
+                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--auto-strike"
+                          :style="{ width: p.autoStrikeProgress + '%' }"></span>
                   </span>
                   <span class="part-progress-panel__countdown">{{ Math.ceil(p.autoStrikeCountdown) }}s</span>
                   <span class="part-progress-panel__bar part-progress-panel__bar--timer">
-                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--timer" :style="{ width: p.autoStrikeTimeoutPercent + '%' }"></span>
+                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--timer"
+                          :style="{ width: p.autoStrikeTimeoutPercent + '%' }"></span>
                   </span>
                 </span>
               </div>
@@ -217,20 +225,21 @@ onBeforeUnmount(() => {
                 </span>
                 <span class="talent-status-chip__bar">
                   <span
-                    class="talent-status-chip__bar-fill talent-status-chip__bar-fill--silver"
-                    :style="{ width: silverStormPercent + '%' }"
+                      class="talent-status-chip__bar-fill talent-status-chip__bar-fill--silver"
+                      :style="{ width: silverStormPercent + '%' }"
                   ></span>
                 </span>
               </div>
-              <span v-if="showOmenRing" class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
+              <span v-if="showOmenRing"
+                    class="talent-status-bar__item talent-status-bar__item--danger talent-omen-ring">
                 <svg class="talent-omen-ring__svg" viewBox="0 0 40 40">
-                  <circle class="talent-omen-ring__track" cx="20" cy="20" r="16" />
+                  <circle class="talent-omen-ring__track" cx="20" cy="20" r="16"/>
                   <circle
-                    class="talent-omen-ring__fill"
-                    cx="20"
-                    cy="20"
-                    r="16"
-                    :style="{ strokeDasharray: `${omenRingProgress * 100.5} ${100.5 - omenRingProgress * 100.5}` }"
+                      class="talent-omen-ring__fill"
+                      cx="20"
+                      cy="20"
+                      r="16"
+                      :style="{ strokeDasharray: `${omenRingProgress * 100.5} ${100.5 - omenRingProgress * 100.5}` }"
                   />
                 </svg>
                 死兆 {{ omenStacks }}

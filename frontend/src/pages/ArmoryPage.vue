@@ -284,7 +284,7 @@ function enhanceBatchCost(level, levels) {
     goldCost += enhanceGoldCost(nextLevel)
     stoneCost += enhanceStoneCost(nextLevel)
   }
-  return { goldCost, stoneCost }
+  return {goldCost, stoneCost}
 }
 
 function maxEnhanceLevel(rarity) {
@@ -427,9 +427,9 @@ const enhancePreviewStatRows = computed(() => {
 })
 
 const enhanceCanConfirm = computed(() => (
-  enhanceSelectedLevels.value > 0
-  && enhanceSelectedLevels.value <= enhanceAffordableLevelsByStone.value
-  && enhanceHasEnoughGold.value
+    enhanceSelectedLevels.value > 0
+    && enhanceSelectedLevels.value <= enhanceAffordableLevelsByStone.value
+    && enhanceHasEnoughGold.value
 ))
 
 async function confirmEnhance() {
@@ -543,8 +543,12 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="loadout-slot__main">
                   <strong v-if="loadout[slot.value]" class="loadout-slot__name">
-                    <span :class="['loadout-slot__rarity', equipmentNameClass(loadout[slot.value])]">{{ formatRarityLabel(loadout[slot.value].rarity) }}</span>
-                    <span :class="equipmentNameClass(loadout[slot.value])"> · {{ equipmentNameParts(loadout[slot.value]).text }}</span>
+                    <span :class="['loadout-slot__rarity', equipmentNameClass(loadout[slot.value])]">{{
+                        formatRarityLabel(loadout[slot.value].rarity)
+                      }}</span>
+                    <span :class="equipmentNameClass(loadout[slot.value])"> · {{
+                        equipmentNameParts(loadout[slot.value]).text
+                      }}</span>
                     <br>
                     <span class="loadout-slot__meta"> 强化 +{{ loadout[slot.value].enhanceLevel || 0 }}</span>
                   </strong>
@@ -632,8 +636,10 @@ onBeforeUnmount(() => {
             </article>
             <div class="armory-backpack-cell__meta">
               <strong>
-                <span :class="['armory-backpack-cell__rarity', equipmentNameClass(item)]">{{ formatRarityLabel(item.rarity) }}</span>
-<!--                <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>-->
+                <span :class="['armory-backpack-cell__rarity', equipmentNameClass(item)]">{{
+                    formatRarityLabel(item.rarity)
+                  }}</span>
+                <!--                <span v-if="equipmentNameParts(item).prefix">{{ equipmentNameParts(item).prefix }}</span>-->
                 <span style="font-size:15px">·</span>
                 <span :class="equipmentNameClass(item)">{{ equipmentNameParts(item).text }}</span>
               </strong>
@@ -692,13 +698,13 @@ onBeforeUnmount(() => {
           <label class="armory-enhance-panel__range" for="armory-enhance-range">
             <span>强化滑条</span>
             <input
-              id="armory-enhance-range"
-              v-model.number="enhanceSelectedLevels"
-              type="range"
-              min="0"
-              :max="enhanceAffordableLevelsByStone"
-              step="1"
-              @input="enhanceFeedback = ''"
+                id="armory-enhance-range"
+                v-model.number="enhanceSelectedLevels"
+                type="range"
+                min="0"
+                :max="enhanceAffordableLevelsByStone"
+                step="1"
+                @input="enhanceFeedback = ''"
             />
           </label>
           <div class="armory-enhance-panel__scale">
@@ -719,7 +725,9 @@ onBeforeUnmount(() => {
         <p v-if="enhanceFeedback" class="feedback feedback--error">{{ enhanceFeedback }}</p>
         <div class="announcement-modal__actions">
           <button class="nickname-form__ghost" type="button" @click="cancelEnhance">取消</button>
-          <button class="nickname-form__submit" type="button" :disabled="!enhanceCanConfirm" @click="confirmEnhance">确认强化</button>
+          <button class="nickname-form__submit" type="button" :disabled="!enhanceCanConfirm" @click="confirmEnhance">
+            确认强化
+          </button>
         </div>
       </article>
     </section>

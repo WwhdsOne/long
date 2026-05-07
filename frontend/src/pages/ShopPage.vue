@@ -57,15 +57,15 @@ async function handleShopAction(item) {
             <strong>{{ gold }}</strong>
           </div>
           <div class="shop-current-cursor">
-            <img class="shop-current-cursor__image" :src="currentCursorImage" alt="当前点击图标预览" />
+            <img class="shop-current-cursor__image" :src="currentCursorImage" alt="当前点击图标预览"/>
             <div class="shop-current-cursor__meta">
               <span>{{ equippedBattleClickCursorImagePath ? '当前已装备点击图标' : '当前使用默认点击图标' }}</span>
               <button
-                v-if="equippedBattleClickCursorImagePath"
-                class="nickname-form__submit shop-current-cursor__reset-btn"
-                type="button"
-                :disabled="!isLoggedIn"
-                @click="unequipShopItem"
+                  v-if="equippedBattleClickCursorImagePath"
+                  class="nickname-form__submit shop-current-cursor__reset-btn"
+                  type="button"
+                  :disabled="!isLoggedIn"
+                  @click="unequipShopItem"
               >
                 恢复默认
               </button>
@@ -79,10 +79,10 @@ async function handleShopAction(item) {
         <article v-for="item in shopItems" :key="item.itemId" class="shop-cursor-card">
           <div class="shop-cursor-card__visual">
             <img
-              v-if="item.previewImagePath || item.imagePath"
-              class="shop-cursor-card__image"
-              :src="item.previewImagePath || item.imagePath"
-              :alt="item.imageAlt || item.title"
+                v-if="item.previewImagePath || item.imagePath"
+                class="shop-cursor-card__image"
+                :src="item.previewImagePath || item.imagePath"
+                :alt="item.imageAlt || item.title"
             />
             <span v-else class="shop-cursor-card__fallback">?</span>
           </div>
@@ -93,10 +93,10 @@ async function handleShopAction(item) {
           <p class="shop-cursor-card__desc">{{ item.description || '永久点击图标外观。' }}</p>
           <div class="shop-cursor-card__action">
             <button
-              class="nickname-form__submit"
-              type="button"
-              :disabled="buttonDisabled(item)"
-              @click="handleShopAction(item)"
+                class="nickname-form__submit"
+                type="button"
+                :disabled="buttonDisabled(item)"
+                @click="handleShopAction(item)"
             >
               {{ buttonLabel(item) }}
             </button>

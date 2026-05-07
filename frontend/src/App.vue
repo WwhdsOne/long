@@ -6,14 +6,14 @@ import TalentBuffDemoPage from './pages/TalentBuffDemoPage.vue'
 
 const currentPath = window.location.pathname
 const currentView = currentPath.startsWith('/admin')
-  ? AdminPage
-  : currentPath.startsWith('/internal/battle-fx-gallery')
-    ? BattleFxGalleryPage
-  : currentPath.startsWith('/__talent-buff-demo')
-    ? TalentBuffDemoPage
-    : PublicPage
+    ? AdminPage
+    : currentPath.startsWith('/internal/battle-fx-gallery')
+        ? BattleFxGalleryPage
+        : currentPath.startsWith('/__talent-buff-demo')
+            ? TalentBuffDemoPage
+            : PublicPage
 </script>
 
 <template>
-  <component :is="currentView" />
+  <component :is="currentView"/>
 </template>

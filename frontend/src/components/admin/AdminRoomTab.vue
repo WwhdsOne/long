@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, watch } from 'vue'
+import {reactive, watch} from 'vue'
 
 const props = defineProps({
   rooms: {
@@ -19,16 +19,16 @@ const props = defineProps({
 const draftNames = reactive({})
 
 watch(
-  () => props.rooms,
-  (nextRooms) => {
-    for (const key of Object.keys(draftNames)) {
-      delete draftNames[key]
-    }
-    for (const room of nextRooms) {
-      draftNames[String(room?.id || '')] = String(room?.displayName || '')
-    }
-  },
-  { immediate: true, deep: true },
+    () => props.rooms,
+    (nextRooms) => {
+      for (const key of Object.keys(draftNames)) {
+        delete draftNames[key]
+      }
+      for (const room of nextRooms) {
+        draftNames[String(room?.id || '')] = String(room?.displayName || '')
+      }
+    },
+    {immediate: true, deep: true},
 )
 </script>
 
@@ -52,16 +52,16 @@ watch(
         </div>
         <div class="admin-room-card__body">
           <input
-            v-model="draftNames[room.id]"
-            class="nickname-form__input"
-            type="text"
-            placeholder="输入房间显示名"
+              v-model="draftNames[room.id]"
+              class="nickname-form__input"
+              type="text"
+              placeholder="输入房间显示名"
           />
           <button
-            class="nickname-form__submit"
-            type="button"
-            :disabled="saving"
-            @click="saveRoomDisplayName(room.id, draftNames[room.id])"
+              class="nickname-form__submit"
+              type="button"
+              :disabled="saving"
+              @click="saveRoomDisplayName(room.id, draftNames[room.id])"
           >
             {{ saving ? '保存中...' : '保存房间名' }}
           </button>
