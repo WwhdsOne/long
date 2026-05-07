@@ -98,6 +98,7 @@ func run() error {
 	var taskCycleArchiveStore *mongostore.TaskCycleArchiveStore
 	var shopItemStore *mongostore.ShopItemStore
 	var shopPurchaseLogStore *mongostore.ShopPurchaseLogStore
+	var staminaPurchaseLogStore *mongostore.StaminaPurchaseLogStore
 	var equipmentDraftFailureWriter httpapi.EquipmentDraftFailureWriter
 	var adminAuditWriter httpapi.AdminAuditWriter
 	var domainEventWriter httpapi.DomainEventWriter
@@ -153,6 +154,10 @@ func run() error {
 		shopPurchaseLogStore = mongostore.NewShopPurchaseLogStore(mongoDB, cfg.Mongo.WriteTimeout)
 		if err := shopPurchaseLogStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo shop purchase log indexes: %w", err)
+		}
+		staminaPurchaseLogStore = mongostore.NewStaminaPurchaseLogStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := staminaPurchaseLogStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo stamina purchase log indexes: %w", err)
 		}
 		equipmentDraftFailureStore := mongostore.NewEquipmentDraftFailureStore(mongoDB, cfg.Mongo.WriteTimeout)
 		if err := equipmentDraftFailureStore.EnsureIndexes(startupCtx); err != nil {
@@ -236,14 +241,15 @@ func run() error {
 			DefaultRoom:    cfg.Room.DefaultRoom,
 			SwitchCooldown: cfg.Room.SwitchCooldown,
 		},
-		BossHistoryStore:      bossHistoryStore,
-		BossHistoryArchiver:   bossHistoryQueue,
-		MessageStore:          mongoMessageStore,
-		TaskDefinitionStore:   taskDefinitionStore,
-		TaskClaimLogStore:     taskClaimLogStore,
-		TaskCycleArchiveStore: taskCycleArchiveStore,
-		ShopCatalogStore:      shopItemStore,
-		ShopPurchaseLogStore:  shopPurchaseLogStore,
+		BossHistoryStore:        bossHistoryStore,
+		BossHistoryArchiver:     bossHistoryQueue,
+		MessageStore:            mongoMessageStore,
+		TaskDefinitionStore:     taskDefinitionStore,
+		TaskClaimLogStore:       taskClaimLogStore,
+		TaskCycleArchiveStore:   taskCycleArchiveStore,
+		ShopCatalogStore:        shopItemStore,
+		ShopPurchaseLogStore:    shopPurchaseLogStore,
+		StaminaPurchaseLogStore: staminaPurchaseLogStore,
 	}, nicknameValidator)
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)

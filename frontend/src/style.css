@@ -232,6 +232,103 @@ select {
     text-decoration: underline;
 }
 
+.stamina-float {
+    position: fixed;
+    right: 22px;
+    bottom: 22px;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.stamina-float__bubble {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 54px;
+    padding: 6px 8px 6px 16px;
+    border: 1px solid rgba(225, 29, 72, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 18px 34px rgba(190, 24, 93, 0.18);
+    backdrop-filter: blur(12px);
+}
+
+.stamina-float__value {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 82px;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 241, 242, 0.96), rgba(255, 228, 233, 0.98));
+    color: var(--primary-deep);
+    font-family: 'Orbitron', var(--display);
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.stamina-float__plus {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #fb7185, #e11d48);
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(225, 29, 72, 0.28);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.stamina-float__plus:hover {
+    transform: translateY(-1px) scale(1.04);
+    box-shadow: 0 14px 26px rgba(225, 29, 72, 0.34);
+}
+
+.stamina-float__tooltip {
+    max-width: 220px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(20, 24, 37, 0.92);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.24);
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.stamina-float__tooltip span {
+    display: block;
+}
+
+.stamina-float:hover .stamina-float__tooltip,
+.stamina-float:focus-within .stamina-float__tooltip {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.stamina-float--danger .stamina-float__bubble {
+    border-color: rgba(185, 28, 28, 0.28);
+    box-shadow: 0 18px 34px rgba(185, 28, 28, 0.2);
+}
+
+.stamina-float--danger .stamina-float__value {
+    color: #991b1b;
+    background: linear-gradient(180deg, rgba(254, 242, 242, 0.98), rgba(254, 226, 226, 0.98));
+}
+
 .hero {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -2492,6 +2589,60 @@ select {
     color: var(--gold-deep);
 }
 
+.shop-stamina-card {
+    display: grid;
+    gap: 6px;
+    min-width: 176px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(233, 248, 246, 0.92));
+    border: 1px solid rgba(15, 118, 110, 0.16);
+}
+
+.shop-stamina-card span {
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: var(--ink-soft);
+    letter-spacing: 0.06em;
+}
+
+.shop-stamina-card strong {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #0f766e;
+}
+
+.shop-stamina-card__notice {
+    display: grid;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(15, 118, 110, 0.1);
+    border: 1px solid rgba(15, 118, 110, 0.14);
+}
+
+.shop-stamina-card__notice span {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: #115e59;
+    letter-spacing: 0;
+}
+
+.shop-stamina-card__actions {
+    display: grid;
+    gap: 8px;
+}
+
+.shop-stamina-card__actions .nickname-form__submit,
+.shop-stamina-card__actions .nickname-form__ghost {
+    width: 100%;
+    margin-top: 0;
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
 .shop-current-cursor {
     padding: 10px 12px;
     border-radius: 18px;
@@ -2593,6 +2744,40 @@ select {
 .shop-cursor-card__action .nickname-form__submit {
     width: 100%;
     margin-top: 0;
+}
+
+.shop-stamina-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+}
+
+.shop-stamina-modal__card {
+    width: min(460px, calc(100vw - 32px));
+}
+
+.shop-stamina-modal__desc {
+    margin: 0;
+    color: var(--ink-soft);
+    line-height: 1.55;
+}
+
+.shop-stamina-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.shop-stamina-modal__actions .nickname-form__submit,
+.shop-stamina-modal__actions .nickname-form__ghost {
+    width: auto;
+    min-width: 132px;
+    margin-top: 0;
+    white-space: nowrap;
 }
 
 .task-card__grid {
@@ -2700,6 +2885,12 @@ select {
     .shop-panel__summary {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .shop-stamina-card,
+    .shop-panel__gold,
+    .shop-current-cursor {
+        width: 100%;
     }
 
     .shop-cursor-grid {
@@ -5023,7 +5214,7 @@ select {
     flex-direction: column;
     gap: 8px;
     z-index: 1;
-    width: 220px;
+    width: 200px;
 }
 
 /* 连击框 */
@@ -6865,5 +7056,28 @@ body:has(.battle-page-hud),
 
     .hall-leaderboard-panel__grid {
         grid-template-columns: 1fr;
+    }
+
+    .stamina-float {
+        right: 14px;
+        bottom: 14px;
+    }
+
+    .stamina-float__bubble {
+        min-height: 48px;
+        padding-left: 12px;
+        gap: 8px;
+    }
+
+    .stamina-float__value {
+        min-width: 72px;
+        height: 34px;
+        font-size: 0.84rem;
+    }
+
+    .stamina-float__plus {
+        width: 34px;
+        height: 34px;
+        font-size: 1.28rem;
     }
 }

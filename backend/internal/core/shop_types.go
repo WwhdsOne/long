@@ -44,6 +44,25 @@ type ShopPurchaseLog struct {
 	Equipped    bool         `json:"equipped" bson:"equipped"`
 }
 
+// StaminaPurchaseLog 记录一次体力购买尝试。
+type StaminaPurchaseLog struct {
+	Nickname            string `json:"nickname" bson:"nickname"`
+	PriceGold           int64  `json:"priceGold" bson:"price_gold"`
+	PurchasedAt         int64  `json:"purchasedAt" bson:"purchased_at"`
+	Succeeded           bool   `json:"succeeded" bson:"succeeded"`
+	FailureReason       string `json:"failureReason,omitempty" bson:"failure_reason,omitempty"`
+	CurrentStamina      int64  `json:"currentStamina" bson:"current_stamina"`
+	MaxStamina          int64  `json:"maxStamina" bson:"max_stamina"`
+	DailyBuyCountBefore int64  `json:"dailyBuyCountBefore" bson:"daily_buy_count_before"`
+	DailyBuyCountAfter  int64  `json:"dailyBuyCountAfter" bson:"daily_buy_count_after"`
+	ZeroAt              int64  `json:"zeroAt,omitempty" bson:"zero_at,omitempty"`
+	SecondsSinceZero    int64  `json:"secondsSinceZero,omitempty" bson:"seconds_since_zero,omitempty"`
+	TriggeredRiskBan    bool   `json:"triggeredRiskBan" bson:"triggered_risk_ban"`
+	RiskBanStrike       int64  `json:"riskBanStrike" bson:"risk_ban_strike"`
+	RiskBanDurationSec  int64  `json:"riskBanDurationSec" bson:"risk_ban_duration_sec"`
+	RiskBanUntil        int64  `json:"riskBanUntil,omitempty" bson:"risk_ban_until,omitempty"`
+}
+
 // ShopActionResult 用于返回购买/切换后的玩家态。
 type ShopActionResult struct {
 	ItemID    string    `json:"itemId"`

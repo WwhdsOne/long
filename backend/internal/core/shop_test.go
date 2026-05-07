@@ -58,11 +58,17 @@ func (s *stubShopCatalogStore) DeleteShopItem(_ context.Context, itemID string) 
 }
 
 type stubShopPurchaseLogStore struct {
-	logs []ShopPurchaseLog
+	logs        []ShopPurchaseLog
+	staminaLogs []StaminaPurchaseLog
 }
 
 func (s *stubShopPurchaseLogStore) WriteShopPurchaseLog(_ context.Context, item ShopPurchaseLog) error {
 	s.logs = append(s.logs, item)
+	return nil
+}
+
+func (s *stubShopPurchaseLogStore) WriteStaminaPurchaseLog(_ context.Context, item StaminaPurchaseLog) error {
+	s.staminaLogs = append(s.staminaLogs, item)
 	return nil
 }
 
@@ -73,9 +79,10 @@ func newShopTestStore(t *testing.T, items []ShopItem) (*Store, *stubShopCatalogS
 	catalogStore := &stubShopCatalogStore{items: items}
 	logStore := &stubShopPurchaseLogStore{}
 	store := NewStore(baseStore.client, "vote:", StoreOptions{
-		CriticalChancePercent: 5,
-		ShopCatalogStore:      catalogStore,
-		ShopPurchaseLogStore:  logStore,
+		CriticalChancePercent:   5,
+		ShopCatalogStore:        catalogStore,
+		ShopPurchaseLogStore:    logStore,
+		StaminaPurchaseLogStore: logStore,
 	}, nickname.NewValidator([]string{"习近平", "xjp"}))
 	return store, catalogStore, logStore, cleanup
 }

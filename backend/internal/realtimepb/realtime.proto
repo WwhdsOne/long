@@ -27,6 +27,10 @@ message UserDeltaPatch {
   int64 gold = 1;
   int64 stones = 2;
   int64 talent_points = 3;
+  int64 stamina_current = 4;
+  int64 stamina_max = 5;
+  int64 stamina_next_recover_at = 6;
+  int64 stamina_risk_ban_until = 7;
 }
 
 message ButtonRef {
@@ -87,6 +91,20 @@ message UserDelta {
   TalentCombatState talent_combat_state = 13;
   string equipped_battle_click_skin_id = 14;
   string equipped_battle_click_cursor_image_path = 15;
+  StaminaState stamina = 16;
+}
+
+message StaminaState {
+  int64 current = 1;
+  int64 max_level = 2;
+  int64 max = 3;
+  int64 click_progress = 4;
+  int64 next_recover_at = 5;
+  int64 zero_at = 6;
+  int64 daily_full_buy_count = 7;
+  int64 next_full_buy_price = 8;
+  int64 next_cap_upgrade_cost = 9;
+  int64 risk_ban_until = 10;
 }
 
 message UserStats {

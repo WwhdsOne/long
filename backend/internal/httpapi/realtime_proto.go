@@ -42,6 +42,7 @@ type realtimeUserDeltaPayload struct {
 	RecentRewards                      []core.Reward             `json:"recentRewards,omitempty"`
 	TalentEvents                       []core.TalentTriggerEvent `json:"talentEvents,omitempty"`
 	TalentCombatState                  *core.TalentCombatState   `json:"talentCombatState,omitempty"`
+	Stamina                            *core.StaminaState        `json:"stamina,omitempty"`
 	EquippedBattleClickSkinID          string                    `json:"equippedBattleClickSkinId,omitempty"`
 	EquippedBattleClickCursorImagePath string                    `json:"equippedBattleClickCursorImagePath,omitempty"`
 }
@@ -164,6 +165,7 @@ func encodeRealtimeBinaryUserDelta(payload realtimeUserDeltaPayload) ([]byte, er
 		RecentRewards:                      toProtoRewards(payload.RecentRewards),
 		TalentEvents:                       toProtoTalentTriggerEvents(payload.TalentEvents),
 		TalentCombatState:                  toProtoTalentCombatState(payload.TalentCombatState),
+		Stamina:                            toProtoStaminaState(payload.Stamina),
 		EquippedBattleClickSkinId:          payload.EquippedBattleClickSkinID,
 		EquippedBattleClickCursorImagePath: payload.EquippedBattleClickCursorImagePath,
 	})
@@ -266,7 +268,37 @@ func toProtoUserDeltaPatch(delta *realtimeUserDelta) *realtimepb.UserDeltaPatch 
 	if delta.TalentPoints != nil {
 		message.TalentPoints = *delta.TalentPoints
 	}
+	if delta.StaminaCurrent != nil {
+		message.StaminaCurrent = *delta.StaminaCurrent
+	}
+	if delta.StaminaMax != nil {
+		message.StaminaMax = *delta.StaminaMax
+	}
+	if delta.StaminaNextRecover != nil {
+		message.StaminaNextRecoverAt = *delta.StaminaNextRecover
+	}
+	if delta.StaminaRiskBan != nil {
+		message.StaminaRiskBanUntil = *delta.StaminaRiskBan
+	}
 	return message
+}
+
+func toProtoStaminaState(state *core.StaminaState) *realtimepb.StaminaState {
+	if state == nil {
+		return nil
+	}
+	return &realtimepb.StaminaState{
+		Current:            state.Current,
+		MaxLevel:           state.MaxLevel,
+		Max:                state.Max,
+		ClickProgress:      state.ClickProgress,
+		NextRecoverAt:      state.NextRecoverAt,
+		ZeroAt:             state.ZeroAt,
+		DailyFullBuyCount:  state.DailyFullBuyCount,
+		NextFullBuyPrice:   state.NextFullBuyPrice,
+		NextCapUpgradeCost: state.NextCapUpgradeCost,
+		RiskBanUntil:       state.RiskBanUntil,
+	}
 }
 
 func toProtoUserStats(stats *core.UserStats) *realtimepb.UserStats {

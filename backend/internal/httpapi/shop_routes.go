@@ -97,6 +97,46 @@ func registerShopRoutes(router route.IRouter, options Options) {
 			UserState: state,
 		})
 	})
+
+	router.POST("/api/shop/stamina/full/purchase", func(ctx context.Context, c *app.RequestContext) {
+		nickname, ok := requireAuthenticatedPlayerNickname(ctx, c, options.PlayerAuthenticator)
+		if !ok {
+			return
+		}
+		state, err := options.Store.PurchaseStaminaFull(ctx, nickname)
+		if err != nil {
+			if writeShopError(c, err) || writeNicknameError(c, err) {
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "STAMINA_PURCHASE_FAILED"})
+			return
+		}
+
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, map[string]any{
+			"userState": state,
+		})
+	})
+
+	router.POST("/api/shop/stamina/cap/upgrade", func(ctx context.Context, c *app.RequestContext) {
+		nickname, ok := requireAuthenticatedPlayerNickname(ctx, c, options.PlayerAuthenticator)
+		if !ok {
+			return
+		}
+		state, err := options.Store.UpgradeStaminaCap(ctx, nickname)
+		if err != nil {
+			if writeShopError(c, err) || writeNicknameError(c, err) {
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "STAMINA_UPGRADE_FAILED"})
+			return
+		}
+
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeJSON(c, consts.StatusOK, map[string]any{
+			"userState": state,
+		})
+	})
 }
 
 func writeShopError(c *app.RequestContext, err error) bool {
@@ -129,6 +169,24 @@ func writeShopError(c *app.RequestContext, err error) bool {
 		writeJSON(c, consts.StatusBadRequest, map[string]string{
 			"error":   "SHOP_GOLD_NOT_ENOUGH",
 			"message": "金币不足，无法购买。",
+		})
+		return true
+	case errors.Is(err, core.ErrStaminaMaxLevelReached):
+		writeJSON(c, consts.StatusBadRequest, map[string]string{
+			"error":   "STAMINA_MAX_LEVEL",
+			"message": "体力上限已升到最高。",
+		})
+		return true
+	case errors.Is(err, core.ErrStaminaAlreadyFull):
+		writeJSON(c, consts.StatusBadRequest, map[string]string{
+			"error":   "STAMINA_ALREADY_FULL",
+			"message": "当前体力已经是满的。",
+		})
+		return true
+	case errors.Is(err, core.ErrStaminaRiskBanned):
+		writeJSON(c, consts.StatusLocked, map[string]string{
+			"error":   "ACCOUNT_STAMINA_BANNED",
+			"message": "账号异常，8 小时内不可手点/挂机/购买体力。",
 		})
 		return true
 	default:

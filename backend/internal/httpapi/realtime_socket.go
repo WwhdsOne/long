@@ -88,9 +88,13 @@ type realtimeClickAckPayload struct {
 }
 
 type realtimeUserDelta struct {
-	Gold         *int64 `json:"gold,omitempty"`
-	Stones       *int64 `json:"stones,omitempty"`
-	TalentPoints *int64 `json:"talentPoints,omitempty"`
+	Gold               *int64 `json:"gold,omitempty"`
+	Stones             *int64 `json:"stones,omitempty"`
+	TalentPoints       *int64 `json:"talentPoints,omitempty"`
+	StaminaCurrent     *int64 `json:"staminaCurrent,omitempty"`
+	StaminaMax         *int64 `json:"staminaMax,omitempty"`
+	StaminaNextRecover *int64 `json:"staminaNextRecoverAt,omitempty"`
+	StaminaRiskBan     *int64 `json:"staminaRiskBanUntil,omitempty"`
 }
 
 type realtimeClickAckMessage struct {
@@ -335,9 +339,13 @@ func (s *realtimeSession) executeClick(ctx context.Context, slug string, comboCo
 	if s.nickname != "" && s.store != nil {
 		if resources, err := s.store.GetPlayerResources(ctx, s.nickname); err == nil {
 			ack.UserDelta = &realtimeUserDelta{
-				Gold:         &resources.Gold,
-				Stones:       &resources.Stones,
-				TalentPoints: &resources.TalentPoints,
+				Gold:               &resources.Gold,
+				Stones:             &resources.Stones,
+				TalentPoints:       &resources.TalentPoints,
+				StaminaCurrent:     &resources.Stamina.Current,
+				StaminaMax:         &resources.Stamina.Max,
+				StaminaNextRecover: &resources.Stamina.NextRecoverAt,
+				StaminaRiskBan:     &resources.Stamina.RiskBanUntil,
 			}
 		}
 	}

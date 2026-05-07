@@ -68,6 +68,8 @@ type ButtonStore interface {
 	GetTaskCycleResults(context.Context, string, string) (core.TaskCycleResultsView, error)
 	ListShopCatalogItemsForPlayer(context.Context, string) ([]core.ShopCatalogItemView, error)
 	PurchaseShopItem(context.Context, string, string) (core.UserState, error)
+	PurchaseStaminaFull(context.Context, string) (core.UserState, error)
+	UpgradeStaminaCap(context.Context, string) (core.UserState, error)
 	EquipShopItem(context.Context, string, string) (core.UserState, error)
 	UnequipShopItem(context.Context, string) (core.UserState, error)
 	ListShopItems(context.Context) ([]core.ShopItem, error)

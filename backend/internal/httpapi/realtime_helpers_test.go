@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"long/internal/core"
 	"long/internal/ratelimit"
 )
 
@@ -57,5 +58,24 @@ func TestExecuteButtonClickStillEnforcesRateLimitForNonWhitelistedNickname(t *te
 	}
 	if len(guard.calls) == 0 {
 		t.Fatal("expected click guard to be called for non-whitelisted nickname")
+	}
+}
+
+func TestExecuteButtonClickReturnsReadableRiskBanError(t *testing.T) {
+	store := &mockStore{clickErr: core.ErrStaminaRiskBanned}
+
+	_, _, apiErr := executeButtonClick(context.Background(), Options{
+		Store: store,
+	}, clickRequestContext{
+		Slug:                  "boss-part:1-0",
+		AuthenticatedNickname: "普通账号",
+		AuthenticatorEnabled:  true,
+		ClientID:              "127.0.0.1",
+	})
+	if apiErr == nil {
+		t.Fatal("expected risk ban error")
+	}
+	if apiErr.Code != "ACCOUNT_STAMINA_BANNED" {
+		t.Fatalf("expected ACCOUNT_STAMINA_BANNED, got %+v", apiErr)
 	}
 }

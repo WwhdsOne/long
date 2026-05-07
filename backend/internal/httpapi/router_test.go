@@ -112,6 +112,8 @@ type mockStore struct {
 	setBossCycleErr           error
 	purchaseShopErr           error
 	equipShopErr              error
+	purchaseStaminaErr        error
+	upgradeStaminaErr         error
 	roomSwitchErr             error
 }
 
@@ -256,6 +258,7 @@ func (m *mockStore) userStateForNickname(nickname string) core.UserState {
 	userState.Gold = m.state.Gold
 	userState.Stones = m.state.Stones
 	userState.TalentPoints = m.state.TalentPoints
+	userState.Stamina = m.state.Stamina
 	userState.RecentRewards = m.state.RecentRewards
 	userState.Tasks = m.tasks
 	userState.EquippedBattleClickSkinID = m.state.EquippedBattleClickSkinID
@@ -284,6 +287,22 @@ func (m *mockStore) EquipShopItem(_ context.Context, _ string, itemID string) (c
 		return core.UserState{}, m.equipShopErr
 	}
 	return m.userStateForNickname("阿明"), nil
+}
+
+func (m *mockStore) PurchaseStaminaFull(_ context.Context, nickname string) (core.UserState, error) {
+	m.lastClickNickname = nickname
+	if m.purchaseStaminaErr != nil {
+		return core.UserState{}, m.purchaseStaminaErr
+	}
+	return m.userStateForNickname(nickname), nil
+}
+
+func (m *mockStore) UpgradeStaminaCap(_ context.Context, nickname string) (core.UserState, error) {
+	m.lastClickNickname = nickname
+	if m.upgradeStaminaErr != nil {
+		return core.UserState{}, m.upgradeStaminaErr
+	}
+	return m.userStateForNickname(nickname), nil
 }
 
 func (m *mockStore) UnequipShopItem(_ context.Context, _ string) (core.UserState, error) {
@@ -609,6 +628,95 @@ func TestShopPurchaseRouteReturnsReadableBusinessErrors(t *testing.T) {
 	}
 	if !strings.Contains(purchaseResponse.Body.String(), "金币不足") {
 		t.Fatalf("expected readable insufficient gold message, got %s", purchaseResponse.Body.String())
+	}
+}
+
+func TestShopStaminaRoutesSupportPurchaseAndUpgrade(t *testing.T) {
+	store := &mockStore{
+		state: core.State{
+			UserStats: &core.UserStats{Nickname: "阿明", ClickCount: 8},
+			Stamina: core.StaminaState{
+				Current:          50,
+				Max:              50,
+				MaxLevel:         0,
+				NextFullBuyPrice: 200000,
+			},
+		},
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{
+			loginToken:     "player-token",
+			loginNickname:  "阿明",
+			verifyNickname: "阿明",
+		},
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/player/auth/login", strings.NewReader(`{"nickname":"阿明","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected player login to set cookie")
+	}
+
+	refillRequest := httptest.NewRequest(http.MethodPost, "/api/shop/stamina/full/purchase", nil)
+	refillRequest.AddCookie(cookies[0])
+	refillResponse := httptest.NewRecorder()
+	handler.ServeHTTP(refillResponse, refillRequest)
+	if refillResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from stamina refill purchase, got %d", refillResponse.Code)
+	}
+	if !strings.Contains(refillResponse.Body.String(), `"nextFullBuyPrice":200000`) {
+		t.Fatalf("expected stamina payload in refill response, got %s", refillResponse.Body.String())
+	}
+
+	upgradeRequest := httptest.NewRequest(http.MethodPost, "/api/shop/stamina/cap/upgrade", nil)
+	upgradeRequest.AddCookie(cookies[0])
+	upgradeResponse := httptest.NewRecorder()
+	handler.ServeHTTP(upgradeResponse, upgradeRequest)
+	if upgradeResponse.Code != http.StatusOK {
+		t.Fatalf("expected 200 from stamina cap upgrade, got %d", upgradeResponse.Code)
+	}
+	if !strings.Contains(upgradeResponse.Body.String(), `"max":50`) {
+		t.Fatalf("expected stamina payload in upgrade response, got %s", upgradeResponse.Body.String())
+	}
+}
+
+func TestShopStaminaRoutesReturnReadableRiskBanError(t *testing.T) {
+	store := &mockStore{
+		purchaseStaminaErr: core.ErrStaminaRiskBanned,
+	}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		PlayerAuthenticator: &mockPlayerAuthenticator{
+			loginToken:     "player-token",
+			loginNickname:  "阿明",
+			verifyNickname: "阿明",
+		},
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/player/auth/login", strings.NewReader(`{"nickname":"阿明","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected player login to set cookie")
+	}
+
+	refillRequest := httptest.NewRequest(http.MethodPost, "/api/shop/stamina/full/purchase", nil)
+	refillRequest.AddCookie(cookies[0])
+	refillResponse := httptest.NewRecorder()
+	handler.ServeHTTP(refillResponse, refillRequest)
+	if refillResponse.Code != http.StatusLocked {
+		t.Fatalf("expected 423 from banned stamina purchase, got %d", refillResponse.Code)
+	}
+	if !strings.Contains(refillResponse.Body.String(), "8 小时内不可手点") {
+		t.Fatalf("expected readable risk ban message, got %s", refillResponse.Body.String())
 	}
 }
 
