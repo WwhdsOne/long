@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"math/rand/v2"
 	"slices"
 	"strings"
 
 	"github.com/bytedance/sonic"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 // TalentTree 天赋树类型
@@ -51,7 +53,21 @@ const (
 	TalentNormalChaseUpgradeRatio = 0.80
 	// 连击扩展：额外追加段数
 	TalentNormalComboExtendHits = 10.0
+
+	TalentStateField                = "state"
+	TalentLegacyTalentsField        = "talents"
+	TalentOverflowSinkID            = "overflow_sink"
+	TalentOverflowUpgradeCost int64 = 1000
 )
+
+var talentOverflowBonusKeys = []string{
+	"soft_damage",
+	"weak_damage",
+	"heavy_damage",
+	"crit_damage",
+	"attack_power",
+	"all_damage",
+}
 
 func TalentLevelCost(base int64, targetLevel int) int64 {
 	if base <= 0 || targetLevel <= 0 {
@@ -94,7 +110,9 @@ type TalentDef struct {
 
 // TalentState 玩家天赋状态
 type TalentState struct {
-	Talents map[string]int `json:"talents"` // talentID → 当前等级
+	Talents         map[string]int `msgpack:"talents" json:"talents"`                 // talentID → 当前等级
+	OverflowLevel   int64          `msgpack:"overflowLevel" json:"overflowLevel"`     // 溢出累计投入次数
+	OverflowBonuses map[string]int `msgpack:"overflowBonuses" json:"overflowBonuses"` // 溢出属性命中次数
 }
 
 type TalentEffectLine struct {
@@ -112,6 +130,61 @@ func GetTalentLevel(state *TalentState, talentID string) int {
 		return 0
 	}
 	return state.Talents[talentID]
+}
+
+func newTalentState() *TalentState {
+	return &TalentState{
+		Talents:         make(map[string]int),
+		OverflowBonuses: make(map[string]int),
+	}
+}
+
+func normalizeTalentState(state *TalentState) *TalentState {
+	if state == nil {
+		return newTalentState()
+	}
+	if state.Talents == nil {
+		state.Talents = make(map[string]int)
+	}
+	if state.OverflowBonuses == nil {
+		state.OverflowBonuses = make(map[string]int)
+	}
+	return state
+}
+
+func hasAnyTalentStateData(state *TalentState) bool {
+	if state == nil {
+		return false
+	}
+	return len(state.Talents) > 0 || state.OverflowLevel > 0 || len(state.OverflowBonuses) > 0
+}
+
+func decodeTalentState(raw []byte) (*TalentState, error) {
+	state := newTalentState()
+	if err := msgpack.Unmarshal(raw, state); err == nil {
+		return normalizeTalentState(state), nil
+	}
+	state = newTalentState()
+	if err := sonic.Unmarshal(raw, state); err != nil {
+		return nil, err
+	}
+	return normalizeTalentState(state), nil
+}
+
+func decodeLegacyTalentLevels(raw []byte) (map[string]int, error) {
+	talents := make(map[string]int)
+	if err := sonic.Unmarshal(raw, &talents); err == nil {
+		return talents, nil
+	}
+
+	var oldTalents []string
+	if err := sonic.Unmarshal(raw, &oldTalents); err != nil {
+		return nil, err
+	}
+	for _, id := range oldTalents {
+		talents[id] = 1
+	}
+	return talents, nil
 }
 
 func HasTalentLearned(state *TalentState, talentID string) bool {
@@ -1082,31 +1155,43 @@ func (s *Store) talentKey(nickname string) string {
 	return s.namespace + "player:talents:" + nickname
 }
 
+func (s *Store) encodeTalentState(state *TalentState) ([]byte, error) {
+	return msgpack.Marshal(normalizeTalentState(state))
+}
+
+func (s *Store) saveTalentState(ctx context.Context, nickname string, state *TalentState) error {
+	raw, err := s.encodeTalentState(state)
+	if err != nil {
+		return err
+	}
+	return s.client.HSet(ctx, s.talentKey(nickname), TalentStateField, raw).Err()
+}
+
 // GetTalentState 获取玩家天赋状态。
 func (s *Store) GetTalentState(ctx context.Context, nickname string) (*TalentState, error) {
-	values, err := s.client.HMGet(ctx, s.talentKey(nickname), "talents").Result()
+	values, err := s.client.HMGet(ctx, s.talentKey(nickname), TalentStateField, TalentLegacyTalentsField).Result()
 	if err != nil {
 		return nil, err
 	}
-	talentsRaw := stringValue(values, 0)
+
+	stateRaw := stringValue(values, 0)
+	if stateRaw != "" {
+		return decodeTalentState([]byte(stateRaw))
+	}
+
+	talentsRaw := stringValue(values, 1)
 	if talentsRaw == "" {
-		return &TalentState{Talents: make(map[string]int)}, nil
+		return newTalentState(), nil
 	}
 
-	state := &TalentState{}
-	talents := make(map[string]int)
-	if err := sonic.Unmarshal([]byte(talentsRaw), &talents); err != nil {
-		// 兼容旧格式 []string → 迁移为 map[string]int (均为 Lv1)
-		var oldTalents []string
-		if err2 := sonic.Unmarshal([]byte(talentsRaw), &oldTalents); err2 != nil {
-			return nil, err
-		}
-		for _, id := range oldTalents {
-			talents[id] = 1
-		}
+	talents, err := decodeLegacyTalentLevels([]byte(talentsRaw))
+	if err != nil {
+		return nil, err
 	}
-	state.Talents = talents
-
+	state := normalizeTalentState(&TalentState{Talents: talents})
+	if err := s.saveTalentState(ctx, nickname, state); err != nil {
+		return nil, err
+	}
 	return state, nil
 }
 
@@ -1125,10 +1210,53 @@ func (s *Store) compiledTalentSetForNickname(ctx context.Context, nickname strin
 	return compiled, nil
 }
 
+func (s *Store) upgradeOverflowTalent(ctx context.Context, nickname string, state *TalentState) error {
+	resources, err := s.resourcesForNickname(ctx, nickname)
+	if err != nil {
+		return err
+	}
+	if resources.TalentPoints < TalentOverflowUpgradeCost {
+		return ErrTalentPointsInsufficient
+	}
+
+	state = normalizeTalentState(state)
+	rollIndex := 0
+	if s.roll != nil {
+		rollIndex = s.roll(len(talentOverflowBonusKeys))
+	} else {
+		rollIndex = rand.IntN(len(talentOverflowBonusKeys))
+	}
+	bonusKey := talentOverflowBonusKeys[max(0, min(rollIndex, len(talentOverflowBonusKeys)-1))]
+	state.OverflowLevel++
+	state.OverflowBonuses[bonusKey]++
+
+	stateRaw, err := s.encodeTalentState(state)
+	if err != nil {
+		return err
+	}
+
+	pipe := s.client.TxPipeline()
+	pipe.HSet(ctx, s.talentKey(nickname), TalentStateField, stateRaw)
+	pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", -TalentOverflowUpgradeCost)
+	_, err = pipe.Exec(ctx)
+	if err == nil {
+		s.invalidatePlayerCombatCaches(nickname)
+	}
+	return err
+}
+
 // UpgradeTalent 升级天赋节点到指定等级。
 func (s *Store) UpgradeTalent(ctx context.Context, nickname string, talentID string, targetLevel int) error {
 	if targetLevel < 1 {
 		return ErrTalentInvalidLevel
+	}
+
+	state, err := s.GetTalentState(ctx, nickname)
+	if err != nil {
+		return err
+	}
+	if talentID == TalentOverflowSinkID {
+		return s.upgradeOverflowTalent(ctx, nickname, state)
 	}
 
 	def, ok := talentDefs[talentID]
@@ -1139,10 +1267,6 @@ func (s *Store) UpgradeTalent(ctx context.Context, nickname string, talentID str
 		return ErrTalentMaxLevel
 	}
 
-	state, err := s.GetTalentState(ctx, nickname)
-	if err != nil {
-		return err
-	}
 	currentLevel := GetTalentLevel(state, talentID)
 	if currentLevel >= targetLevel {
 		return ErrTalentAlreadyLearned
@@ -1169,13 +1293,13 @@ func (s *Store) UpgradeTalent(ctx context.Context, nickname string, talentID str
 	}
 
 	state.Talents[talentID] = targetLevel
-	talentsJSON, err := sonic.Marshal(state.Talents)
+	stateRaw, err := s.encodeTalentState(state)
 	if err != nil {
 		return err
 	}
 
 	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.talentKey(nickname), "talents", string(talentsJSON))
+	pipe.HSet(ctx, s.talentKey(nickname), TalentStateField, stateRaw)
 	pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", -diff)
 	_, err = pipe.Exec(ctx)
 	if err == nil {
@@ -1190,8 +1314,9 @@ func (s *Store) ResetTalents(ctx context.Context, nickname string) error {
 	if err != nil {
 		return err
 	}
-	if state == nil || len(state.Talents) == 0 {
-		return s.client.HSet(ctx, s.talentKey(nickname), "talents", "{}").Err()
+	state = normalizeTalentState(state)
+	if !hasAnyTalentStateData(state) {
+		return s.saveTalentState(ctx, nickname, newTalentState())
 	}
 
 	var refund int64
@@ -1202,9 +1327,16 @@ func (s *Store) ResetTalents(ctx context.Context, nickname string) error {
 		}
 		refund += TalentCumulativeCost(def.Cost, level)
 	}
+	refund += state.OverflowLevel * TalentOverflowUpgradeCost
+
+	resetState := newTalentState()
+	stateRaw, err := s.encodeTalentState(resetState)
+	if err != nil {
+		return err
+	}
 
 	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.talentKey(nickname), "talents", "{}")
+	pipe.HSet(ctx, s.talentKey(nickname), TalentStateField, stateRaw)
 	if refund > 0 {
 		pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", refund)
 	}
@@ -1328,6 +1460,10 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 	if mods.CritDamagePercentBonus > 0 {
 		stats.CritDamageMultiplier += mods.CritDamagePercentBonus
 	}
+
+	stats.PartTypeDamageSoft += max(0.0, mods.PartTypeBonus[PartTypeSoft])
+	stats.PartTypeDamageHeavy += max(0.0, mods.PartTypeBonus[PartTypeHeavy])
+	stats.PartTypeDamageWeak += max(0.0, mods.PartTypeBonus[PartTypeWeak])
 
 	// 围剿：每存活一个部位 +12% 伤害
 	if mods.PerPartDamagePercent > 0 && alivePartCount > 1 {

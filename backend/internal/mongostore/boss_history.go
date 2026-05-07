@@ -5,9 +5,9 @@ import (
 	"math"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/internal/core"
 )
@@ -121,7 +121,7 @@ func (s *BossHistoryStore) SaveBossHistory(ctx context.Context, entry core.BossH
 		writeCtx,
 		bson.M{"boss_id": entry.ID},
 		bson.M{"$set": doc},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }

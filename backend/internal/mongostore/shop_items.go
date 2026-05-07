@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/internal/core"
 )
@@ -118,7 +118,7 @@ func (s *ShopItemStore) UpsertShopItem(ctx context.Context, item core.ShopItem) 
 		writeCtx,
 		bson.M{"item_id": item.ItemID},
 		bson.M{"$set": item},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }

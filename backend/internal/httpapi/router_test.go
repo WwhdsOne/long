@@ -1183,12 +1183,20 @@ func (m *mockStore) GetTalentState(_ context.Context, _ string) (*core.TalentSta
 	return &core.TalentState{Talents: map[string]int{}}, nil
 }
 
-func (m *mockStore) UpgradeTalent(_ context.Context, _ string, _ string, _ int) error {
+func (m *mockStore) UpgradeTalent(_ context.Context, _ string, talentID string, _ int) error {
 	if m.talentState == nil {
 		m.talentState = &core.TalentState{Talents: map[string]int{}}
 	}
 	if m.talentState.Talents == nil {
 		m.talentState.Talents = map[string]int{}
+	}
+	if talentID == core.TalentOverflowSinkID {
+		m.talentState.OverflowLevel++
+		if m.talentState.OverflowBonuses == nil {
+			m.talentState.OverflowBonuses = map[string]int{}
+		}
+		m.talentState.OverflowBonuses["all_damage"]++
+		return nil
 	}
 	m.talentState.Talents["normal_core"] = 2
 	return nil
@@ -1464,6 +1472,10 @@ func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
 			Talents: map[string]int{
 				"normal_core": 2,
 			},
+			OverflowLevel: 2,
+			OverflowBonuses: map[string]int{
+				"all_damage": 1,
+			},
 		},
 	}
 	handler := NewHandler(Options{
@@ -1510,6 +1522,16 @@ func TestTalentStateReturnsBackendEffectLines(t *testing.T) {
 	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 68% x 18 段总伤。可无限触发。" {
 		t.Fatalf("expected dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
 	}
+	if payload["overflowLevel"] != float64(2) {
+		t.Fatalf("expected overflowLevel 2, got %+v", payload["overflowLevel"])
+	}
+	overflowBonuses, ok := payload["overflowBonuses"].(map[string]any)
+	if !ok || overflowBonuses["all_damage"] != float64(1) {
+		t.Fatalf("expected overflowBonuses in payload, got %+v", payload["overflowBonuses"])
+	}
+	if payload["overflowUpgradeCost"] != float64(core.TalentOverflowUpgradeCost) {
+		t.Fatalf("expected overflowUpgradeCost %d, got %+v", core.TalentOverflowUpgradeCost, payload["overflowUpgradeCost"])
+	}
 }
 
 func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
@@ -1521,6 +1543,7 @@ func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
 			Talents: map[string]int{
 				"normal_core": 1,
 			},
+			OverflowBonuses: map[string]int{},
 		},
 	}
 	handler := NewHandler(Options{
@@ -1574,6 +1597,9 @@ func TestTalentUpgradeReturnsUpdatedEffectLines(t *testing.T) {
 	}
 	if effectDescriptions["normal_core"] != "每 55 次点击触发追击爆发，造成 基础伤害 x 68% x 18 段总伤。可无限触发。" {
 		t.Fatalf("expected upgraded dynamic normal_core description, got %+v", effectDescriptions["normal_core"])
+	}
+	if payload["overflowUpgradeCost"] != float64(core.TalentOverflowUpgradeCost) {
+		t.Fatalf("expected overflowUpgradeCost %d, got %+v", core.TalentOverflowUpgradeCost, payload["overflowUpgradeCost"])
 	}
 }
 

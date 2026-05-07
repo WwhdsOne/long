@@ -71,11 +71,14 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 	}
 
 	c.JSON(consts.StatusOK, map[string]any{
-		"trees":              allTrees,
-		"talents":            state.Talents,
-		"talentPoints":       userState.TalentPoints,
-		"effectLines":        core.BuildTalentEffectLineMap(state),
-		"effectDescriptions": core.BuildTalentEffectDescriptionMap(state),
+		"trees":               allTrees,
+		"talents":             state.Talents,
+		"talentPoints":        userState.TalentPoints,
+		"overflowLevel":       state.OverflowLevel,
+		"overflowBonuses":     state.OverflowBonuses,
+		"overflowUpgradeCost": core.TalentOverflowUpgradeCost,
+		"effectLines":         core.BuildTalentEffectLineMap(state),
+		"effectDescriptions":  core.BuildTalentEffectDescriptionMap(state),
 	})
 }
 
@@ -109,11 +112,14 @@ func (h *talentAPI) upgrade(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	c.JSON(consts.StatusOK, map[string]any{
-		"status":             "ok",
-		"talents":            state.Talents,
-		"talentPoints":       userState.TalentPoints,
-		"effectLines":        core.BuildTalentEffectLineMap(state),
-		"effectDescriptions": core.BuildTalentEffectDescriptionMap(state),
+		"status":              "ok",
+		"talents":             state.Talents,
+		"talentPoints":        userState.TalentPoints,
+		"overflowLevel":       state.OverflowLevel,
+		"overflowBonuses":     state.OverflowBonuses,
+		"overflowUpgradeCost": core.TalentOverflowUpgradeCost,
+		"effectLines":         core.BuildTalentEffectLineMap(state),
+		"effectDescriptions":  core.BuildTalentEffectDescriptionMap(state),
 	})
 }
 
@@ -135,8 +141,9 @@ func (h *talentAPI) reset(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	c.JSON(consts.StatusOK, map[string]any{
-		"status":       "ok",
-		"talentPoints": userState.TalentPoints,
+		"status":              "ok",
+		"talentPoints":        userState.TalentPoints,
+		"overflowUpgradeCost": core.TalentOverflowUpgradeCost,
 	})
 }
 

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"long/internal/core"
 )
@@ -197,7 +197,7 @@ func (s *MessageStore) UpsertMessage(ctx context.Context, item core.Message) err
 			CreatedAt: item.CreatedAt,
 			Status:    "active",
 		}},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	if err != nil {
 		return err
@@ -207,7 +207,7 @@ func (s *MessageStore) UpsertMessage(ctx context.Context, item core.Message) err
 		writeCtx,
 		bson.M{"_id": messageCounterID},
 		bson.M{"$max": bson.M{"value": seq}},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }
@@ -231,7 +231,7 @@ func (s *MessageStore) ensureCounterFloor(ctx context.Context) error {
 			ctx,
 			bson.M{"_id": messageCounterID},
 			bson.M{"$setOnInsert": bson.M{"value": int64(0)}},
-			options.Update().SetUpsert(true),
+			options.UpdateOne().SetUpsert(true),
 		)
 		return err
 	}
@@ -243,7 +243,7 @@ func (s *MessageStore) ensureCounterFloor(ctx context.Context) error {
 		ctx,
 		bson.M{"_id": messageCounterID},
 		bson.M{"$max": bson.M{"value": doc.Seq}},
-		options.Update().SetUpsert(true),
+		options.UpdateOne().SetUpsert(true),
 	)
 	return err
 }

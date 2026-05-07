@@ -62,4 +62,19 @@ describe('TalentsPage effectLines 响应链路', () => {
     expect(pageSource).toContain('const needed = totalNodesInTier(tree, tier)')
     expect(pageSource).not.toContain('const tierNodeCount = { 0: 1, 1: 5, 2: 5, 3: 4, 4: 1 }')
   })
+
+  it('页面展示独立溢出强化卡片，并消费后端新增字段', () => {
+    expect(pageSource).toContain('overflowLevel')
+    expect(pageSource).toContain('overflowBonuses')
+    expect(pageSource).toContain('overflowUpgradeCost')
+    expect(pageSource).toContain('overflow_sink')
+    expect(pageSource).toContain('消耗 1000 点随机强化')
+    expect(pageSource).toContain('累计消耗')
+    expect(pageSource).toContain('已获得属性汇总')
+  })
+
+  it('洗点提示明确包含普通天赋与溢出强化返还', () => {
+    expect(pageSource).toContain('普通天赋与溢出强化都会被清空并返还')
+    expect(pageSource).toContain('普通天赋点与溢出强化消耗都会返还')
+  })
 })

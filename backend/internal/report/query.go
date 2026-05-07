@@ -3,7 +3,7 @@ package report
 import (
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // timeFilter 构建时间区间过滤条件。

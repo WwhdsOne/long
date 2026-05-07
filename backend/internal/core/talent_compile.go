@@ -79,6 +79,7 @@ func (c *CompiledTalentSet) IsTierFull(tree TalentTree, tier int) bool {
 }
 
 func compileTalentSet(state *TalentState) *CompiledTalentSet {
+	state = normalizeTalentState(state)
 	compiled := &CompiledTalentSet{
 		levels:   make(map[string]int),
 		learned:  make(map[string]struct{}),
@@ -94,7 +95,7 @@ func compileTalentSet(state *TalentState) *CompiledTalentSet {
 			CollapseDuration: 6,
 		},
 	}
-	if state == nil || len(state.Talents) == 0 {
+	if !hasAnyTalentStateData(state) {
 		return compiled
 	}
 
@@ -109,6 +110,7 @@ func compileTalentSet(state *TalentState) *CompiledTalentSet {
 
 	compiled.tierFull = compileTierFull(state.Talents)
 	compiled.Modifiers = buildTalentModifiersFromCompiled(compiled)
+	applyOverflowTalentModifiers(compiled.Modifiers, state)
 	compiled.Normal = compileNormalTalents(compiled)
 	compiled.Armor = compileArmorTalents(compiled)
 	compiled.Crit = compileCritTalents(compiled)
@@ -274,6 +276,32 @@ func buildTalentModifiersFromCompiled(compiled *CompiledTalentSet) *TalentModifi
 	}
 
 	return mods
+}
+
+func applyOverflowTalentModifiers(mods *TalentModifiers, state *TalentState) {
+	if mods == nil || state == nil {
+		return
+	}
+	for key, count := range state.OverflowBonuses {
+		if count <= 0 {
+			continue
+		}
+		bonus := float64(count) * 0.001
+		switch key {
+		case "soft_damage":
+			mods.PartTypeBonus[PartTypeSoft] += bonus
+		case "weak_damage":
+			mods.PartTypeBonus[PartTypeWeak] += bonus
+		case "heavy_damage":
+			mods.PartTypeBonus[PartTypeHeavy] += bonus
+		case "crit_damage":
+			mods.CritDamagePercentBonus += bonus
+		case "attack_power":
+			mods.AttackPowerPercent += bonus
+		case "all_damage":
+			mods.AllDamageAmplify += bonus
+		}
+	}
 }
 
 func compileNormalTalents(compiled *CompiledTalentSet) compiledNormalTalents {

@@ -53,6 +53,8 @@
 - 正式口径：
   - [designs/2026-04-30-天赋系统数值策划案-V2.0.md](./designs/2026-04-30-天赋系统数值策划案-V2.0.md)
 - 相关实现：
+  - [architecture/2026-05-07-天赋溢出节点与MessagePack存储方案.md](./architecture/2026-05-07-天赋溢出节点与MessagePack存储方案.md)
+  - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
   - [implementation/2026-04-30-天赋系统第一阶段落地方案.md](./implementation/2026-04-30-天赋系统第一阶段落地方案.md)
   - [implementation/2026-05-01-天赋系统第二阶段落地方案.md](./implementation/2026-05-01-天赋系统第二阶段落地方案.md)
 
