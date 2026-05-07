@@ -172,7 +172,7 @@ func (s *Store) GrantEquipmentToPlayer(ctx context.Context, nickname string, ite
 
 	nowUnix := s.now().Unix()
 	pipe := s.client.TxPipeline()
-	for count := int64(0); count < quantity; count++ {
+	for range quantity {
 		instanceID, createErr := s.newEquipmentInstanceID(ctx)
 		if createErr != nil {
 			return UserState{}, createErr
