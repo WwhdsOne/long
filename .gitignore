@@ -10,7 +10,7 @@
 node_modules/
 long.tar.gz
 *.tar.gz
-/scripts/__pycache__
+pixel-assets/scripts/__pycache__
 backend/reports
 backend/server
 backend/long
