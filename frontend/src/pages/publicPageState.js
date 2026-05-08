@@ -1320,16 +1320,29 @@ function closeRewardModal() {
 }
 
 async function readErrorMessage(response, fallback) {
+    const payload = await readErrorPayload(response, fallback)
+    return payload.message
+}
+
+async function readErrorPayload(response, fallback) {
     try {
         const payload = await response.json()
-        if (payload?.message) {
-            return payload.message
+        if (payload && typeof payload === 'object') {
+            return {
+                error: typeof payload.error === 'string' ? payload.error : '',
+                message: typeof payload.message === 'string' && payload.message ? payload.message : fallback,
+                siteKey: typeof payload.siteKey === 'string' ? payload.siteKey : '',
+            }
         }
     } catch {
         // Ignore malformed error payloads and keep fallback copy.
     }
 
-    return fallback
+    return {
+        error: '',
+        message: fallback,
+        siteKey: '',
+    }
 }
 
 function bossResourceVersion(value = boss.value) {
@@ -1906,7 +1919,7 @@ async function unequipShopItem() {
     }
 }
 
-async function purchaseStaminaFull() {
+async function purchaseStaminaFull(turnstileToken = '') {
     if (!nickname.value) {
         errorMessage.value = '先登录账号再购买。'
         return {ok: false, message: errorMessage.value}
@@ -1915,11 +1928,20 @@ async function purchaseStaminaFull() {
     try {
         const response = await fetch('/api/shop/stamina/full/purchase', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(turnstileToken ? {turnstileToken} : {}),
         })
         if (!response.ok) {
-            const message = await readErrorMessage(response, '购买体力失败，请稍后重试。')
-            errorMessage.value = message
-            return {ok: false, message}
+            const payload = await readErrorPayload(response, '购买体力失败，请稍后重试。')
+            errorMessage.value = payload.message
+            return {
+                ok: false,
+                message: payload.message,
+                errorCode: payload.error,
+                siteKey: payload.siteKey,
+            }
         }
         const payload = await response.json()
         applyUserState(payload.userState)
@@ -3044,15 +3066,15 @@ async function enhanceItem(instanceId, levels = 1) {
     }
 }
 
-async function submitNickname() {
+async function submitNickname(turnstileToken = '') {
     const nextNickname = normalizeNickname(nicknameDraft.value)
     if (!nextNickname) {
         errorMessage.value = '先填一个昵称。'
-        return
+        return {ok: false, message: errorMessage.value}
     }
     if (!passwordDraft.value.trim()) {
         errorMessage.value = '再设一个密码。'
-        return
+        return {ok: false, message: errorMessage.value}
     }
 
     errorMessage.value = ''
@@ -3066,10 +3088,18 @@ async function submitNickname() {
             body: JSON.stringify({
                 nickname: nextNickname,
                 password: passwordDraft.value,
+                turnstileToken,
             }),
         })
         if (!response.ok) {
-            throw new Error(await readErrorMessage(response, '登录失败，请稍后重试。'))
+            const payload = await readErrorPayload(response, '登录失败，请稍后重试。')
+            errorMessage.value = payload.message
+            return {
+                ok: false,
+                message: payload.message,
+                errorCode: payload.error,
+                siteKey: payload.siteKey,
+            }
         }
 
         const payload = await response.json()
@@ -3091,8 +3121,10 @@ async function submitNickname() {
         startTaskPolling()
         await loadRooms()
         connectRealtime(resolvedNickname)
+        return {ok: true}
     } catch (error) {
         errorMessage.value = error.message || '登录失败，请稍后重试。'
+        return {ok: false, message: errorMessage.value}
     }
 }
 

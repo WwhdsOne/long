@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 
@@ -52,6 +54,18 @@ func peekRequestBody(c *app.RequestContext) string {
 	data := c.Request.Body()
 	if len(data) == 0 {
 		return ""
+	}
+	if (string(c.Path()) == "/api/shop/stamina/full/purchase" || string(c.Path()) == "/api/player/auth/login") && strings.Contains(string(data), "turnstileToken") {
+		var payload map[string]any
+		if err := sonic.Unmarshal(data, &payload); err == nil {
+			payload["turnstileToken"] = "[REDACTED]"
+			if redacted, err := sonic.Marshal(payload); err == nil {
+				if len(redacted) > 1024 {
+					return string(redacted[:1024])
+				}
+				return string(redacted)
+			}
+		}
 	}
 	if len(data) > 1024 {
 		return string(data[:1024])

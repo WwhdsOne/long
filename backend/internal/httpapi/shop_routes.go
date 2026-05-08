@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -99,9 +100,51 @@ func registerShopRoutes(router route.IRouter, options Options) {
 	})
 
 	router.POST("/api/shop/stamina/full/purchase", func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			TurnstileToken string `json:"turnstileToken"`
+		}
+		if rawBody := c.Request.Body(); len(rawBody) > 0 && !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
+			return
+		}
 		nickname, ok := requireAuthenticatedPlayerNickname(ctx, c, options.PlayerAuthenticator)
 		if !ok {
 			return
+		}
+		if options.StaminaPurchaseTurnstile != nil {
+			turnstileResult, err := options.StaminaPurchaseTurnstile.CheckPurchaseStamina(ctx, StaminaPurchaseTurnstileRequest{
+				Nickname: nickname,
+				Token:    strings.TrimSpace(body.TurnstileToken),
+				RemoteIP: requestIP(c),
+			})
+			if err != nil {
+				writeJSON(c, consts.StatusServiceUnavailable, map[string]string{
+					"error":   "CAPTCHA_VERIFY_UNAVAILABLE",
+					"message": "验证服务暂时不可用，请稍后再试",
+				})
+				return
+			}
+			switch turnstileResult.Decision {
+			case StaminaPurchaseTurnstileAllow:
+			case StaminaPurchaseTurnstileRequire:
+				writeJSON(c, consts.StatusBadRequest, map[string]any{
+					"error":   "CAPTCHA_REQUIRED",
+					"message": "本次购买需要完成人机验证",
+					"siteKey": turnstileResult.SiteKey,
+				})
+				return
+			case StaminaPurchaseTurnstileInvalid:
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "CAPTCHA_INVALID",
+					"message": "验证失败，请重试",
+				})
+				return
+			default:
+				writeJSON(c, consts.StatusServiceUnavailable, map[string]string{
+					"error":   "CAPTCHA_VERIFY_UNAVAILABLE",
+					"message": "验证服务暂时不可用，请稍后再试",
+				})
+				return
+			}
 		}
 		state, err := options.Store.PurchaseStaminaFull(ctx, nickname)
 		if err != nil {

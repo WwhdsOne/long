@@ -301,10 +301,25 @@ func run() error {
 			Timeout: cfg.LLM.Timeout,
 		})
 	}
+	staminaPurchaseTurnstile := httpapi.NewStaminaPurchaseTurnstile(httpapi.StaminaPurchaseTurnstileConfig{
+		Enabled:                   cfg.Turnstile.Enabled,
+		SiteKey:                   cfg.Turnstile.SiteKey,
+		SecretKey:                 cfg.Turnstile.SecretKey,
+		PurchaseStaminaSampleRate: cfg.Turnstile.PurchaseStaminaSampleRate,
+		VerifyTimeoutMS:           cfg.Turnstile.VerifyTimeoutMS,
+	})
+	playerLoginTurnstile := httpapi.NewPlayerLoginTurnstile(httpapi.PlayerLoginTurnstileConfig{
+		Enabled:         cfg.Turnstile.Enabled,
+		SiteKey:         cfg.Turnstile.SiteKey,
+		SecretKey:       cfg.Turnstile.SecretKey,
+		VerifyTimeoutMS: cfg.Turnstile.VerifyTimeoutMS,
+	})
 	httpServer := httpapi.NewHertzServer(listenAddr, httpapi.Options{
 		Store:                       store,
 		StateView:                   stateCache,
 		ChangePublisher:             changeBus,
+		StaminaPurchaseTurnstile:    staminaPurchaseTurnstile,
+		PlayerLoginTurnstile:        playerLoginTurnstile,
 		ClickGuard:                  clickLimiter,
 		RateLimitNicknameWhitelist:  cfg.RateLimit.NicknameWhitelist,
 		Afk:                         afkService,

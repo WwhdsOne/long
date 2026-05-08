@@ -1,7 +1,9 @@
 <script setup>
-import {computed, ref} from 'vue'
+import {computed, nextTick, onBeforeUnmount, ref} from 'vue'
 
 import {usePublicPageState} from './publicPageState'
+
+let turnstileScriptPromise = null
 
 const {
   isLoggedIn,
@@ -22,6 +24,13 @@ const currentCursorImage = computed(() => equippedBattleClickCursorImagePath.val
 const isRiskBanned = computed(() => Number(stamina.value?.riskBanUntil || 0) > Date.now() / 1000)
 const staminaConfirmOpen = ref(false)
 const staminaCapConfirmOpen = ref(false)
+const staminaPurchaseSubmitting = ref(false)
+const staminaCaptchaRequired = ref(false)
+const staminaTurnstileSiteKey = ref('')
+const staminaTurnstileToken = ref('')
+const staminaTurnstileError = ref('')
+const staminaTurnstileWidgetId = ref(null)
+const staminaTurnstileContainer = ref(null)
 const staminaBanHint = computed(() => (
     isRiskBanned.value ? '账号异常，当前不可手点/挂机/购买体力' : ''
 ))
@@ -51,9 +60,141 @@ async function handleShopAction(item) {
   await purchaseShopItem(item.itemId)
 }
 
+function ensureTurnstileScript() {
+  if (window.turnstile) {
+    return Promise.resolve(window.turnstile)
+  }
+  if (turnstileScriptPromise) {
+    return turnstileScriptPromise
+  }
+  turnstileScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-turnstile-script="true"]')
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.turnstile), {once: true})
+      existing.addEventListener('error', () => reject(new Error('load failed')), {once: true})
+      return
+    }
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.dataset.turnstileScript = 'true'
+    script.onload = () => resolve(window.turnstile)
+    script.onerror = () => reject(new Error('load failed'))
+    document.head.appendChild(script)
+  })
+  return turnstileScriptPromise
+}
+
+function clearStaminaTurnstileState() {
+  staminaCaptchaRequired.value = false
+  staminaTurnstileSiteKey.value = ''
+  staminaTurnstileToken.value = ''
+  staminaTurnstileError.value = ''
+  if (window.turnstile && staminaTurnstileWidgetId.value !== null) {
+    window.turnstile.remove?.(staminaTurnstileWidgetId.value)
+  }
+  staminaTurnstileWidgetId.value = null
+  if (staminaTurnstileContainer.value) {
+    staminaTurnstileContainer.value.innerHTML = ''
+  }
+}
+
+function resetStaminaTurnstileWidget(message = '') {
+  staminaTurnstileToken.value = ''
+  staminaTurnstileError.value = message
+  if (window.turnstile && staminaTurnstileWidgetId.value !== null) {
+    window.turnstile.reset(staminaTurnstileWidgetId.value)
+  }
+}
+
+async function renderStaminaTurnstile() {
+  if (!staminaCaptchaRequired.value || !staminaTurnstileSiteKey.value) {
+    return
+  }
+  await nextTick()
+  if (!staminaTurnstileContainer.value) {
+    return
+  }
+  try {
+    const turnstile = await ensureTurnstileScript()
+    if (!turnstile || !staminaCaptchaRequired.value) {
+      return
+    }
+    if (staminaTurnstileWidgetId.value !== null) {
+      turnstile.reset(staminaTurnstileWidgetId.value)
+      return
+    }
+    staminaTurnstileContainer.value.innerHTML = ''
+    staminaTurnstileWidgetId.value = turnstile.render(staminaTurnstileContainer.value, {
+      sitekey: staminaTurnstileSiteKey.value,
+      callback: handlePurchaseStaminaCaptchaSuccess,
+      'expired-callback': handlePurchaseStaminaCaptchaExpired,
+      'error-callback': handlePurchaseStaminaCaptchaError,
+    })
+  } catch {
+    staminaTurnstileError.value = '验证服务暂时不可用，请稍后再试'
+  }
+}
+
+async function submitPurchaseStaminaFull(turnstileToken = '') {
+  if (staminaPurchaseSubmitting.value) {
+    return
+  }
+  if (staminaCaptchaRequired.value && !turnstileToken) {
+    staminaTurnstileError.value = '本次购买需要完成人机验证'
+    return
+  }
+
+  staminaPurchaseSubmitting.value = true
+  const result = await purchaseStaminaFull(turnstileToken)
+  staminaPurchaseSubmitting.value = false
+
+  if (result.ok) {
+    clearStaminaTurnstileState()
+    staminaConfirmOpen.value = false
+    return
+  }
+
+  if (result.errorCode === 'CAPTCHA_REQUIRED') {
+    if (!result.siteKey) {
+      staminaTurnstileError.value = '验证服务暂时不可用，请稍后再试'
+      return
+    }
+    staminaCaptchaRequired.value = true
+    staminaTurnstileSiteKey.value = result.siteKey
+    staminaTurnstileToken.value = ''
+    staminaTurnstileError.value = '本次购买需要完成人机验证'
+    await renderStaminaTurnstile()
+    return
+  }
+
+  if (result.errorCode === 'CAPTCHA_INVALID') {
+    resetStaminaTurnstileWidget('验证失败，请重试')
+    return
+  }
+
+  if (result.errorCode === 'CAPTCHA_VERIFY_UNAVAILABLE') {
+    resetStaminaTurnstileWidget('验证服务暂时不可用，请稍后再试')
+  }
+}
+
 async function handlePurchaseStaminaFull() {
-  await purchaseStaminaFull()
-  staminaConfirmOpen.value = false
+  await submitPurchaseStaminaFull(staminaTurnstileToken.value)
+}
+
+async function handlePurchaseStaminaCaptchaSuccess(token) {
+  staminaTurnstileToken.value = token
+  staminaTurnstileError.value = ''
+  await submitPurchaseStaminaFull(token)
+}
+
+function handlePurchaseStaminaCaptchaExpired() {
+  resetStaminaTurnstileWidget('验证已过期，请重新验证')
+}
+
+function handlePurchaseStaminaCaptchaError() {
+  resetStaminaTurnstileWidget('验证失败，请重试')
 }
 
 async function handleUpgradeStaminaCap() {
@@ -65,10 +206,12 @@ function openStaminaConfirm() {
   if (!isLoggedIn.value || isRiskBanned.value) {
     return
   }
+  clearStaminaTurnstileState()
   staminaConfirmOpen.value = true
 }
 
 function closeStaminaConfirm() {
+  clearStaminaTurnstileState()
   staminaConfirmOpen.value = false
 }
 
@@ -82,6 +225,10 @@ function openStaminaCapConfirm() {
 function closeStaminaCapConfirm() {
   staminaCapConfirmOpen.value = false
 }
+
+onBeforeUnmount(() => {
+  clearStaminaTurnstileState()
+})
 </script>
 
 <template>
@@ -186,12 +333,22 @@ function closeStaminaCapConfirm() {
           </div>
           <p class="shop-stamina-modal__desc">购买后将体力直接补满，并按当日次数刷新下一次价格。</p>
           <p class="shop-stamina-modal__desc">当前体力：{{ stamina.current }} / {{ stamina.max }}，体力上限等级：{{ stamina.maxLevel }} / 50</p>
+          <div v-if="staminaCaptchaRequired" class="shop-turnstile-panel">
+            <p class="shop-stamina-modal__desc shop-stamina-modal__desc--captcha">本次购买需要完成人机验证</p>
+            <div ref="staminaTurnstileContainer" class="shop-turnstile-panel__widget"></div>
+          </div>
+          <p v-if="staminaTurnstileError" class="feedback-panel feedback-panel--compact">{{ staminaTurnstileError }}</p>
         </section>
         <div class="shop-stamina-modal__actions">
           <button class="nickname-form__ghost" type="button" @click="closeStaminaConfirm">
             取消购买
           </button>
-          <button class="nickname-form__submit" type="button" :disabled="!isLoggedIn || isRiskBanned" @click="handlePurchaseStaminaFull">
+          <button
+              class="nickname-form__submit"
+              type="button"
+              :disabled="!isLoggedIn || isRiskBanned || staminaPurchaseSubmitting || (staminaCaptchaRequired && !staminaTurnstileToken)"
+              @click="handlePurchaseStaminaFull"
+          >
             确认购买体力
           </button>
         </div>

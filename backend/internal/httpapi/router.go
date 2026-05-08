@@ -116,6 +116,16 @@ type ChangePublisher interface {
 	PublishChange(context.Context, core.StateChange) error
 }
 
+// StaminaPurchaseTurnstile 负责购买体力的人机验证判定与校验。
+type StaminaPurchaseTurnstile interface {
+	CheckPurchaseStamina(context.Context, StaminaPurchaseTurnstileRequest) (StaminaPurchaseTurnstileResult, error)
+}
+
+// PlayerLoginTurnstile 负责玩家登录的人机验证判定与校验。
+type PlayerLoginTurnstile interface {
+	CheckPlayerLogin(context.Context, PlayerLoginTurnstileRequest) (PlayerLoginTurnstileResult, error)
+}
+
 // AdminBossHistoryReader 负责后台 Boss 历史分页读取，可选替换 Redis 默认读源。
 type AdminBossHistoryReader interface {
 	ListAdminBossHistoryPage(context.Context, int64, int64) (core.AdminBossHistoryPage, error)
@@ -193,6 +203,8 @@ type Options struct {
 	StateView                   StateView
 	Broadcaster                 Broadcaster
 	ChangePublisher             ChangePublisher
+	StaminaPurchaseTurnstile    StaminaPurchaseTurnstile
+	PlayerLoginTurnstile        PlayerLoginTurnstile
 	ClickGuard                  ClickGuard
 	RateLimitNicknameWhitelist  []string
 	AutoClick                   AutoClickController

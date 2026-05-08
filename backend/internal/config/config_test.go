@@ -63,6 +63,12 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               base_url: "https://llm.example.com/v1/"
               model: "gpt-test"
               timeout_ms: 15000
+            turnstile:
+              enabled: true
+              site_key: "site-key"
+              secret_key: "secret-key"
+              purchase_stamina_sample_rate: 0.5
+              verify_timeout_ms: 2500
             log:
               level: "debug"
               format: "console"
@@ -159,6 +165,21 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if cfg.LLM.Timeout != 15*time.Second {
 		t.Fatalf("expected llm timeout 15s, got %s", cfg.LLM.Timeout)
 	}
+	if !cfg.Turnstile.Enabled {
+		t.Fatal("expected turnstile enabled")
+	}
+	if cfg.Turnstile.SiteKey != "site-key" {
+		t.Fatalf("expected turnstile site key site-key, got %q", cfg.Turnstile.SiteKey)
+	}
+	if cfg.Turnstile.SecretKey != "secret-key" {
+		t.Fatalf("expected turnstile secret key secret-key, got %q", cfg.Turnstile.SecretKey)
+	}
+	if cfg.Turnstile.PurchaseStaminaSampleRate != 0.5 {
+		t.Fatalf("expected turnstile sample rate 0.5, got %v", cfg.Turnstile.PurchaseStaminaSampleRate)
+	}
+	if cfg.Turnstile.VerifyTimeoutMS != 2500 {
+		t.Fatalf("expected turnstile verify timeout 2500, got %d", cfg.Turnstile.VerifyTimeoutMS)
+	}
 	if cfg.Log.Level != "debug" {
 		t.Fatalf("expected log level debug, got %q", cfg.Log.Level)
 	}
@@ -225,6 +246,10 @@ func TestLoadDefaultsInvalidRoomCount(t *testing.T) {
             player_auth:
               jwt_secret: "player-secret"
               jwt_ttl_seconds: 604800
+            turnstile:
+              enabled: false
+              purchase_stamina_sample_rate: 0.5
+              verify_timeout_ms: 3000
             room:
               enabled: true
               count: 0
@@ -419,6 +444,11 @@ func validConfigForTest() Config {
 		PlayerAuth: PlayerAuthConfig{
 			JWTSecret: "player-secret",
 			JWTTTL:    7 * 24 * time.Hour,
+		},
+		Turnstile: TurnstileConfig{
+			Enabled:                   false,
+			PurchaseStaminaSampleRate: 0.5,
+			VerifyTimeoutMS:           3000,
 		},
 	}
 }

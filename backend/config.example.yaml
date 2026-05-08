@@ -45,6 +45,19 @@ llm:
   timeout_ms: 30000
 realtime:
   debounce_ms: 50
+# Cloudflare Turnstile 人机验证总开关。
+# false 表示关闭购买体力和登录验证码；true 时必须同时提供 site_key 和 secret_key。
+turnstile:
+  # 是否启用购买体力和登录的人机验证。
+  enabled: false
+  # 前端渲染 Turnstile 小组件使用的站点公钥。
+  site_key: ""
+  # 后端调用 siteverify 使用的服务端密钥，严禁写入日志。
+  secret_key: ""
+  # 购买体力命中验证的抽样概率，0.5 表示 50% 概率触发购买体力验证。
+  purchase_stamina_sample_rate: 0.5
+  # 后端调用 Cloudflare siteverify 的超时时间，建议 3000 毫秒。
+  verify_timeout_ms: 3000
 room:
   enabled: true
   count: 3

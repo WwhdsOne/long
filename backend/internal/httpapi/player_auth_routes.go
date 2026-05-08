@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
@@ -19,11 +20,48 @@ func registerPlayerAuthRoutes(router route.IRouter, options Options) {
 
 	router.POST("/api/player/auth/login", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
-			Nickname string `json:"nickname"`
-			Password string `json:"password"`
+			Nickname       string `json:"nickname"`
+			Password       string `json:"password"`
+			TurnstileToken string `json:"turnstileToken"`
 		}
 		if !bindJSON(c, &body, map[string]string{"error": "INVALID_REQUEST"}) {
 			return
+		}
+		if options.PlayerLoginTurnstile != nil {
+			turnstileResult, err := options.PlayerLoginTurnstile.CheckPlayerLogin(ctx, PlayerLoginTurnstileRequest{
+				Nickname: strings.TrimSpace(body.Nickname),
+				Token:    strings.TrimSpace(body.TurnstileToken),
+				RemoteIP: requestIP(c),
+			})
+			if err != nil {
+				writeJSON(c, consts.StatusServiceUnavailable, map[string]string{
+					"error":   "CAPTCHA_VERIFY_UNAVAILABLE",
+					"message": "验证服务暂时不可用，请稍后再试",
+				})
+				return
+			}
+			switch turnstileResult.Decision {
+			case PlayerLoginTurnstileAllow:
+			case PlayerLoginTurnstileRequire:
+				writeJSON(c, consts.StatusBadRequest, map[string]any{
+					"error":   "CAPTCHA_REQUIRED",
+					"message": "登录前需要先完成人机验证",
+					"siteKey": turnstileResult.SiteKey,
+				})
+				return
+			case PlayerLoginTurnstileInvalid:
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "CAPTCHA_INVALID",
+					"message": "验证失败，请重试",
+				})
+				return
+			default:
+				writeJSON(c, consts.StatusServiceUnavailable, map[string]string{
+					"error":   "CAPTCHA_VERIFY_UNAVAILABLE",
+					"message": "验证服务暂时不可用，请稍后再试",
+				})
+				return
+			}
 		}
 
 		token, nickname, err := options.PlayerAuthenticator.Login(ctx, body.Nickname, body.Password)

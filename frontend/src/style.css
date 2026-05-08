@@ -2796,6 +2796,48 @@ select {
     line-height: 1.55;
 }
 
+.shop-stamina-modal__desc--captcha {
+    color: #9f1239;
+    font-weight: 700;
+}
+
+.shop-turnstile-panel {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 241, 242, 0.88);
+    border: 1px solid rgba(225, 29, 72, 0.18);
+}
+
+.shop-turnstile-panel__widget {
+    min-height: 68px;
+    display: grid;
+    justify-content: start;
+}
+
+.login-modal__hint--captcha {
+    color: #9f1239;
+    font-weight: 700;
+}
+
+.login-turnstile-panel {
+    display: grid;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 241, 242, 0.88);
+    border: 1px solid rgba(225, 29, 72, 0.18);
+}
+
+.login-turnstile-panel__widget {
+    min-height: 68px;
+    display: grid;
+    justify-content: start;
+}
+
 .shop-stamina-modal__actions {
     display: flex;
     justify-content: flex-end;

@@ -84,6 +84,15 @@ type RealtimeConfig struct {
 	DebounceMs int
 }
 
+// TurnstileConfig 控制购买体力的人机验证。
+type TurnstileConfig struct {
+	Enabled                   bool
+	SiteKey                   string
+	SecretKey                 string
+	PurchaseStaminaSampleRate float64
+	VerifyTimeoutMS           int
+}
+
 // LogConfig 控制结构化日志输出行为。
 type LogConfig struct {
 	Level         string
@@ -122,6 +131,7 @@ type Config struct {
 	OSS         OSSConfig
 	LLM         LLMConfig
 	Realtime    RealtimeConfig
+	Turnstile   TurnstileConfig
 	Log         LogConfig
 	Mongo       MongoConfig
 	Archive     ArchiveConfig
@@ -186,6 +196,13 @@ type fileConfig struct {
 	Realtime struct {
 		DebounceMs int `yaml:"debounce_ms"`
 	} `yaml:"realtime"`
+	Turnstile struct {
+		Enabled                   bool    `yaml:"enabled"`
+		SiteKey                   string  `yaml:"site_key"`
+		SecretKey                 string  `yaml:"secret_key"`
+		PurchaseStaminaSampleRate float64 `yaml:"purchase_stamina_sample_rate"`
+		VerifyTimeoutMS           int     `yaml:"verify_timeout_ms"`
+	} `yaml:"turnstile"`
 	Room struct {
 		Enabled               bool   `yaml:"enabled"`
 		Count                 int    `yaml:"count"`
@@ -310,6 +327,13 @@ func loadFromConsul() (Config, consulSource, error) {
 		Realtime: RealtimeConfig{
 			DebounceMs: parsed.Realtime.DebounceMs,
 		},
+		Turnstile: TurnstileConfig{
+			Enabled:                   parsed.Turnstile.Enabled,
+			SiteKey:                   strings.TrimSpace(parsed.Turnstile.SiteKey),
+			SecretKey:                 strings.TrimSpace(parsed.Turnstile.SecretKey),
+			PurchaseStaminaSampleRate: parsed.Turnstile.PurchaseStaminaSampleRate,
+			VerifyTimeoutMS:           parsed.Turnstile.VerifyTimeoutMS,
+		},
 		Log: LogConfig{
 			Level:         normalizeLogLevel(parsed.Log.Level),
 			Format:        normalizeLogFormat(parsed.Log.Format),
@@ -334,6 +358,9 @@ func loadFromConsul() (Config, consulSource, error) {
 	}
 	if config.Realtime.DebounceMs <= 0 {
 		config.Realtime.DebounceMs = 50
+	}
+	if config.Turnstile.VerifyTimeoutMS <= 0 {
+		config.Turnstile.VerifyTimeoutMS = 3000
 	}
 	config.Room = normalizeRoomConfig(config.Room)
 
@@ -390,6 +417,14 @@ func validate(config Config) error {
 		return errors.New("llm.base_url is required when llm is enabled")
 	case config.LLM.Enabled && config.LLM.Timeout <= 0:
 		return errors.New("llm.timeout_ms must be greater than 0 when llm is enabled")
+	case config.Turnstile.Enabled && strings.TrimSpace(config.Turnstile.SiteKey) == "":
+		return errors.New("turnstile.site_key is required when turnstile is enabled")
+	case config.Turnstile.Enabled && strings.TrimSpace(config.Turnstile.SecretKey) == "":
+		return errors.New("turnstile.secret_key is required when turnstile is enabled")
+	case config.Turnstile.PurchaseStaminaSampleRate < 0 || config.Turnstile.PurchaseStaminaSampleRate > 1:
+		return errors.New("turnstile.purchase_stamina_sample_rate must be between 0 and 1")
+	case config.Turnstile.VerifyTimeoutMS <= 0:
+		return errors.New("turnstile.verify_timeout_ms must be greater than 0")
 	case config.Mongo.Enabled && strings.TrimSpace(config.Mongo.URI) == "":
 		return errors.New("mongo.uri is required when mongo is enabled")
 	case config.Mongo.Enabled && strings.TrimSpace(config.Mongo.Database) == "":

@@ -1,5 +1,5 @@
 <script setup>
-import {computed, ref} from 'vue'
+import {computed, nextTick, onBeforeUnmount, ref} from 'vue'
 import BattlePage from './BattlePage.vue'
 import ArmoryPage from './ArmoryPage.vue'
 import MessagesPage from './MessagesPage.vue'
@@ -9,6 +9,8 @@ import TalentsPage from './TalentsPage.vue'
 import {usePublicPageState} from './publicPageState'
 import {formatCompact} from '../utils/formatNumber.js'
 import wechatGroupImage from '../assets/community/wechat-group.png'
+
+let loginTurnstileScriptPromise = null
 
 const {
   publicPages,
@@ -35,6 +37,13 @@ const {
 registerPublicPageLifecycle()
 
 const loginModalOpen = ref(false)
+const loginSubmitting = ref(false)
+const loginCaptchaRequired = ref(false)
+const loginTurnstileSiteKey = ref('')
+const loginTurnstileToken = ref('')
+const loginTurnstileError = ref('')
+const loginTurnstileWidgetId = ref(null)
+const loginTurnstileContainer = ref(null)
 const armoryPageIDs = new Set(['resources', 'inventory', 'stats', 'loadout'])
 const isBattlePage = computed(() => currentPublicPage.value === 'battle')
 const myBattlePower = computed(() => (
@@ -50,22 +59,168 @@ function isArmoryPage(pageID) {
   return armoryPageIDs.has(pageID)
 }
 
+function ensureLoginTurnstileScript() {
+  if (window.turnstile) {
+    return Promise.resolve(window.turnstile)
+  }
+  if (loginTurnstileScriptPromise) {
+    return loginTurnstileScriptPromise
+  }
+  loginTurnstileScriptPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-turnstile-script="true"]')
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.turnstile), {once: true})
+      existing.addEventListener('error', () => reject(new Error('load failed')), {once: true})
+      return
+    }
+    const script = document.createElement('script')
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.dataset.turnstileScript = 'true'
+    script.onload = () => resolve(window.turnstile)
+    script.onerror = () => reject(new Error('load failed'))
+    document.head.appendChild(script)
+  })
+  return loginTurnstileScriptPromise
+}
+
+function clearLoginTurnstileState() {
+  loginCaptchaRequired.value = false
+  loginTurnstileSiteKey.value = ''
+  loginTurnstileToken.value = ''
+  loginTurnstileError.value = ''
+  if (window.turnstile && loginTurnstileWidgetId.value !== null) {
+    window.turnstile.remove?.(loginTurnstileWidgetId.value)
+  }
+  loginTurnstileWidgetId.value = null
+  if (loginTurnstileContainer.value) {
+    loginTurnstileContainer.value.innerHTML = ''
+  }
+}
+
+function resetLoginTurnstileWidget(message = '') {
+  loginTurnstileToken.value = ''
+  loginTurnstileError.value = message
+  if (window.turnstile && loginTurnstileWidgetId.value !== null) {
+    window.turnstile.reset(loginTurnstileWidgetId.value)
+  }
+}
+
+async function renderLoginTurnstile() {
+  if (!loginCaptchaRequired.value || !loginTurnstileSiteKey.value) {
+    return
+  }
+  await nextTick()
+  if (!loginTurnstileContainer.value) {
+    return
+  }
+  try {
+    const turnstile = await ensureLoginTurnstileScript()
+    if (!turnstile || !loginCaptchaRequired.value) {
+      return
+    }
+    if (loginTurnstileWidgetId.value !== null) {
+      turnstile.reset(loginTurnstileWidgetId.value)
+      return
+    }
+    loginTurnstileContainer.value.innerHTML = ''
+    loginTurnstileWidgetId.value = turnstile.render(loginTurnstileContainer.value, {
+      sitekey: loginTurnstileSiteKey.value,
+      callback: handleLoginCaptchaSuccess,
+      'expired-callback': handleLoginCaptchaExpired,
+      'error-callback': handleLoginCaptchaError,
+    })
+  } catch {
+    loginTurnstileError.value = '验证服务暂时不可用，请稍后再试'
+  }
+}
+
+async function submitNicknameWithCaptcha(turnstileToken = '') {
+  if (loginSubmitting.value) {
+    return
+  }
+  if (loginCaptchaRequired.value && !turnstileToken) {
+    loginTurnstileError.value = '登录前需要先完成人机验证'
+    return
+  }
+
+  loginSubmitting.value = true
+  const result = await submitNickname(turnstileToken)
+  loginSubmitting.value = false
+
+  if (result?.ok) {
+    clearLoginTurnstileState()
+    loginModalOpen.value = false
+    errorMessage.value = ''
+    return
+  }
+
+  if (result?.errorCode === 'CAPTCHA_REQUIRED') {
+    if (!result.siteKey) {
+      loginTurnstileError.value = '验证服务暂时不可用，请稍后再试'
+      return
+    }
+    loginCaptchaRequired.value = true
+    loginTurnstileSiteKey.value = result.siteKey
+    loginTurnstileToken.value = ''
+    loginTurnstileError.value = '登录前需要先完成人机验证'
+    await renderLoginTurnstile()
+    return
+  }
+
+  if (result?.errorCode === 'CAPTCHA_INVALID') {
+    resetLoginTurnstileWidget('验证失败，请重试')
+    return
+  }
+
+  if (result?.errorCode === 'CAPTCHA_VERIFY_UNAVAILABLE') {
+    resetLoginTurnstileWidget('验证服务暂时不可用，请稍后再试')
+    return
+  }
+
+  if (loginCaptchaRequired.value) {
+    resetLoginTurnstileWidget('')
+  }
+}
+
 async function handleAuthClick() {
   if (isLoggedIn.value) {
     await resetNickname()
   } else {
     loginModalOpen.value = true
     errorMessage.value = ''
+    clearLoginTurnstileState()
   }
 }
 
 async function handleLoginSubmit() {
-  await submitNickname()
-  if (nickname.value) {
-    loginModalOpen.value = false
-    errorMessage.value = ''
-  }
+  await submitNicknameWithCaptcha(loginTurnstileToken.value)
 }
+
+function closeLoginModal() {
+  clearLoginTurnstileState()
+  errorMessage.value = ''
+  loginModalOpen.value = false
+}
+
+async function handleLoginCaptchaSuccess(token) {
+  loginTurnstileToken.value = token
+  loginTurnstileError.value = ''
+  await submitNicknameWithCaptcha(token)
+}
+
+function handleLoginCaptchaExpired() {
+  resetLoginTurnstileWidget('验证已过期，请重新验证')
+}
+
+function handleLoginCaptchaError() {
+  resetLoginTurnstileWidget('验证失败，请重试')
+}
+
+onBeforeUnmount(() => {
+  clearLoginTurnstileState()
+})
 </script>
 
 <template>
@@ -150,7 +305,7 @@ async function handleLoginSubmit() {
 
 
     <section v-if="loginModalOpen" class="login-modal" aria-label="登录">
-      <div class="login-modal__backdrop" @click="loginModalOpen = false"></div>
+      <div class="login-modal__backdrop" @click="closeLoginModal"></div>
       <div class="login-modal__card">
         <div class="login-modal__header">
           <p class="vote-stage__eyebrow">账号</p>
@@ -172,10 +327,15 @@ async function handleLoginSubmit() {
               type="password"
               placeholder="输入密码"
           />
-          <button class="nickname-form__submit" type="submit">
+          <div v-if="loginCaptchaRequired" class="login-turnstile-panel">
+            <p class="login-modal__hint login-modal__hint--captcha">登录前需要先完成人机验证</p>
+            <div ref="loginTurnstileContainer" class="login-turnstile-panel__widget"></div>
+          </div>
+          <button class="nickname-form__submit" type="submit" :disabled="loginSubmitting || (loginCaptchaRequired && !loginTurnstileToken)">
             登录 / 首次认领
           </button>
         </form>
+        <p v-if="loginTurnstileError" class="feedback">{{ loginTurnstileError }}</p>
         <p v-if="errorMessage" class="feedback">{{ errorMessage }}</p>
       </div>
     </section>
