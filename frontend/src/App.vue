@@ -1,17 +1,23 @@
 <script setup>
-import AdminPage from './pages/AdminPage.vue'
-import BattleFxGalleryPage from './pages/BattleFxGalleryPage.vue'
-import PublicPage from './pages/PublicPage.vue'
-import TalentBuffDemoPage from './pages/TalentBuffDemoPage.vue'
+import {defineAsyncComponent} from 'vue'
+
+const pageMap = {
+    admin: () => import('./pages/AdminPage.vue'),
+    battleFxGallery: () => import('./pages/BattleFxGalleryPage.vue'),
+    talentBuffDemo: () => import('./pages/TalentBuffDemoPage.vue'),
+    public: () => import('./pages/PublicPage.vue'),
+}
 
 const currentPath = window.location.pathname
-const currentView = currentPath.startsWith('/admin')
-    ? AdminPage
+const pageKey = currentPath.startsWith('/admin')
+    ? 'admin'
     : currentPath.startsWith('/internal/battle-fx-gallery')
-        ? BattleFxGalleryPage
+        ? 'battleFxGallery'
         : currentPath.startsWith('/__talent-buff-demo')
-            ? TalentBuffDemoPage
-            : PublicPage
+            ? 'talentBuffDemo'
+            : 'public'
+
+const currentView = defineAsyncComponent(pageMap[pageKey])
 </script>
 
 <template>
