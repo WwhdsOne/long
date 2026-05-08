@@ -1617,7 +1617,7 @@ const silverStormActive = computed(() => {
       </div>
       <div class="stamina-float__tooltip">
         <span>{{ staminaTooltipText }}</span>
-        <span>1 点体力 = 100 次点击</span>
+        <span>1 点体力 = 50 次点击</span>
         <span v-if="recoveredStamina <= 0">手点伤害固定为 1</span>
         <span>挂机伤害不受体力系统限制</span>
         <span v-if="isStaminaRiskBanned">账号异常，当前不可手点/挂机/购买体力</span>

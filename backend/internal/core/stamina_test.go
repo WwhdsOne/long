@@ -20,7 +20,7 @@ func TestClickButtonConsumesStaminaAndLocksDamageAfterExhausted(t *testing.T) {
 
 	seedActiveBossForStaminaTest(t, store, ctx, "1")
 
-	for i := range 5000 {
+	for i := range 2500 {
 		result, err := store.ClickButton(ctx, "boss-part:1-0", nickname, 0)
 		if err != nil {
 			t.Fatalf("click %d failed: %v", i+1, err)
@@ -35,7 +35,7 @@ func TestClickButtonConsumesStaminaAndLocksDamageAfterExhausted(t *testing.T) {
 		t.Fatalf("get user state after exhausting stamina: %v", err)
 	}
 	if state.Stamina.Current != 0 {
-		t.Fatalf("expected stamina to be 0 after 5000 clicks, got %+v", state.Stamina)
+		t.Fatalf("expected stamina to be 0 after 2500 clicks, got %+v", state.Stamina)
 	}
 
 	result, err := store.ClickButton(ctx, "boss-part:1-0", nickname, 0)
