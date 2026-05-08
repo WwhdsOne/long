@@ -49,9 +49,21 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
     })
 
     it('强化预期中的比例属性按真实百分比展示', () => {
-        expect(pageSource).toContain("pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatCritDamageBonus)")
+        expect(pageSource).toContain('function formatCritDamageExtraBonus(value) {')
+        expect(pageSource).toContain('return `+${formatTrimmedNumber(Number(value ?? 0) * 100, 2)}%`')
+        expect(pageSource).toContain("pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatCritDamageExtraBonus)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatRatioPercentValue)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatRatioPercentValue)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatRatioPercentValue)")
+    })
+
+    it('一键分解预估与规则文案同步保留每种装备一件最高强化', () => {
+        expect(pageSource).toContain('const groupedCandidates = new Map()')
+        expect(pageSource).toContain('excludedKeptHighest += 1')
+        expect(pageSource).toContain("keepCandidates.sort((left, right) => left.instanceId.localeCompare(right.instanceId))")
+        expect(pageSource).toContain('即将分解 {{ bulkSalvageConfirmData.total }} 件装备')
+        expect(pageSource).toContain('按规则保留 {{ bulkSalvageConfirmData.excludedKeptHighest }} 件')
+        expect(pageSource).toContain('一键分解会按 itemId 分组，每种装备保留 1 件最高强化。')
+        expect(pageSource).toContain('若最高强化并列，则随机保留其中 1 件。')
     })
 })

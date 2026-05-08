@@ -74,6 +74,10 @@ function formatCritDamageBonus(value) {
   return `+${formatTrimmedNumber((Number(value ?? 0) - 1) * 100, 2)}%`
 }
 
+function formatCritDamageExtraBonus(value) {
+  return `+${formatTrimmedNumber(Number(value ?? 0) * 100, 2)}%`
+}
+
 function formatArmorPenPercent(value) {
   return formatRatioPercentValue(value)
 }
@@ -186,11 +190,40 @@ function salvagePreview(item) {
 
 function estimateBulkSalvage() {
   const candidates = inventory.value.filter((item) => !item.equipped && !item.locked && String(item.rarity || '').trim() !== '至臻')
+  const groupedCandidates = new Map()
+  for (const item of candidates) {
+    const itemID = String(item.itemId || '').trim()
+    const key = itemID || String(item.instanceId || '').trim()
+    const existing = groupedCandidates.get(key) || []
+    existing.push(item)
+    groupedCandidates.set(key, existing)
+  }
+
+  const salvageableCandidates = []
+  let excludedKeptHighest = 0
+  for (const groupedItems of groupedCandidates.values()) {
+    if (groupedItems.length <= 1) {
+      excludedKeptHighest += groupedItems.length
+      continue
+    }
+
+    const highestEnhanceLevel = Math.max(...groupedItems.map((item) => Number(item.enhanceLevel || 0)))
+    const keepCandidates = groupedItems.filter((item) => Number(item.enhanceLevel || 0) === highestEnhanceLevel)
+    keepCandidates.sort((left, right) => left.instanceId.localeCompare(right.instanceId))
+    const keepItem = keepCandidates[0]
+
+    for (const item of groupedItems) {
+      if (item.instanceId === keepItem.instanceId) continue
+      salvageableCandidates.push(item)
+    }
+    excludedKeptHighest += 1
+  }
+
   const byRarity = {}
   let gold = 0
   let stones = 0
   let hasEnhanced = false
-  for (const item of candidates) {
+  for (const item of salvageableCandidates) {
     const rarity = String(item.rarity || '').trim() || '普通'
     const reward = salvageBaseReward(rarity)
     gold += reward.gold
@@ -201,11 +234,12 @@ function estimateBulkSalvage() {
     }
   }
   return {
-    total: candidates.length,
+    total: salvageableCandidates.length,
     byRarity,
     gold,
     stones,
     hasEnhanced,
+    excludedKeptHighest,
     excludedEquipped: inventory.value.filter((item) => item.equipped).length,
     excludedLocked: inventory.value.filter((item) => item.locked).length,
     excludedTopRarity: inventory.value.filter((item) => String(item.rarity || '').trim() === '至臻').length,
@@ -415,7 +449,7 @@ const enhancePreviewStatRows = computed(() => {
   pushEnhancePreviewRow(rows, '攻击力', item.attackPower, preview.attackPower, (value) => formatNumber(value))
   pushEnhancePreviewRow(rows, '护甲穿透', item.armorPenPercent, preview.armorPenPercent, formatArmorPenPercent)
   pushEnhancePreviewRow(rows, '暴击率', item.critRate, preview.critRate, formatRatioPercentValue)
-  pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatCritDamageBonus)
+  pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatCritDamageExtraBonus)
   pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatRatioPercentValue)
   pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatRatioPercentValue)
   pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatRatioPercentValue)
@@ -736,7 +770,7 @@ onBeforeUnmount(() => {
         <div class="boss-drop-modal__head">
           <div>
             <p class="vote-stage__eyebrow">一键分解确认</p>
-            <strong>即将分解 {{ bulkSalvageConfirmData.total }} 件未穿戴装备</strong>
+            <strong>即将分解 {{ bulkSalvageConfirmData.total }} 件装备</strong>
           </div>
           <button class="nickname-form__ghost" type="button" @click="cancelBulkSalvage">关闭</button>
         </div>
@@ -745,7 +779,7 @@ onBeforeUnmount(() => {
           <p>预计强化石：{{ bulkSalvageConfirmData.stones }}</p>
           <p v-if="bulkSalvageConfirmData.hasEnhanced">已强化装备会额外返还 60% 已消耗强化石（向下取整）。</p>
           <p>自动排除：穿戴中 {{ bulkSalvageConfirmData.excludedEquipped }} 件、已锁定
-            {{ bulkSalvageConfirmData.excludedLocked }} 件、至臻 {{ bulkSalvageConfirmData.excludedTopRarity }} 件。</p>
+            {{ bulkSalvageConfirmData.excludedLocked }} 件、至臻 {{ bulkSalvageConfirmData.excludedTopRarity }} 件、按规则保留 {{ bulkSalvageConfirmData.excludedKeptHighest }} 件。</p>
           <p v-if="Object.keys(bulkSalvageConfirmData.byRarity).length > 0">
             分解明细：
             <span v-for="(count, rarity) in bulkSalvageConfirmData.byRarity" :key="rarity">
@@ -775,9 +809,10 @@ onBeforeUnmount(() => {
         </div>
         <div class="leaderboard-list" style="line-height: 1.4; margin: 10px 0;">
           <p style="margin: 4px 0;">1. 一键分解仅处理未穿戴、未锁定、且非至臻装备。</p>
-          <p style="margin: 4px 0;">2. 至臻装备默认不参与一键分解。</p>
-          <p style="margin: 4px 0;">3. 已强化装备会额外返还 60% 已消耗强化石（向下取整）。</p>
-          <p style="margin: 8px 0 6px;">4. 分解基础收益：</p>
+          <p style="margin: 4px 0;">2. 一键分解会按 itemId 分组，每种装备保留 1 件最高强化。</p>
+          <p style="margin: 4px 0;">3. 若最高强化并列，则随机保留其中 1 件。</p>
+          <p style="margin: 4px 0;">4. 已强化装备会额外返还 60% 已消耗强化石（向下取整）。</p>
+          <p style="margin: 8px 0 6px;">5. 分解基础收益：</p>
 
           <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
             <thead>

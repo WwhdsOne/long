@@ -81,25 +81,102 @@ func TestBulkSalvageUnequippedSkipsProtectedItems(t *testing.T) {
 		t.Fatalf("bulk salvage: %v", err)
 	}
 
-	if result.SalvagedCount != 1 || result.ExcludedEquipped != 1 || result.ExcludedLocked != 1 || result.ExcludedTopRarity != 1 {
+	if result.SalvagedCount != 0 || result.ExcludedEquipped != 1 || result.ExcludedLocked != 1 || result.ExcludedTopRarity != 1 {
 		t.Fatalf("unexpected bulk salvage summary: %+v", result)
 	}
-	if result.GoldReward != 500 || result.StoneReward != 1 || result.RefundedStones != 2 {
+	if result.GoldReward != 0 || result.StoneReward != 0 || result.RefundedStones != 0 {
 		t.Fatalf("unexpected bulk salvage rewards: %+v", result)
 	}
-	if result.Gold != 500 || result.Stones != 3 {
-		t.Fatalf("expected resources after bulk salvage gold=500 stones=3, got %+v", result)
+	if result.Gold != 0 || result.Stones != 0 {
+		t.Fatalf("expected resources unchanged after bulk salvage, got %+v", result)
 	}
 
 	remainingIDs, err := store.client.SMembers(ctx, store.playerInstancesKey(nickname)).Result()
 	if err != nil {
 		t.Fatalf("list remaining instances: %v", err)
 	}
-	if len(remainingIDs) != 3 {
-		t.Fatalf("expected 3 remaining instances, got %v", remainingIDs)
+	if len(remainingIDs) != 4 {
+		t.Fatalf("expected 4 remaining instances, got %v", remainingIDs)
 	}
-	if !containsString(remainingIDs, equippedID) || !containsString(remainingIDs, lockedID) || !containsString(remainingIDs, perfectID) {
-		t.Fatalf("expected equipped/locked/top rarity instances kept, got %v", remainingIDs)
+	if !containsString(remainingIDs, equippedID) || !containsString(remainingIDs, lockedID) || !containsString(remainingIDs, perfectID) || !containsString(remainingIDs, salvageID) {
+		t.Fatalf("expected equipped/locked/top rarity/single candidate instances kept, got %v", remainingIDs)
+	}
+}
+
+func TestBulkSalvageUnequippedKeepsHighestEnhancedPerItem(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	seedEquipmentDefinitionWithRarity(t, store, ctx, "rare-sword", "weapon", "稀有", 20)
+	seedEquipmentDefinitionWithRarity(t, store, ctx, "epic-armor", "chest", "史诗", 30)
+
+	lowID := seedOwnedInstance(t, store, ctx, nickname, "rare-sword")
+	highAID := seedOwnedInstance(t, store, ctx, nickname, "rare-sword")
+	highBID := seedOwnedInstance(t, store, ctx, nickname, "rare-sword")
+	otherSingleID := seedOwnedInstance(t, store, ctx, nickname, "epic-armor")
+
+	if err := store.client.HSet(ctx, store.equipmentInstanceKey(lowID), map[string]any{
+		"enhance_level": "1",
+		"spent_stones":  "3",
+	}).Err(); err != nil {
+		t.Fatalf("seed low enhance instance: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.equipmentInstanceKey(highAID), map[string]any{
+		"enhance_level": "4",
+		"spent_stones":  "12",
+	}).Err(); err != nil {
+		t.Fatalf("seed high enhance instance a: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.equipmentInstanceKey(highBID), map[string]any{
+		"enhance_level": "4",
+		"spent_stones":  "12",
+	}).Err(); err != nil {
+		t.Fatalf("seed high enhance instance b: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.equipmentInstanceKey(otherSingleID), map[string]any{
+		"enhance_level": "2",
+		"spent_stones":  "5",
+	}).Err(); err != nil {
+		t.Fatalf("seed single instance: %v", err)
+	}
+
+	result, err := store.BulkSalvageUnequipped(ctx, nickname)
+	if err != nil {
+		t.Fatalf("bulk salvage: %v", err)
+	}
+
+	if result.SalvagedCount != 2 {
+		t.Fatalf("expected two rare swords salvaged, got %+v", result)
+	}
+	if result.GoldReward != 1000 || result.StoneReward != 2 || result.RefundedStones != 8 {
+		t.Fatalf("unexpected bulk salvage rewards: %+v", result)
+	}
+
+	remainingIDs, err := store.client.SMembers(ctx, store.playerInstancesKey(nickname)).Result()
+	if err != nil {
+		t.Fatalf("list remaining instances: %v", err)
+	}
+	if len(remainingIDs) != 2 {
+		t.Fatalf("expected 2 remaining instances, got %v", remainingIDs)
+	}
+	if containsString(remainingIDs, lowID) {
+		t.Fatalf("expected lowest enhanced rare sword salvaged, got %v", remainingIDs)
+	}
+	if !containsString(remainingIDs, otherSingleID) {
+		t.Fatalf("expected single epic armor kept, got %v", remainingIDs)
+	}
+
+	keptHighCount := 0
+	if containsString(remainingIDs, highAID) {
+		keptHighCount++
+	}
+	if containsString(remainingIDs, highBID) {
+		keptHighCount++
+	}
+	if keptHighCount != 1 {
+		t.Fatalf("expected one random highest-enhanced rare sword kept, got %v", remainingIDs)
 	}
 }
 

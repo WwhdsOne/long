@@ -1410,6 +1410,7 @@ func (s *Store) BulkSalvageUnequipped(ctx context.Context, nickname string) (Bul
 		SalvagedByRarity: map[string]int{},
 	}
 	candidates := make([]salvageCandidate, 0, len(instances))
+	candidatesByItemID := make(map[string][]salvageCandidate, len(instances))
 	for _, instance := range instances {
 		if equipped[instance.InstanceID] != "" {
 			result.ExcludedEquipped++
@@ -1431,11 +1432,44 @@ func (s *Store) BulkSalvageUnequipped(ctx context.Context, nickname string) (Bul
 			continue
 		}
 
-		candidates = append(candidates, salvageCandidate{
+		candidate := salvageCandidate{
 			instance: instance,
 			slot:     definition.Slot,
 			rarity:   rarity,
-		})
+		}
+		candidatesByItemID[instance.ItemID] = append(candidatesByItemID[instance.ItemID], candidate)
+	}
+
+	for _, groupedCandidates := range candidatesByItemID {
+		if len(groupedCandidates) <= 1 {
+			continue
+		}
+
+		keepIndex := 0
+		highestEnhanceLevel := groupedCandidates[0].instance.EnhanceLevel
+		tiedIndexes := []int{0}
+		for i := 1; i < len(groupedCandidates); i++ {
+			enhanceLevel := groupedCandidates[i].instance.EnhanceLevel
+			switch {
+			case enhanceLevel > highestEnhanceLevel:
+				highestEnhanceLevel = enhanceLevel
+				tiedIndexes = []int{i}
+			case enhanceLevel == highestEnhanceLevel:
+				tiedIndexes = append(tiedIndexes, i)
+			}
+		}
+		if len(tiedIndexes) > 1 {
+			keepIndex = tiedIndexes[rand.IntN(len(tiedIndexes))]
+		} else {
+			keepIndex = tiedIndexes[0]
+		}
+
+		for i, candidate := range groupedCandidates {
+			if i == keepIndex {
+				continue
+			}
+			candidates = append(candidates, candidate)
+		}
 	}
 
 	if len(candidates) == 0 {
