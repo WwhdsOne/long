@@ -1,0 +1,88 @@
+{
+  "name": "talent-magic_ultimate",
+  "size": [
+    48,
+    48
+  ],
+  "constraints": {
+    "maxPixels": 15,
+    "allowAlpha": false
+  },
+  "pixels": [
+    {
+      "x": 24,
+      "y": 6,
+      "color": "#dbeafe"
+    },
+    {
+      "x": 20,
+      "y": 12,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 28,
+      "y": 12,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 16,
+      "y": 18,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 32,
+      "y": 18,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 14,
+      "y": 24,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 34,
+      "y": 24,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 16,
+      "y": 30,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 32,
+      "y": 30,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 20,
+      "y": 36,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 28,
+      "y": 36,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 24,
+      "y": 42,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 22,
+      "y": 22,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 26,
+      "y": 22,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 24,
+      "y": 27,
+      "color": "#dbeafe"
+    }
+  ]
+}

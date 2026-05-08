@@ -47,4 +47,11 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
         expect(stateSource).toContain('async function enhanceItem(instanceId, levels = 1)')
         expect(stateSource).toContain('JSON.stringify({nickname: nickname.value, levels})')
     })
+
+    it('强化预期中的比例属性按真实百分比展示', () => {
+        expect(pageSource).toContain("pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatCritDamageBonus)")
+        expect(pageSource).toContain("pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatRatioPercentValue)")
+        expect(pageSource).toContain("pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatRatioPercentValue)")
+        expect(pageSource).toContain("pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatRatioPercentValue)")
+    })
 })

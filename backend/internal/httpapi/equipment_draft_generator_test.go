@@ -40,7 +40,7 @@ func TestOpenAIEquipmentDraftGeneratorCallsChatCompletions(t *testing.T) {
 		_, _ = w.Write([]byte(`{
 			"choices": [{
 				"message": {
-					"content": "{\"itemId\":\"soft-blade\",\"name\":\"软组织切割刃\",\"slot\":\"weapon\",\"rarity\":\"史诗\",\"description\":\"测试描述\",\"attackPower\":150,\"armorPenPercent\":0.4,\"critDamageMultiplier\":1.0,\"partTypeDamageSoft\":0.2,\"partTypeDamageHeavy\":0.2,\"partTypeDamageWeak\":0.2,\"talentAffinity\":\"normal\"}"
+					"content": "{\"itemId\":\"soft-blade\",\"name\":\"软组织切割刃\",\"slot\":\"weapon\",\"rarity\":\"史诗\",\"attackPower\":150,\"armorPenPercent\":0.4,\"critRate\":0.08,\"critDamageMultiplier\":1.0,\"partTypeDamageSoft\":0.2,\"partTypeDamageHeavy\":0.2,\"partTypeDamageWeak\":0.2,\"magicProcRateBonus\":0.015,\"magicDamageBonus\":0.25}"
 				}
 			}]
 		}`))
@@ -58,7 +58,7 @@ func TestOpenAIEquipmentDraftGeneratorCallsChatCompletions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate equipment draft: %v", err)
 	}
-	if draft.ItemID != "soft-blade" || draft.Slot != "weapon" || draft.TalentAffinity != "normal" {
+	if draft.ItemID != "soft-blade" || draft.Slot != "weapon" || draft.MagicDamageBonus != 0.25 {
 		t.Fatalf("unexpected draft: %+v", draft)
 	}
 }
@@ -69,7 +69,7 @@ func TestOpenAIEquipmentDraftGeneratorReturnsRawResponseOnInvalidDraft(t *testin
 		_, _ = w.Write([]byte(`{
 			"choices": [{
 				"message": {
-					"content": "{\"itemId\":\"bad-blade\",\"name\":\"坏刀\",\"slot\":\"weapon\",\"rarity\":\"史诗\",\"description\":\"测试描述\",\"attackPower\":150,\"armorPenPercent\":0.95,\"critDamageMultiplier\":1.0,\"partTypeDamageSoft\":0.2,\"partTypeDamageHeavy\":0.2,\"partTypeDamageWeak\":0.2,\"talentAffinity\":\"normal\"}"
+					"content": "{\"itemId\":\"bad-blade\",\"name\":\"坏刀\",\"slot\":\"weapon\",\"rarity\":\"史诗\",\"attackPower\":150,\"armorPenPercent\":0.95,\"critRate\":0.08,\"critDamageMultiplier\":1.0,\"partTypeDamageSoft\":0.2,\"partTypeDamageHeavy\":0.2,\"partTypeDamageWeak\":0.2}"
 				}
 			}]
 		}`))
@@ -109,12 +109,13 @@ func TestOpenAIEquipmentDraftGeneratorRejectsForbiddenField(t *testing.T) {
 		"imageAlt":"",
 		"attackPower":8,
 		"armorPenPercent":0.1,
+		"critRate":0.03,
 		"critDamageMultiplier":1.2,
-		"bossDamagePercent":0.05,
 		"partTypeDamageSoft":0,
 		"partTypeDamageHeavy":0,
 		"partTypeDamageWeak":0,
-		"talentAffinity":"armor",
+		"magicProcRateBonus":0.01,
+		"magicDamageBonus":0.15,
 		"attackSpeed":1.5
 	}`))
 	if err == nil {
@@ -132,12 +133,11 @@ func TestOpenAIEquipmentDraftGeneratorRejectsArmorPenOverflow(t *testing.T) {
 		"imageAlt":"",
 		"attackPower":10,
 		"armorPenPercent":0.81,
+		"critRate":0.04,
 		"critDamageMultiplier":1.2,
-		"bossDamagePercent":0.05,
 		"partTypeDamageSoft":0,
 		"partTypeDamageHeavy":0,
-		"partTypeDamageWeak":0,
-		"talentAffinity":"armor"
+		"partTypeDamageWeak":0
 	}`))
 	if err == nil {
 		t.Fatal("expected armorPenPercent overflow to be rejected")

@@ -6534,6 +6534,8 @@ export const realtime = $root.realtime = (() => {
          * @property {number|null} [partTypeDamageSoft] InventoryItem partTypeDamageSoft
          * @property {number|null} [partTypeDamageHeavy] InventoryItem partTypeDamageHeavy
          * @property {number|null} [partTypeDamageWeak] InventoryItem partTypeDamageWeak
+         * @property {number|null} [magicProcRateBonus] InventoryItem magicProcRateBonus
+         * @property {number|null} [magicDamageBonus] InventoryItem magicDamageBonus
          */
 
         /**
@@ -6704,6 +6706,22 @@ export const realtime = $root.realtime = (() => {
         InventoryItem.prototype.partTypeDamageWeak = 0;
 
         /**
+         * InventoryItem magicProcRateBonus.
+         * @member {number} magicProcRateBonus
+         * @memberof realtime.InventoryItem
+         * @instance
+         */
+        InventoryItem.prototype.magicProcRateBonus = 0;
+
+        /**
+         * InventoryItem magicDamageBonus.
+         * @member {number} magicDamageBonus
+         * @memberof realtime.InventoryItem
+         * @instance
+         */
+        InventoryItem.prototype.magicDamageBonus = 0;
+
+        /**
          * Creates a new InventoryItem instance using the specified properties.
          * @function create
          * @memberof realtime.InventoryItem
@@ -6765,6 +6783,10 @@ export const realtime = $root.realtime = (() => {
                 writer.uint32(/* id 18, wireType 1 =*/145).double(message.partTypeDamageHeavy);
             if (message.partTypeDamageWeak != null && Object.hasOwnProperty.call(message, "partTypeDamageWeak"))
                 writer.uint32(/* id 19, wireType 1 =*/153).double(message.partTypeDamageWeak);
+            if (message.magicProcRateBonus != null && Object.hasOwnProperty.call(message, "magicProcRateBonus"))
+                writer.uint32(/* id 20, wireType 1 =*/161).double(message.magicProcRateBonus);
+            if (message.magicDamageBonus != null && Object.hasOwnProperty.call(message, "magicDamageBonus"))
+                writer.uint32(/* id 21, wireType 1 =*/169).double(message.magicDamageBonus);
             return writer;
         };
 
@@ -6881,6 +6903,14 @@ export const realtime = $root.realtime = (() => {
                         message.partTypeDamageWeak = reader.double();
                         break;
                     }
+                case 20: {
+                        message.magicProcRateBonus = reader.double();
+                        break;
+                    }
+                case 21: {
+                        message.magicDamageBonus = reader.double();
+                        break;
+                    }
                 default:
                     reader.skipType(tag & 7, long);
                     break;
@@ -6977,6 +7007,12 @@ export const realtime = $root.realtime = (() => {
             if (message.partTypeDamageWeak != null && message.hasOwnProperty("partTypeDamageWeak"))
                 if (typeof message.partTypeDamageWeak !== "number")
                     return "partTypeDamageWeak: number expected";
+            if (message.magicProcRateBonus != null && message.hasOwnProperty("magicProcRateBonus"))
+                if (typeof message.magicProcRateBonus !== "number")
+                    return "magicProcRateBonus: number expected";
+            if (message.magicDamageBonus != null && message.hasOwnProperty("magicDamageBonus"))
+                if (typeof message.magicDamageBonus !== "number")
+                    return "magicDamageBonus: number expected";
             return null;
         };
 
@@ -7048,6 +7084,10 @@ export const realtime = $root.realtime = (() => {
                 message.partTypeDamageHeavy = Number(object.partTypeDamageHeavy);
             if (object.partTypeDamageWeak != null)
                 message.partTypeDamageWeak = Number(object.partTypeDamageWeak);
+            if (object.magicProcRateBonus != null)
+                message.magicProcRateBonus = Number(object.magicProcRateBonus);
+            if (object.magicDamageBonus != null)
+                message.magicDamageBonus = Number(object.magicDamageBonus);
             return message;
         };
 
@@ -7092,6 +7132,8 @@ export const realtime = $root.realtime = (() => {
                 object.partTypeDamageSoft = 0;
                 object.partTypeDamageHeavy = 0;
                 object.partTypeDamageWeak = 0;
+                object.magicProcRateBonus = 0;
+                object.magicDamageBonus = 0;
             }
             if (message.itemId != null && message.hasOwnProperty("itemId"))
                 object.itemId = message.itemId;
@@ -7137,6 +7179,10 @@ export const realtime = $root.realtime = (() => {
                 object.partTypeDamageHeavy = options.json && !isFinite(message.partTypeDamageHeavy) ? String(message.partTypeDamageHeavy) : message.partTypeDamageHeavy;
             if (message.partTypeDamageWeak != null && message.hasOwnProperty("partTypeDamageWeak"))
                 object.partTypeDamageWeak = options.json && !isFinite(message.partTypeDamageWeak) ? String(message.partTypeDamageWeak) : message.partTypeDamageWeak;
+            if (message.magicProcRateBonus != null && message.hasOwnProperty("magicProcRateBonus"))
+                object.magicProcRateBonus = options.json && !isFinite(message.magicProcRateBonus) ? String(message.magicProcRateBonus) : message.magicProcRateBonus;
+            if (message.magicDamageBonus != null && message.hasOwnProperty("magicDamageBonus"))
+                object.magicDamageBonus = options.json && !isFinite(message.magicDamageBonus) ? String(message.magicDamageBonus) : message.magicDamageBonus;
             return object;
         };
 
@@ -7552,6 +7598,8 @@ export const realtime = $root.realtime = (() => {
          * @property {number|null} [perPartDamagePercent] CombatStats perPartDamagePercent
          * @property {number|null} [lowHpMultiplier] CombatStats lowHpMultiplier
          * @property {number|null} [lowHpThreshold] CombatStats lowHpThreshold
+         * @property {number|null} [magicProcRate] CombatStats magicProcRate
+         * @property {number|null} [magicDamageMultiplier] CombatStats magicDamageMultiplier
          */
 
         /**
@@ -7682,6 +7730,22 @@ export const realtime = $root.realtime = (() => {
         CombatStats.prototype.lowHpThreshold = 0;
 
         /**
+         * CombatStats magicProcRate.
+         * @member {number} magicProcRate
+         * @memberof realtime.CombatStats
+         * @instance
+         */
+        CombatStats.prototype.magicProcRate = 0;
+
+        /**
+         * CombatStats magicDamageMultiplier.
+         * @member {number} magicDamageMultiplier
+         * @memberof realtime.CombatStats
+         * @instance
+         */
+        CombatStats.prototype.magicDamageMultiplier = 0;
+
+        /**
          * Creates a new CombatStats instance using the specified properties.
          * @function create
          * @memberof realtime.CombatStats
@@ -7733,6 +7797,10 @@ export const realtime = $root.realtime = (() => {
                 writer.uint32(/* id 13, wireType 1 =*/105).double(message.lowHpMultiplier);
             if (message.lowHpThreshold != null && Object.hasOwnProperty.call(message, "lowHpThreshold"))
                 writer.uint32(/* id 14, wireType 1 =*/113).double(message.lowHpThreshold);
+            if (message.magicProcRate != null && Object.hasOwnProperty.call(message, "magicProcRate"))
+                writer.uint32(/* id 15, wireType 1 =*/121).double(message.magicProcRate);
+            if (message.magicDamageMultiplier != null && Object.hasOwnProperty.call(message, "magicDamageMultiplier"))
+                writer.uint32(/* id 16, wireType 1 =*/129).double(message.magicDamageMultiplier);
             return writer;
         };
 
@@ -7829,6 +7897,14 @@ export const realtime = $root.realtime = (() => {
                         message.lowHpThreshold = reader.double();
                         break;
                     }
+                case 15: {
+                        message.magicProcRate = reader.double();
+                        break;
+                    }
+                case 16: {
+                        message.magicDamageMultiplier = reader.double();
+                        break;
+                    }
                 default:
                     reader.skipType(tag & 7, long);
                     break;
@@ -7910,6 +7986,12 @@ export const realtime = $root.realtime = (() => {
             if (message.lowHpThreshold != null && message.hasOwnProperty("lowHpThreshold"))
                 if (typeof message.lowHpThreshold !== "number")
                     return "lowHpThreshold: number expected";
+            if (message.magicProcRate != null && message.hasOwnProperty("magicProcRate"))
+                if (typeof message.magicProcRate !== "number")
+                    return "magicProcRate: number expected";
+            if (message.magicDamageMultiplier != null && message.hasOwnProperty("magicDamageMultiplier"))
+                if (typeof message.magicDamageMultiplier !== "number")
+                    return "magicDamageMultiplier: number expected";
             return null;
         };
 
@@ -7985,6 +8067,10 @@ export const realtime = $root.realtime = (() => {
                 message.lowHpMultiplier = Number(object.lowHpMultiplier);
             if (object.lowHpThreshold != null)
                 message.lowHpThreshold = Number(object.lowHpThreshold);
+            if (object.magicProcRate != null)
+                message.magicProcRate = Number(object.magicProcRate);
+            if (object.magicDamageMultiplier != null)
+                message.magicDamageMultiplier = Number(object.magicDamageMultiplier);
             return message;
         };
 
@@ -8032,6 +8118,8 @@ export const realtime = $root.realtime = (() => {
                 object.perPartDamagePercent = 0;
                 object.lowHpMultiplier = 0;
                 object.lowHpThreshold = 0;
+                object.magicProcRate = 0;
+                object.magicDamageMultiplier = 0;
             }
             if (message.effectiveIncrement != null && message.hasOwnProperty("effectiveIncrement"))
                 if (typeof message.effectiveIncrement === "number")
@@ -8073,6 +8161,10 @@ export const realtime = $root.realtime = (() => {
                 object.lowHpMultiplier = options.json && !isFinite(message.lowHpMultiplier) ? String(message.lowHpMultiplier) : message.lowHpMultiplier;
             if (message.lowHpThreshold != null && message.hasOwnProperty("lowHpThreshold"))
                 object.lowHpThreshold = options.json && !isFinite(message.lowHpThreshold) ? String(message.lowHpThreshold) : message.lowHpThreshold;
+            if (message.magicProcRate != null && message.hasOwnProperty("magicProcRate"))
+                object.magicProcRate = options.json && !isFinite(message.magicProcRate) ? String(message.magicProcRate) : message.magicProcRate;
+            if (message.magicDamageMultiplier != null && message.hasOwnProperty("magicDamageMultiplier"))
+                object.magicDamageMultiplier = options.json && !isFinite(message.magicDamageMultiplier) ? String(message.magicDamageMultiplier) : message.magicDamageMultiplier;
             return object;
         };
 
@@ -9784,6 +9876,17 @@ export const realtime = $root.realtime = (() => {
          * @property {number|Long|null} [judgmentDayTriggerCount] TalentCombatState judgmentDayTriggerCount
          * @property {number|Long|null} [autoStrikeTriggerCount] TalentCombatState autoStrikeTriggerCount
          * @property {number|Long|null} [autoStrikeWindowSec] TalentCombatState autoStrikeWindowSec
+         * @property {string|null} [magicEchoTargetPart] TalentCombatState magicEchoTargetPart
+         * @property {number|Long|null} [magicEchoStacks] TalentCombatState magicEchoStacks
+         * @property {number|Long|null} [magicEchoExpiresAt] TalentCombatState magicEchoExpiresAt
+         * @property {number|Long|null} [magicEchoCooldownEndsAt] TalentCombatState magicEchoCooldownEndsAt
+         * @property {number|Long|null} [magicEchoWindowSec] TalentCombatState magicEchoWindowSec
+         * @property {number|Long|null} [magicEchoRequiredHits] TalentCombatState magicEchoRequiredHits
+         * @property {number|Long|null} [magicEchoCooldownSec] TalentCombatState magicEchoCooldownSec
+         * @property {number|Long|null} [magicUltimateTrigger] TalentCombatState magicUltimateTrigger
+         * @property {number|Long|null} [magicUltimateCooldown] TalentCombatState magicUltimateCooldown
+         * @property {number|Long|null} [magicUltimateCooldownAt] TalentCombatState magicUltimateCooldownAt
+         * @property {Object.<string,number|Long>|null} [partMagicTriggerCount] TalentCombatState partMagicTriggerCount
          */
 
         /**
@@ -9806,6 +9909,7 @@ export const realtime = $root.realtime = (() => {
             this.partStormComboCount = {};
             this.skinnerParts = {};
             this.skinnerDurationByPart = {};
+            this.partMagicTriggerCount = {};
             if (properties)
                 for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                     if (properties[keys[i]] != null && keys[i] !== "__proto__")
@@ -10053,6 +10157,94 @@ export const realtime = $root.realtime = (() => {
         TalentCombatState.prototype.autoStrikeWindowSec = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
 
         /**
+         * TalentCombatState magicEchoTargetPart.
+         * @member {string} magicEchoTargetPart
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicEchoTargetPart = "";
+
+        /**
+         * TalentCombatState magicEchoStacks.
+         * @member {number|Long} magicEchoStacks
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicEchoStacks = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicEchoExpiresAt.
+         * @member {number|Long} magicEchoExpiresAt
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicEchoExpiresAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicEchoCooldownEndsAt.
+         * @member {number|Long} magicEchoCooldownEndsAt
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicEchoCooldownEndsAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicEchoWindowSec.
+         * @member {number|Long} magicEchoWindowSec
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicEchoWindowSec = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicEchoRequiredHits.
+         * @member {number|Long} magicEchoRequiredHits
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicEchoRequiredHits = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicEchoCooldownSec.
+         * @member {number|Long} magicEchoCooldownSec
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicEchoCooldownSec = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicUltimateTrigger.
+         * @member {number|Long} magicUltimateTrigger
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicUltimateTrigger = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicUltimateCooldown.
+         * @member {number|Long} magicUltimateCooldown
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicUltimateCooldown = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState magicUltimateCooldownAt.
+         * @member {number|Long} magicUltimateCooldownAt
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.magicUltimateCooldownAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * TalentCombatState partMagicTriggerCount.
+         * @member {Object.<string,number|Long>} partMagicTriggerCount
+         * @memberof realtime.TalentCombatState
+         * @instance
+         */
+        TalentCombatState.prototype.partMagicTriggerCount = $util.emptyObject;
+
+        /**
          * Creates a new TalentCombatState instance using the specified properties.
          * @function create
          * @memberof realtime.TalentCombatState
@@ -10155,6 +10347,29 @@ export const realtime = $root.realtime = (() => {
                 writer.uint32(/* id 29, wireType 0 =*/232).int64(message.autoStrikeTriggerCount);
             if (message.autoStrikeWindowSec != null && Object.hasOwnProperty.call(message, "autoStrikeWindowSec"))
                 writer.uint32(/* id 30, wireType 0 =*/240).int64(message.autoStrikeWindowSec);
+            if (message.magicEchoTargetPart != null && Object.hasOwnProperty.call(message, "magicEchoTargetPart"))
+                writer.uint32(/* id 31, wireType 2 =*/250).string(message.magicEchoTargetPart);
+            if (message.magicEchoStacks != null && Object.hasOwnProperty.call(message, "magicEchoStacks"))
+                writer.uint32(/* id 32, wireType 0 =*/256).int64(message.magicEchoStacks);
+            if (message.magicEchoExpiresAt != null && Object.hasOwnProperty.call(message, "magicEchoExpiresAt"))
+                writer.uint32(/* id 33, wireType 0 =*/264).int64(message.magicEchoExpiresAt);
+            if (message.magicEchoCooldownEndsAt != null && Object.hasOwnProperty.call(message, "magicEchoCooldownEndsAt"))
+                writer.uint32(/* id 34, wireType 0 =*/272).int64(message.magicEchoCooldownEndsAt);
+            if (message.magicEchoWindowSec != null && Object.hasOwnProperty.call(message, "magicEchoWindowSec"))
+                writer.uint32(/* id 35, wireType 0 =*/280).int64(message.magicEchoWindowSec);
+            if (message.magicEchoRequiredHits != null && Object.hasOwnProperty.call(message, "magicEchoRequiredHits"))
+                writer.uint32(/* id 36, wireType 0 =*/288).int64(message.magicEchoRequiredHits);
+            if (message.magicEchoCooldownSec != null && Object.hasOwnProperty.call(message, "magicEchoCooldownSec"))
+                writer.uint32(/* id 37, wireType 0 =*/296).int64(message.magicEchoCooldownSec);
+            if (message.magicUltimateTrigger != null && Object.hasOwnProperty.call(message, "magicUltimateTrigger"))
+                writer.uint32(/* id 38, wireType 0 =*/304).int64(message.magicUltimateTrigger);
+            if (message.magicUltimateCooldown != null && Object.hasOwnProperty.call(message, "magicUltimateCooldown"))
+                writer.uint32(/* id 39, wireType 0 =*/312).int64(message.magicUltimateCooldown);
+            if (message.magicUltimateCooldownAt != null && Object.hasOwnProperty.call(message, "magicUltimateCooldownAt"))
+                writer.uint32(/* id 40, wireType 0 =*/320).int64(message.magicUltimateCooldownAt);
+            if (message.partMagicTriggerCount != null && Object.hasOwnProperty.call(message, "partMagicTriggerCount"))
+                for (let keys = Object.keys(message.partMagicTriggerCount), i = 0; i < keys.length; ++i)
+                    writer.uint32(/* id 41, wireType 2 =*/330).fork().uint32(/* id 1, wireType 2 =*/10).string(keys[i]).uint32(/* id 2, wireType 0 =*/16).int64(message.partMagicTriggerCount[keys[i]]).ldelim();
             return writer;
         };
 
@@ -10518,6 +10733,71 @@ export const realtime = $root.realtime = (() => {
                         message.autoStrikeWindowSec = reader.int64();
                         break;
                     }
+                case 31: {
+                        message.magicEchoTargetPart = reader.string();
+                        break;
+                    }
+                case 32: {
+                        message.magicEchoStacks = reader.int64();
+                        break;
+                    }
+                case 33: {
+                        message.magicEchoExpiresAt = reader.int64();
+                        break;
+                    }
+                case 34: {
+                        message.magicEchoCooldownEndsAt = reader.int64();
+                        break;
+                    }
+                case 35: {
+                        message.magicEchoWindowSec = reader.int64();
+                        break;
+                    }
+                case 36: {
+                        message.magicEchoRequiredHits = reader.int64();
+                        break;
+                    }
+                case 37: {
+                        message.magicEchoCooldownSec = reader.int64();
+                        break;
+                    }
+                case 38: {
+                        message.magicUltimateTrigger = reader.int64();
+                        break;
+                    }
+                case 39: {
+                        message.magicUltimateCooldown = reader.int64();
+                        break;
+                    }
+                case 40: {
+                        message.magicUltimateCooldownAt = reader.int64();
+                        break;
+                    }
+                case 41: {
+                        if (message.partMagicTriggerCount === $util.emptyObject)
+                            message.partMagicTriggerCount = {};
+                        let end2 = reader.uint32() + reader.pos;
+                        key = "";
+                        value = 0;
+                        while (reader.pos < end2) {
+                            let tag2 = reader.uint32();
+                            switch (tag2 >>> 3) {
+                            case 1:
+                                key = reader.string();
+                                break;
+                            case 2:
+                                value = reader.int64();
+                                break;
+                            default:
+                                reader.skipType(tag2 & 7, long);
+                                break;
+                            }
+                        }
+                        if (key === "__proto__")
+                            $util.makeProp(message.partMagicTriggerCount, key);
+                        message.partMagicTriggerCount[key] = value;
+                        break;
+                    }
                 default:
                     reader.skipType(tag & 7, long);
                     break;
@@ -10702,6 +10982,44 @@ export const realtime = $root.realtime = (() => {
             if (message.autoStrikeWindowSec != null && message.hasOwnProperty("autoStrikeWindowSec"))
                 if (!$util.isInteger(message.autoStrikeWindowSec) && !(message.autoStrikeWindowSec && $util.isInteger(message.autoStrikeWindowSec.low) && $util.isInteger(message.autoStrikeWindowSec.high)))
                     return "autoStrikeWindowSec: integer|Long expected";
+            if (message.magicEchoTargetPart != null && message.hasOwnProperty("magicEchoTargetPart"))
+                if (!$util.isString(message.magicEchoTargetPart))
+                    return "magicEchoTargetPart: string expected";
+            if (message.magicEchoStacks != null && message.hasOwnProperty("magicEchoStacks"))
+                if (!$util.isInteger(message.magicEchoStacks) && !(message.magicEchoStacks && $util.isInteger(message.magicEchoStacks.low) && $util.isInteger(message.magicEchoStacks.high)))
+                    return "magicEchoStacks: integer|Long expected";
+            if (message.magicEchoExpiresAt != null && message.hasOwnProperty("magicEchoExpiresAt"))
+                if (!$util.isInteger(message.magicEchoExpiresAt) && !(message.magicEchoExpiresAt && $util.isInteger(message.magicEchoExpiresAt.low) && $util.isInteger(message.magicEchoExpiresAt.high)))
+                    return "magicEchoExpiresAt: integer|Long expected";
+            if (message.magicEchoCooldownEndsAt != null && message.hasOwnProperty("magicEchoCooldownEndsAt"))
+                if (!$util.isInteger(message.magicEchoCooldownEndsAt) && !(message.magicEchoCooldownEndsAt && $util.isInteger(message.magicEchoCooldownEndsAt.low) && $util.isInteger(message.magicEchoCooldownEndsAt.high)))
+                    return "magicEchoCooldownEndsAt: integer|Long expected";
+            if (message.magicEchoWindowSec != null && message.hasOwnProperty("magicEchoWindowSec"))
+                if (!$util.isInteger(message.magicEchoWindowSec) && !(message.magicEchoWindowSec && $util.isInteger(message.magicEchoWindowSec.low) && $util.isInteger(message.magicEchoWindowSec.high)))
+                    return "magicEchoWindowSec: integer|Long expected";
+            if (message.magicEchoRequiredHits != null && message.hasOwnProperty("magicEchoRequiredHits"))
+                if (!$util.isInteger(message.magicEchoRequiredHits) && !(message.magicEchoRequiredHits && $util.isInteger(message.magicEchoRequiredHits.low) && $util.isInteger(message.magicEchoRequiredHits.high)))
+                    return "magicEchoRequiredHits: integer|Long expected";
+            if (message.magicEchoCooldownSec != null && message.hasOwnProperty("magicEchoCooldownSec"))
+                if (!$util.isInteger(message.magicEchoCooldownSec) && !(message.magicEchoCooldownSec && $util.isInteger(message.magicEchoCooldownSec.low) && $util.isInteger(message.magicEchoCooldownSec.high)))
+                    return "magicEchoCooldownSec: integer|Long expected";
+            if (message.magicUltimateTrigger != null && message.hasOwnProperty("magicUltimateTrigger"))
+                if (!$util.isInteger(message.magicUltimateTrigger) && !(message.magicUltimateTrigger && $util.isInteger(message.magicUltimateTrigger.low) && $util.isInteger(message.magicUltimateTrigger.high)))
+                    return "magicUltimateTrigger: integer|Long expected";
+            if (message.magicUltimateCooldown != null && message.hasOwnProperty("magicUltimateCooldown"))
+                if (!$util.isInteger(message.magicUltimateCooldown) && !(message.magicUltimateCooldown && $util.isInteger(message.magicUltimateCooldown.low) && $util.isInteger(message.magicUltimateCooldown.high)))
+                    return "magicUltimateCooldown: integer|Long expected";
+            if (message.magicUltimateCooldownAt != null && message.hasOwnProperty("magicUltimateCooldownAt"))
+                if (!$util.isInteger(message.magicUltimateCooldownAt) && !(message.magicUltimateCooldownAt && $util.isInteger(message.magicUltimateCooldownAt.low) && $util.isInteger(message.magicUltimateCooldownAt.high)))
+                    return "magicUltimateCooldownAt: integer|Long expected";
+            if (message.partMagicTriggerCount != null && message.hasOwnProperty("partMagicTriggerCount")) {
+                if (!$util.isObject(message.partMagicTriggerCount))
+                    return "partMagicTriggerCount: object expected";
+                let key = Object.keys(message.partMagicTriggerCount);
+                for (let i = 0; i < key.length; ++i)
+                    if (!$util.isInteger(message.partMagicTriggerCount[key[i]]) && !(message.partMagicTriggerCount[key[i]] && $util.isInteger(message.partMagicTriggerCount[key[i]].low) && $util.isInteger(message.partMagicTriggerCount[key[i]].high)))
+                        return "partMagicTriggerCount: integer|Long{k:string} expected";
+            }
             return null;
         };
 
@@ -11019,6 +11337,106 @@ export const realtime = $root.realtime = (() => {
                     message.autoStrikeWindowSec = object.autoStrikeWindowSec;
                 else if (typeof object.autoStrikeWindowSec === "object")
                     message.autoStrikeWindowSec = new $util.LongBits(object.autoStrikeWindowSec.low >>> 0, object.autoStrikeWindowSec.high >>> 0).toNumber();
+            if (object.magicEchoTargetPart != null)
+                message.magicEchoTargetPart = String(object.magicEchoTargetPart);
+            if (object.magicEchoStacks != null)
+                if ($util.Long)
+                    (message.magicEchoStacks = $util.Long.fromValue(object.magicEchoStacks)).unsigned = false;
+                else if (typeof object.magicEchoStacks === "string")
+                    message.magicEchoStacks = parseInt(object.magicEchoStacks, 10);
+                else if (typeof object.magicEchoStacks === "number")
+                    message.magicEchoStacks = object.magicEchoStacks;
+                else if (typeof object.magicEchoStacks === "object")
+                    message.magicEchoStacks = new $util.LongBits(object.magicEchoStacks.low >>> 0, object.magicEchoStacks.high >>> 0).toNumber();
+            if (object.magicEchoExpiresAt != null)
+                if ($util.Long)
+                    (message.magicEchoExpiresAt = $util.Long.fromValue(object.magicEchoExpiresAt)).unsigned = false;
+                else if (typeof object.magicEchoExpiresAt === "string")
+                    message.magicEchoExpiresAt = parseInt(object.magicEchoExpiresAt, 10);
+                else if (typeof object.magicEchoExpiresAt === "number")
+                    message.magicEchoExpiresAt = object.magicEchoExpiresAt;
+                else if (typeof object.magicEchoExpiresAt === "object")
+                    message.magicEchoExpiresAt = new $util.LongBits(object.magicEchoExpiresAt.low >>> 0, object.magicEchoExpiresAt.high >>> 0).toNumber();
+            if (object.magicEchoCooldownEndsAt != null)
+                if ($util.Long)
+                    (message.magicEchoCooldownEndsAt = $util.Long.fromValue(object.magicEchoCooldownEndsAt)).unsigned = false;
+                else if (typeof object.magicEchoCooldownEndsAt === "string")
+                    message.magicEchoCooldownEndsAt = parseInt(object.magicEchoCooldownEndsAt, 10);
+                else if (typeof object.magicEchoCooldownEndsAt === "number")
+                    message.magicEchoCooldownEndsAt = object.magicEchoCooldownEndsAt;
+                else if (typeof object.magicEchoCooldownEndsAt === "object")
+                    message.magicEchoCooldownEndsAt = new $util.LongBits(object.magicEchoCooldownEndsAt.low >>> 0, object.magicEchoCooldownEndsAt.high >>> 0).toNumber();
+            if (object.magicEchoWindowSec != null)
+                if ($util.Long)
+                    (message.magicEchoWindowSec = $util.Long.fromValue(object.magicEchoWindowSec)).unsigned = false;
+                else if (typeof object.magicEchoWindowSec === "string")
+                    message.magicEchoWindowSec = parseInt(object.magicEchoWindowSec, 10);
+                else if (typeof object.magicEchoWindowSec === "number")
+                    message.magicEchoWindowSec = object.magicEchoWindowSec;
+                else if (typeof object.magicEchoWindowSec === "object")
+                    message.magicEchoWindowSec = new $util.LongBits(object.magicEchoWindowSec.low >>> 0, object.magicEchoWindowSec.high >>> 0).toNumber();
+            if (object.magicEchoRequiredHits != null)
+                if ($util.Long)
+                    (message.magicEchoRequiredHits = $util.Long.fromValue(object.magicEchoRequiredHits)).unsigned = false;
+                else if (typeof object.magicEchoRequiredHits === "string")
+                    message.magicEchoRequiredHits = parseInt(object.magicEchoRequiredHits, 10);
+                else if (typeof object.magicEchoRequiredHits === "number")
+                    message.magicEchoRequiredHits = object.magicEchoRequiredHits;
+                else if (typeof object.magicEchoRequiredHits === "object")
+                    message.magicEchoRequiredHits = new $util.LongBits(object.magicEchoRequiredHits.low >>> 0, object.magicEchoRequiredHits.high >>> 0).toNumber();
+            if (object.magicEchoCooldownSec != null)
+                if ($util.Long)
+                    (message.magicEchoCooldownSec = $util.Long.fromValue(object.magicEchoCooldownSec)).unsigned = false;
+                else if (typeof object.magicEchoCooldownSec === "string")
+                    message.magicEchoCooldownSec = parseInt(object.magicEchoCooldownSec, 10);
+                else if (typeof object.magicEchoCooldownSec === "number")
+                    message.magicEchoCooldownSec = object.magicEchoCooldownSec;
+                else if (typeof object.magicEchoCooldownSec === "object")
+                    message.magicEchoCooldownSec = new $util.LongBits(object.magicEchoCooldownSec.low >>> 0, object.magicEchoCooldownSec.high >>> 0).toNumber();
+            if (object.magicUltimateTrigger != null)
+                if ($util.Long)
+                    (message.magicUltimateTrigger = $util.Long.fromValue(object.magicUltimateTrigger)).unsigned = false;
+                else if (typeof object.magicUltimateTrigger === "string")
+                    message.magicUltimateTrigger = parseInt(object.magicUltimateTrigger, 10);
+                else if (typeof object.magicUltimateTrigger === "number")
+                    message.magicUltimateTrigger = object.magicUltimateTrigger;
+                else if (typeof object.magicUltimateTrigger === "object")
+                    message.magicUltimateTrigger = new $util.LongBits(object.magicUltimateTrigger.low >>> 0, object.magicUltimateTrigger.high >>> 0).toNumber();
+            if (object.magicUltimateCooldown != null)
+                if ($util.Long)
+                    (message.magicUltimateCooldown = $util.Long.fromValue(object.magicUltimateCooldown)).unsigned = false;
+                else if (typeof object.magicUltimateCooldown === "string")
+                    message.magicUltimateCooldown = parseInt(object.magicUltimateCooldown, 10);
+                else if (typeof object.magicUltimateCooldown === "number")
+                    message.magicUltimateCooldown = object.magicUltimateCooldown;
+                else if (typeof object.magicUltimateCooldown === "object")
+                    message.magicUltimateCooldown = new $util.LongBits(object.magicUltimateCooldown.low >>> 0, object.magicUltimateCooldown.high >>> 0).toNumber();
+            if (object.magicUltimateCooldownAt != null)
+                if ($util.Long)
+                    (message.magicUltimateCooldownAt = $util.Long.fromValue(object.magicUltimateCooldownAt)).unsigned = false;
+                else if (typeof object.magicUltimateCooldownAt === "string")
+                    message.magicUltimateCooldownAt = parseInt(object.magicUltimateCooldownAt, 10);
+                else if (typeof object.magicUltimateCooldownAt === "number")
+                    message.magicUltimateCooldownAt = object.magicUltimateCooldownAt;
+                else if (typeof object.magicUltimateCooldownAt === "object")
+                    message.magicUltimateCooldownAt = new $util.LongBits(object.magicUltimateCooldownAt.low >>> 0, object.magicUltimateCooldownAt.high >>> 0).toNumber();
+            if (object.partMagicTriggerCount) {
+                if (typeof object.partMagicTriggerCount !== "object")
+                    throw TypeError(".realtime.TalentCombatState.partMagicTriggerCount: object expected");
+                message.partMagicTriggerCount = {};
+                for (let keys = Object.keys(object.partMagicTriggerCount), i = 0; i < keys.length; ++i) {
+                    if (keys[i] === "__proto__")
+                        $util.makeProp(message.partMagicTriggerCount, keys[i]);
+                    if ($util.Long)
+                        (message.partMagicTriggerCount[keys[i]] = $util.Long.fromValue(object.partMagicTriggerCount[keys[i]])).unsigned = false;
+                    else if (typeof object.partMagicTriggerCount[keys[i]] === "string")
+                        message.partMagicTriggerCount[keys[i]] = parseInt(object.partMagicTriggerCount[keys[i]], 10);
+                    else if (typeof object.partMagicTriggerCount[keys[i]] === "number")
+                        message.partMagicTriggerCount[keys[i]] = object.partMagicTriggerCount[keys[i]];
+                    else if (typeof object.partMagicTriggerCount[keys[i]] === "object")
+                        message.partMagicTriggerCount[keys[i]] = new $util.LongBits(object.partMagicTriggerCount[keys[i]].low >>> 0, object.partMagicTriggerCount[keys[i]].high >>> 0).toNumber();
+                }
+            }
             return message;
         };
 
@@ -11049,6 +11467,7 @@ export const realtime = $root.realtime = (() => {
                 object.partStormComboCount = {};
                 object.skinnerParts = {};
                 object.skinnerDurationByPart = {};
+                object.partMagicTriggerCount = {};
             }
             if (options.defaults) {
                 object.omenStacks = 0;
@@ -11126,6 +11545,52 @@ export const realtime = $root.realtime = (() => {
                     object.autoStrikeWindowSec = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
                 } else
                     object.autoStrikeWindowSec = options.longs === String ? "0" : 0;
+                object.magicEchoTargetPart = "";
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicEchoStacks = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicEchoStacks = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicEchoExpiresAt = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicEchoExpiresAt = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicEchoCooldownEndsAt = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicEchoCooldownEndsAt = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicEchoWindowSec = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicEchoWindowSec = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicEchoRequiredHits = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicEchoRequiredHits = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicEchoCooldownSec = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicEchoCooldownSec = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicUltimateTrigger = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicUltimateTrigger = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicUltimateCooldown = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicUltimateCooldown = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.magicUltimateCooldownAt = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.magicUltimateCooldownAt = options.longs === String ? "0" : 0;
             }
             if (message.omenStacks != null && message.hasOwnProperty("omenStacks"))
                 object.omenStacks = message.omenStacks;
@@ -11314,6 +11779,64 @@ export const realtime = $root.realtime = (() => {
                     object.autoStrikeWindowSec = options.longs === String ? String(message.autoStrikeWindowSec) : message.autoStrikeWindowSec;
                 else
                     object.autoStrikeWindowSec = options.longs === String ? $util.Long.prototype.toString.call(message.autoStrikeWindowSec) : options.longs === Number ? new $util.LongBits(message.autoStrikeWindowSec.low >>> 0, message.autoStrikeWindowSec.high >>> 0).toNumber() : message.autoStrikeWindowSec;
+            if (message.magicEchoTargetPart != null && message.hasOwnProperty("magicEchoTargetPart"))
+                object.magicEchoTargetPart = message.magicEchoTargetPart;
+            if (message.magicEchoStacks != null && message.hasOwnProperty("magicEchoStacks"))
+                if (typeof message.magicEchoStacks === "number")
+                    object.magicEchoStacks = options.longs === String ? String(message.magicEchoStacks) : message.magicEchoStacks;
+                else
+                    object.magicEchoStacks = options.longs === String ? $util.Long.prototype.toString.call(message.magicEchoStacks) : options.longs === Number ? new $util.LongBits(message.magicEchoStacks.low >>> 0, message.magicEchoStacks.high >>> 0).toNumber() : message.magicEchoStacks;
+            if (message.magicEchoExpiresAt != null && message.hasOwnProperty("magicEchoExpiresAt"))
+                if (typeof message.magicEchoExpiresAt === "number")
+                    object.magicEchoExpiresAt = options.longs === String ? String(message.magicEchoExpiresAt) : message.magicEchoExpiresAt;
+                else
+                    object.magicEchoExpiresAt = options.longs === String ? $util.Long.prototype.toString.call(message.magicEchoExpiresAt) : options.longs === Number ? new $util.LongBits(message.magicEchoExpiresAt.low >>> 0, message.magicEchoExpiresAt.high >>> 0).toNumber() : message.magicEchoExpiresAt;
+            if (message.magicEchoCooldownEndsAt != null && message.hasOwnProperty("magicEchoCooldownEndsAt"))
+                if (typeof message.magicEchoCooldownEndsAt === "number")
+                    object.magicEchoCooldownEndsAt = options.longs === String ? String(message.magicEchoCooldownEndsAt) : message.magicEchoCooldownEndsAt;
+                else
+                    object.magicEchoCooldownEndsAt = options.longs === String ? $util.Long.prototype.toString.call(message.magicEchoCooldownEndsAt) : options.longs === Number ? new $util.LongBits(message.magicEchoCooldownEndsAt.low >>> 0, message.magicEchoCooldownEndsAt.high >>> 0).toNumber() : message.magicEchoCooldownEndsAt;
+            if (message.magicEchoWindowSec != null && message.hasOwnProperty("magicEchoWindowSec"))
+                if (typeof message.magicEchoWindowSec === "number")
+                    object.magicEchoWindowSec = options.longs === String ? String(message.magicEchoWindowSec) : message.magicEchoWindowSec;
+                else
+                    object.magicEchoWindowSec = options.longs === String ? $util.Long.prototype.toString.call(message.magicEchoWindowSec) : options.longs === Number ? new $util.LongBits(message.magicEchoWindowSec.low >>> 0, message.magicEchoWindowSec.high >>> 0).toNumber() : message.magicEchoWindowSec;
+            if (message.magicEchoRequiredHits != null && message.hasOwnProperty("magicEchoRequiredHits"))
+                if (typeof message.magicEchoRequiredHits === "number")
+                    object.magicEchoRequiredHits = options.longs === String ? String(message.magicEchoRequiredHits) : message.magicEchoRequiredHits;
+                else
+                    object.magicEchoRequiredHits = options.longs === String ? $util.Long.prototype.toString.call(message.magicEchoRequiredHits) : options.longs === Number ? new $util.LongBits(message.magicEchoRequiredHits.low >>> 0, message.magicEchoRequiredHits.high >>> 0).toNumber() : message.magicEchoRequiredHits;
+            if (message.magicEchoCooldownSec != null && message.hasOwnProperty("magicEchoCooldownSec"))
+                if (typeof message.magicEchoCooldownSec === "number")
+                    object.magicEchoCooldownSec = options.longs === String ? String(message.magicEchoCooldownSec) : message.magicEchoCooldownSec;
+                else
+                    object.magicEchoCooldownSec = options.longs === String ? $util.Long.prototype.toString.call(message.magicEchoCooldownSec) : options.longs === Number ? new $util.LongBits(message.magicEchoCooldownSec.low >>> 0, message.magicEchoCooldownSec.high >>> 0).toNumber() : message.magicEchoCooldownSec;
+            if (message.magicUltimateTrigger != null && message.hasOwnProperty("magicUltimateTrigger"))
+                if (typeof message.magicUltimateTrigger === "number")
+                    object.magicUltimateTrigger = options.longs === String ? String(message.magicUltimateTrigger) : message.magicUltimateTrigger;
+                else
+                    object.magicUltimateTrigger = options.longs === String ? $util.Long.prototype.toString.call(message.magicUltimateTrigger) : options.longs === Number ? new $util.LongBits(message.magicUltimateTrigger.low >>> 0, message.magicUltimateTrigger.high >>> 0).toNumber() : message.magicUltimateTrigger;
+            if (message.magicUltimateCooldown != null && message.hasOwnProperty("magicUltimateCooldown"))
+                if (typeof message.magicUltimateCooldown === "number")
+                    object.magicUltimateCooldown = options.longs === String ? String(message.magicUltimateCooldown) : message.magicUltimateCooldown;
+                else
+                    object.magicUltimateCooldown = options.longs === String ? $util.Long.prototype.toString.call(message.magicUltimateCooldown) : options.longs === Number ? new $util.LongBits(message.magicUltimateCooldown.low >>> 0, message.magicUltimateCooldown.high >>> 0).toNumber() : message.magicUltimateCooldown;
+            if (message.magicUltimateCooldownAt != null && message.hasOwnProperty("magicUltimateCooldownAt"))
+                if (typeof message.magicUltimateCooldownAt === "number")
+                    object.magicUltimateCooldownAt = options.longs === String ? String(message.magicUltimateCooldownAt) : message.magicUltimateCooldownAt;
+                else
+                    object.magicUltimateCooldownAt = options.longs === String ? $util.Long.prototype.toString.call(message.magicUltimateCooldownAt) : options.longs === Number ? new $util.LongBits(message.magicUltimateCooldownAt.low >>> 0, message.magicUltimateCooldownAt.high >>> 0).toNumber() : message.magicUltimateCooldownAt;
+            if (message.partMagicTriggerCount && (keys2 = Object.keys(message.partMagicTriggerCount)).length) {
+                object.partMagicTriggerCount = {};
+                for (let j = 0; j < keys2.length; ++j) {
+                    if (keys2[j] === "__proto__")
+                        $util.makeProp(object.partMagicTriggerCount, keys2[j]);
+                    if (typeof message.partMagicTriggerCount[keys2[j]] === "number")
+                        object.partMagicTriggerCount[keys2[j]] = options.longs === String ? String(message.partMagicTriggerCount[keys2[j]]) : message.partMagicTriggerCount[keys2[j]];
+                    else
+                        object.partMagicTriggerCount[keys2[j]] = options.longs === String ? $util.Long.prototype.toString.call(message.partMagicTriggerCount[keys2[j]]) : options.longs === Number ? new $util.LongBits(message.partMagicTriggerCount[keys2[j]].low >>> 0, message.partMagicTriggerCount[keys2[j]].high >>> 0).toNumber() : message.partMagicTriggerCount[keys2[j]];
+                }
+            }
             return object;
         };
 

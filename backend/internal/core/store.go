@@ -168,6 +168,8 @@ type EquipmentDefinition struct {
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`  // 软组织增伤
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"` // 重甲增伤
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`  // 弱点增伤
+	MagicProcRateBonus   float64 `json:"magicProcRateBonus,omitempty"`  // 魔法触发率额外加成
+	MagicDamageBonus     float64 `json:"magicDamageBonus,omitempty"`    // 魔法伤害额外加成
 	TalentAffinity       string  `json:"talentAffinity,omitempty"`      // 天赋系绑定
 }
 
@@ -231,6 +233,8 @@ type InventoryItem struct {
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
+	MagicProcRateBonus   float64 `json:"magicProcRateBonus,omitempty"`
+	MagicDamageBonus     float64 `json:"magicDamageBonus,omitempty"`
 }
 
 // ItemInstance 装备实例
@@ -264,6 +268,8 @@ type CombatStats struct {
 	ArmorPenPercent       float64 `json:"armorPenPercent"`
 	CritDamageMultiplier  float64 `json:"critDamageMultiplier"`
 	AllDamageAmplify      float64 `json:"allDamageAmplify"`
+	MagicProcRate         float64 `json:"magicProcRate,omitempty"`
+	MagicDamageMultiplier float64 `json:"magicDamageMultiplier,omitempty"`
 	PartTypeDamageSoft    float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy   float64 `json:"partTypeDamageHeavy,omitempty"`
 	PartTypeDamageWeak    float64 `json:"partTypeDamageWeak,omitempty"`
@@ -300,6 +306,8 @@ type BossLootEntry struct {
 	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
 	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
+	MagicProcRateBonus   float64 `json:"magicProcRateBonus,omitempty"`
+	MagicDamageBonus     float64 `json:"magicDamageBonus,omitempty"`
 	TalentAffinity       string  `json:"talentAffinity,omitempty"`
 }
 
@@ -374,6 +382,7 @@ type State struct {
 	Stones                             int64                  `json:"stones"`
 	TalentPoints                       int64                  `json:"talentPoints"`
 	RecentRewards                      []Reward               `json:"recentRewards,omitempty"`
+	TalentCombatState                  *TalentCombatState     `json:"talentCombatState,omitempty"`
 	Stamina                            StaminaState           `json:"stamina"`
 	EquippedBattleClickSkinID          string                 `json:"equippedBattleClickSkinId"`
 	EquippedBattleClickCursorImagePath string                 `json:"equippedBattleClickCursorImagePath"`
@@ -1680,6 +1689,7 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		Stones:                             userState.Stones,
 		TalentPoints:                       userState.TalentPoints,
 		RecentRewards:                      userState.RecentRewards,
+		TalentCombatState:                  userState.TalentCombatState,
 		Stamina:                            userState.Stamina,
 		EquippedBattleClickSkinID:          userState.EquippedBattleClickSkinID,
 		EquippedBattleClickCursorImagePath: userState.EquippedBattleClickCursorImagePath,
@@ -2058,17 +2068,10 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		PartType: string(part.Type),
 	})
 
-	extraDamage, talentEvents, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, combatStats, effectivePartType, compiledTalents, combatState, now, nowMs)
+	extraDamage, talentEvents, extraDeltas, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, combatStats, effectivePartType, compiledTalents, combatState, now, nowMs)
 	if extraDamage > 0 {
 		totalDamage += extraDamage
-		result.PartStateDeltas = append(result.PartStateDeltas, BossPartStateDelta{
-			X:        part.X,
-			Y:        part.Y,
-			Damage:   extraDamage,
-			BeforeHP: part.CurrentHP + extraDamage,
-			AfterHP:  part.CurrentHP,
-			PartType: string(part.Type),
-		})
+		result.PartStateDeltas = append(result.PartStateDeltas, extraDeltas...)
 	}
 	if len(talentEvents) > 0 {
 		result.TalentEvents = append(result.TalentEvents, talentEvents...)
@@ -2143,6 +2146,15 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if compiledTalents.Has("armor_ultimate") {
 		combatState.JudgmentDayTriggerCount = compiledTalents.Armor.UltimateTrigger
 		combatState.JudgmentDayCooldownSec = compiledTalents.Armor.UltimateCooldown
+	}
+	if compiledTalents.Has("magic_echo_mark") {
+		combatState.MagicEchoWindowSec = TalentMagicEchoWindowSec
+		combatState.MagicEchoRequiredHits = compiledTalents.Magic.EchoRequiredHits
+		combatState.MagicEchoCooldownSec = compiledTalents.Magic.EchoCooldownSec
+	}
+	if compiledTalents.Has("magic_ultimate") {
+		combatState.MagicUltimateTrigger = compiledTalents.Magic.UltimateTriggerCount
+		combatState.MagicUltimateCooldown = compiledTalents.Magic.UltimateCooldownSec
 	}
 
 	result.TalentCombatState = combatState
@@ -2529,9 +2541,9 @@ func applyBossPartDamageDelta(boss *Boss, part *BossPart, damage int64) (beforeH
 	return beforeHP, actualDamage, partWasAlive && !part.Alive
 }
 
-func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, combatStats CombatStats, effectivePartType PartType, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now, nowMs int64) (int64, []TalentTriggerEvent, string) {
+func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, combatStats CombatStats, effectivePartType PartType, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now, nowMs int64) (int64, []TalentTriggerEvent, []BossPartStateDelta, string) {
 	if boss == nil || part == nil || strings.TrimSpace(nickname) == "" || clickCount <= 0 {
-		return 0, nil, ""
+		return 0, nil, nil, ""
 	}
 	if compiledTalents == nil {
 		compiledTalents = compileTalentSet(nil)
@@ -2562,7 +2574,7 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		combatState.CollapseEndsAt = 0
 	}
 
-	return triggerCtx.totalExtra, triggerCtx.events, triggerCtx.damageTypeOverride
+	return triggerCtx.totalExtra, triggerCtx.events, triggerCtx.deltas, triggerCtx.damageTypeOverride
 }
 
 func (s *Store) selectTargetPart(parts []BossPart, nickname string) int {
@@ -2870,7 +2882,7 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 
 	stats := s.baseCombatStats()
 
-	attackPower, armorPen, critRate, critDmgMult, partTypeSoft, partTypeHeavy, partTypeWeak := loadoutBonuses(loadout)
+	attackPower, armorPen, critRate, critDmgMult, partTypeSoft, partTypeHeavy, partTypeWeak, magicProcRate, magicDamageBonus := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 1.0)
 	stats.CriticalChancePercent += critRate * 100
@@ -2878,6 +2890,8 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 	stats.PartTypeDamageSoft += partTypeSoft
 	stats.PartTypeDamageHeavy += partTypeHeavy
 	stats.PartTypeDamageWeak += partTypeWeak
+	stats.MagicProcRate += magicProcRate
+	stats.MagicDamageMultiplier *= 1 + max(0.0, magicDamageBonus)
 
 	compiledTalents, err := s.compiledTalentSetForNickname(ctx, nickname)
 	if err != nil {
@@ -2905,6 +2919,8 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 			stats.CriticalChancePercent = 100
 		}
 	}
+	stats.MagicProcRate += compiledTalents.Magic.ProcRate
+	stats.MagicDamageMultiplier *= compiledTalents.Magic.DamageMultiplier
 	stats.CriticalChancePercent = clampFloat(stats.CriticalChancePercent, 0, 100)
 
 	result := deriveCombatStats(stats)
@@ -2919,11 +2935,12 @@ func (s *Store) baseCombatStats() CombatStats {
 		ArmorPenPercent:       0,
 		CritDamageMultiplier:  1.5,
 		AllDamageAmplify:      0,
+		MagicDamageMultiplier: 1,
 		LowHpMultiplier:       1,
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64, partTypeSoft float64, partTypeHeavy float64, partTypeWeak float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64, partTypeSoft float64, partTypeHeavy float64, partTypeWeak float64, magicProcRate float64, magicDamageBonus float64) {
 	items := []*InventoryItem{
 		loadout.Weapon,
 		loadout.Helmet,
@@ -2943,6 +2960,8 @@ func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critR
 		partTypeSoft += item.PartTypeDamageSoft
 		partTypeHeavy += item.PartTypeDamageHeavy
 		partTypeWeak += item.PartTypeDamageWeak
+		magicProcRate += item.MagicProcRateBonus
+		magicDamageBonus += item.MagicDamageBonus
 	}
 	return
 }
@@ -3023,6 +3042,8 @@ func CalcBossPartDamage(stats CombatStats, partType PartType, partArmor int64, a
 		ArmorPenPercent:       stats.ArmorPenPercent,
 		CritDamageMultiplier:  critMult,
 		AllDamageAmplify:      amplify - 1.0,
+		MagicProcRate:         stats.MagicProcRate,
+		MagicDamageMultiplier: stats.MagicDamageMultiplier,
 		PartTypeDamageSoft:    stats.PartTypeDamageSoft,
 		PartTypeDamageHeavy:   stats.PartTypeDamageHeavy,
 		PartTypeDamageWeak:    stats.PartTypeDamageWeak,
@@ -3192,6 +3213,8 @@ func (s *Store) loadEquipmentDefinitionFromRedis(ctx context.Context, itemID str
 		"part_type_damage_soft",
 		"part_type_damage_heavy",
 		"part_type_damage_weak",
+		"magic_proc_rate_bonus",
+		"magic_damage_bonus",
 		"talent_affinity",
 	).Result()
 	if err != nil {
@@ -3218,7 +3241,9 @@ func (s *Store) loadEquipmentDefinitionFromRedis(ctx context.Context, itemID str
 		PartTypeDamageSoft:   float64FromString(stringValue(values, 9)),
 		PartTypeDamageHeavy:  float64FromString(stringValue(values, 10)),
 		PartTypeDamageWeak:   float64FromString(stringValue(values, 11)),
-		TalentAffinity:       strings.TrimSpace(stringValue(values, 12)),
+		MagicProcRateBonus:   float64FromString(stringValue(values, 12)),
+		MagicDamageBonus:     float64FromString(stringValue(values, 13)),
+		TalentAffinity:       strings.TrimSpace(stringValue(values, 14)),
 	}, nil
 }
 
@@ -3591,6 +3616,8 @@ func (s *Store) loadBossLoot(ctx context.Context, bossID string) ([]BossLootEntr
 			PartTypeDamageSoft:   definition.PartTypeDamageSoft,
 			PartTypeDamageHeavy:  definition.PartTypeDamageHeavy,
 			PartTypeDamageWeak:   definition.PartTypeDamageWeak,
+			MagicProcRateBonus:   definition.MagicProcRateBonus,
+			MagicDamageBonus:     definition.MagicDamageBonus,
 			TalentAffinity:       definition.TalentAffinity,
 		})
 	}
@@ -4072,6 +4099,8 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 	partTypeDamageSoft := definition.PartTypeDamageSoft * multPercent
 	partTypeDamageHeavy := definition.PartTypeDamageHeavy * multPercent
 	partTypeDamageWeak := definition.PartTypeDamageWeak * multPercent
+	magicProcRateBonus := definition.MagicProcRateBonus * multPercent
+	magicDamageBonus := definition.MagicDamageBonus * multPercent
 
 	return InventoryItem{
 		ItemID:               definition.ItemID,
@@ -4093,6 +4122,8 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 		PartTypeDamageSoft:   partTypeDamageSoft,
 		PartTypeDamageHeavy:  partTypeDamageHeavy,
 		PartTypeDamageWeak:   partTypeDamageWeak,
+		MagicProcRateBonus:   magicProcRateBonus,
+		MagicDamageBonus:     magicDamageBonus,
 	}
 }
 

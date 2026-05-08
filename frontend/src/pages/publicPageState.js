@@ -16,7 +16,8 @@ const EQUIPMENT_ENHANCE_COST = 10
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
 const AFK_HEARTBEAT_INTERVAL_MS = 15000
 const TASK_POLL_INTERVAL_MS = 10000
-const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'pursuit', 'heavy', 'normal']
+const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'magic', 'pursuit', 'heavy', 'normal']
+const PERSISTENT_TALENT_EFFECT_TYPES = new Set(['magic_starfall', 'judgment_day', 'final_cut', 'silver_storm'])
 const DAMAGE_VARIANTS = {
     normal: {
         scale: 1,
@@ -53,6 +54,15 @@ const DAMAGE_VARIANTS = {
         particles: 5,
         colors: ['#c084fc', '#a78bfa', '#8b5cf6', '#7c3aed'],
         label: '⚡',
+    },
+    magic: {
+        scale: 1.12,
+        ttl: 1500,
+        shake: 0,
+        stageFx: ['flash'],
+        particles: 10,
+        colors: ['#38bdf8', '#60a5fa', '#8b5cf6', '#a78bfa', '#c4b5fd'],
+        label: '🔮',
     },
     critical: {
         scale: 1.5,
@@ -343,11 +353,16 @@ const partProgressList = computed(() => {
     if (!Array.isArray(parts) || parts.length === 0) return []
     const stormMap = cs?.partStormComboCount || {}
     const heavyMap = cs?.partHeavyClickCount || {}
+    const magicMap = cs?.partMagicTriggerCount || {}
     const judgmentDayMap = cs?.partJudgmentDayCount || {}
     const jdUsedMap = cs?.judgmentDayUsed || {}
     const jdCooldown = Math.max(0, Number(cs?.judgmentDayCooldownSec) || 0)
     const autoStrikeTargetPart = String(cs?.autoStrikeTargetPart || '')
     const autoStrikeComboCount = Number(cs?.autoStrikeComboCount) || 0
+    const magicEchoTargetPart = String(cs?.magicEchoTargetPart || '')
+    const magicEchoStacks = Number(cs?.magicEchoStacks) || 0
+    const magicEchoTrigger = Math.max(0, Number(cs?.magicEchoRequiredHits) || 0)
+    const magicUltimateTrigger = Math.max(0, Number(cs?.magicUltimateTrigger) || 0)
     const jdTrigger = judgmentDayTrigger.value
     const nowSec = Date.now() / 1000
     const result = []
@@ -355,13 +370,16 @@ const partProgressList = computed(() => {
         const key = `${part.x}-${part.y}`
         const storm = Number(stormMap[key]) || 0
         const armor = Number(heavyMap[key]) || 0
+        const magic = key === magicEchoTargetPart ? magicEchoStacks : 0
+        const magicTriggered = Number(magicMap[key]) || 0
         const autoStrike = key === autoStrikeTargetPart ? autoStrikeComboCount : 0
         const rawJudgmentDay = Number(judgmentDayMap[key]) || 0
         const lastJdTrigger = Number(jdUsedMap[key]) || 0
         const jdOnCooldown = part.type === 'heavy' && lastJdTrigger > 0 && jdCooldown > 0 && (nowSec - lastJdTrigger) < jdCooldown
         const jdCount = (part.type === 'heavy' && !jdOnCooldown) ? rawJudgmentDay : 0
         const jdProgress = jdTrigger > 0 ? Math.min(100, Math.round((jdCount / jdTrigger) * 100)) : 0
-        if (storm <= 0 && armor <= 0 && autoStrike <= 0 && jdCount <= 0) continue
+        const magicProgress = magicEchoTrigger > 0 ? Math.min(100, Math.round((magic / magicEchoTrigger) * 100)) : 0
+        if (storm <= 0 && armor <= 0 && autoStrike <= 0 && jdCount <= 0 && magic <= 0 && magicTriggered <= 0) continue
         if (!part.alive) continue
         result.push({
             key,
@@ -373,6 +391,12 @@ const partProgressList = computed(() => {
             stormProgress: Math.min(100, Math.round((storm / stormTrigger.value) * 100)),
             armor,
             armorProgress: Math.min(100, Math.round((armor / armorTrigger.value) * 100)),
+            magic,
+            magicTrigger: magicEchoTrigger,
+            magicProgress,
+            magicTriggered,
+            magicUltimateTrigger,
+            magicUltimateProgress: magicUltimateTrigger > 0 ? Math.min(100, Math.round((magicTriggered / magicUltimateTrigger) * 100)) : 0,
             autoStrike,
             autoStrikeProgress: autoStrikeTrigger.value > 0
                 ? Math.min(100, Math.round((autoStrike / autoStrikeTrigger.value) * 100))
@@ -510,6 +534,16 @@ const partStatusList = computed(() => {
     return result
 })
 
+function partDisplayNameByKey(partKey) {
+    const key = String(partKey || '').trim()
+    if (!key) return ''
+    const parts = boss.value?.parts
+    if (!Array.isArray(parts) || parts.length === 0) return key
+    const part = parts.find((entry) => `${entry.x}-${entry.y}` === key)
+    if (!part) return key
+    return part.displayName || partTypeLabel(part.type)
+}
+
 const globalStatusList = computed(() => {
     void nowTick.value
     const result = []
@@ -519,6 +553,8 @@ const globalStatusList = computed(() => {
     const comboT = Math.min(comboValue / 200, 1)
     const comboHue = 120 - Math.min(comboValue / 200, 1) * 120
     const comboColor = `hsl(${comboHue}, 90%, ${55 - Math.min(comboValue / 200, 1) * 15}%)`
+    const comboBarLeadColor = `hsl(${comboHue}, 92%, ${Math.max(34, 42 - comboT * 8)}%)`
+    const comboBarTailColor = `hsl(${Math.max(0, comboHue - 18)}, 96%, ${Math.max(52, 68 - comboT * 10)}%)`
     const comboIsGold = comboValue >= 200
     const comboGoldGradientStops = ['#fde047', '#fbbf24', '#f59e0b', '#fef08a', '#fde047']
     const comboGoldGradient = `linear-gradient(135deg, ${comboGoldGradientStops.join(', ')})`
@@ -568,7 +604,7 @@ const globalStatusList = computed(() => {
         : null
     const comboBarStyle = comboValue > 0
         ? {
-            background: comboIsGold ? `linear-gradient(90deg, ${comboGoldGradientStops.join(', ')})` : `linear-gradient(90deg, ${comboColor}, ${comboColor}cc)`,
+            background: comboIsGold ? `linear-gradient(90deg, ${comboGoldGradientStops.join(', ')})` : `linear-gradient(90deg, ${comboBarLeadColor}, ${comboColor}, ${comboBarTailColor})`,
             backgroundSize: '300% 300%',
             boxShadow: comboIsGold ? '0 0 10px rgba(251, 191, 36, 0.65)' : `0 0 8px ${comboColor}80`,
             animation: 'combo-gold-shimmer 2s linear infinite',
@@ -670,6 +706,79 @@ const globalStatusList = computed(() => {
                 backgroundSize: '300% 300%',
                 boxShadow: '0 0 10px rgba(125, 211, 252, 0.45)',
                 animation: 'combo-gold-shimmer 2s linear infinite',
+            },
+        })
+    }
+
+    const magicEchoRequiredHits = Math.max(0, Number(talentCombatState.value?.magicEchoRequiredHits) || 0)
+    const magicEchoStacks = Math.max(0, Number(talentCombatState.value?.magicEchoStacks) || 0)
+    const magicEchoTargetPart = String(talentCombatState.value?.magicEchoTargetPart || '')
+    const magicEchoTargetName = partDisplayNameByKey(magicEchoTargetPart)
+    const magicEchoWindowSec = Math.max(0, Number(talentCombatState.value?.magicEchoWindowSec) || 0)
+    const magicEchoExpiresAt = Math.max(0, Number(talentCombatState.value?.magicEchoExpiresAt) || 0)
+    const magicEchoCooldownSec = Math.max(0, Number(talentCombatState.value?.magicEchoCooldownSec) || 0)
+    const magicEchoCooldownEndsAt = Math.max(0, Number(talentCombatState.value?.magicEchoCooldownEndsAt) || 0)
+    const nowSec = Date.now() / 1000
+    const magicEchoRemaining = magicEchoExpiresAt > 0 ? Math.max(0, Math.ceil(magicEchoExpiresAt - nowSec)) : 0
+    const magicEchoCooldownRemaining = magicEchoCooldownEndsAt > 0 ? Math.max(0, Math.ceil(magicEchoCooldownEndsAt - nowSec)) : 0
+    const magicEchoActive = magicEchoRemaining > 0
+    if (magicEchoRequiredHits > 0 && (magicEchoStacks > 0 || magicEchoActive || magicEchoCooldownRemaining > 0)) {
+        result.push({
+            key: 'magic-echo',
+            kind: 'magic_echo',
+            title: '回响刻印',
+            primary: magicEchoActive ? `${magicEchoRemaining}s` : magicEchoCooldownRemaining > 0 ? `${magicEchoCooldownRemaining}s` : `${magicEchoStacks}/${magicEchoRequiredHits}`,
+            secondary: magicEchoCooldownRemaining > 0
+                ? `CD 剩余 ${magicEchoCooldownRemaining}s`
+                : `触发 ${magicEchoRequiredHits} 层 · CD ${magicEchoCooldownSec}s`,
+            hint: magicEchoActive
+                ? '2s 内全部攻击保底'
+                : magicEchoCooldownRemaining > 0
+                    ? '长 CD'
+                    : (magicEchoTargetName ? `目标 ${magicEchoTargetName}` : '累计中'),
+            progress: magicEchoActive
+                ? (magicEchoWindowSec > 0 ? Math.min(100, Math.max(0, (magicEchoRemaining / magicEchoWindowSec) * 100)) : 100)
+                : magicEchoCooldownRemaining > 0
+                    ? (magicEchoCooldownSec > 0 ? Math.min(100, Math.max(0, (magicEchoCooldownRemaining / magicEchoCooldownSec) * 100)) : 100)
+                    : (magicEchoRequiredHits > 0 ? Math.min(100, Math.max(0, (magicEchoStacks / magicEchoRequiredHits) * 100)) : 0),
+            panelStyle: {
+                borderColor: 'rgba(129, 140, 248, 0.34)',
+                boxShadow: '0 0 16px rgba(79, 70, 229, 0.16), inset 0 0 10px rgba(56, 189, 248, 0.08)',
+            },
+        })
+    }
+
+    const magicUltimateTrigger = Math.max(0, Number(talentCombatState.value?.magicUltimateTrigger) || 0)
+    const magicUltimateCooldownSec = Math.max(0, Number(talentCombatState.value?.magicUltimateCooldown) || 0)
+    const magicUltimateCooldownAt = Math.max(0, Number(talentCombatState.value?.magicUltimateCooldownAt) || 0)
+    const magicUltimateCooldownRemaining = magicUltimateCooldownAt > 0 ? Math.max(0, Math.ceil(magicUltimateCooldownAt - nowSec)) : 0
+    const magicTriggerMap = talentCombatState.value?.partMagicTriggerCount || {}
+    let magicUltimateBestKey = ''
+    let magicUltimateBestCount = 0
+    for (const [partKey, rawCount] of Object.entries(magicTriggerMap)) {
+        const count = Math.max(0, Number(rawCount) || 0)
+        if (count > magicUltimateBestCount) {
+            magicUltimateBestCount = count
+            magicUltimateBestKey = partKey
+        }
+    }
+    const magicUltimateTargetName = partDisplayNameByKey(magicUltimateBestKey)
+    if (magicUltimateTrigger > 0 && (magicUltimateBestCount > 0 || magicUltimateCooldownRemaining > 0)) {
+        result.push({
+            key: 'magic-ultimate',
+            kind: 'magic_ultimate',
+            title: '星陨潮爆',
+            primary: magicUltimateCooldownRemaining > 0 ? `${magicUltimateCooldownRemaining}s` : `${magicUltimateBestCount}/${magicUltimateTrigger}`,
+            secondary: magicUltimateCooldownSec > 0 ? `触发 ${magicUltimateTrigger} 次 · CD ${magicUltimateCooldownSec}s` : `触发 ${magicUltimateTrigger} 次`,
+            hint: magicUltimateCooldownRemaining > 0
+                ? '冷却中'
+                : (magicUltimateTargetName ? `目标 ${magicUltimateTargetName}` : '累计中'),
+            progress: magicUltimateCooldownRemaining > 0
+                ? (magicUltimateCooldownSec > 0 ? Math.min(100, Math.max(0, (magicUltimateCooldownRemaining / magicUltimateCooldownSec) * 100)) : 100)
+                : (magicUltimateTrigger > 0 ? Math.min(100, Math.max(0, (magicUltimateBestCount / magicUltimateTrigger) * 100)) : 0),
+            panelStyle: {
+                borderColor: 'rgba(167, 139, 250, 0.34)',
+                boxShadow: '0 0 16px rgba(91, 33, 182, 0.18), inset 0 0 10px rgba(250, 204, 21, 0.06)',
             },
         })
     }
@@ -865,6 +974,8 @@ function defaultCombatStats() {
         critDamageMultiplier: 0,
         bossDamagePercent: 0,
         allDamageAmplify: 0,
+        magicProcRate: 0,
+        magicDamageMultiplier: 1,
         perPartDamagePercent: 0,
         lowHpMultiplier: 1,
         lowHpThreshold: 0,
@@ -878,6 +989,8 @@ function formatItemStats(item) {
     if (item?.critRate) parts.push(`暴击率 ${(item.critRate * 100).toFixed(1)}%`)
     if (item?.critDamageMultiplier) parts.push(`暴伤 ${item.critDamageMultiplier}`)
     if (item?.bossDamagePercent) parts.push(`首领伤 ${item.bossDamagePercent}%`)
+    if (item?.magicProcRateBonus) parts.push(`魔法触发 ${(item.magicProcRateBonus * 100).toFixed(1)}%`)
+    if (item?.magicDamageBonus) parts.push(`魔法增伤 ${formatDisplayPercent(item.magicDamageBonus)}%`)
     return parts.join(' ') || '无属性'
 }
 
@@ -903,6 +1016,8 @@ function formatItemStatLines(item) {
     if (item?.partTypeDamageSoft) lines.push(`软组织伤害 ${formatDisplayPercent(item.partTypeDamageSoft)}%`)
     if (item?.partTypeDamageHeavy) lines.push(`重甲伤害 ${formatDisplayPercent(item.partTypeDamageHeavy)}%`)
     if (item?.partTypeDamageWeak) lines.push(`弱点伤害 ${formatDisplayPercent(item.partTypeDamageWeak)}%`)
+    if (item?.magicProcRateBonus) lines.push(`魔法触发率 ${formatDisplayPercent(item.magicProcRateBonus)}%`)
+    if (item?.magicDamageBonus) lines.push(`魔法伤害加成 ${formatDisplayPercent(item.magicDamageBonus)}%`)
 
     return lines
 }
@@ -2035,10 +2150,23 @@ function appendTalentTriggerEvents(events) {
         ...nextEntries,
         ...talentTriggerFeed.value,
     ]
-    const otherEvents = mergedFeed.filter((entry) => entry.effectType !== 'bleed').slice(0, 6)
-    talentTriggerFeed.value = otherEvents
+    const otherEvents = mergedFeed
+        .filter((entry) => entry.effectType !== 'bleed')
         .sort((left, right) => Number(right.triggeredAt || 0) - Number(left.triggeredAt || 0))
-        .slice(0, 6)
+    const pinnedEffects = []
+    const pinnedTypes = new Set()
+    const regularEffects = []
+    for (const entry of otherEvents) {
+        if (PERSISTENT_TALENT_EFFECT_TYPES.has(entry.effectType) && !pinnedTypes.has(entry.effectType)) {
+            pinnedEffects.push(entry)
+            pinnedTypes.add(entry.effectType)
+            continue
+        }
+        regularEffects.push(entry)
+    }
+    talentTriggerFeed.value = [...pinnedEffects, ...regularEffects]
+        .sort((left, right) => Number(right.triggeredAt || 0) - Number(left.triggeredAt || 0))
+        .slice(0, 10)
     appendBleedTriggerEvents(events)
     applyTalentVisualState(events)
 }
@@ -2048,17 +2176,28 @@ function triggerTalentEventDamageBursts(events) {
         return
     }
     for (const event of events) {
-        if (event.effectType !== 'bleed' || Number(event.extraDamage || 0) <= 0) {
+        const effectType = String(event.effectType || '')
+        if (Number(event.extraDamage || 0) <= 0) {
             continue
         }
         if (event.partX === undefined || event.partY === undefined) {
             continue
         }
-        triggerBleedBurst(`boss-part:${event.partX}-${event.partY}`, {
-            bossDamage: Number(event.extraDamage || 0),
-            damageType: 'bleed',
-            effectType: 'bleed',
-        })
+        if (effectType === 'bleed') {
+            triggerBleedBurst(`boss-part:${event.partX}-${event.partY}`, {
+                bossDamage: Number(event.extraDamage || 0),
+                damageType: 'bleed',
+                effectType: 'bleed',
+            })
+            continue
+        }
+        if (effectType === 'magic_burst' || effectType === 'magic_starfall') {
+            triggerDamageBurst(`boss-part:${event.partX}-${event.partY}`, {
+                bossDamage: Number(event.extraDamage || 0),
+                damageType: 'magic',
+                effectType,
+            })
+        }
     }
 }
 
@@ -2343,6 +2482,11 @@ function normalizeDamageVariant(rawType) {
         true: 'trueDamage',
         true_damage: 'trueDamage',
         truedamage: 'trueDamage',
+        magic: 'magic',
+        magic_burst: 'magic',
+        magic_starfall: 'magic',
+        magic_damage: 'magic',
+        arcane: 'magic',
         pursuit: 'pursuit',
         followup: 'pursuit',
         normal: 'normal',

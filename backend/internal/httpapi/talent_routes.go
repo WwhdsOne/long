@@ -62,6 +62,7 @@ func (h *talentAPI) getState(ctx context.Context, c *app.RequestContext) {
 		"normal": core.GetTreeTalents(core.TalentTreeNormal),
 		"armor":  core.GetTreeTalents(core.TalentTreeArmor),
 		"crit":   core.GetTreeTalents(core.TalentTreeCrit),
+		"magic":  core.GetTreeTalents(core.TalentTreeMagic),
 	}
 
 	userState, err := h.store.GetUserState(ctx, nickStr)
@@ -164,6 +165,11 @@ func (h *talentAPI) getDefs(ctx context.Context, c *app.RequestContext) {
 				"name":                  "致命洞察",
 				"talents":               defsToMap(core.GetTreeTalents(core.TalentTreeCrit)),
 				"tierCompletionBonuses": core.TalentTierCompletionBonusLabels(core.TalentTreeCrit),
+			},
+			"magic": map[string]any{
+				"name":                  "奥术潮汐",
+				"talents":               defsToMap(core.GetTreeTalents(core.TalentTreeMagic)),
+				"tierCompletionBonuses": core.TalentTierCompletionBonusLabels(core.TalentTreeMagic),
 			},
 		},
 	}

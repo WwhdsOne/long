@@ -23,4 +23,13 @@ describe('effectAssets', () => {
     it('未命中映射时会回退到本地 effects 目录', () => {
         expect(effectAssetUrl('future-effect.png')).toBe('/effects/future-effect.png')
     })
+
+    it('魔法系图标走正式 OSS 映射，不再复用旧系远端图标', () => {
+        expect(effectAssetUrl('talent-magic_core.png')).toBe(
+            'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-magic_core.png',
+        )
+        expect(effectAssetUrl('talent-magic_ultimate.png')).toBe(
+            'https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/talent-magic_ultimate.png',
+        )
+    })
 })

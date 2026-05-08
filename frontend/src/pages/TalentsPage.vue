@@ -55,14 +55,43 @@ function confirmCancel() {
 }
 
 const treeConfig = {
-  normal: {name: '均衡攻势', color: '#2bb873'},
-  armor: {name: '碎盾攻坚', color: '#c48a33'},
-  crit: {name: '致命洞察', color: '#ca3e59'},
+  normal: {
+    name: '均衡攻势',
+    color: '#2bb873',
+    buttonBg: 'linear-gradient(135deg, rgba(13, 53, 33, 0.96), rgba(23, 102, 61, 0.92))',
+    buttonBorder: 'rgba(74, 222, 128, 0.34)',
+    buttonText: '#d9ffe8',
+    buttonGlow: 'rgba(52, 211, 153, 0.28)',
+  },
+  armor: {
+    name: '碎盾攻坚',
+    color: '#d8a63a',
+    buttonBg: 'linear-gradient(135deg, rgba(61, 40, 10, 0.96), rgba(133, 91, 25, 0.92))',
+    buttonBorder: 'rgba(251, 191, 36, 0.34)',
+    buttonText: '#fff0c2',
+    buttonGlow: 'rgba(245, 158, 11, 0.28)',
+  },
+  crit: {
+    name: '弱点洞悉',
+    color: '#d9485f',
+    buttonBg: 'linear-gradient(135deg, rgba(61, 15, 27, 0.96), rgba(130, 28, 47, 0.92))',
+    buttonBorder: 'rgba(251, 113, 133, 0.34)',
+    buttonText: '#ffe0e6',
+    buttonGlow: 'rgba(244, 63, 94, 0.28)',
+  },
+  magic: {
+    name: '奥术潮汐',
+    color: '#7c6cff',
+    buttonBg: 'linear-gradient(135deg, rgba(18, 28, 68, 0.98), rgba(70, 39, 148, 0.94) 48%, rgba(33, 109, 194, 0.96))',
+    buttonBorder: 'rgba(129, 140, 248, 0.44)',
+    buttonText: '#eef2ff',
+    buttonGlow: 'rgba(96, 165, 250, 0.28)',
+  },
 }
 
 const tierLabels = {0: '基石', 1: '一阶', 2: '二阶', 3: '三阶', 4: '终极'}
 const tierRadiusPercent = {0: 14, 1: 28, 2: 42, 3: 56, 4: 70}
-const trees = ['normal', 'armor', 'crit']
+const trees = ['normal', 'armor', 'crit', 'magic']
 const arcStartAngle = 135
 const arcEndAngle = 45
 const talentCostLevelExponent = 0.85
@@ -582,8 +611,14 @@ watch(isLoggedIn, (val) => {
                 v-for="tree in trees"
                 :key="`main-${tree}`"
                 class="talent-select__btn"
-                :class="{ 'talent-select__btn--active': selectedTree === tree }"
-                :style="{ '--tree-color': treeConfig[tree].color }"
+                :class="[`talent-select__btn--${tree}`, { 'talent-select__btn--active': selectedTree === tree }]"
+                :style="{
+                  '--tree-color': treeConfig[tree].color,
+                  '--tree-button-bg': treeConfig[tree].buttonBg,
+                  '--tree-button-border': treeConfig[tree].buttonBorder,
+                  '--tree-button-text': treeConfig[tree].buttonText,
+                  '--tree-button-glow': treeConfig[tree].buttonGlow,
+                }"
                 :disabled="loading"
                 @click="selectTree(tree)"
             >
@@ -841,24 +876,127 @@ watch(isLoggedIn, (val) => {
 }
 
 .talent-select__btn {
-  border: 1px solid #35515d;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--tree-button-border, #35515d);
   border-radius: 999px;
-  background: #132933;
-  color: #dbe9f1;
+  background: var(--tree-button-bg, #132933);
+  color: var(--tree-button-text, #dbe9f1);
   cursor: pointer;
-  padding: 0.32rem 0.76rem;
+  padding: 0.42rem 0.92rem;
   font-size: 0.84rem;
-  transition: border-color 0.2s ease;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, filter 0.2s ease;
+}
+
+.talent-select__btn::before,
+.talent-select__btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.talent-select__btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.talent-select__btn--magic {
+  background:
+      radial-gradient(circle at 18% 28%, rgba(125, 211, 252, 0.18), transparent 30%),
+      radial-gradient(circle at 82% 38%, rgba(167, 139, 250, 0.22), transparent 34%),
+      var(--tree-button-bg, linear-gradient(135deg, rgba(18, 28, 68, 0.98), rgba(70, 39, 148, 0.94) 48%, rgba(33, 109, 194, 0.96)));
+  background-size: 160% 160%;
+  animation: magic-button-flow 7.2s linear infinite;
+}
+
+.talent-select__btn--magic::before {
+  inset: -32%;
+  background:
+      radial-gradient(circle at 24% 36%, rgba(129, 140, 248, 0.32), transparent 22%),
+      radial-gradient(circle at 74% 46%, rgba(56, 189, 248, 0.24), transparent 26%);
+  mix-blend-mode: screen;
+  opacity: 0.78;
+  transform: translate3d(-4%, 0, 0) scale(1.02);
+  animation: magic-button-aura 6.4s ease-in-out infinite;
+}
+
+.talent-select__btn--magic::after {
+  inset: -18%;
+  background: linear-gradient(118deg, transparent 26%, rgba(255, 255, 255, 0.2) 49%, transparent 72%);
+  opacity: 0.5;
+  transform: translate3d(-46%, 0, 0) rotate(-6deg);
+  animation: magic-button-sheen 5.2s ease-in-out infinite;
+}
+
+.talent-select__btn--magic:hover:not(:disabled) {
+  filter: brightness(1.08) saturate(1.08);
 }
 
 .talent-select__btn--active {
   border-color: var(--tree-color, #2bb873);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tree-color, #2bb873) 40%, transparent);
+  box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--tree-color, #2bb873) 48%, transparent),
+      0 10px 24px var(--tree-button-glow, rgba(43, 184, 115, 0.22)),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.talent-select__btn--magic.talent-select__btn--active {
+  box-shadow:
+      0 0 0 1px rgba(129, 140, 248, 0.58),
+      0 0 18px rgba(96, 165, 250, 0.24),
+      0 12px 28px rgba(79, 70, 229, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .talent-select__btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+@keyframes magic-button-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes magic-button-aura {
+  0% {
+    transform: translate3d(-6%, 0, 0) scale(1.01);
+    opacity: 0.64;
+  }
+  50% {
+    transform: translate3d(5%, -1%, 0) scale(1.08);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(-6%, 0, 0) scale(1.01);
+    opacity: 0.64;
+  }
+}
+
+@keyframes magic-button-sheen {
+  0% {
+    transform: translate3d(-56%, 0, 0) rotate(-6deg);
+    opacity: 0.12;
+  }
+  45% {
+    opacity: 0.56;
+  }
+  100% {
+    transform: translate3d(62%, 0, 0) rotate(-6deg);
+    opacity: 0.14;
+  }
 }
 
 .talent-guide {

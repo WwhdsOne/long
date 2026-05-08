@@ -670,6 +670,9 @@ const TALENT_EFFECT_WINDOW_MS = 1350
 const BLEED_EFFECT_WINDOW_MS = 1200
 const ULTIMATE_EFFECT_WINDOW_MS = 3200
 const JUDGMENT_DAY_EFFECT_WINDOW_MS = 5000
+const STARFALL_EFFECT_WINDOW_MS = 9200
+const MAGIC_BURST_EFFECT_WINDOW_MS = 1600
+const MAGIC_RUPTURE_EFFECT_WINDOW_MS = 1800
 
 function slashOverlayStyle() {
   const recent = talentTriggerFeed.value[0]
@@ -703,6 +706,7 @@ function recentBleedTriggers(windowMs = BLEED_EFFECT_WINDOW_MS) {
 }
 
 function isTriggerFresh(entry, windowMs = TALENT_EFFECT_WINDOW_MS) {
+  void nowTick.value
   if (!entry) return false
   const at = Number(entry.triggeredAt || 0)
   if (!Number.isFinite(at) || at <= 0) return false
@@ -1013,6 +1017,18 @@ const silverStormActive = computed(() => {
                       class="part-progress-panel__bar-fill part-progress-panel__bar-fill--armor"
                       :style="{ width: p.armorProgress + '%' }"></span></span>
                 </span>
+                  <span v-if="p.magic > 0" class="part-progress-panel__track part-progress-panel__track--magic">
+                  回响层数 {{ p.magic }}/{{ p.magicTrigger }}
+                  <span class="part-progress-panel__bar"><span
+                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--magic"
+                      :style="{ width: p.magicProgress + '%' }"></span></span>
+                </span>
+                  <span v-if="p.magicTriggered > 0" class="part-progress-panel__track part-progress-panel__track--magic-ultimate">
+                  潮爆 {{ p.magicTriggered }}/{{ p.magicUltimateTrigger }}
+                  <span class="part-progress-panel__bar"><span
+                      class="part-progress-panel__bar-fill part-progress-panel__bar-fill--magic-ultimate"
+                      :style="{ width: p.magicUltimateProgress + '%' }"></span></span>
+                </span>
                   <span v-if="p.type === 'heavy' && p.judgmentDay > 0"
                         class="part-progress-panel__track part-progress-panel__track--judgment-day">
                   审判日 {{ p.judgmentDay }}/{{ judgmentDayTrigger }}
@@ -1238,6 +1254,7 @@ const silverStormActive = computed(() => {
                 <span class="boss-right-legend__item boss-right-legend__item--pursuit">追击</span>
                 <span class="boss-right-legend__item boss-right-legend__item--true"><span
                     class="boss-right-legend__icon">⚡</span>真实伤害</span>
+                <span class="boss-right-legend__item boss-right-legend__item--magic">🔮 魔法伤害</span>
                 <span class="boss-right-legend__item boss-right-legend__item--doomsday">💀 削血</span>
                 <span class="boss-right-legend__item boss-right-legend__item--judgement">K.O. 终结</span>
               </div>
@@ -1299,6 +1316,24 @@ const silverStormActive = computed(() => {
                  class="talent-canvas-fx"
                  :style="effectOverlayStyle('judgment_day', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
               <PixelEffectCanvas effect="judgment_day" :size="bossGridEffectSize()" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('magic_burst', { scale: 2.45, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="magic_burst" :size="effectCanvasSize(2.45)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('magic_rupture', { scale: 2.65, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="magic_rupture" :size="effectCanvasSize(2.65)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('magic_starfall', STARFALL_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('magic_starfall', STARFALL_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('magic_starfall', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="magic_starfall" :size="ultimateEffectCanvasSize()" :loop="false"/>
             </div>
             <div v-if="hasRecentTrigger('doom_mark')"
                  :key="triggerKey('doom_mark')"

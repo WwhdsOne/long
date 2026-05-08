@@ -11,12 +11,20 @@ const armorTrigger = 50
 const autoStrikeTrigger = 8
 const autoStrikeWindowSec = 5
 const silverStormDurationSec = 15
+const magicEchoTrigger = 16
+const magicEchoDurationSec = 2
+const magicEchoCooldownSec = 32
 
 const silverStormEndsAt = ref(0)
 const omenStacks = ref(36)
 const collapseEndsAt = ref(0)
 const collapseDuration = ref(12)
 const collapsePartNames = ref(['胸甲核心'])
+const magicProcRate = ref(6.3)
+const magicDamageMultiplier = ref(2.46)
+const magicEchoStacks = ref(9)
+const magicEchoActiveEndsAt = ref(0)
+const magicEchoCooldownEndsAt = ref(0)
 
 const softStorm = ref(18)
 const heavyStorm = ref(34)
@@ -39,6 +47,8 @@ const partProgressList = computed(() => {
       autoStrikeProgress: 0,
       autoStrikeCountdown: 0,
       autoStrikeTimeoutPercent: 0,
+      magic: magicEchoStacks.value,
+      magicProgress: clampPercent((magicEchoStacks.value / magicEchoTrigger) * 100),
     },
     {
       key: 'heavy-2-2',
@@ -52,6 +62,8 @@ const partProgressList = computed(() => {
       autoStrikeProgress: clampPercent((autoStrikeCount.value / autoStrikeTrigger) * 100),
       autoStrikeCountdown,
       autoStrikeTimeoutPercent: clampPercent((autoStrikeCountdown / autoStrikeWindowSec) * 100),
+      magic: magicEchoStacks.value,
+      magicProgress: clampPercent((magicEchoStacks.value / magicEchoTrigger) * 100),
     },
   ]
 })
@@ -67,6 +79,11 @@ const collapsePercent = computed(() => {
   if (!collapseActive.value || collapseDuration.value <= 0) return 0
   return clampPercent((Math.max(0, collapseEndsAt.value - nowSec.value) / collapseDuration.value) * 100)
 })
+const magicEchoActive = computed(() => magicEchoActiveEndsAt.value > nowSec.value)
+const magicEchoCountdown = computed(() => Math.max(0, Math.ceil(magicEchoActiveEndsAt.value - nowSec.value)))
+const magicEchoPercent = computed(() => clampPercent((Math.max(0, magicEchoActiveEndsAt.value - nowSec.value) / magicEchoDurationSec) * 100))
+const magicEchoCooldown = computed(() => Math.max(0, Math.ceil(magicEchoCooldownEndsAt.value - nowSec.value)))
+const magicEchoCooldownPercent = computed(() => clampPercent((Math.max(0, magicEchoCooldownEndsAt.value - nowSec.value) / magicEchoCooldownSec) * 100))
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value))
@@ -88,6 +105,11 @@ function triggerCollapse() {
   pushTimer(collapseEndsAt, collapseDuration.value)
 }
 
+function triggerMagicEcho() {
+  pushTimer(magicEchoActiveEndsAt, magicEchoDurationSec)
+  magicEchoStacks.value = 0
+}
+
 function growStorm() {
   softStorm.value = Math.min(stormTrigger, softStorm.value + 8)
   heavyStorm.value = Math.min(stormTrigger, heavyStorm.value + 6)
@@ -100,6 +122,15 @@ function growArmor() {
 function growAutoStrike() {
   autoStrikeCount.value = Math.min(autoStrikeTrigger, autoStrikeCount.value + 1)
   pushTimer(autoStrikeEndsAt, autoStrikeWindowSec)
+}
+
+function growMagicEcho() {
+  magicEchoStacks.value = Math.min(magicEchoTrigger, magicEchoStacks.value + 2)
+}
+
+function consumeMagicEcho() {
+  pushTimer(magicEchoCooldownEndsAt, magicEchoCooldownSec)
+  magicEchoActiveEndsAt.value = 0
 }
 
 function applyPreset(mode) {
@@ -121,6 +152,13 @@ function applyPreset(mode) {
     triggerCollapse()
     return
   }
+  if (mode === 'magic') {
+    magicProcRate.value = 6.3
+    magicDamageMultiplier.value = 2.84
+    magicEchoStacks.value = 16
+    triggerMagicEcho()
+    return
+  }
   if (mode === 'all') {
     triggerSilverStorm()
     omenStacks.value = 120
@@ -130,6 +168,10 @@ function applyPreset(mode) {
     heavyArmor.value = 50
     autoStrikeCount.value = 8
     pushTimer(autoStrikeEndsAt, autoStrikeWindowSec)
+    magicProcRate.value = 6.3
+    magicDamageMultiplier.value = 3.12
+    magicEchoStacks.value = 16
+    triggerMagicEcho()
   }
 }
 
@@ -142,6 +184,11 @@ function resetDemo() {
   heavyArmor.value = 27
   autoStrikeCount.value = 5
   autoStrikeEndsAt.value = 0
+  magicProcRate.value = 6.3
+  magicDamageMultiplier.value = 2.46
+  magicEchoStacks.value = 9
+  magicEchoActiveEndsAt.value = 0
+  magicEchoCooldownEndsAt.value = 0
 }
 
 onBeforeUnmount(() => {
@@ -164,6 +211,7 @@ onBeforeUnmount(() => {
         <button type="button" class="nickname-form__submit" @click="applyPreset('silver')">白银风暴预设</button>
         <button type="button" class="nickname-form__submit" @click="applyPreset('doom')">死兆预设</button>
         <button type="button" class="nickname-form__submit" @click="applyPreset('armor')">破甲预设</button>
+        <button type="button" class="nickname-form__submit" @click="applyPreset('magic')">魔法预设</button>
         <button type="button" class="nickname-form__submit" @click="applyPreset('all')">全开预设</button>
         <button type="button" class="nickname-form__submit nickname-form__submit--ghost" @click="resetDemo">重置
         </button>
@@ -183,6 +231,13 @@ onBeforeUnmount(() => {
                   <span class="part-progress-panel__bar">
                     <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--storm"
                           :style="{ width: p.stormProgress + '%' }"></span>
+                  </span>
+                </span>
+                <span class="part-progress-panel__track part-progress-panel__track--magic">
+                  回响层数 {{ p.magic }}/{{ magicEchoTrigger }}
+                  <span class="part-progress-panel__bar">
+                    <span class="part-progress-panel__bar-fill part-progress-panel__bar-fill--magic"
+                          :style="{ width: p.magicProgress + '%' }"></span>
                   </span>
                 </span>
                 <span v-if="p.type === 'heavy'" class="part-progress-panel__track part-progress-panel__track--armor">
@@ -217,7 +272,35 @@ onBeforeUnmount(() => {
               <span class="collapse-panel__count">{{ collapseRemaining }}s</span>
             </div>
 
-            <div v-if="silverStormActive || showOmenRing" class="talent-status-bar">
+            <div class="arcane-rupture-panel">
+              <div class="arcane-rupture-panel__title">奥术裂解</div>
+              <div class="arcane-rupture-panel__meta">
+                <span>魔法触发率 {{ magicProcRate.toFixed(1) }}%</span>
+                <span>魔法伤害 {{ magicDamageMultiplier.toFixed(2) }}x</span>
+              </div>
+              <span v-if="magicEchoActive" class="arcane-rupture-panel__badge">奥术裂解 {{ magicEchoCountdown }}s</span>
+              <span v-else-if="magicEchoCooldown > 0" class="arcane-rupture-panel__badge arcane-rupture-panel__badge--cooldown">长 CD {{ magicEchoCooldown }}s</span>
+              <span class="arcane-rupture-panel__bar">
+                <span v-if="magicEchoActive" class="arcane-rupture-panel__bar-fill"
+                      :style="{ width: magicEchoPercent + '%' }"></span>
+                <span v-else class="arcane-rupture-panel__bar-fill arcane-rupture-panel__bar-fill--cooldown"
+                      :style="{ width: magicEchoCooldownPercent + '%' }"></span>
+              </span>
+            </div>
+
+            <div v-if="silverStormActive || showOmenRing || magicEchoActive" class="talent-status-bar">
+              <div v-if="magicEchoActive" class="talent-status-chip talent-status-chip--magic">
+                <span class="talent-status-chip__head">
+                  <span class="talent-status-chip__label">奥术裂解</span>
+                  <span class="talent-status-chip__count">{{ magicEchoCountdown }}s</span>
+                </span>
+                <span class="talent-status-chip__bar">
+                  <span
+                      class="talent-status-chip__bar-fill talent-status-chip__bar-fill--magic"
+                      :style="{ width: magicEchoPercent + '%' }"
+                  ></span>
+                </span>
+              </div>
               <div v-if="silverStormActive" class="talent-status-chip talent-status-chip--silver">
                 <span class="talent-status-chip__head">
                   <span class="talent-status-chip__label">白银风暴</span>
@@ -253,6 +336,7 @@ onBeforeUnmount(() => {
             <strong>持续 Buff</strong>
             <button type="button" class="nickname-form__submit" @click="triggerSilverStorm">触发白银风暴</button>
             <button type="button" class="nickname-form__submit" @click="triggerCollapse">触发护甲崩塌</button>
+            <button type="button" class="nickname-form__submit" @click="triggerMagicEcho">触发奥术裂解</button>
           </div>
 
           <div class="talent-buff-demo__card">
@@ -266,6 +350,8 @@ onBeforeUnmount(() => {
             <button type="button" class="nickname-form__submit" @click="growStorm">推进追击</button>
             <button type="button" class="nickname-form__submit" @click="growArmor">推进破甲</button>
             <button type="button" class="nickname-form__submit" @click="growAutoStrike">推进碎甲重击</button>
+            <button type="button" class="nickname-form__submit" @click="growMagicEcho">推进回响层数</button>
+            <button type="button" class="nickname-form__submit nickname-form__submit--ghost" @click="consumeMagicEcho">消耗保底触发</button>
           </div>
 
           <div class="talent-buff-demo__card talent-buff-demo__card--note">
@@ -274,6 +360,8 @@ onBeforeUnmount(() => {
             <span>死兆</span>
             <span>护甲崩塌</span>
             <span>碎甲重击累计</span>
+            <span>奥术裂解</span>
+            <span>魔法触发率</span>
           </div>
         </aside>
       </div>

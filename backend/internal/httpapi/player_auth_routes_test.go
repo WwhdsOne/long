@@ -215,6 +215,13 @@ func TestBattleStateOmitsInventoryAndLegacyRewardFields(t *testing.T) {
 			Gold:          12,
 			Stones:        34,
 			TalentPoints:  56,
+			TalentCombatState: &core.TalentCombatState{
+				MagicEchoRequiredHits: 24,
+				MagicEchoCooldownSec:  40,
+				MagicUltimateTrigger:  7,
+				MagicUltimateCooldown: 32,
+				PartMagicTriggerCount: map[string]int64{"2-2": 3},
+			},
 		},
 	}
 	handler := NewHandler(Options{
@@ -245,6 +252,16 @@ func TestBattleStateOmitsInventoryAndLegacyRewardFields(t *testing.T) {
 	}
 	if _, ok := payload["recentRewards"]; !ok {
 		t.Fatalf("battle state should include recentRewards, got %+v", payload)
+	}
+	talentCombatState, ok := payload["talentCombatState"].(map[string]any)
+	if !ok {
+		t.Fatalf("battle state should include talentCombatState, got %+v", payload)
+	}
+	if got := int64(talentCombatState["magicEchoRequiredHits"].(float64)); got != 24 {
+		t.Fatalf("expected magicEchoRequiredHits 24, got %d", got)
+	}
+	if got := int64(talentCombatState["magicUltimateTrigger"].(float64)); got != 7 {
+		t.Fatalf("expected magicUltimateTrigger 7, got %d", got)
 	}
 }
 

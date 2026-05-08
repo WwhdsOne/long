@@ -1,0 +1,78 @@
+{
+  "name": "talent-magic_echo_mark",
+  "size": [
+    48,
+    48
+  ],
+  "constraints": {
+    "maxPixels": 13,
+    "allowAlpha": false
+  },
+  "pixels": [
+    {
+      "x": 24,
+      "y": 8,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 24,
+      "y": 40,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 8,
+      "y": 24,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 40,
+      "y": 24,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 19,
+      "y": 19,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 29,
+      "y": 19,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 19,
+      "y": 29,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 29,
+      "y": 29,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 22,
+      "y": 22,
+      "color": "#dbeafe"
+    },
+    {
+      "x": 26,
+      "y": 22,
+      "color": "#dbeafe"
+    },
+    {
+      "x": 24,
+      "y": 26,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 15,
+      "y": 14,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 33,
+      "y": 14,
+      "color": "#3b82f6"
+    }
+  ]
+}

@@ -287,7 +287,6 @@ func parseEquipmentDraftJSON(raw []byte) (core.EquipmentDefinition, error) {
 		"itemId":               {},
 		"name":                 {},
 		"slot":                 {},
-		"description":          {},
 		"rarity":               {},
 		"attackPower":          {},
 		"armorPenPercent":      {},
@@ -295,8 +294,9 @@ func parseEquipmentDraftJSON(raw []byte) (core.EquipmentDefinition, error) {
 		"partTypeDamageSoft":   {},
 		"partTypeDamageHeavy":  {},
 		"partTypeDamageWeak":   {},
-		"talentAffinity":       {},
 		"critRate":             {},
+		"magicProcRateBonus":   {},
+		"magicDamageBonus":     {},
 	}
 
 	numericFields := []string{
@@ -307,16 +307,14 @@ func parseEquipmentDraftJSON(raw []byte) (core.EquipmentDefinition, error) {
 		"partTypeDamageHeavy",
 		"partTypeDamageWeak",
 		"critRate",
+		"magicProcRateBonus",
+		"magicDamageBonus",
 	}
 	for _, key := range numericFields {
 		if _, ok := fields[key]; !ok {
 			fields[key] = json.RawMessage("0")
 		}
 	}
-	if _, ok := fields["talentAffinity"]; !ok {
-		fields["talentAffinity"] = json.RawMessage(`""`)
-	}
-
 	raw, _ = sonic.Marshal(fields)
 
 	for key := range fields {
@@ -453,7 +451,7 @@ func validateEquipmentDraft(draft core.EquipmentDefinition) error {
 	if !allowedString(draft.Rarity, []string{"普通", "优秀", "稀有", "史诗", "传说", "至臻"}) {
 		return fmt.Errorf("%w: invalid rarity", ErrInvalidEquipmentDraft)
 	}
-	if !allowedString(draft.TalentAffinity, []string{"", "normal", "armor", "crit"}) {
+	if !allowedString(draft.TalentAffinity, []string{"", "normal", "armor", "crit", "magic"}) {
 		return fmt.Errorf("%w: invalid talentAffinity", ErrInvalidEquipmentDraft)
 	}
 
@@ -509,26 +507,6 @@ func validateEquipmentDraft(draft core.EquipmentDefinition) error {
 		}
 	}
 
-	// 通用装备：attackPower 应接近中位值
-	if draft.TalentAffinity == "" {
-		midAttack := bounds.attackMin + (bounds.attackMax-bounds.attackMin)/2
-		lower := bounds.attackMin + (bounds.attackMax-bounds.attackMin)/4
-		upper := bounds.attackMin + (bounds.attackMax-bounds.attackMin)*3/4
-		if draft.AttackPower < lower || draft.AttackPower > upper {
-			return fmt.Errorf("%w: 通用装备 attackPower %d 应接近 %s %s 中位值 %d，允许范围 [%d, %d]",
-				ErrInvalidEquipmentDraft, draft.AttackPower, draft.Rarity, draft.Slot, midAttack, lower, upper)
-		}
-		if draft.CritDamageMultiplier > bounds.critMax*0.5 {
-			return fmt.Errorf("%w: 通用装备 critDamageMultiplier 不应超过上限的 50%%", ErrInvalidEquipmentDraft)
-		}
-		if draft.ArmorPenPercent > bounds.armorPenMax*0.5 {
-			return fmt.Errorf("%w: 通用装备 armorPenPercent 不应超过上限的 50%%", ErrInvalidEquipmentDraft)
-		}
-		if draft.CritRate > bounds.critRateMax*0.5 {
-			return fmt.Errorf("%w: 通用装备 critRate 不应超过上限的 50%%", ErrInvalidEquipmentDraft)
-		}
-	}
-
 	return nil
 }
 
@@ -571,23 +549,17 @@ func equipmentDraftSystemPromptForRarity(rarity string) string {
 	slotLines := make([]string, 0, 6)
 	for _, slot := range []string{"weapon", "gloves", "helmet", "chest", "legs", "accessory"} {
 		r := ranges[slot]
-		lower := r.attackMin + (r.attackMax-r.attackMin)/4
-		upper := r.attackMin + (r.attackMax-r.attackMin)*3/4
 
 		line := fmt.Sprintf(
 			"%s %s：attackPower %d~%d，critRate 0~%.2f，critDamageMultiplier 0~%.2f，armorPenPercent 0~%.2f，partTypeDamage 三项各 0~%.2f",
 			rarity, slot, r.attackMin, r.attackMax, r.critRateMax, r.critMax, r.armorPenMax, r.softMax,
-		)
-		line += fmt.Sprintf(
-			"；若 talentAffinity=\"\"（通用装备），则 attackPower 限制在 %d~%d，critRate不超过%.2f，critDamageMultiplier不超过%.2f，armorPenPercent不超过%.2f",
-			lower, upper, r.critRateMax*0.5, r.critMax*0.5, r.armorPenMax*0.5,
 		)
 		slotLines = append(slotLines, line)
 	}
 
 	prompt := strings.Join([]string{
 		"你是装备数值策划，只能输出符合 JSON Schema 的装备草稿。",
-		"三主系：normal=均衡攻势，armor=碎盾攻坚，crit=致命洞察。",
+		"四主系：normal=均衡攻势，armor=碎盾攻坚，crit=致命洞察，magic=奥术潮汐。",
 		"部位类型只允许 weapon、helmet、chest、gloves、legs、accessory。",
 		fmt.Sprintf("本次只生成 %s 稀有度的装备，最终数值必须严格遵守下方给出的范围。", rarity),
 		"所有百分比用 0.2 这类小数表示。",
@@ -595,10 +567,8 @@ func equipmentDraftSystemPromptForRarity(rarity string) string {
 		"【所有部位最终数值范围（已含修正，直接使用，禁止自行乘法）】",
 		strings.Join(slotLines, "\n"),
 		"",
-		"talentAffinity 为空字符串表示通用装备，否则必须是 normal/armor/crit 之一。",
-		"description 是用中文描述装备外观和特点的文本。",
 		"返回必须是完整 JSON 对象，不要 Markdown，不要解释。",
-		"输出的 JSON 要求：itemId 必须是字符串，其余字段为 name, slot, rarity, description, attackPower, armorPenPercent, critRate, critDamageMultiplier, partTypeDamageSoft, partTypeDamageHeavy, partTypeDamageWeak, talentAffinity。",
+		"输出的 JSON 要求：itemId 必须是字符串，其余字段为 name, slot, rarity, attackPower, armorPenPercent, critRate, critDamageMultiplier, partTypeDamageSoft, partTypeDamageHeavy, partTypeDamageWeak, magicProcRateBonus, magicDamageBonus。",
 	}, "\n")
 
 	return prompt

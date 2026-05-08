@@ -2872,6 +2872,8 @@ func TestGetEquipmentDefinitionReadsStableFields(t *testing.T) {
 		"part_type_damage_soft":      "1.1",
 		"part_type_damage_heavy":     "1.2",
 		"part_type_damage_weak":      "1.4",
+		"magic_proc_rate_bonus":      "0.03",
+		"magic_damage_bonus":         "0.45",
 		"talent_affinity":            "crit",
 		"unused_field_should_ignore": "x",
 	}).Err(); err != nil {
@@ -2885,7 +2887,7 @@ func TestGetEquipmentDefinitionReadsStableFields(t *testing.T) {
 	if definition.Name != "测试长剑" || definition.Slot != "weapon" || definition.AttackPower != 18 {
 		t.Fatalf("expected stable equipment definition fields, got %+v", definition)
 	}
-	if definition.TalentAffinity != "crit" || definition.PartTypeDamageWeak != 1.4 {
+	if definition.TalentAffinity != "crit" || definition.PartTypeDamageWeak != 1.4 || definition.MagicProcRateBonus != 0.03 || definition.MagicDamageBonus != 0.45 {
 		t.Fatalf("expected extended equipment fields, got %+v", definition)
 	}
 }

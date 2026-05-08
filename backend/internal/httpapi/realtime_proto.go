@@ -436,6 +436,8 @@ func toProtoInventoryItem(item *core.InventoryItem) *realtimepb.InventoryItem {
 		PartTypeDamageSoft:   item.PartTypeDamageSoft,
 		PartTypeDamageHeavy:  item.PartTypeDamageHeavy,
 		PartTypeDamageWeak:   item.PartTypeDamageWeak,
+		MagicProcRateBonus:   item.MagicProcRateBonus,
+		MagicDamageBonus:     item.MagicDamageBonus,
 	}
 }
 
@@ -472,6 +474,8 @@ func toProtoCombatStats(stats *core.CombatStats) *realtimepb.CombatStats {
 		PerPartDamagePercent:  stats.PerPartDamagePercent,
 		LowHpMultiplier:       stats.LowHpMultiplier,
 		LowHpThreshold:        stats.LowHpThreshold,
+		MagicProcRate:         stats.MagicProcRate,
+		MagicDamageMultiplier: stats.MagicDamageMultiplier,
 	}
 }
 
@@ -571,6 +575,17 @@ func toProtoTalentCombatState(state *core.TalentCombatState) *realtimepb.TalentC
 		JudgmentDayTriggerCount: state.JudgmentDayTriggerCount,
 		AutoStrikeTriggerCount:  state.AutoStrikeTriggerCount,
 		AutoStrikeWindowSec:     state.AutoStrikeWindowSec,
+		MagicEchoTargetPart:     state.MagicEchoTargetPart,
+		MagicEchoStacks:         state.MagicEchoStacks,
+		MagicEchoExpiresAt:      state.MagicEchoExpiresAt,
+		MagicEchoCooldownEndsAt: state.MagicEchoCooldownEndsAt,
+		MagicEchoWindowSec:      state.MagicEchoWindowSec,
+		MagicEchoRequiredHits:   state.MagicEchoRequiredHits,
+		MagicEchoCooldownSec:    state.MagicEchoCooldownSec,
+		MagicUltimateTrigger:    state.MagicUltimateTrigger,
+		MagicUltimateCooldown:   state.MagicUltimateCooldown,
+		MagicUltimateCooldownAt: state.MagicUltimateCooldownAt,
+		PartMagicTriggerCount:   cloneInt64Map(state.PartMagicTriggerCount),
 	}
 }
 

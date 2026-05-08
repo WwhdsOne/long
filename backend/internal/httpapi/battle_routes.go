@@ -41,6 +41,7 @@ func registerBattleRoutes(router route.IRouter, options Options) {
 			"stones":              state.Stones,
 			"talentPoints":        state.TalentPoints,
 			"recentRewards":       state.RecentRewards,
+			"talentCombatState":   state.TalentCombatState,
 		}
 		resources, err := options.Store.GetBossResources(ctx)
 		if reader, ok := options.Store.(interface {

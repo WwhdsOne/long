@@ -376,8 +376,12 @@ export function createAdminPageActions(state) {
                 method,
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    ...equipmentForm.value,
+                    itemId: equipmentForm.value.itemId,
+                    name: equipmentForm.value.name,
+                    slot: equipmentForm.value.slot,
                     rarity: equipmentForm.value.rarity,
+                    imagePath: equipmentForm.value.imagePath,
+                    imageAlt: equipmentForm.value.imageAlt,
                     attackPower: Number(equipmentForm.value.attackPower),
                     armorPenPercent: Number(equipmentForm.value.armorPenPercent),
                     critRate: Number(equipmentForm.value.critRate),
@@ -386,7 +390,8 @@ export function createAdminPageActions(state) {
                     partTypeDamageSoft: Number(equipmentForm.value.partTypeDamageSoft),
                     partTypeDamageHeavy: Number(equipmentForm.value.partTypeDamageHeavy),
                     partTypeDamageWeak: Number(equipmentForm.value.partTypeDamageWeak),
-                    talentAffinity: equipmentForm.value.talentAffinity,
+                    magicProcRateBonus: Number(equipmentForm.value.magicProcRateBonus),
+                    magicDamageBonus: Number(equipmentForm.value.magicDamageBonus),
                 }),
             })
             if (!response.ok) {

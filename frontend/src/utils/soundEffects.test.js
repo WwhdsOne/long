@@ -40,6 +40,9 @@ describe('soundEffects', () => {
     it('能按名称解析战斗和操作音效地址', () => {
         expect(resolveSoundEffectUrl('白银风暴')).toBe('/sfx/battle/trigger/silver-storm.wav')
         expect(resolveSoundEffectUrl('storm_combo')).toBe('/sfx/battle/trigger/pursuit.wav')
+        expect(resolveSoundEffectUrl('奥术爆裂')).toBe('/sfx/battle/trigger/magic-burst.wav')
+        expect(resolveSoundEffectUrl('奥术裂解')).toBe('/sfx/battle/trigger/magic-rupture.wav')
+        expect(resolveSoundEffectUrl('星陨潮爆')).toBe('/sfx/battle/trigger/magic-starfall.wav')
         expect(resolveSoundEffectUrl('重甲')).toBe('/sfx/battle/click/heavy.wav')
         expect(resolveSoundEffectUrl('穿戴')).toBe('/sfx/battle/trigger/action-equip.wav')
         expect(resolveSoundEffectUrl('分解')).toBe('/sfx/battle/trigger/action-salvage.wav')
@@ -100,6 +103,21 @@ describe('soundEffects', () => {
         vi.advanceTimersByTime(35)
         expect(globalThis.Audio).toHaveBeenCalledTimes(2)
         expect(globalThis.Audio.mock.results[1].value.volume).toBe(0.72)
+    })
+
+    it('魔法系触发音效走独立资源文件', () => {
+        expect(playBattleTriggerSound('奥术爆裂')).toBe(true)
+        vi.advanceTimersByTime(160)
+        expect(globalThis.Audio).toHaveBeenCalledWith('/sfx/battle/trigger/magic-burst.wav')
+
+        globalThis.Audio.mockClear()
+        expect(playBattleTriggerSound('奥术裂解')).toBe(true)
+        expect(globalThis.Audio).toHaveBeenCalledWith('/sfx/battle/trigger/magic-rupture.wav')
+
+        globalThis.Audio.mockClear()
+        expect(playBattleTriggerSound('星陨潮爆')).toBe(true)
+        vi.advanceTimersByTime(480)
+        expect(globalThis.Audio).toHaveBeenCalledWith('/sfx/battle/trigger/magic-starfall.wav')
     })
 
     it('能按操作名称播放 UI 音效', () => {

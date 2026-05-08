@@ -62,6 +62,26 @@ const smallEffects = [
     tagClass: 'tag--soft',
     note: '从顶部到底部快速刷出更多、更粗的随机银色刀光，落底后短暂残留并伴随轻微闪白。'
   },
+  {
+    key: 'magic_burst',
+    name: '奥术爆裂',
+    skill: '魔力涌流',
+    trigger: 'magic_burst',
+    layer: 'L2 + L3',
+    tag: '奥能',
+    tagClass: 'tag--best',
+    note: '一道蓝白闪电从上方霹雳直落到目标格，命中后会回卷出电弧和余辉火花，单点打击更饱满。'
+  },
+  {
+    key: 'magic_rupture',
+    name: '奥术裂解',
+    skill: '回响刻印',
+    trigger: 'magic_rupture',
+    layer: 'L1 + L2',
+    tag: '保底',
+    tagClass: 'tag--heavy',
+    note: '几颗奥术蓝紫法球在格心短暂显现，随即像符文玻璃一样向周围碎裂，提示保底即将生效。'
+  },
 ]
 
 const ultimateSkills = [
@@ -92,6 +112,15 @@ const ultimateSkills = [
     tag: '连斩',
     tagClass: 'tag--soft',
     note: '同样使用真实战斗页 5x5 终极技能画布。覆盖层直接铺满整块网格，用来观察白银风暴在实战尺寸下的刀光密度、宽度和留场效果。',
+  },
+  {
+    key: 'magic_starfall',
+    name: '星陨潮爆',
+    skill: '星陨潮爆',
+    trigger: 'magic_starfall',
+    tag: '天穹',
+    tagClass: 'tag--best',
+    note: '先有一颗蓝紫流星从左上斜坠砸进 5x5 中心，落地先炸出陨坑感爆裂，再接原本的全场扩散星潮。'
   },
 ]
 

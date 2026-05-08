@@ -102,12 +102,13 @@ describe('装备草稿生成动作', () => {
                     imageAlt: '',
                     attackPower: 12,
                     armorPenPercent: 0.2,
+                    critRate: 0.06,
                     critDamageMultiplier: 1.5,
-                    bossDamagePercent: 0.1,
                     partTypeDamageSoft: 0.35,
                     partTypeDamageHeavy: 0,
                     partTypeDamageWeak: 0.15,
-                    talentAffinity: 'normal',
+                    magicProcRateBonus: 0.018,
+                    magicDamageBonus: 0.24,
                 },
             }),
         }))
@@ -118,11 +119,12 @@ describe('装备草稿生成动作', () => {
         expect(global.fetch).toHaveBeenCalledWith('/api/admin/equipment/generate', expect.objectContaining({method: 'POST'}))
         expect(state.equipmentForm.value.itemId).toBe('soft-blade')
         expect(state.equipmentForm.value.attackPower).toBe(12)
+        expect(state.equipmentForm.value.magicProcRateBonus).toBe(0.018)
         expect(state.fetchEquipmentPage).not.toHaveBeenCalled()
         expect(state.showEquipmentEditor.value).toBe(true)
     })
 
-    it('保存装备时会提交 critRate 数值字段', async () => {
+    it('保存装备时会提交魔法数值字段且不再提交天赋字段', async () => {
         const state = makeState()
         state.equipmentForm.value = {
             ...emptyEquipmentForm(),
@@ -134,6 +136,8 @@ describe('装备草稿生成动作', () => {
             armorPenPercent: '0.2',
             critRate: '0.22',
             critDamageMultiplier: '1.5',
+            magicProcRateBonus: '0.015',
+            magicDamageBonus: '0.3',
         }
 
         global.fetch = vi.fn(async () => ({
@@ -151,6 +155,9 @@ describe('装备草稿生成动作', () => {
 
         const body = JSON.parse(global.fetch.mock.calls[0][1].body)
         expect(body.critRate).toBe(0.22)
+        expect(body.magicProcRateBonus).toBe(0.015)
+        expect(body.magicDamageBonus).toBe(0.3)
+        expect(body.talentAffinity).toBeUndefined()
     })
 
     it('保存任务时会提交奖励和时间窗口数值字段', async () => {

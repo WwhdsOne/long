@@ -1,0 +1,78 @@
+{
+  "name": "talent-magic_splash",
+  "size": [
+    48,
+    48
+  ],
+  "constraints": {
+    "maxPixels": 13,
+    "allowAlpha": false
+  },
+  "pixels": [
+    {
+      "x": 24,
+      "y": 18,
+      "color": "#dbeafe"
+    },
+    {
+      "x": 24,
+      "y": 24,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 24,
+      "y": 30,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 14,
+      "y": 22,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 17,
+      "y": 19,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 18,
+      "y": 27,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 34,
+      "y": 22,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 31,
+      "y": 19,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 30,
+      "y": 27,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 21,
+      "y": 32,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 27,
+      "y": 32,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 22,
+      "y": 22,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 26,
+      "y": 22,
+      "color": "#7dd3fc"
+    }
+  ]
+}

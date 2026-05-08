@@ -1265,6 +1265,14 @@ select {
     border-color: rgba(192, 132, 252, 0.3);
 }
 
+.boss-right-legend__item--magic {
+    color: #a78bfa;
+    border-color: rgba(129, 140, 248, 0.34);
+    background: linear-gradient(90deg, rgba(30, 41, 59, 0.36), rgba(49, 46, 129, 0.2), rgba(91, 33, 182, 0.18));
+    text-shadow: 0 0 10px rgba(129, 140, 248, 0.3), 0 0 18px rgba(56, 189, 248, 0.22);
+    box-shadow: inset 0 0 10px rgba(96, 165, 250, 0.08);
+}
+
 .boss-right-legend__item--doomsday {
     color: #c084fc;
     border-color: rgba(192, 132, 252, 0.3);
@@ -4152,6 +4160,12 @@ select {
     text-shadow: 0 0 10px rgba(192, 132, 252, 0.45), 0 4px 14px rgba(15, 23, 42, 0.65);
 }
 
+.boss-zone-button__damage-burst--magic {
+    color: #a78bfa;
+    font-size: 1.02em;
+    text-shadow: 0 0 12px rgba(129, 140, 248, 0.55), 0 0 22px rgba(56, 189, 248, 0.3), 0 4px 14px rgba(15, 23, 42, 0.68);
+}
+
 .boss-zone-button__damage-burst--bleed {
     color: #f87171;
     font-size: 0.86em;
@@ -4633,6 +4647,11 @@ select {
     box-shadow: 0 0 6px rgba(192, 192, 192, 0.3);
 }
 
+.talent-status-chip--magic {
+    border-color: rgba(96, 165, 250, 0.36);
+    background: linear-gradient(135deg, rgba(17, 24, 39, 0.92), rgba(30, 27, 75, 0.94));
+}
+
 .talent-status-chip__head {
     display: flex;
     align-items: center;
@@ -4667,6 +4686,11 @@ select {
 
 .talent-status-chip__bar-fill--silver {
     background: linear-gradient(90deg, #f8fafc, #cbd5e1);
+}
+
+.talent-status-chip__bar-fill--magic {
+    background: linear-gradient(90deg, #38bdf8, #8b5cf6);
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.45);
 }
 
 @media (max-width: 768px) {
@@ -5602,6 +5626,44 @@ select {
     box-shadow: 0 0 8px rgba(191, 219, 254, 0.45);
 }
 
+.status-panel--magic_echo {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(49, 46, 129, 0.82));
+    border: 1px solid rgba(129, 140, 248, 0.3);
+}
+
+.status-panel--magic_echo .status-panel__title {
+    color: #c4b5fd;
+}
+
+.status-panel--magic_echo .status-panel__primary {
+    color: #e0e7ff;
+    text-shadow: 0 0 10px rgba(129, 140, 248, 0.28);
+}
+
+.status-panel__bar-fill--magic_echo {
+    background: linear-gradient(90deg, #38bdf8, #818cf8, #a78bfa);
+    box-shadow: 0 0 8px rgba(96, 165, 250, 0.42);
+}
+
+.status-panel--magic_ultimate {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.92), rgba(88, 28, 135, 0.82));
+    border: 1px solid rgba(167, 139, 250, 0.28);
+}
+
+.status-panel--magic_ultimate .status-panel__title {
+    color: #ddd6fe;
+}
+
+.status-panel--magic_ultimate .status-panel__primary {
+    color: #f5f3ff;
+    text-shadow: 0 0 12px rgba(167, 139, 250, 0.3);
+}
+
+.status-panel__bar-fill--magic_ultimate {
+    background: linear-gradient(90deg, #60a5fa, #8b5cf6, #fcd34d);
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.45);
+}
+
 /* 死兆面板 */
 .omen-panel {
     display: flex;
@@ -5878,6 +5940,14 @@ select {
     font-variant-numeric: tabular-nums;
 }
 
+.part-progress-panel__track--magic {
+    color: #c4b5fd;
+}
+
+.part-progress-panel__track--magic-ultimate {
+    color: #ddd6fe;
+}
+
 .part-progress-panel__bar {
     flex: 1;
     height: 4px;
@@ -5902,6 +5972,16 @@ select {
 .part-progress-panel__bar-fill--armor {
     background: linear-gradient(90deg, #f59e0b, #fbbf24);
     box-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
+}
+
+.part-progress-panel__bar-fill--magic {
+    background: linear-gradient(90deg, #38bdf8, #a78bfa);
+    box-shadow: 0 0 8px rgba(96, 165, 250, 0.55);
+}
+
+.part-progress-panel__bar-fill--magic-ultimate {
+    background: linear-gradient(90deg, #60a5fa, #8b5cf6, #fcd34d);
+    box-shadow: 0 0 8px rgba(139, 92, 246, 0.45);
 }
 
 .part-progress-panel__bar-fill--judgment-day {
@@ -6049,6 +6129,69 @@ select {
 
 .talent-buff-demo__card strong {
     font-size: 1rem;
+}
+
+.arcane-rupture-panel {
+    display: grid;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(96, 165, 250, 0.24);
+    background: linear-gradient(135deg, rgba(22, 30, 58, 0.96), rgba(34, 18, 67, 0.94));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.arcane-rupture-panel__title {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: #dbeafe;
+}
+
+.arcane-rupture-panel__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.68rem;
+    color: #bfdbfe;
+    font-variant-numeric: tabular-nums;
+}
+
+.arcane-rupture-panel__badge {
+    justify-self: start;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.18);
+    border: 1px solid rgba(96, 165, 250, 0.34);
+    color: #e0f2fe;
+    font-size: 0.66rem;
+    font-weight: 700;
+}
+
+.arcane-rupture-panel__badge--cooldown {
+    background: rgba(148, 163, 184, 0.14);
+    border-color: rgba(148, 163, 184, 0.28);
+    color: #cbd5e1;
+}
+
+.arcane-rupture-panel__bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.82);
+    overflow: hidden;
+}
+
+.arcane-rupture-panel__bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #38bdf8, #8b5cf6);
+    box-shadow: 0 0 10px rgba(96, 165, 250, 0.4);
+}
+
+.arcane-rupture-panel__bar-fill--cooldown {
+    background: linear-gradient(90deg, #64748b, #cbd5e1);
+    box-shadow: none;
 }
 
 .talent-buff-demo__card--note span {

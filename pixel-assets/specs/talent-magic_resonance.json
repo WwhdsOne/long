@@ -1,0 +1,73 @@
+{
+  "name": "talent-magic_resonance",
+  "size": [
+    48,
+    48
+  ],
+  "constraints": {
+    "maxPixels": 12,
+    "allowAlpha": false
+  },
+  "pixels": [
+    {
+      "x": 16,
+      "y": 20,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 32,
+      "y": 20,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 16,
+      "y": 28,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 32,
+      "y": 28,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 20,
+      "y": 17,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 28,
+      "y": 17,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 20,
+      "y": 31,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 28,
+      "y": 31,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 22,
+      "y": 22,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 26,
+      "y": 22,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 24,
+      "y": 24,
+      "color": "#dbeafe"
+    },
+    {
+      "x": 24,
+      "y": 28,
+      "color": "#1e3a8a"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "name": "talent-magic_focus",
+  "size": [
+    48,
+    48
+  ],
+  "constraints": {
+    "maxPixels": 13,
+    "allowAlpha": false
+  },
+  "pixels": [
+    {
+      "x": 24,
+      "y": 10,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 19,
+      "y": 16,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 29,
+      "y": 16,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 16,
+      "y": 24,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 32,
+      "y": 24,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 19,
+      "y": 32,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 29,
+      "y": 32,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 24,
+      "y": 38,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 22,
+      "y": 21,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 26,
+      "y": 21,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 22,
+      "y": 27,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 26,
+      "y": 27,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 24,
+      "y": 24,
+      "color": "#dbeafe"
+    }
+  ]
+}

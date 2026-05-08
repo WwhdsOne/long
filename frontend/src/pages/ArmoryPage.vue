@@ -78,16 +78,6 @@ function formatArmorPenPercent(value) {
   return formatRatioPercentValue(value)
 }
 
-function formatPreviewPercent(value) {
-  const normalized = Number(value ?? 0)
-  const display = Math.abs(normalized) <= 1 ? normalized * 100 : normalized
-  return `${formatTrimmedNumber(display, 2)}%`
-}
-
-function formatPreviewBonusPercent(value) {
-  return `+${formatPreviewPercent(value)}`
-}
-
 const combatStatSummaryItems = computed(() => [
   {label: '攻击力', value: formatNumber(combatStats.value?.attackPower ?? 0)},
   {label: '暴击伤害', value: formatNumber(combatStats.value?.criticalDamage ?? 0)},
@@ -95,6 +85,8 @@ const combatStatSummaryItems = computed(() => [
   {label: '护甲穿透', value: formatArmorPenPercent(combatStats.value?.armorPenPercent ?? 0)},
   {label: '暴击倍率', value: formatCritDamageBonus(combatStats.value?.critDamageMultiplier ?? 0)},
   {label: '全伤害加成', value: formatRatioPercentValue(combatStats.value?.allDamageAmplify ?? 0)},
+  {label: '魔法触发率', value: formatRatioPercentValue(combatStats.value?.magicProcRate ?? 0)},
+  {label: '魔法伤害加成', value: formatRatioPercentValue((combatStats.value?.magicDamageMultiplier ?? 1) - 1)},
   {label: '软组织增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageSoft ?? 0)},
   {label: '重甲增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageHeavy ?? 0)},
   {label: '弱点增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageWeak ?? 0)},
@@ -369,6 +361,8 @@ function buildEnhancePreviewItem(item, levels) {
     partTypeDamageSoft: Number(item.partTypeDamageSoft || 0),
     partTypeDamageHeavy: Number(item.partTypeDamageHeavy || 0),
     partTypeDamageWeak: Number(item.partTypeDamageWeak || 0),
+    magicProcRateBonus: Number(item.magicProcRateBonus || 0),
+    magicDamageBonus: Number(item.magicDamageBonus || 0),
   }
 
   if (targetLevel === currentLevel) {
@@ -385,6 +379,8 @@ function buildEnhancePreviewItem(item, levels) {
   preview.partTypeDamageSoft = previewScaledStat(preview.partTypeDamageSoft, currentLevel, targetLevel)
   preview.partTypeDamageHeavy = previewScaledStat(preview.partTypeDamageHeavy, currentLevel, targetLevel)
   preview.partTypeDamageWeak = previewScaledStat(preview.partTypeDamageWeak, currentLevel, targetLevel)
+  preview.magicProcRateBonus = previewScaledStat(preview.magicProcRateBonus, currentLevel, targetLevel)
+  preview.magicDamageBonus = previewScaledStat(preview.magicDamageBonus, currentLevel, targetLevel)
 
   return preview
 }
@@ -419,10 +415,12 @@ const enhancePreviewStatRows = computed(() => {
   pushEnhancePreviewRow(rows, '攻击力', item.attackPower, preview.attackPower, (value) => formatNumber(value))
   pushEnhancePreviewRow(rows, '护甲穿透', item.armorPenPercent, preview.armorPenPercent, formatArmorPenPercent)
   pushEnhancePreviewRow(rows, '暴击率', item.critRate, preview.critRate, formatRatioPercentValue)
-  pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatPreviewBonusPercent)
-  pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatPreviewPercent)
-  pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatPreviewPercent)
-  pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatPreviewPercent)
+  pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatCritDamageBonus)
+  pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatRatioPercentValue)
+  pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatRatioPercentValue)
+  pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatRatioPercentValue)
+  pushEnhancePreviewRow(rows, '魔法触发率', item.magicProcRateBonus, preview.magicProcRateBonus, formatRatioPercentValue)
+  pushEnhancePreviewRow(rows, '魔法伤害加成', item.magicDamageBonus, preview.magicDamageBonus, formatRatioPercentValue)
   return rows
 })
 

@@ -121,6 +121,8 @@ func (s *Store) SaveEquipmentDefinition(ctx context.Context, definition Equipmen
 		"part_type_damage_soft":  strconv.FormatFloat(definition.PartTypeDamageSoft, 'f', -1, 64),
 		"part_type_damage_heavy": strconv.FormatFloat(definition.PartTypeDamageHeavy, 'f', -1, 64),
 		"part_type_damage_weak":  strconv.FormatFloat(definition.PartTypeDamageWeak, 'f', -1, 64),
+		"magic_proc_rate_bonus":  strconv.FormatFloat(definition.MagicProcRateBonus, 'f', -1, 64),
+		"magic_damage_bonus":     strconv.FormatFloat(definition.MagicDamageBonus, 'f', -1, 64),
 		"talent_affinity":        strings.TrimSpace(definition.TalentAffinity),
 	}
 

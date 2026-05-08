@@ -21,6 +21,7 @@ const (
 	TalentTreeNormal TalentTree = "normal" // 普攻 - 均衡攻势
 	TalentTreeArmor  TalentTree = "armor"  // 破甲 - 碎盾攻坚
 	TalentTreeCrit   TalentTree = "crit"   // 暴击 - 致命洞察
+	TalentTreeMagic  TalentTree = "magic"  // 魔法 - 奥术潮汐
 )
 
 const (
@@ -35,6 +36,7 @@ const (
 	TalentDefaultMaxLevel           = 5
 	TalentAutoStrikeWindowSec       = 5
 	TalentOmenStackCap              = 150
+	TalentMagicEchoWindowSec  int64 = 2
 
 	talentCostLevelExponent = 0.85
 	talentCostMultiplier    = 1.8
@@ -251,6 +253,31 @@ var talentDefs = map[string]TalentDef{
 	"crit_filler_t2b": {ID: "crit_filler_t2b", Tree: TalentTreeCrit, Tier: 2, MaxLevel: 5, Name: "喋血", EffectType: "omen_crit_damage", EffectValue: map[string]any{"critDmgPerOmen": 0.002}},
 	"crit_filler_t3a": {ID: "crit_filler_t3a", Tree: TalentTreeCrit, Tier: 3, MaxLevel: 5, Name: "追魂", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.15}},
 	"crit_filler_t3b": {ID: "crit_filler_t3b", Tree: TalentTreeCrit, Tier: 3, MaxLevel: 5, Name: "暴虐", EffectType: "crit_damage_bonus", EffectValue: map[string]any{"percent": 0.12}},
+
+	// ===== 魔法：奥术潮汐 =====
+	"magic_core":        {ID: "magic_core", Tree: TalentTreeMagic, Tier: 0, MaxLevel: 5, Name: "魔力涌流", EffectType: "magic_core", EffectValue: map[string]any{"procRate": 0.02, "mainRatio": 0.55, "splashRatio": 0.22}},
+	"magic_amp":         {ID: "magic_amp", Tree: TalentTreeMagic, Tier: 1, MaxLevel: 5, Name: "法术增幅", EffectType: "magic_damage_multiplier", EffectValue: map[string]any{"percent": 0.18}},
+	"magic_resonance":   {ID: "magic_resonance", Tree: TalentTreeMagic, Tier: 1, MaxLevel: 5, Name: "法术共鸣", EffectType: "magic_proc_rate", EffectValue: map[string]any{"percent": 0.006}},
+	"magic_splash":      {ID: "magic_splash", Tree: TalentTreeMagic, Tier: 1, MaxLevel: 5, Name: "余波扩散", EffectType: "magic_splash_multiplier", EffectValue: map[string]any{"percent": 0.10}},
+	"magic_focus":       {ID: "magic_focus", Tree: TalentTreeMagic, Tier: 2, MaxLevel: 5, Name: "奥能聚焦", EffectType: "magic_damage_multiplier", EffectValue: map[string]any{"percent": 0.20}},
+	"magic_echo_mark":   {ID: "magic_echo_mark", Tree: TalentTreeMagic, Tier: 2, MaxLevel: 5, Name: "回响刻印", EffectType: "magic_echo_mark", EffectValue: map[string]any{"hits": 28.0, "cooldown": 45.0}},
+	"magic_static_flux": {ID: "magic_static_flux", Tree: TalentTreeMagic, Tier: 2, MaxLevel: 5, Name: "静电外溢", EffectType: "magic_splash_multiplier", EffectValue: map[string]any{"percent": 0.08}},
+	"magic_pierce":      {ID: "magic_pierce", Tree: TalentTreeMagic, Tier: 3, MaxLevel: 5, Name: "秘法穿透", EffectType: "magic_armor_blunt", EffectValue: map[string]any{"percent": 0.08}},
+	"magic_chain_bound": {ID: "magic_chain_bound", Tree: TalentTreeMagic, Tier: 3, MaxLevel: 5, Name: "连锁约束", EffectType: "magic_damage_multiplier", EffectValue: map[string]any{"percent": 0.12}},
+	"magic_ultimate":    {ID: "magic_ultimate", Tree: TalentTreeMagic, Tier: 4, MaxLevel: 5, Name: "星陨潮爆", EffectType: "magic_starfall", EffectValue: map[string]any{"mainRatio": 44.0, "splashShare": 0.30, "triggerCount": 70.0, "cooldown": 0.0}},
+}
+
+var magicTalentCustomCosts = map[string]int64{
+	"magic_core":        12600,
+	"magic_amp":         5200,
+	"magic_resonance":   3000,
+	"magic_splash":      3000,
+	"magic_focus":       7600,
+	"magic_echo_mark":   4600,
+	"magic_static_flux": 4600,
+	"magic_pierce":      10800,
+	"magic_chain_bound": 6800,
+	"magic_ultimate":    26000,
 }
 
 var talentTierMainCosts = map[int]int64{
@@ -290,6 +317,13 @@ var tierCompletionBonusLabels = map[TalentTree]map[int]string{
 		3: "每层死兆暴伤 +0.5%",
 		4: "狂喜倍率 +2x",
 	},
+	TalentTreeMagic: {
+		0: "魔法伤害倍率 +8%",
+		1: "魔法触发率 +0.8%",
+		2: "魔法伤害倍率 +10%",
+		3: "秘法穿透 +6%",
+		4: "星陨潮爆倍率 +0.4",
+	},
 }
 
 func isFillerTalentID(id string) bool {
@@ -304,7 +338,9 @@ func init() {
 			def.MaxLevel = TalentDefaultMaxLevel
 		}
 		var baseCost int64
-		if isFillerTalentID(id) {
+		if customCost, ok := magicTalentCustomCosts[id]; ok {
+			baseCost = customCost
+		} else if isFillerTalentID(id) {
 			baseCost = talentTierFillerCosts[def.Tier]
 		} else {
 			var ok bool
@@ -515,6 +551,31 @@ func TalentEffectDescriptionForLevel(def TalentDef, level int) string {
 		return fmt.Sprintf("Boss 血量低于 %s 时，随机标记 %d 个部位。被标记部位被击碎时触发 +%d 死兆。每场 Boss 战仅触发一次。", talentPercent(0.35), markCount, omenPerMark)
 	case "chase_ratio_bonus":
 		return fmt.Sprintf("追击爆发单段倍率额外 +%s。被动生效。", talentPercentScaled(value["percent"], currentFactor))
+	case "magic_core":
+		return fmt.Sprintf("普通点击有 %s 概率触发奥术爆裂。魔法基础伤害取攻击力基础值，主目标倍率 ×%.2f，邻近副目标倍率 ×%.2f，并额外吃全伤害加成。", talentPercent(magicCoreProcRateForLevel(currentFactor)), magicCoreMainRatioForLevel(currentFactor), magicCoreSplashRatioForLevel(currentFactor))
+	case "magic_damage_multiplier":
+		switch def.ID {
+		case "magic_amp":
+			return fmt.Sprintf("魔法伤害倍率 +%s。只作用于魔法额外伤害。", talentPercent(magicAmpPercentForLevel(currentFactor)))
+		case "magic_focus":
+			return fmt.Sprintf("主目标魔法伤害额外 +%s。只作用于主目标奥术爆裂。", talentPercent(magicFocusPercentForLevel(currentFactor)))
+		case "magic_chain_bound":
+			return fmt.Sprintf("单次魔法爆发质量额外 +%s。", talentPercent(magicChainBoundPercentForLevel(currentFactor)))
+		}
+		return "魔法伤害倍率提升。"
+	case "magic_proc_rate":
+		return fmt.Sprintf("额外魔法触发率 +%s。", talentPercent(magicResonanceProcRateForLevel(currentFactor)))
+	case "magic_splash_multiplier":
+		if def.ID == "magic_splash" {
+			return fmt.Sprintf("副目标承伤额外 +%s。只作用于邻近副目标。", talentPercent(magicSplashPercentForLevel(currentFactor)))
+		}
+		return fmt.Sprintf("副目标承伤衰减修正 +%s。被动生效。", talentPercent(magicStaticFluxPercentForLevel(currentFactor)))
+	case "magic_echo_mark":
+		return fmt.Sprintf("连续命中同一部位 %d 次后进入 2 秒奥术裂解窗口。窗口内所有点击都会触发魔法追击，结束后进入 %d 秒冷却。", magicEchoHitsForLevel(currentFactor), magicEchoCooldownForLevel(currentFactor))
+	case "magic_armor_blunt":
+		return fmt.Sprintf("魔法结算时钝化 %s 护甲，不接入普通破甲和暴击体系。", talentPercent(magicPiercePercentForLevel(currentFactor)))
+	case "magic_starfall":
+		return fmt.Sprintf("同一部位累计触发 %d 次奥术爆裂后，对所有存活部位造成一次星陨潮爆。主目标倍率 ×%.1f，副目标承受主目标本次魔法伤害的 %s，无冷却。", magicUltimateTriggerCountForLevel(currentFactor), magicUltimateMainRatioForLevel(currentFactor), talentPercent(magicUltimateSplashShareForLevel(currentFactor)))
 	default:
 		return "该天赋效果说明暂未配置"
 	}
@@ -776,6 +837,70 @@ func critFillerT3bCritDmgForLevel(level int) float64 {
 	return lerpTalentValue(level, 0.12, 0.36)
 }
 
+func magicCoreProcRateForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.02, 0.045)
+}
+
+func magicCoreMainRatioForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.55, 1.10)
+}
+
+func magicCoreSplashRatioForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.22, 0.42)
+}
+
+func magicAmpPercentForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.18, 0.55)
+}
+
+func magicResonanceProcRateForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.006, 0.018)
+}
+
+func magicSplashPercentForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.10, 0.26)
+}
+
+func magicFocusPercentForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.20, 0.60)
+}
+
+func magicEchoHitsForLevel(level int) int {
+	return lerpTalentInt(level, 28, 16)
+}
+
+func magicEchoCooldownForLevel(level int) int64 {
+	return int64(lerpTalentInt(level, 23, 16))
+}
+
+func magicStaticFluxPercentForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.08, 0.24)
+}
+
+func magicPiercePercentForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.08, 0.25)
+}
+
+func magicChainBoundPercentForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.12, 0.36)
+}
+
+func magicUltimateMainRatioForLevel(level int) float64 {
+	return lerpTalentValue(level, 44.0, 76.0)
+}
+
+func magicUltimateSplashShareForLevel(level int) float64 {
+	return lerpTalentValue(level, 0.30, 0.46)
+}
+
+func magicUltimateTriggerCountForLevel(level int) int64 {
+	return int64(lerpTalentInt(level, 70, 50))
+}
+
+func magicUltimateCooldownForLevel(level int) int64 {
+	return 0
+}
+
 func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine {
 	value, _ := def.EffectValue.(map[string]any)
 	if len(value) == 0 {
@@ -993,6 +1118,40 @@ func BuildTalentEffectLines(def TalentDef, currentLevel int) []TalentEffectLine 
 			add("追击段数", talentIntScaledString(value["extraHits"], currentFactor), talentIntScaledString(value["extraHits"], nextLevel))
 		}
 		add("追击倍率", talentPercent(normalCoreChaseRatioForLevel(currentFactor)), talentPercent(normalCoreChaseRatioForLevel(nextLevel)))
+	case "magic_core":
+		add("触发率", talentPercent(magicCoreProcRateForLevel(currentFactor)), talentPercent(magicCoreProcRateForLevel(nextLevel)))
+		add("主目标倍率", fmt.Sprintf("×%.2f", magicCoreMainRatioForLevel(currentFactor)), fmt.Sprintf("×%.2f", magicCoreMainRatioForLevel(nextLevel)))
+		add("副目标倍率", fmt.Sprintf("×%.2f", magicCoreSplashRatioForLevel(currentFactor)), fmt.Sprintf("×%.2f", magicCoreSplashRatioForLevel(nextLevel)))
+	case "magic_damage_multiplier":
+		switch def.ID {
+		case "magic_amp":
+			add("魔法伤害", talentPercent(magicAmpPercentForLevel(currentFactor)), talentPercent(magicAmpPercentForLevel(nextLevel)))
+		case "magic_focus":
+			add("主目标增伤", talentPercent(magicFocusPercentForLevel(currentFactor)), talentPercent(magicFocusPercentForLevel(nextLevel)))
+		case "magic_chain_bound":
+			add("单次质量", talentPercent(magicChainBoundPercentForLevel(currentFactor)), talentPercent(magicChainBoundPercentForLevel(nextLevel)))
+		}
+	case "magic_proc_rate":
+		add("额外触发率", talentPercent(magicResonanceProcRateForLevel(currentFactor)), talentPercent(magicResonanceProcRateForLevel(nextLevel)))
+	case "magic_splash_multiplier":
+		if def.ID == "magic_splash" {
+			add("副目标承伤", talentPercent(magicSplashPercentForLevel(currentFactor)), talentPercent(magicSplashPercentForLevel(nextLevel)))
+		} else {
+			add("衰减修正", talentPercent(magicStaticFluxPercentForLevel(currentFactor)), talentPercent(magicStaticFluxPercentForLevel(nextLevel)))
+		}
+	case "magic_echo_mark":
+		add("所需命中", fmt.Sprintf("%d", magicEchoHitsForLevel(currentFactor)), fmt.Sprintf("%d", magicEchoHitsForLevel(nextLevel)))
+		add("冷却时间", fmt.Sprintf("%ds", magicEchoCooldownForLevel(currentFactor)), fmt.Sprintf("%ds", magicEchoCooldownForLevel(nextLevel)))
+	case "magic_armor_blunt":
+		add("护甲钝化", talentPercent(magicPiercePercentForLevel(currentFactor)), talentPercent(magicPiercePercentForLevel(nextLevel)))
+	case "magic_starfall":
+		add("触发次数", fmt.Sprintf("%d", magicUltimateTriggerCountForLevel(currentFactor)), fmt.Sprintf("%d", magicUltimateTriggerCountForLevel(nextLevel)))
+		add("主目标倍率", fmt.Sprintf("×%.1f", magicUltimateMainRatioForLevel(currentFactor)), fmt.Sprintf("×%.1f", magicUltimateMainRatioForLevel(nextLevel)))
+		if magicUltimateCooldownForLevel(currentFactor) <= 0 && magicUltimateCooldownForLevel(nextLevel) <= 0 {
+			add("冷却时间", "无冷却", "无冷却")
+		} else {
+			add("冷却时间", fmt.Sprintf("%ds", magicUltimateCooldownForLevel(currentFactor)), fmt.Sprintf("%ds", magicUltimateCooldownForLevel(nextLevel)))
+		}
 	}
 
 	return lines
@@ -1370,6 +1529,8 @@ type TalentModifiers struct {
 	CritRateBonus          float64 `json:"critRateBonus"`
 	OmenKillThresholdRaise float64 `json:"omenKillThresholdRaise"`
 	DoomMultBoost          float64 `json:"doomMultBoost"`
+	MagicProcRate          float64 `json:"magicProcRate"`
+	MagicDamageMultiplier  float64 `json:"magicDamageMultiplier"`
 	// 已学习天赋 ID 列表，供具体逻辑判断
 	Learned       []string             `json:"-"`
 	PartTypeBonus map[PartType]float64 `json:"-"`
@@ -1421,6 +1582,12 @@ func applyTierCompletionBonus(mods *TalentModifiers, treeStr string, tier int) {
 		mods.OmenCritDmgExtra += 0.003
 	case treeStr == "crit" && tier == 4:
 		mods.DoomMultBoost += 2.0
+	case treeStr == "magic" && tier == 0:
+		mods.MagicDamageMultiplier += 0.08
+	case treeStr == "magic" && tier == 1:
+		mods.MagicProcRate += 0.008
+	case treeStr == "magic" && tier == 2:
+		mods.MagicDamageMultiplier += 0.10
 	}
 }
 
@@ -1464,6 +1631,8 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 	stats.PartTypeDamageSoft += max(0.0, mods.PartTypeBonus[PartTypeSoft])
 	stats.PartTypeDamageHeavy += max(0.0, mods.PartTypeBonus[PartTypeHeavy])
 	stats.PartTypeDamageWeak += max(0.0, mods.PartTypeBonus[PartTypeWeak])
+	stats.MagicProcRate += max(0.0, mods.MagicProcRate)
+	stats.MagicDamageMultiplier += max(0.0, mods.MagicDamageMultiplier)
 
 	// 围剿：每存活一个部位 +12% 伤害
 	if mods.PerPartDamagePercent > 0 && alivePartCount > 1 {
@@ -1520,6 +1689,17 @@ type TalentCombatState struct {
 	JudgmentDayTriggerCount int64                       `json:"judgmentDayTriggerCount"`
 	AutoStrikeTriggerCount  int64                       `json:"autoStrikeTriggerCount"`
 	AutoStrikeWindowSec     int64                       `json:"autoStrikeWindowSec"`
+	MagicEchoTargetPart     string                      `json:"magicEchoTargetPart"`
+	MagicEchoStacks         int64                       `json:"magicEchoStacks"`
+	MagicEchoExpiresAt      int64                       `json:"magicEchoExpiresAt"`
+	MagicEchoCooldownEndsAt int64                       `json:"magicEchoCooldownEndsAt"`
+	MagicEchoWindowSec      int64                       `json:"magicEchoWindowSec"`
+	MagicEchoRequiredHits   int64                       `json:"magicEchoRequiredHits"`
+	MagicEchoCooldownSec    int64                       `json:"magicEchoCooldownSec"`
+	MagicUltimateTrigger    int64                       `json:"magicUltimateTrigger"`
+	MagicUltimateCooldown   int64                       `json:"magicUltimateCooldown"`
+	MagicUltimateCooldownAt int64                       `json:"magicUltimateCooldownAt"`
+	PartMagicTriggerCount   map[string]int64            `json:"partMagicTriggerCount"`
 }
 
 // NewTalentCombatState 创建空天赋战斗状态。
@@ -1535,6 +1715,7 @@ func NewTalentCombatState() *TalentCombatState {
 		DoomMarkCumDamage:      make(map[string]int64),
 		SkinnerParts:           make(map[string]int64),
 		SkinnerDurationByPart:  make(map[string]int64),
+		PartMagicTriggerCount:  make(map[string]int64),
 	}
 }
 
@@ -1586,6 +1767,9 @@ func (s *Store) GetTalentCombatState(ctx context.Context, nickname, bossID strin
 	}
 	if state.DoomMarkCumDamage == nil {
 		state.DoomMarkCumDamage = make(map[string]int64)
+	}
+	if state.PartMagicTriggerCount == nil {
+		state.PartMagicTriggerCount = make(map[string]int64)
 	}
 	return &state, nil
 }

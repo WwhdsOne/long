@@ -8,6 +8,8 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const battleSource = readFileSync(path.resolve(currentDir, './BattlePage.vue'), 'utf8')
 const canvasSource = readFileSync(path.resolve(currentDir, '../components/PixelEffectCanvas.vue'), 'utf8')
 const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
+const publicPageStateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
+const realtimeProtoSource = readFileSync(path.resolve(currentDir, '../proto/realtime.js'), 'utf8')
 
 describe('BattlePage 战斗特效覆盖层', () => {
     it('左侧状态列宽度更充裕，并与 5x5 战斗区保留明确间距', () => {
@@ -69,6 +71,79 @@ describe('BattlePage 战斗特效覆盖层', () => {
         expect(battleSource).toContain("triggerKey('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)")
         expect(battleSource).toContain("effectOverlayStyle('judgment_day', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })")
         expect(battleSource).toContain("<PixelEffectCanvas effect=\"judgment_day\" :size=\"bossGridEffectSize()\" :loop=\"false\"/>")
+    })
+
+    it('魔法系特效正式挂到真实战斗页，并区分单格与 5x5 覆盖层', () => {
+        expect(battleSource).toContain('const MAGIC_BURST_EFFECT_WINDOW_MS = 1600')
+        expect(battleSource).toContain('const MAGIC_RUPTURE_EFFECT_WINDOW_MS = 1800')
+        expect(battleSource).toContain("hasRecentTrigger('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS)")
+        expect(battleSource).toContain("triggerKey('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS)")
+        expect(battleSource).toContain("<PixelEffectCanvas effect=\"magic_burst\" :size=\"effectCanvasSize(2.45)\" :loop=\"false\"/>")
+        expect(battleSource).toContain("hasRecentTrigger('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS)")
+        expect(battleSource).toContain("triggerKey('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS)")
+        expect(battleSource).toContain("<PixelEffectCanvas effect=\"magic_rupture\" :size=\"effectCanvasSize(2.65)\" :loop=\"false\"/>")
+        expect(battleSource).toContain("const STARFALL_EFFECT_WINDOW_MS = 9200")
+        expect(battleSource).toContain("hasRecentTrigger('magic_starfall', STARFALL_EFFECT_WINDOW_MS)")
+        expect(battleSource).toContain("triggerKey('magic_starfall', STARFALL_EFFECT_WINDOW_MS)")
+        expect(battleSource).toContain("<PixelEffectCanvas effect=\"magic_starfall\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\"/>")
+    })
+
+    it('左侧部位累计进度加入回响层数显示，右侧图例加入魔法伤害说明', () => {
+        expect(battleSource).toContain('回响层数 {{ p.magic }}/{{ p.magicTrigger }}')
+        expect(battleSource).toContain('潮爆 {{ p.magicTriggered }}/{{ p.magicUltimateTrigger }}')
+        expect(battleSource).toContain('v-if="p.magic > 0"')
+        expect(battleSource).toContain('v-if="p.magicTriggered > 0"')
+        expect(battleSource).toContain('part-progress-panel__track--magic')
+        expect(battleSource).toContain('part-progress-panel__track--magic-ultimate')
+        expect(battleSource).toContain('part-progress-panel__bar-fill--magic')
+        expect(battleSource).toContain('part-progress-panel__bar-fill--magic-ultimate')
+        expect(battleSource).toContain('boss-right-legend__item boss-right-legend__item--magic')
+        expect(battleSource).toContain('魔法伤害')
+        expect(styleSource).toContain('.boss-right-legend__item--magic {')
+        expect(styleSource).toContain('.boss-zone-button__damage-burst--magic {')
+        expect(publicPageStateSource).toContain('magic: {')
+        expect(publicPageStateSource).toContain("magic_damage: 'magic'")
+        expect(publicPageStateSource).toContain("effectType === 'magic_burst'")
+    })
+
+    it('左侧全局状态加入回响刻印和星陨潮爆的累计与冷却显示', () => {
+        expect(publicPageStateSource).toContain("key: 'magic-echo'")
+        expect(publicPageStateSource).toContain("title: '回响刻印'")
+        expect(publicPageStateSource).toContain("kind: 'magic_echo'")
+        expect(publicPageStateSource).toContain("key: 'magic-ultimate'")
+        expect(publicPageStateSource).toContain("title: '星陨潮爆'")
+        expect(publicPageStateSource).toContain("kind: 'magic_ultimate'")
+        expect(publicPageStateSource).toContain('if (magicEchoRequiredHits > 0 && (magicEchoStacks > 0 || magicEchoActive || magicEchoCooldownRemaining > 0)) {')
+        expect(publicPageStateSource).toContain('? `CD 剩余 ${magicEchoCooldownRemaining}s`')
+        expect(publicPageStateSource).toContain('if (magicUltimateTrigger > 0 && (magicUltimateBestCount > 0 || magicUltimateCooldownRemaining > 0)) {')
+        expect(styleSource).toContain('.status-panel--magic_echo')
+        expect(styleSource).toContain('.status-panel--magic_ultimate')
+        expect(styleSource).toContain('.status-panel__bar-fill--magic_echo')
+        expect(styleSource).toContain('.status-panel__bar-fill--magic_ultimate')
+    })
+
+    it('连击条颜色会随层数平滑渐变，而不是只在 200 层时才整体跳成金色', () => {
+        expect(publicPageStateSource).toContain('const comboBarLeadColor = `hsl(${comboHue}, 92%,')
+        expect(publicPageStateSource).toContain('const comboBarTailColor = `hsl(${Math.max(0, comboHue - 18)}, 96%,')
+        expect(publicPageStateSource).toContain("background: comboIsGold ? `linear-gradient(90deg, ${comboGoldGradientStops.join(', ')})` : `linear-gradient(90deg, ${comboBarLeadColor}, ${comboColor}, ${comboBarTailColor})`")
+    })
+
+    it('星陨潮爆在真实战斗页沿用图鉴页同款低分辨率 5x5 画布，不直接按网格原始像素重算内部粒度', () => {
+        expect(battleSource).toContain("<PixelEffectCanvas effect=\"magic_starfall\" :size=\"ultimateEffectCanvasSize()\" :loop=\"false\"/>")
+    })
+
+    it('星陨潮爆自身时间轴被拉长，落地后会继续扩散和收尾，但仍然保持非循环播放', () => {
+        expect(canvasSource).toContain("if (s.timer > 280) {")
+        expect(canvasSource).toContain('const progress = Math.min(1, s.timer / 1720)')
+        expect(canvasSource).toContain('p.life -= 0.014')
+        expect(canvasSource).toContain("return s.phase === 'done' && s.timer > 2200")
+    })
+
+    it('实时二进制协议同步包含魔法战斗态字段，避免动画有了但层数和 CD 丢失', () => {
+        expect(realtimeProtoSource).toContain('TalentCombatState.prototype.magicEchoTargetPart')
+        expect(realtimeProtoSource).toContain('TalentCombatState.prototype.magicEchoRequiredHits')
+        expect(realtimeProtoSource).toContain('TalentCombatState.prototype.magicUltimateTrigger')
+        expect(realtimeProtoSource).toContain('TalentCombatState.prototype.partMagicTriggerCount')
     })
 
     it('流血以格子中心为喷发源，终末血斩的终结斩回退到更细一版的 5x5 对角重斩', () => {

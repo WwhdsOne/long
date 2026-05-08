@@ -179,6 +179,8 @@ message InventoryItem {
   double part_type_damage_soft = 17;
   double part_type_damage_heavy = 18;
   double part_type_damage_weak = 19;
+  double magic_proc_rate_bonus = 20;
+  double magic_damage_bonus = 21;
 }
 
 message Loadout {
@@ -205,6 +207,8 @@ message CombatStats {
   double per_part_damage_percent = 12;
   double low_hp_multiplier = 13;
   double low_hp_threshold = 14;
+  double magic_proc_rate = 15;
+  double magic_damage_multiplier = 16;
 }
 
 message Reward {
@@ -279,4 +283,15 @@ message TalentCombatState {
   int64 judgment_day_trigger_count = 28;
   int64 auto_strike_trigger_count = 29;
   int64 auto_strike_window_sec = 30;
+  string magic_echo_target_part = 31;
+  int64 magic_echo_stacks = 32;
+  int64 magic_echo_expires_at = 33;
+  int64 magic_echo_cooldown_ends_at = 34;
+  int64 magic_echo_window_sec = 35;
+  int64 magic_echo_required_hits = 36;
+  int64 magic_echo_cooldown_sec = 37;
+  int64 magic_ultimate_trigger = 38;
+  int64 magic_ultimate_cooldown = 39;
+  int64 magic_ultimate_cooldown_at = 40;
+  map<string, int64> part_magic_trigger_count = 41;
 }

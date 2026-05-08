@@ -43,6 +43,21 @@ type compiledCritTalents struct {
 	DoomOmenPerMark     int
 }
 
+type compiledMagicTalents struct {
+	ProcRate             float64
+	DamageMultiplier     float64
+	MainRatio            float64
+	SplashRatio          float64
+	SplashMultiplier     float64
+	ArmorBluntPercent    float64
+	EchoRequiredHits     int64
+	EchoCooldownSec      int64
+	UltimateTriggerCount int64
+	UltimateMainRatio    float64
+	UltimateSplashShare  float64
+	UltimateCooldownSec  int64
+}
+
 type CompiledTalentSet struct {
 	levels   map[string]int
 	learned  map[string]struct{}
@@ -52,6 +67,7 @@ type CompiledTalentSet struct {
 	Normal       compiledNormalTalents
 	Armor        compiledArmorTalents
 	Crit         compiledCritTalents
+	Magic        compiledMagicTalents
 	triggers     []compiledTalentTrigger
 	triggerNames []string
 }
@@ -114,6 +130,7 @@ func compileTalentSet(state *TalentState) *CompiledTalentSet {
 	compiled.Normal = compileNormalTalents(compiled)
 	compiled.Armor = compileArmorTalents(compiled)
 	compiled.Crit = compileCritTalents(compiled)
+	compiled.Magic = compileMagicTalents(compiled)
 	compiled.triggers, compiled.triggerNames = compiled.buildTriggerHandlers()
 
 	return compiled
@@ -424,6 +441,68 @@ func compileCritTalents(compiled *CompiledTalentSet) compiledCritTalents {
 	}
 
 	return crit
+}
+
+func compileMagicTalents(compiled *CompiledTalentSet) compiledMagicTalents {
+	magic := compiledMagicTalents{
+		DamageMultiplier: 1.0,
+		SplashMultiplier: 1.0,
+	}
+	if compiled.Has("magic_core") {
+		level := compiled.Level("magic_core")
+		magic.ProcRate = magicCoreProcRateForLevel(level)
+		magic.MainRatio = magicCoreMainRatioForLevel(level)
+		magic.SplashRatio = magicCoreSplashRatioForLevel(level)
+	}
+	if compiled.Has("magic_amp") {
+		magic.DamageMultiplier += magicAmpPercentForLevel(compiled.Level("magic_amp"))
+	}
+	if compiled.Has("magic_resonance") {
+		magic.ProcRate += magicResonanceProcRateForLevel(compiled.Level("magic_resonance"))
+	}
+	if compiled.Has("magic_splash") {
+		magic.SplashMultiplier += magicSplashPercentForLevel(compiled.Level("magic_splash"))
+	}
+	if compiled.Has("magic_focus") {
+		magic.DamageMultiplier += magicFocusPercentForLevel(compiled.Level("magic_focus"))
+	}
+	if compiled.Has("magic_echo_mark") {
+		level := compiled.Level("magic_echo_mark")
+		magic.EchoRequiredHits = int64(magicEchoHitsForLevel(level))
+		magic.EchoCooldownSec = magicEchoCooldownForLevel(level)
+	}
+	if compiled.Has("magic_static_flux") {
+		magic.SplashMultiplier += magicStaticFluxPercentForLevel(compiled.Level("magic_static_flux"))
+	}
+	if compiled.Has("magic_pierce") {
+		magic.ArmorBluntPercent = magicPiercePercentForLevel(compiled.Level("magic_pierce"))
+	}
+	if compiled.Has("magic_chain_bound") {
+		magic.DamageMultiplier += magicChainBoundPercentForLevel(compiled.Level("magic_chain_bound"))
+	}
+	if compiled.Has("magic_ultimate") {
+		level := compiled.Level("magic_ultimate")
+		magic.UltimateTriggerCount = magicUltimateTriggerCountForLevel(level)
+		magic.UltimateMainRatio = magicUltimateMainRatioForLevel(level)
+		magic.UltimateSplashShare = magicUltimateSplashShareForLevel(level)
+		magic.UltimateCooldownSec = magicUltimateCooldownForLevel(level)
+	}
+	if compiled.IsTierFull(TalentTreeMagic, 0) {
+		magic.DamageMultiplier += 0.08
+	}
+	if compiled.IsTierFull(TalentTreeMagic, 1) {
+		magic.ProcRate += 0.008
+	}
+	if compiled.IsTierFull(TalentTreeMagic, 2) {
+		magic.DamageMultiplier += 0.10
+	}
+	if compiled.IsTierFull(TalentTreeMagic, 3) {
+		magic.ArmorBluntPercent += 0.06
+	}
+	if compiled.IsTierFull(TalentTreeMagic, 4) {
+		magic.UltimateMainRatio += 0.4
+	}
+	return magic
 }
 
 func chaseRatioBonusForLevel(level int, talentID string) float64 {

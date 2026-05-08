@@ -63,6 +63,26 @@ function makeParticle(x, y, vx, vy, life, size, color) {
   return {x, y, vx, vy, life, maxLife: life, size, color}
 }
 
+function drawPixelRing(ctx, cx, cy, radius, thickness, color) {
+  const outer = radius + thickness / 2
+  const inner = Math.max(0, radius - thickness / 2)
+  const minX = Math.floor(cx - outer - 1)
+  const maxX = Math.ceil(cx + outer + 1)
+  const minY = Math.floor(cy - outer - 1)
+  const maxY = Math.ceil(cy + outer + 1)
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const dx = x - cx
+      const dy = y - cy
+      const dist = Math.hypot(dx, dy)
+      if (dist >= inner && dist <= outer) {
+        ctx.fillStyle = color
+        ctx.fillRect(Math.round(x), Math.round(y), 1, 1)
+      }
+    }
+  }
+}
+
 // ======= 各特效渲染器 =======
 // 每个返回 { init, update, draw, isDone }
 
@@ -934,6 +954,669 @@ const doomJudgmentRenderer = {
   },
 }
 
+// ---- 8.5 magic_burst: 蓝色闪电霹雳直击 ----
+const magicBurstRenderer = {
+  init(size) {
+    return {
+      phase: 'charge',
+      timer: 0,
+      flash: 0,
+      linePixels: [],
+      impactPixels: [],
+      emberPixels: [],
+      arcPixels: [],
+      ringPixels: [],
+      cx: size / 2,
+      cy: size / 2,
+    }
+  },
+  update(s, size) {
+    s.timer += 16
+    if (s.phase === 'charge') {
+      s.flash = Math.min(0.22, s.timer / 900)
+      if (s.timer > 320) {
+        s.phase = 'strike'
+        s.timer = 0
+        s.flash = 0.38
+        s.linePixels = []
+        s.impactPixels = []
+        s.emberPixels = []
+        s.arcPixels = []
+        s.ringPixels = []
+        const path = []
+        let x = s.cx + rnd(size * 0.06)
+        let y = -6
+        path.push({x, y})
+        while (y < s.cy) {
+          x += rnd(size * 0.12)
+          y += size * 0.11 + Math.random() * size * 0.08
+          path.push({x, y: Math.min(y, s.cy)})
+        }
+        path[path.length - 1] = {x: s.cx + rnd(4), y: s.cy}
+        for (let i = 1; i < path.length; i++) {
+          const prev = path[i - 1]
+          const next = path[i]
+          const dx = next.x - prev.x
+          const dy = next.y - prev.y
+          const dist = Math.max(1, Math.hypot(dx, dy))
+          const nx = -dy / dist
+          const ny = dx / dist
+          const steps = Math.max(1, Math.ceil(dist / 3))
+          for (let step = 0; step <= steps; step++) {
+            const t = step / steps
+            const px = prev.x + dx * t
+            const py = prev.y + dy * t
+            for (let w = -1; w <= 1; w++) {
+              const weight = Math.abs(w)
+              s.linePixels.push({
+                x: px + nx * w * 2 + rnd(0.8),
+                y: py + ny * w * 2 + rnd(0.8),
+                life: 0.85 - weight * 0.15 + Math.random() * 0.15,
+                size: weight === 0 ? 4 : 3,
+                color: weight === 0 ? '#f8fdff' : weight === 1 ? '#60a5fa' : '#312e81',
+              })
+            }
+          }
+        }
+        for (let i = 0; i < 24; i++) {
+          const ang = Math.random() * Math.PI * 2
+          const speed = 1.1 + Math.random() * 3.2
+          s.impactPixels.push(makeParticle(
+              s.cx + rnd(4),
+              s.cy + rnd(4),
+              Math.cos(ang) * speed,
+              Math.sin(ang) * speed * 0.75,
+              0.35 + Math.random() * 0.35,
+              i % 5 === 0 ? 4 : 3,
+              i % 4 === 0 ? '#dbeafe' : i % 4 === 1 ? '#93c5fd' : i % 4 === 2 ? '#60a5fa' : '#312e81',
+          ))
+        }
+        for (let i = 0; i < 12; i++) {
+          const ang = Math.random() * Math.PI * 2
+          const speed = 0.8 + Math.random() * 1.8
+          s.emberPixels.push(makeParticle(
+              s.cx + rnd(6),
+              s.cy + rnd(6),
+              Math.cos(ang) * speed,
+              Math.sin(ang) * speed,
+              0.45 + Math.random() * 0.2,
+              2,
+              i % 2 === 0 ? '#38bdf8' : '#8b5cf6',
+          ))
+        }
+        for (let i = 0; i < 18; i++) {
+          const angle = (Math.PI * 2 * i) / 18
+          const radius = size * 0.08
+          s.ringPixels.push({
+            angle,
+            radius,
+            life: 0.75 + Math.random() * 0.18,
+            size: i % 3 === 0 ? 3 : 2,
+            color: i % 4 === 0 ? '#dbeafe' : i % 2 === 0 ? '#60a5fa' : '#38bdf8',
+          })
+        }
+        for (let branch = 0; branch < 3; branch++) {
+          const baseAngle = -Math.PI / 2 + branch * (Math.PI / 2)
+          for (let i = 0; i < 10; i++) {
+            const arcAngle = baseAngle + (Math.random() - 0.5) * 0.85
+            const radius = size * (0.06 + i * 0.012)
+            s.arcPixels.push({
+              angle: arcAngle,
+              radius,
+              twist: (Math.random() - 0.5) * 0.7,
+              life: 0.72 + Math.random() * 0.18,
+              size: i % 4 === 0 ? 3 : 2,
+              color: i % 3 === 0 ? '#dbeafe' : i % 2 === 0 ? '#60a5fa' : '#8b5cf6',
+            })
+          }
+        }
+      }
+    }
+    if (s.phase === 'strike') {
+      for (const p of s.linePixels) p.life -= 0.045
+      for (const p of s.impactPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.92
+        p.vy *= 0.9
+        p.life -= 0.03
+      }
+      for (const p of s.emberPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.95
+        p.vy *= 0.95
+        p.life -= 0.022
+      }
+      for (const p of s.ringPixels) {
+        p.radius += size * 0.01
+        p.life -= 0.018
+      }
+      for (const p of s.arcPixels) {
+        p.angle += p.twist * 0.06
+        p.radius -= size * 0.002
+        p.life -= 0.016
+      }
+      s.flash = Math.max(0, s.flash - 0.028)
+      if (s.timer > 220) {
+        s.phase = 'afterglow'
+        s.timer = 0
+      }
+    }
+    if (s.phase === 'afterglow') {
+      for (const p of s.linePixels) p.life -= 0.025
+      for (const p of s.impactPixels) {
+        p.x += p.vx * 0.6
+        p.y += p.vy * 0.6
+        p.vx *= 0.9
+        p.vy *= 0.88
+        p.life -= 0.018
+      }
+      for (const p of s.emberPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.97
+        p.vy *= 0.97
+        p.life -= 0.014
+      }
+      for (const p of s.ringPixels) {
+        p.radius += size * 0.008
+        p.life -= 0.014
+      }
+      for (const p of s.arcPixels) {
+        p.angle += p.twist * 0.05
+        p.radius = Math.max(0, p.radius - size * 0.0015)
+        p.life -= 0.012
+      }
+      s.flash = Math.max(0, s.flash - 0.012)
+      if (
+          s.linePixels.every((p) => p.life <= 0) &&
+          s.impactPixels.every((p) => p.life <= 0) &&
+          s.emberPixels.every((p) => p.life <= 0) &&
+          s.ringPixels.every((p) => p.life <= 0) &&
+          s.arcPixels.every((p) => p.life <= 0)
+      ) {
+        s.phase = 'done'
+        s.timer = 0
+      }
+    }
+    return s
+  },
+  draw(ctx, s, size) {
+    if (s.flash > 0) {
+      ctx.globalAlpha = s.flash
+      const flashSize = Math.max(12, Math.round(size * 0.34))
+      ctx.fillStyle = '#dbeafe'
+      ctx.fillRect(
+          Math.round(s.cx - flashSize / 2),
+          Math.round(s.cy - flashSize / 2),
+          flashSize,
+          flashSize,
+      )
+      ctx.globalAlpha = Math.max(0, s.flash * 0.58)
+      ctx.fillStyle = '#93c5fd'
+      ctx.fillRect(
+          Math.round(s.cx - flashSize * 0.32),
+          Math.round(s.cy - flashSize * 0.32),
+          Math.round(flashSize * 0.64),
+          Math.round(flashSize * 0.64),
+      )
+    }
+    for (const p of s.linePixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const p of s.impactPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const p of s.emberPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const p of s.ringPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      const x = s.cx + Math.cos(p.angle) * p.radius
+      const y = s.cy + Math.sin(p.angle) * p.radius
+      ctx.fillRect(Math.round(x), Math.round(y), p.size, p.size)
+    }
+    for (const p of s.arcPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      const x = s.cx + Math.cos(p.angle) * p.radius
+      const y = s.cy + Math.sin(p.angle) * p.radius
+      ctx.fillRect(Math.round(x), Math.round(y), p.size, p.size)
+    }
+    ctx.globalAlpha = 1
+  },
+  isDone(s) {
+    return s.phase === 'done' && s.timer > 700
+  },
+}
+
+// ---- 8.6 magic_rupture: 法球显现后迅速碎裂 ----
+const magicRuptureRenderer = {
+  init(size) {
+    const cx = size / 2
+    const cy = size / 2
+    const orbs = []
+    for (let i = 0; i < 4; i++) {
+      const angle = (Math.PI * 2 * i) / 4 + Math.PI / 4
+      orbs.push({
+        angle,
+        radius: size * 0.14,
+        size: i % 2 === 0 ? 6 : 5,
+        life: 1,
+        color: i % 2 === 0 ? '#60a5fa' : '#8b5cf6',
+      })
+    }
+    return {phase: 'form', timer: 0, cx, cy, orbs, runePixels: [], shardPixels: [], sparkPixels: [], flash: 0}
+  },
+  update(s, size) {
+    s.timer += 16
+    if (s.phase === 'form') {
+      s.flash = 0.08 + Math.sin(s.timer * 0.05) * 0.04
+      s.runePixels = []
+      const runeRadius = size * 0.24
+      for (let i = 0; i < 8; i++) {
+        if (i === 1 || i === 5) continue
+        const angle = (Math.PI * 2 * i) / 8
+        s.runePixels.push({
+          x: s.cx + Math.cos(angle) * runeRadius,
+          y: s.cy + Math.sin(angle) * runeRadius,
+          life: 0.6 + Math.sin(s.timer * 0.03 + i) * 0.18,
+          size: i % 2 === 0 ? 3 : 2,
+          color: i % 2 === 0 ? '#c4b5fd' : '#38bdf8',
+        })
+      }
+      for (const orb of s.orbs) {
+        orb.radius = size * (0.14 - Math.min(0.065, s.timer / 3400))
+      }
+      if (s.timer > 220) {
+        s.phase = 'shatter'
+        s.timer = 0
+        s.flash = 0.3
+        s.shardPixels = []
+        s.sparkPixels = []
+        for (const orb of s.orbs) {
+          const ox = s.cx + Math.cos(orb.angle) * orb.radius
+          const oy = s.cy + Math.sin(orb.angle) * orb.radius
+          for (let i = 0; i < 10; i++) {
+            const ang = orb.angle + (Math.random() - 0.5) * 1.6
+            const speed = 0.9 + Math.random() * 2.4
+            s.shardPixels.push(makeParticle(
+                ox + rnd(2),
+                oy + rnd(2),
+                Math.cos(ang) * speed,
+                Math.sin(ang) * speed,
+                0.42 + Math.random() * 0.28,
+                i % 3 === 0 ? 4 : 3,
+                i % 4 === 0 ? '#dbeafe' : i % 4 === 1 ? '#60a5fa' : i % 4 === 2 ? '#8b5cf6' : '#312e81',
+            ))
+          }
+        }
+        for (let i = 0; i < 16; i++) {
+          const ang = Math.random() * Math.PI * 2
+          const speed = 1 + Math.random() * 2
+          s.sparkPixels.push(makeParticle(
+              s.cx + rnd(4),
+              s.cy + rnd(4),
+              Math.cos(ang) * speed,
+              Math.sin(ang) * speed,
+              0.3 + Math.random() * 0.2,
+              2,
+              i % 2 === 0 ? '#67e8f9' : '#c4b5fd',
+          ))
+        }
+      }
+    }
+    if (s.phase === 'shatter') {
+      for (const p of s.shardPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.93
+        p.vy *= 0.91
+        p.life -= 0.025
+      }
+      for (const p of s.sparkPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.95
+        p.vy *= 0.94
+        p.life -= 0.035
+      }
+      s.flash = Math.max(0, s.flash - 0.03)
+      if (s.shardPixels.every((p) => p.life <= 0) && s.sparkPixels.every((p) => p.life <= 0)) {
+        s.phase = 'done'
+        s.timer = 0
+      }
+    }
+    return s
+  },
+  draw(ctx, s, size) {
+    if (s.flash > 0) {
+      ctx.globalAlpha = s.flash
+      ctx.fillStyle = '#a78bfa'
+      ctx.fillRect(0, 0, size, size)
+    }
+    for (const rune of s.runePixels) {
+      ctx.globalAlpha = Math.max(0, rune.life)
+      ctx.fillStyle = rune.color
+      ctx.fillRect(Math.round(rune.x), Math.round(rune.y), rune.size, rune.size)
+    }
+    if (s.phase === 'form') {
+      for (const orb of s.orbs) {
+        const ox = s.cx + Math.cos(orb.angle) * orb.radius
+        const oy = s.cy + Math.sin(orb.angle) * orb.radius
+        ctx.globalAlpha = orb.life
+        ctx.fillStyle = orb.color
+        ctx.fillRect(Math.round(ox - orb.size / 2), Math.round(oy - orb.size / 2), orb.size, orb.size)
+        ctx.fillStyle = '#eff6ff'
+        ctx.fillRect(Math.round(ox - 1), Math.round(oy - 1), 2, 2)
+      }
+    }
+    for (const p of s.shardPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const p of s.sparkPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    ctx.globalAlpha = 1
+  },
+  isDone(s) {
+    return s.phase === 'done' && s.timer > 450
+  },
+}
+
+// ---- 8.7 magic_starfall: 中心扩散到 5x5 的高阶星陨潮爆 ----
+const magicStarfallRenderer = {
+  init(size) {
+    return {
+      phase: 'meteor',
+      timer: 0,
+      waveRadius: 0,
+      flash: 0,
+      corePulse: 0,
+      wavePixels: [],
+      dustPixels: [],
+      emberPixels: [],
+      meteorTrailPixels: [],
+      meteorShards: [],
+      meteorStartX: size * 0.12,
+      meteorStartY: size * 0.14,
+      meteorX: size * 0.12,
+      meteorY: size * 0.14,
+    }
+  },
+  update(s, size) {
+    s.timer += 16
+    const cx = size / 2
+    const cy = size / 2
+    const maxRadius = size * 0.7
+    if (s.phase === 'meteor') {
+      const progress = Math.min(1, s.timer / 460)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      s.meteorX = s.meteorStartX + (cx - s.meteorStartX) * eased
+      s.meteorY = s.meteorStartY + (cy - s.meteorStartY) * eased
+      s.corePulse = progress * 0.25
+      s.flash = progress * 0.08
+      s.meteorTrailPixels = []
+      const dx = s.meteorX - s.meteorStartX
+      const dy = s.meteorY - s.meteorStartY
+      const trailSteps = 18
+      for (let i = 0; i < trailSteps; i++) {
+        const t = i / Math.max(1, trailSteps - 1)
+        const px = s.meteorX - dx * t * 0.62 + rnd(1.2)
+        const py = s.meteorY - dy * t * 0.62 + rnd(1.2)
+        s.meteorTrailPixels.push({
+          x: px,
+          y: py,
+          life: 0.94 - t * 0.6,
+          size: i < 3 ? 6 : i < 8 ? 4 : 3,
+          color: i < 2 ? '#f8fdff' : i < 6 ? '#7dd3fc' : i < 12 ? '#60a5fa' : '#8b5cf6',
+        })
+      }
+      if (progress >= 1) {
+        s.phase = 'impact'
+        s.timer = 0
+        s.flash = 0.26
+        s.corePulse = 0.45
+        s.meteorShards = []
+        for (let i = 0; i < 22; i++) {
+          const angle = Math.random() * Math.PI * 2
+          const speed = 0.9 + Math.random() * 2.2
+          s.meteorShards.push(makeParticle(
+              cx + rnd(5),
+              cy + rnd(5),
+              Math.cos(angle) * speed,
+              Math.sin(angle) * speed,
+              0.34 + Math.random() * 0.24,
+              i % 6 === 0 ? 4 : 3,
+              i % 7 === 0 ? '#fcd34d' : i % 2 === 0 ? '#7dd3fc' : '#8b5cf6',
+          ))
+        }
+      }
+    }
+    if (s.phase === 'impact') {
+      s.corePulse = Math.min(1, 0.45 + s.timer / 260)
+      s.flash = Math.max(0, s.flash - 0.02)
+      for (const p of s.meteorShards) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.94
+        p.vy *= 0.94
+        p.life -= 0.026
+      }
+      s.meteorTrailPixels = s.meteorTrailPixels.filter((p) => p.life > 0).map((p) => ({
+        ...p,
+        life: p.life - 0.04,
+      }))
+      if (s.timer > 280) {
+        s.phase = 'expand'
+        s.timer = 0
+        s.waveRadius = size * 0.08
+      }
+    }
+    if (s.phase === 'expand') {
+      const progress = Math.min(1, s.timer / 1720)
+      s.waveRadius = size * 0.08 + (maxRadius - size * 0.08) * progress
+      s.flash = 0.05 + (1 - progress) * 0.08
+      s.wavePixels = []
+      const ringCount = 84
+      const innerBandOffset = Math.max(3, size * 0.022)
+      for (let i = 0; i < ringCount; i++) {
+        const angle = (Math.PI * 2 * i) / ringCount
+        const wobble = Math.sin(progress * 4 + i * 0.72) * size * 0.006
+        const outerRadius = s.waveRadius + wobble
+        const innerRadius = Math.max(0, outerRadius - innerBandOffset)
+        const outerX = cx + Math.cos(angle) * outerRadius
+        const outerY = cy + Math.sin(angle) * outerRadius
+        const innerX = cx + Math.cos(angle) * innerRadius
+        const innerY = cy + Math.sin(angle) * innerRadius
+        s.wavePixels.push({
+          x: outerX,
+          y: outerY,
+          life: 0.9,
+          size: i % 10 === 0 ? 6 : i % 2 === 0 ? 4 : 3,
+          color: i % 18 === 0 ? '#fcd34d' : i % 6 === 0 ? '#c4b5fd' : '#7dd3fc',
+        })
+        s.wavePixels.push({
+          x: innerX,
+          y: innerY,
+          life: 0.88,
+          size: i % 10 === 0 ? 5 : 3,
+          color: i % 18 === 0 ? '#f59e0b' : i % 6 === 0 ? '#60a5fa' : '#1e3a8a',
+        })
+      }
+      if (Math.random() < 0.95) {
+        for (let i = 0; i < 5; i++) {
+          const angle = Math.random() * Math.PI * 2
+          const radius = Math.max(0, s.waveRadius - Math.random() * size * 0.1)
+          s.dustPixels.push(makeParticle(
+              cx + Math.cos(angle) * radius,
+              cy + Math.sin(angle) * radius,
+              Math.cos(angle) * (0.6 + Math.random() * 1.6),
+              Math.sin(angle) * (0.6 + Math.random() * 1.6),
+              0.45 + Math.random() * 0.3,
+              Math.random() < 0.22 ? 4 : 3,
+              Math.random() < 0.12 ? '#fcd34d' : Math.random() < 0.22 ? '#fde68a' : Math.random() < 0.62 ? '#60a5fa' : '#8b5cf6',
+          ))
+        }
+      }
+      for (const p of s.dustPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.96
+        p.vy *= 0.96
+        p.life -= 0.012
+      }
+      s.dustPixels = s.dustPixels.filter((p) => p.life > 0)
+      if (progress >= 1) {
+        s.phase = 'fade'
+        s.timer = 0
+        s.emberPixels = []
+        for (let i = 0; i < 42; i++) {
+          const angle = Math.random() * Math.PI * 2
+          const radius = Math.random() * maxRadius
+          const speed = 0.5 + Math.random() * 1.8
+          s.emberPixels.push(makeParticle(
+              cx + Math.cos(angle) * radius,
+              cy + Math.sin(angle) * radius,
+              Math.cos(angle) * speed,
+              Math.sin(angle) * speed,
+              0.38 + Math.random() * 0.28,
+              i % 6 === 0 ? 5 : i % 3 === 0 ? 4 : 3,
+              i % 5 === 0 ? '#fcd34d' : i % 2 === 0 ? '#a78bfa' : '#60a5fa',
+          ))
+        }
+      }
+    }
+    if (s.phase === 'fade') {
+      s.flash = Math.max(0, s.flash - 0.01)
+      for (const p of s.dustPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.96
+        p.vy *= 0.96
+        p.life -= 0.012
+      }
+      for (const p of s.emberPixels) {
+        p.x += p.vx
+        p.y += p.vy
+        p.vx *= 0.95
+        p.vy *= 0.95
+        p.life -= 0.014
+      }
+      s.dustPixels = s.dustPixels.filter((p) => p.life > 0)
+      if (s.emberPixels.every((p) => p.life <= 0) && s.dustPixels.length === 0) {
+        s.phase = 'done'
+        s.timer = 0
+      }
+    }
+    return s
+  },
+  draw(ctx, s, size) {
+    const cx = size / 2
+    const cy = size / 2
+    if (s.flash > 0) {
+      ctx.globalAlpha = s.flash
+      ctx.fillStyle = '#312e81'
+      ctx.fillRect(0, 0, size, size)
+    }
+    for (const p of s.meteorTrailPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    if (s.phase === 'meteor' || s.phase === 'impact') {
+      ctx.globalAlpha = 0.95
+      ctx.fillStyle = '#eef6ff'
+      ctx.fillRect(Math.round(s.meteorX - 5), Math.round(s.meteorY - 5), 10, 10)
+      ctx.fillStyle = '#7dd3fc'
+      ctx.fillRect(Math.round(s.meteorX - 3), Math.round(s.meteorY - 3), 6, 6)
+      ctx.fillStyle = '#4f46e5'
+      ctx.fillRect(Math.round(s.meteorX - 1), Math.round(s.meteorY - 1), 3, 3)
+    }
+    for (const p of s.meteorShards) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    if (s.phase === 'impact') {
+      const craterRadius = 6 + s.corePulse * 6
+      const debrisKick = Math.max(0, 1 - s.timer / 120) * 4
+      ctx.globalAlpha = 0.92
+      drawPixelRing(ctx, cx, cy, craterRadius, 2.8, '#7dd3fc')
+      ctx.globalAlpha = 0.82
+      ctx.fillStyle = '#312e81'
+      ctx.fillRect(Math.round(cx - craterRadius * 1.02 - debrisKick), Math.round(cy - craterRadius * 0.9 - debrisKick * 0.65), Math.round(craterRadius * 0.34), Math.round(craterRadius * 0.2))
+      ctx.fillRect(Math.round(cx + craterRadius * 0.66 + debrisKick), Math.round(cy - craterRadius * 0.62 - debrisKick * 0.48), Math.round(craterRadius * 0.3), Math.round(craterRadius * 0.18))
+      ctx.fillRect(Math.round(cx - craterRadius * 0.84 - debrisKick * 0.82), Math.round(cy + craterRadius * 0.44 + debrisKick * 0.28), Math.round(craterRadius * 0.28), Math.round(craterRadius * 0.18))
+      ctx.fillRect(Math.round(cx + craterRadius * 0.52 + debrisKick * 0.74), Math.round(cy + craterRadius * 0.58 + debrisKick * 0.34), Math.round(craterRadius * 0.36), Math.round(craterRadius * 0.2))
+      ctx.globalAlpha = 0.94
+      ctx.fillStyle = '#60a5fa'
+      ctx.fillRect(Math.round(cx - craterRadius * 0.98 - debrisKick), Math.round(cy - craterRadius * 0.94 - debrisKick * 0.65), Math.round(craterRadius * 0.28), Math.round(craterRadius * 0.12))
+      ctx.fillRect(Math.round(cx + craterRadius * 0.68 + debrisKick), Math.round(cy - craterRadius * 0.66 - debrisKick * 0.48), Math.round(craterRadius * 0.24), Math.round(craterRadius * 0.1))
+      ctx.fillRect(Math.round(cx - craterRadius * 0.8 - debrisKick * 0.82), Math.round(cy + craterRadius * 0.42 + debrisKick * 0.28), Math.round(craterRadius * 0.22), Math.round(craterRadius * 0.1))
+      ctx.fillRect(Math.round(cx + craterRadius * 0.56 + debrisKick * 0.74), Math.round(cy + craterRadius * 0.56 + debrisKick * 0.34), Math.round(craterRadius * 0.3), Math.round(craterRadius * 0.12))
+      ctx.globalAlpha = 0.95
+      ctx.fillStyle = '#1e1b4b'
+      ctx.fillRect(Math.round(cx - craterRadius * 0.58), Math.round(cy - craterRadius * 0.42), Math.round(craterRadius * 1.16), Math.round(craterRadius * 0.84))
+      ctx.fillStyle = '#0f172a'
+      ctx.fillRect(Math.round(cx - craterRadius * 0.42), Math.round(cy - craterRadius * 0.28), Math.round(craterRadius * 0.84), Math.round(craterRadius * 0.56))
+      ctx.globalAlpha = 0.46
+      ctx.fillStyle = '#f8fdff'
+      ctx.fillRect(Math.round(cx - craterRadius * 0.48), Math.round(cy - craterRadius * 0.52), Math.round(craterRadius * 0.62), 2)
+    }
+    if (s.phase === 'expand' || s.phase === 'fade' || s.phase === 'done') {
+      const outerRingRadius = 5 + s.corePulse * 5
+      const innerRingRadius = Math.max(2, outerRingRadius - 3)
+      ctx.globalAlpha = 0.82
+      drawPixelRing(ctx, cx, cy, outerRingRadius, 2.4, '#93c5fd')
+      ctx.globalAlpha = 0.96
+      drawPixelRing(ctx, cx, cy, innerRingRadius, 2.2, '#1d4ed8')
+    }
+    for (const p of s.wavePixels) {
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const p of s.dustPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    for (const p of s.emberPixels) {
+      if (p.life <= 0) continue
+      ctx.globalAlpha = p.life
+      ctx.fillStyle = p.color
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
+    }
+    ctx.globalAlpha = 1
+  },
+  isDone(s) {
+    return s.phase === 'done' && s.timer > 2200
+  },
+}
+
 // ---- 9. silver_storm: 顶部到底部的多道随机银色刀光 ----
 const silverStormRenderer = {
   init(size) {
@@ -1189,6 +1872,9 @@ const renderers = {
   judgment_day: judgmentDayRenderer,
   doom_mark: doomJudgmentRenderer,
   silver_storm: silverStormRenderer,
+  magic_burst: magicBurstRenderer,
+  magic_rupture: magicRuptureRenderer,
+  magic_starfall: magicStarfallRenderer,
 }
 
 // ======= 组件生命周期 =======

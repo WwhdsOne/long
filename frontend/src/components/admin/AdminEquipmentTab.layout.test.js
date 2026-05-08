@@ -28,4 +28,13 @@ describe('AdminEquipmentTab 布局与草稿生成入口', () => {
         expect(styleSource).toContain('grid-template-columns: repeat(5, minmax(0, 1fr))')
         expect(styleSource).toContain('@media (max-width: 900px)')
     })
+
+    it('新增装备表单移除描述和天赋，改为魔法词条', () => {
+        expect(componentSource).not.toContain('装备描述')
+        expect(componentSource).not.toContain('talentAffinity')
+        expect(componentSource).toContain('magicProcRateBonus')
+        expect(componentSource).toContain('magicDamageBonus')
+        expect(componentSource).toContain('魔法触发')
+        expect(componentSource).toContain('魔法增伤')
+    })
 })

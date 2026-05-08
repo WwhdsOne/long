@@ -1,0 +1,78 @@
+{
+  "name": "talent-magic_chain_bound",
+  "size": [
+    48,
+    48
+  ],
+  "constraints": {
+    "maxPixels": 13,
+    "allowAlpha": false
+  },
+  "pixels": [
+    {
+      "x": 15,
+      "y": 22,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 18,
+      "y": 19,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 21,
+      "y": 22,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 24,
+      "y": 24,
+      "color": "#dbeafe"
+    },
+    {
+      "x": 27,
+      "y": 26,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 30,
+      "y": 29,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 33,
+      "y": 26,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 22,
+      "y": 16,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 26,
+      "y": 16,
+      "color": "#7dd3fc"
+    },
+    {
+      "x": 22,
+      "y": 32,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 26,
+      "y": 32,
+      "color": "#3b82f6"
+    },
+    {
+      "x": 18,
+      "y": 32,
+      "color": "#1e3a8a"
+    },
+    {
+      "x": 30,
+      "y": 16,
+      "color": "#1e3a8a"
+    }
+  ]
+}

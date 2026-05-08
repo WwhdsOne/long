@@ -15,12 +15,14 @@ func TestCombatStatsRefreshAfterEquipItem(t *testing.T) {
 	nickname := "缓存穿戴测试"
 
 	if err := store.SaveEquipmentDefinition(ctx, EquipmentDefinition{
-		ItemID:      "cache-sword",
-		Name:        "缓存之剑",
-		Slot:        "weapon",
-		Rarity:      "普通",
-		AttackPower: 7,
-		CritRate:    0.05,
+		ItemID:             "cache-sword",
+		Name:               "缓存之剑",
+		Slot:               "weapon",
+		Rarity:             "普通",
+		AttackPower:        7,
+		CritRate:           0.05,
+		MagicProcRateBonus: 0.02,
+		MagicDamageBonus:   0.5,
 	}); err != nil {
 		t.Fatalf("save equipment definition: %v", err)
 	}
@@ -47,6 +49,12 @@ func TestCombatStatsRefreshAfterEquipItem(t *testing.T) {
 	}
 	if after.CombatStats.CriticalChancePercent != before.CombatStats.CriticalChancePercent+5 {
 		t.Fatalf("expected crit rate to increase by 5 after equip, before=%+v after=%+v", before.CombatStats, after.CombatStats)
+	}
+	if after.CombatStats.MagicProcRate != before.CombatStats.MagicProcRate+0.02 {
+		t.Fatalf("expected magic proc rate to increase by 0.02, before=%+v after=%+v", before.CombatStats, after.CombatStats)
+	}
+	if after.CombatStats.MagicDamageMultiplier != before.CombatStats.MagicDamageMultiplier*1.5 {
+		t.Fatalf("expected magic damage multiplier to increase by 50%%, before=%+v after=%+v", before.CombatStats, after.CombatStats)
 	}
 }
 

@@ -48,7 +48,8 @@ export function emptyEquipmentForm() {
         partTypeDamageSoft: '',
         partTypeDamageHeavy: '',
         partTypeDamageWeak: '',
-        talentAffinity: '',
+        magicProcRateBonus: '',
+        magicDamageBonus: '',
     }
 }
 
@@ -249,7 +250,8 @@ export function normalizeLootEntry(entry) {
         partTypeDamageSoft: Number(entry?.partTypeDamageSoft ?? 0),
         partTypeDamageHeavy: Number(entry?.partTypeDamageHeavy ?? 0),
         partTypeDamageWeak: Number(entry?.partTypeDamageWeak ?? 0),
-        talentAffinity: entry?.talentAffinity || '',
+        magicProcRateBonus: Number(entry?.magicProcRateBonus ?? 0),
+        magicDamageBonus: Number(entry?.magicDamageBonus ?? 0),
     }
 }
 
@@ -485,6 +487,8 @@ export function formatItemStats(item) {
     if (item.partTypeDamageSoft != null) parts.push(`软组织 +${(item.partTypeDamageSoft * 100).toFixed(0)}%`)
     if (item.partTypeDamageHeavy != null) parts.push(`重甲 +${(item.partTypeDamageHeavy * 100).toFixed(0)}%`)
     if (item.partTypeDamageWeak != null) parts.push(`弱点 +${(item.partTypeDamageWeak * 100).toFixed(0)}%`)
+    if (item.magicProcRateBonus != null) parts.push(`魔法触发 +${(item.magicProcRateBonus * 100).toFixed(1)}%`)
+    if (item.magicDamageBonus != null) parts.push(`魔法增伤 +${(item.magicDamageBonus * 100).toFixed(0)}%`)
     return parts.join('，') || '无主要属性'
 }
 

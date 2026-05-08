@@ -64,15 +64,6 @@ defineProps({
             <input v-model="equipmentForm.name" class="nickname-form__input" type="text" placeholder="前台显示名称"/>
           </label>
           <label class="admin-labeled-field">
-            <span>装备描述:</span>
-            <textarea
-                v-model="equipmentForm.description"
-                class="nickname-form__input"
-                rows="4"
-                placeholder="描述装备背景故事"
-            ></textarea>
-          </label>
-          <label class="admin-labeled-field">
             <span>部位:</span>
             <select v-model="equipmentForm.slot" class="nickname-form__input">
               <option v-for="slot in EQUIPMENT_SLOTS" :key="slot.value" :value="slot.value">
@@ -148,13 +139,14 @@ defineProps({
                      step="0.01"/>
             </label>
             <label class="admin-labeled-field">
-              <span>天赋:</span>
-              <select v-model="equipmentForm.talentAffinity" class="nickname-form__input">
-                <option value="">通用（无天赋绑定）</option>
-                <option value="normal">均衡攻势</option>
-                <option value="armor">碎盾攻坚</option>
-                <option value="crit">致命洞察</option>
-              </select>
+              <span>魔法触发:</span>
+              <input v-model="equipmentForm.magicProcRateBonus" class="nickname-form__input" type="number" min="0"
+                     step="0.001"/>
+            </label>
+            <label class="admin-labeled-field">
+              <span>魔法增伤:</span>
+              <input v-model="equipmentForm.magicDamageBonus" class="nickname-form__input" type="number" min="0"
+                     step="0.01"/>
             </label>
           </fieldset>
           <button class="nickname-form__submit equipment-form__save" type="submit" :disabled="saving">
@@ -179,10 +171,6 @@ defineProps({
               <div>
                 <dt>稀有度</dt>
                 <dd>{{ formatRarityLabel(item.rarity) }}</dd>
-              </div>
-              <div>
-                <dt>天赋</dt>
-                <dd>{{ item.talentAffinity || '通用' }}</dd>
               </div>
             </dl>
             <p class="equipment-card__stats">{{ formatItemStats(item) || '无主要属性' }}</p>

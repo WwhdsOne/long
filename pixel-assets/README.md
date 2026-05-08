@@ -56,6 +56,31 @@ python scripts/render_pixels.py specs/ --dry-run
 python scripts/validate_pixels.py specs/ output/
 ```
 
+## OSS 上传
+
+如果要把本地生成的 PNG 上传到阿里云 OSS，并同步更新 `oss-url-map.json`，可以使用：
+
+```bash
+export OSS_ACCESS_KEY_ID=你的Key
+export OSS_ACCESS_KEY_SECRET=你的Secret
+
+python scripts/upload_oss_and_update_map.py frontend/public/effects/talent-magic_*.png
+```
+
+可选环境变量：
+
+- `OSS_BUCKET`
+- `OSS_ENDPOINT`
+- `OSS_PREFIX`
+- `OSS_PUBLIC_BASE_URL`
+- `OSSUTIL_BIN`
+
+仅查看将上传什么而不真正执行：
+
+```bash
+python scripts/upload_oss_and_update_map.py frontend/public/effects/talent-magic_*.png --dry-run
+```
+
 ## 校验规则
 
 - 像素数量 ≤ maxPixels

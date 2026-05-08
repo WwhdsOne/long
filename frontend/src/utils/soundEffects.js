@@ -10,6 +10,9 @@ const soundRegistry = new Map([
     ['battle.trigger.judgment-day', 'sfx/battle/trigger/judgment-day.wav'],
     ['battle.trigger.final-cut', 'sfx/battle/trigger/final-cut.wav'],
     ['battle.trigger.auto-strike', 'sfx/battle/trigger/auto-strike.wav'],
+    ['battle.trigger.magic-burst', 'sfx/battle/trigger/magic-burst.wav'],
+    ['battle.trigger.magic-rupture', 'sfx/battle/trigger/magic-rupture.wav'],
+    ['battle.trigger.magic-starfall', 'sfx/battle/trigger/magic-starfall.wav'],
     ['ui.action.equip', 'sfx/battle/trigger/action-equip.wav'],
     ['ui.action.unequip', 'sfx/battle/trigger/action-equip.wav'],
     ['ui.action.salvage', 'sfx/battle/trigger/action-salvage.wav'],
@@ -41,6 +44,12 @@ const soundAliases = {
     '终末血斩': 'battle.trigger.final-cut',
     auto_strike: 'battle.trigger.auto-strike',
     '自动锤击音效': 'battle.trigger.auto-strike',
+    magic_burst: 'battle.trigger.magic-burst',
+    magic_rupture: 'battle.trigger.magic-rupture',
+    magic_starfall: 'battle.trigger.magic-starfall',
+    '奥术爆裂': 'battle.trigger.magic-burst',
+    '奥术裂解': 'battle.trigger.magic-rupture',
+    '星陨潮爆': 'battle.trigger.magic-starfall',
     equip: 'ui.action.equip',
     unequip: 'ui.action.unequip',
     salvage: 'ui.action.salvage',
@@ -71,6 +80,13 @@ const triggerSoundPolicies = {
         layers: [
             {delayMs: 35, volume: 0.72},
         ],
+    },
+    'battle.trigger.magic-burst': {
+        delayMs: 160,
+    },
+    'battle.trigger.magic-starfall': {
+        delayMs: 480,
+        cooldownMs: 2600,
     },
 }
 
