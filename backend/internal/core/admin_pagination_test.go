@@ -10,7 +10,7 @@ func TestGetAdminStateOmitsHeavyCollections(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:button:feel", map[string]any{
 		"label":   "有感觉吗",
 		"count":   "1",
 		"sort":    "10",
@@ -18,14 +18,14 @@ func TestGetAdminStateOmitsHeavyCollections(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed button: %v", err)
 	}
-	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:equip:def:wood-sword", map[string]any{
 		"name":         "木剑",
 		"slot":         "weapon",
 		"bonus_clicks": "2",
 	}).Err(); err != nil {
 		t.Fatalf("seed equipment: %v", err)
 	}
-	if err := store.client.SAdd(ctx, "vote:equipment:index", "wood-sword").Err(); err != nil {
+	if err := store.client.SAdd(ctx, "hai-world:equipment:index", "wood-sword").Err(); err != nil {
 		t.Fatalf("seed equipment index: %v", err)
 	}
 
@@ -133,14 +133,14 @@ func TestListAdminBossHistoryPageReturnsStablePagination(t *testing.T) {
 func seedEquipmentDefinitionForPage(t *testing.T, store *Store, ctx context.Context, itemID string, name string, slot string) {
 	t.Helper()
 
-	if err := store.client.HSet(ctx, "vote:equip:def:"+itemID, map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:equip:def:"+itemID, map[string]any{
 		"name":         name,
 		"slot":         slot,
 		"bonus_clicks": "1",
 	}).Err(); err != nil {
 		t.Fatalf("seed equipment %s: %v", itemID, err)
 	}
-	if err := store.client.SAdd(ctx, "vote:equipment:index", itemID).Err(); err != nil {
+	if err := store.client.SAdd(ctx, "hai-world:equipment:index", itemID).Err(); err != nil {
 		t.Fatalf("seed equipment index %s: %v", itemID, err)
 	}
 }

@@ -319,6 +319,29 @@ select {
     transform: translateY(0);
 }
 
+.stamina-float__rule-card {
+    width: min(220px, calc(100vw - 36px));
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid rgba(225, 29, 72, 0.18);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.stamina-float__rule-card strong {
+    color: var(--primary-deep);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+}
+
+.stamina-float__rule-card span {
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
 .stamina-float--danger .stamina-float__bubble {
     border-color: rgba(185, 28, 28, 0.28);
     box-shadow: 0 18px 34px rgba(185, 28, 28, 0.2);
@@ -7079,5 +7102,10 @@ body:has(.battle-page-hud),
         width: 34px;
         height: 34px;
         font-size: 1.28rem;
+    }
+
+    .stamina-float__rule-card {
+        width: min(200px, calc(100vw - 28px));
+        padding: 8px 10px;
     }
 }

@@ -74,7 +74,7 @@ func newTaskTestStore(t *testing.T, defs []TaskDefinition) (*Store, func()) {
 	t.Helper()
 	baseStore, cleanup := newTestStore(t)
 	taskDefStore := &stubTaskDefinitionStore{items: defs}
-	taskStore := NewStore(baseStore.client, "vote:", StoreOptions{
+	taskStore := NewStore(baseStore.client, "hai-world:", StoreOptions{
 		CriticalChancePercent: 5,
 		TaskDefinitionStore:   taskDefStore,
 		TaskClaimLogStore:     stubTaskClaimLogStore{},
@@ -229,7 +229,7 @@ func TestSaveTaskDefinitionNormalizesLegacyFields(t *testing.T) {
 	defer cleanup()
 
 	taskDefStore := &stubTaskDefinitionStore{}
-	store := NewStore(baseStore.client, "vote:", StoreOptions{
+	store := NewStore(baseStore.client, "hai-world:", StoreOptions{
 		CriticalChancePercent: 5,
 		TaskDefinitionStore:   taskDefStore,
 		TaskClaimLogStore:     stubTaskClaimLogStore{},
@@ -328,7 +328,7 @@ func TestSaveTaskDefinitionSupportsLifetimeWindow(t *testing.T) {
 	defer cleanup()
 
 	taskDefStore := &stubTaskDefinitionStore{}
-	store := NewStore(baseStore.client, "vote:", StoreOptions{
+	store := NewStore(baseStore.client, "hai-world:", StoreOptions{
 		CriticalChancePercent: 5,
 		TaskDefinitionStore:   taskDefStore,
 		TaskClaimLogStore:     stubTaskClaimLogStore{},

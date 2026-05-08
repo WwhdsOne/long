@@ -43,7 +43,7 @@ func TestRenderStartupInfoIncludesBannerAndSummary(t *testing.T) {
 		Redis:       config.RedisConfig{Host: "127.0.0.1", Port: 6379, DB: 2, TLSEnabled: true},
 		Mongo:       config.MongoConfig{Enabled: true, Database: "vote_wall"},
 		Log:         config.LogConfig{Level: "info", Format: "json"},
-		RedisPrefix: "vote:",
+		RedisPrefix: "hai-world:",
 	}
 
 	info := renderStartupInfo(cfg, "127.0.0.1:2333")

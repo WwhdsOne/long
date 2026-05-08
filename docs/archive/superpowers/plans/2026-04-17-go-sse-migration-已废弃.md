@@ -23,7 +23,7 @@
 
 ## Redis
 
-- 键格式继续使用 `vote:button:<slug>`
+- 键格式继续使用 `hai-world:button:<slug>`
 - 字段继续兼容 `label`、`count`、`sort`、`enabled`、`image_path`、`image_alt`
 - 点击继续使用 Redis 原子自增
 

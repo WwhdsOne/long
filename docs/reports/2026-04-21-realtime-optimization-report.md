@@ -62,9 +62,9 @@
 
 为了避免频繁扫描 Redis 键空间，本次新增并使用了以下索引：
 
-- `vote:buttons:index`
-- `vote:equipment:index`
-- `vote:players:index`
+- `hai-world:buttons:index`
+- `hai-world:equipment:index`
+- `hai-world:players:index`
 
 改动后的读取方式：
 

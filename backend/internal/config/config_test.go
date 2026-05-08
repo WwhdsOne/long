@@ -29,7 +29,7 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               pool_size: 20
               min_idle_conns: 5
               tls_enabled: false
-            redis_prefix: "vote:"
+            redis_prefix: "hai-world:"
             rate_limit:
               limit: 30
               window_ms: 2000
@@ -96,8 +96,8 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if cfg.Port != 2333 {
 		t.Fatalf("expected port 2333, got %d", cfg.Port)
 	}
-	if cfg.RedisPrefix != "vote:" {
-		t.Fatalf("expected redis prefix vote:button:, got %q", cfg.RedisPrefix)
+	if cfg.RedisPrefix != "hai-world:" {
+		t.Fatalf("expected redis prefix hai-world:button:, got %q", cfg.RedisPrefix)
 	}
 	if cfg.Redis.PoolSize != 20 {
 		t.Fatalf("expected redis pool size 20, got %d", cfg.Redis.PoolSize)
@@ -213,7 +213,7 @@ func TestLoadDefaultsInvalidRoomCount(t *testing.T) {
               password: ""
               db: 0
               tls_enabled: false
-            redis_prefix: "vote:"
+            redis_prefix: "hai-world:"
             rate_limit:
               limit: 30
               window_ms: 2000
@@ -405,7 +405,7 @@ func validConfigForTest() Config {
 			Host: "127.0.0.1",
 			Port: 6379,
 		},
-		RedisPrefix: "vote:",
+		RedisPrefix: "hai-world:",
 		RateLimit: RateLimitConfig{
 			Limit:             30,
 			Window:            2 * time.Second,

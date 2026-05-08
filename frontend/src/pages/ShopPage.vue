@@ -97,7 +97,7 @@ function closeStaminaCapConfirm() {
             <span>体力</span>
             <strong>{{ stamina.current }} / {{ stamina.max }}</strong>
             <div class="shop-stamina-card__notice">
-              <span>1 点体力 = 100 次点击</span>
+              <span>1 点体力 = 50 次点击</span>
               <span>体力归零后点击伤害锁定为 1</span>
               <span>挂机时伤害不受体力系统限制</span>
             </div>

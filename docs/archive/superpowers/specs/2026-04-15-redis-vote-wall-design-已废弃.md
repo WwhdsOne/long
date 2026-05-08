@@ -27,7 +27,7 @@
 
 ## Redis Data Model
 
-- Each button is stored as a Redis hash under the key pattern `vote:button:<slug>`.
+- Each button is stored as a Redis hash under the key pattern `hai-world:button:<slug>`.
 - Required fields:
   - `label`: text shown on the button card.
   - `count`: integer total.
@@ -36,17 +36,17 @@
 - Example:
 
 ```text
-HSET vote:button:feel label "有感觉吗" count 0 sort 10 enabled 1
+HSET hai-world:button:feel label "有感觉吗" count 0 sort 10 enabled 1
 ```
 
 ## Backend Behavior
 
 - `GET /api/buttons`
-  - Scans Redis for `vote:button:*`.
+  - Scans Redis for `hai-world:button:*`.
   - Loads button hashes, normalizes data, filters disabled entries, sorts by `sort` then slug, and returns the list.
 - `POST /api/buttons/:slug/click`
   - Validates that the target hash exists and is enabled.
-  - Uses `HINCRBY vote:button:<slug> count 1` for an atomic increment.
+  - Uses `HINCRBY hai-world:button:<slug> count 1` for an atomic increment.
   - Reloads the updated button, emits a Socket.IO broadcast, and returns the new total.
 - Socket.IO
   - Emits an initial snapshot after connection.

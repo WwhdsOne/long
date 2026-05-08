@@ -19,16 +19,16 @@
 
 ## 数据模型
 
-- 当前 Boss 继续使用 `vote:boss:current`，但改为存储“实例 Boss”。
+- 当前 Boss 继续使用 `hai-world:boss:current`，但改为存储“实例 Boss”。
 - 新增 Boss 模板池：
-  - `vote:boss:pool:index`
-  - `vote:boss:pool:<templateId>`
-  - `vote:boss:pool:<templateId>:loot`
+  - `hai-world:boss:pool:index`
+  - `hai-world:boss:pool:<templateId>`
+  - `hai-world:boss:pool:<templateId>:loot`
 - 新增循环状态：
-  - `vote:boss:cycle`
+  - `hai-world:boss:cycle`
 - 当前刷出的实例 Boss 继续使用已有实例级数据：
-  - `vote:boss:<instanceId>:damage`
-  - `vote:boss:<instanceId>:loot`
+  - `hai-world:boss:<instanceId>:damage`
+  - `hai-world:boss:<instanceId>:loot`
 - 实例 Boss 支持记录 `templateId`，用于后台识别来源；前台可忽略该字段。
 
 ## 运行规则

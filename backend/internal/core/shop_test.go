@@ -78,7 +78,7 @@ func newShopTestStore(t *testing.T, items []ShopItem) (*Store, *stubShopCatalogS
 	baseStore, cleanup := newTestStore(t)
 	catalogStore := &stubShopCatalogStore{items: items}
 	logStore := &stubShopPurchaseLogStore{}
-	store := NewStore(baseStore.client, "vote:", StoreOptions{
+	store := NewStore(baseStore.client, "hai-world:", StoreOptions{
 		CriticalChancePercent:   5,
 		ShopCatalogStore:        catalogStore,
 		ShopPurchaseLogStore:    logStore,

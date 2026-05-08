@@ -131,7 +131,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=6379)
     parser.add_argument("--password", default="")
     parser.add_argument("--db", type=int, default=0)
-    parser.add_argument("--prefix", default="vote:boss")
+    parser.add_argument("--prefix", default="hai-world:boss")
 
     args = parser.parse_args()
 

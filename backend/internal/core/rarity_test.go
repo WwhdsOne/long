@@ -28,7 +28,7 @@ func TestEquipmentDefinitionDefaultsRarityToCommon(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:equip:def:wood-sword", map[string]any{
 		"name":         "木剑",
 		"slot":         "weapon",
 		"bonus_clicks": "2",
@@ -36,7 +36,7 @@ func TestEquipmentDefinitionDefaultsRarityToCommon(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed equipment definition: %v", err)
 	}
-	if err := store.client.SAdd(ctx, "vote:equipment:index", "wood-sword").Err(); err != nil {
+	if err := store.client.SAdd(ctx, "hai-world:equipment:index", "wood-sword").Err(); err != nil {
 		t.Fatalf("seed equipment index: %v", err)
 	}
 
