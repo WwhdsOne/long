@@ -9,19 +9,6 @@ redis:
   min_idle_conns: 5
   tls_enabled: false
 redis_prefix: "hai-world"
-rate_limit:
-  limit: 60
-  window_ms: 5000
-  blacklist_ms: 600000
-  nickname_whitelist: ["压测账号"]
-  blacklist_multiplier: 2.0
-  offense_decay_ms: 86400000
-  medium:
-    limit: 1000
-    window_ms: 600000
-  long:
-    limit: 2500
-    window_ms: 3600000
 admin:
   username: "root"
   password: "123456"
@@ -74,3 +61,25 @@ mongo:
   connect_timeout_ms: 3000
   write_timeout_ms: 2000
   read_timeout_ms: 3000
+anti_script:
+  score_window_seconds: 86400
+  purchase_click_cooldown_seconds: 3
+  ban_threshold_8h: 6
+  ban_threshold_24h: 10
+  ban_threshold_72h: 14
+  points:
+    click_rate_limit_hit: 2
+    login_turnstile_invalid: 3
+    stamina_turnstile_invalid: 3
+    post_stamina_purchase_click: 4
+  click_rate_limit:
+    nickname_whitelist: ["压测账号"]
+    short:
+      limit: 60
+      window_ms: 5000
+    medium:
+      limit: 1000
+      window_ms: 600000
+    long:
+      limit: 2500
+      window_ms: 3600000

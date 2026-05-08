@@ -517,19 +517,19 @@ export function createAdminPageActions(state) {
         await deleteByID(`/api/admin/messages/${encodeURIComponent(id)}`, '留言已删除。', '删除留言失败', fetchMessages)
     }
 
-    async function unblockBlacklistEntry(clientId, nickname) {
+    async function unblockBlacklistEntry(nickname) {
         saving.value = true
         try {
-            const response = await fetch(`/api/admin/blacklist/${encodeURIComponent(clientId)}/unblock`, {
+            const response = await fetch(`/api/admin/blacklist/${encodeURIComponent(nickname)}/unblock`, {
                 method: 'POST',
             })
             if (!response.ok) {
-                throw new Error(await readErrorMessage(response, '手动解封失败'))
+                throw new Error(await readErrorMessage(response, '清除账号风险状态失败'))
             }
-            setSuccess(`已解封 ${nickname || clientId}。`)
+            setSuccess(`已清除 ${nickname} 的账号风险状态。`)
             await fetchBlacklist()
         } catch (error) {
-            errorMessage.value = error.message || '手动解封失败'
+            errorMessage.value = error.message || '清除账号风险状态失败'
         } finally {
             saving.value = false
         }

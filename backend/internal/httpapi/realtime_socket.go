@@ -117,7 +117,8 @@ type realtimeSessionOptions struct {
 	store                      ButtonStore
 	hub                        RealtimeHub
 	changePublisher            ChangePublisher
-	clickGuard                 ClickGuard
+	clickRiskDetector          ClickRiskDetector
+	accountRisk                AccountRiskManager
 	rateLimitNicknameWhitelist []string
 	authenticatorEnabled       bool
 	authenticatedNickname      string
@@ -129,7 +130,8 @@ type realtimeSession struct {
 	store                      ButtonStore
 	hub                        RealtimeHub
 	changePublisher            ChangePublisher
-	clickGuard                 ClickGuard
+	clickRiskDetector          ClickRiskDetector
+	accountRisk                AccountRiskManager
 	rateLimitNicknameWhitelist []string
 	authenticatorEnabled       bool
 	authenticatedNickname      string
@@ -156,7 +158,8 @@ func newRealtimeSession(options realtimeSessionOptions) *realtimeSession {
 		store:                      options.store,
 		hub:                        options.hub,
 		changePublisher:            options.changePublisher,
-		clickGuard:                 options.clickGuard,
+		clickRiskDetector:          options.clickRiskDetector,
+		accountRisk:                options.accountRisk,
 		rateLimitNicknameWhitelist: append([]string(nil), options.rateLimitNicknameWhitelist...),
 		authenticatorEnabled:       options.authenticatorEnabled,
 		authenticatedNickname:      strings.TrimSpace(options.authenticatedNickname),
@@ -177,7 +180,8 @@ func newRealtimeSocketHandler(options Options) app.HandlerFunc {
 			store:                      options.Store,
 			hub:                        options.RealtimeHub,
 			changePublisher:            options.ChangePublisher,
-			clickGuard:                 options.ClickGuard,
+			clickRiskDetector:          options.ClickRiskDetector,
+			accountRisk:                options.AccountRisk,
 			rateLimitNicknameWhitelist: options.RateLimitNicknameWhitelist,
 			authenticatorEnabled:       options.PlayerAuthenticator != nil,
 			authenticatedNickname:      authenticatedNickname,
@@ -292,7 +296,8 @@ func (s *realtimeSession) executeClick(ctx context.Context, slug string, comboCo
 
 	nickname, result, apiErr := executeButtonClick(ctx, Options{
 		Store:                      s.store,
-		ClickGuard:                 s.clickGuard,
+		ClickRiskDetector:          s.clickRiskDetector,
+		AccountRisk:                s.accountRisk,
 		RateLimitNicknameWhitelist: s.rateLimitNicknameWhitelist,
 		ChangePublisher:            s.changePublisher,
 	}, clickRequestContext{

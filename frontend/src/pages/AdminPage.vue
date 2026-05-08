@@ -108,7 +108,7 @@ const admin = reactive(useAdminPage())
                   @click="admin.activeTab = 'tasks'; admin.fetchTasks()">任务
           </button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'blacklist' }"
-                  @click="admin.activeTab = 'blacklist'; admin.fetchBlacklist()">黑名单
+                  @click="admin.activeTab = 'blacklist'; admin.fetchBlacklist()">风险名单
           </button>
           <button class="admin-tab" :class="{ 'admin-tab--active': admin.activeTab === 'dashboard' }"
                   @click="admin.activeTab = 'dashboard'">看板

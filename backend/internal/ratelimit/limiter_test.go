@@ -5,206 +5,81 @@ import (
 	"time"
 )
 
-func TestLimiterBlocksBurstingClientForTenMinutes(t *testing.T) {
+func TestLimiterDetectsBurstOverflow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Limit:             3,
-		Window:            2 * time.Second,
-		BlacklistDuration: 10 * time.Minute,
+		Limit:  3,
+		Window: 2 * time.Second,
 		Now: func() time.Time {
 			return now
 		},
 	})
 
 	for range 3 {
-		if _, err := limiter.Allow("203.0.113.10"); err != nil {
-			t.Fatalf("expected request to pass before threshold, got %v", err)
+		hit, err := limiter.Detect("203.0.113.10")
+		if err != nil {
+			t.Fatalf("detect hit: %v", err)
+		}
+		if hit {
+			t.Fatal("expected hit to stay false before threshold")
 		}
 	}
 
-	retryAfter, err := limiter.Allow("203.0.113.10")
-	if err == nil {
-		t.Fatal("expected fourth request to be rate limited")
+	hit, err := limiter.Detect("203.0.113.10")
+	if err != nil {
+		t.Fatalf("detect overflow: %v", err)
 	}
-	if retryAfter != 10*time.Minute {
-		t.Fatalf("expected retryAfter 10m, got %s", retryAfter)
-	}
-
-	now = now.Add(5 * time.Minute)
-	retryAfter, err = limiter.Allow("203.0.113.10")
-	if err == nil {
-		t.Fatal("expected client to stay blocked during blacklist window")
-	}
-	if retryAfter != 5*time.Minute {
-		t.Fatalf("expected remaining block time 5m, got %s", retryAfter)
-	}
-
-	now = now.Add(5*time.Minute + time.Second)
-	if _, err := limiter.Allow("203.0.113.10"); err != nil {
-		t.Fatalf("expected client to recover after blacklist expires, got %v", err)
+	if !hit {
+		t.Fatal("expected fourth request to trigger detector")
 	}
 }
 
-func TestLimiterDoublesBlacklistDurationOnRepeatedOffense(t *testing.T) {
-	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+func TestLimiterKeepsDifferentKeysIndependent(t *testing.T) {
 	limiter := NewLimiter(Config{
-		Limit:               1,
-		Window:              time.Second,
-		BlacklistDuration:   10 * time.Minute,
-		BlacklistMultiplier: 2,
-		OffenseDecay:        24 * time.Hour,
-		Now: func() time.Time {
-			return now
-		},
+		Limit:  1,
+		Window: time.Second,
 	})
 
-	if _, err := limiter.Allow("203.0.113.77"); err != nil {
-		t.Fatalf("expected first request to pass, got %v", err)
+	if hit, err := limiter.Detect("198.51.100.10"); err != nil || hit {
+		t.Fatalf("expected first key first hit to be normal, hit=%v err=%v", hit, err)
 	}
-	retryAfter, err := limiter.Allow("203.0.113.77")
-	if err == nil {
-		t.Fatal("expected first offense to be blocked")
+	if hit, err := limiter.Detect("198.51.100.10"); err != nil || !hit {
+		t.Fatalf("expected first key second hit to overflow, hit=%v err=%v", hit, err)
 	}
-	if retryAfter != 10*time.Minute {
-		t.Fatalf("expected first offense retryAfter 10m, got %s", retryAfter)
-	}
-
-	now = now.Add(10*time.Minute + time.Second)
-	if _, err := limiter.Allow("203.0.113.77"); err != nil {
-		t.Fatalf("expected client to recover after first block, got %v", err)
-	}
-	retryAfter, err = limiter.Allow("203.0.113.77")
-	if err == nil {
-		t.Fatal("expected second offense to be blocked")
-	}
-	if retryAfter != 20*time.Minute {
-		t.Fatalf("expected second offense retryAfter 20m, got %s", retryAfter)
+	if hit, err := limiter.Detect("198.51.100.11"); err != nil || hit {
+		t.Fatalf("expected second key to stay independent, hit=%v err=%v", hit, err)
 	}
 }
 
-func TestLimiterResetsBlacklistDurationAfterOneDayWithoutOffense(t *testing.T) {
-	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+func TestLimiterUsesWindowDefaults(t *testing.T) {
 	limiter := NewLimiter(Config{
-		Limit:               1,
-		Window:              time.Second,
-		BlacklistDuration:   10 * time.Minute,
-		BlacklistMultiplier: 2,
-		OffenseDecay:        24 * time.Hour,
-		Now: func() time.Time {
-			return now
-		},
-	})
-
-	if _, err := limiter.Allow("203.0.113.78"); err != nil {
-		t.Fatalf("expected first request to pass, got %v", err)
-	}
-	if _, err := limiter.Allow("203.0.113.78"); err == nil {
-		t.Fatal("expected first offense to be blocked")
-	}
-
-	now = now.Add(10*time.Minute + time.Second)
-	if _, err := limiter.Allow("203.0.113.78"); err != nil {
-		t.Fatalf("expected client to recover after first block, got %v", err)
-	}
-	if _, err := limiter.Allow("203.0.113.78"); err == nil {
-		t.Fatal("expected second offense to be blocked")
-	}
-
-	now = now.Add(24*time.Hour + 20*time.Minute + time.Second)
-	if _, err := limiter.Allow("203.0.113.78"); err != nil {
-		t.Fatalf("expected client to recover after offense decay window, got %v", err)
-	}
-	retryAfter, err := limiter.Allow("203.0.113.78")
-	if err == nil {
-		t.Fatal("expected post-decay offense to be blocked")
-	}
-	if retryAfter != 10*time.Minute {
-		t.Fatalf("expected post-decay retryAfter reset to 10m, got %s", retryAfter)
-	}
-}
-
-func TestLimiterKeepsDifferentIPsIndependent(t *testing.T) {
-	limiter := NewLimiter(Config{
-		Limit:             1,
-		Window:            2 * time.Second,
-		BlacklistDuration: 10 * time.Minute,
-	})
-
-	if _, err := limiter.Allow("198.51.100.10"); err != nil {
-		t.Fatalf("expected first ip to pass, got %v", err)
-	}
-	if _, err := limiter.Allow("198.51.100.10"); err == nil {
-		t.Fatal("expected first ip to be blocked on second hit")
-	}
-
-	if _, err := limiter.Allow("198.51.100.11"); err != nil {
-		t.Fatalf("expected second ip to stay independent, got %v", err)
-	}
-}
-
-func TestLimiterUsesFortyTwoAsDefaultBurstLimit(t *testing.T) {
-	limiter := NewLimiter(Config{
-		Window:            2 * time.Second,
-		BlacklistDuration: 10 * time.Minute,
+		Window: 2 * time.Second,
 	})
 
 	for i := range 42 {
-		if _, err := limiter.Allow("203.0.113.20"); err != nil {
-			t.Fatalf("expected request %d to pass before default threshold, got %v", i+1, err)
+		hit, err := limiter.Detect("203.0.113.20")
+		if err != nil {
+			t.Fatalf("detect %d: %v", i+1, err)
+		}
+		if hit {
+			t.Fatalf("expected request %d to stay below default threshold", i+1)
 		}
 	}
 
-	if _, err := limiter.Allow("203.0.113.20"); err == nil {
-		t.Fatal("expected request 43 to be rate limited")
+	hit, err := limiter.Detect("203.0.113.20")
+	if err != nil {
+		t.Fatalf("detect 43: %v", err)
+	}
+	if !hit {
+		t.Fatal("expected request 43 to overflow default threshold")
 	}
 }
 
-func TestLimiterListsAndUnblocksBlacklistEntries(t *testing.T) {
+func TestLimiterDetectsMediumWindow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Limit:             1,
-		Window:            time.Second,
-		BlacklistDuration: 10 * time.Minute,
-		Now: func() time.Time {
-			return now
-		},
-	})
-
-	if _, err := limiter.Allow("203.0.113.99"); err != nil {
-		t.Fatalf("expected first request to pass, got %v", err)
-	}
-	if _, err := limiter.Allow("203.0.113.99"); err == nil {
-		t.Fatal("expected client to be blocked")
-	}
-
-	entries := limiter.ListBlacklist()
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 blacklist entry, got %d", len(entries))
-	}
-	if entries[0].ClientID != "203.0.113.99" {
-		t.Fatalf("expected client id 203.0.113.99, got %s", entries[0].ClientID)
-	}
-	if entries[0].BlockedAt == 0 {
-		t.Fatal("expected blocked at to be recorded")
-	}
-
-	if !limiter.Unblock("203.0.113.99") {
-		t.Fatal("expected unblock to succeed")
-	}
-	if got := limiter.ListBlacklist(); len(got) != 0 {
-		t.Fatalf("expected blacklist to be empty after unblock, got %d", len(got))
-	}
-	if _, err := limiter.Allow("203.0.113.99"); err != nil {
-		t.Fatalf("expected client to pass after unblock, got %v", err)
-	}
-}
-
-func TestLimiterBlocksClientWhenMediumWindowExceedsLimit(t *testing.T) {
-	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	limiter := NewLimiter(Config{
-		Limit:             10,
-		Window:            time.Second,
-		BlacklistDuration: 10 * time.Minute,
+		Limit:  10,
+		Window: time.Second,
 		Medium: WindowConfig{
 			Limit:  5,
 			Window: 10 * time.Second,
@@ -215,27 +90,29 @@ func TestLimiterBlocksClientWhenMediumWindowExceedsLimit(t *testing.T) {
 	})
 
 	for i := range 5 {
-		if _, err := limiter.Allow("203.0.113.30"); err != nil {
-			t.Fatalf("expected request %d to pass before medium threshold, got %v", i+1, err)
+		hit, err := limiter.Detect("medium")
+		if err != nil {
+			t.Fatalf("medium detect %d: %v", i+1, err)
+		}
+		if hit {
+			t.Fatalf("expected medium detect %d below threshold", i+1)
 		}
 		now = now.Add(2 * time.Second)
 	}
-
-	retryAfter, err := limiter.Allow("203.0.113.30")
-	if err == nil {
-		t.Fatal("expected medium window overflow to be rate limited")
+	hit, err := limiter.Detect("medium")
+	if err != nil {
+		t.Fatalf("medium overflow detect: %v", err)
 	}
-	if retryAfter != 10*time.Minute {
-		t.Fatalf("expected retryAfter 10m, got %s", retryAfter)
+	if !hit {
+		t.Fatal("expected medium window overflow")
 	}
 }
 
-func TestLimiterBlocksClientWhenLongWindowExceedsLimit(t *testing.T) {
+func TestLimiterDetectsLongWindow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Limit:             10,
-		Window:            time.Second,
-		BlacklistDuration: 10 * time.Minute,
+		Limit:  10,
+		Window: time.Second,
 		Long: WindowConfig{
 			Limit:  3,
 			Window: time.Hour,
@@ -245,18 +122,24 @@ func TestLimiterBlocksClientWhenLongWindowExceedsLimit(t *testing.T) {
 		},
 	})
 
+	now = time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	var hit bool
+	var err error
 	for i := range 3 {
-		if _, err := limiter.Allow("203.0.113.40"); err != nil {
-			t.Fatalf("expected request %d to pass before long threshold, got %v", i+1, err)
+		hit, err = limiter.Detect("long")
+		if err != nil {
+			t.Fatalf("long detect %d: %v", i+1, err)
+		}
+		if hit {
+			t.Fatalf("expected long detect %d below threshold", i+1)
 		}
 		now = now.Add(20 * time.Minute)
 	}
-
-	retryAfter, err := limiter.Allow("203.0.113.40")
-	if err == nil {
-		t.Fatal("expected long window overflow to be rate limited")
+	hit, err = limiter.Detect("long")
+	if err != nil {
+		t.Fatalf("long overflow detect: %v", err)
 	}
-	if retryAfter != 10*time.Minute {
-		t.Fatalf("expected retryAfter 10m, got %s", retryAfter)
+	if !hit {
+		t.Fatal("expected long window overflow")
 	}
 }

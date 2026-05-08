@@ -15,7 +15,7 @@ defineProps({
     <section class="social-card">
       <div class="social-card__head">
         <div>
-          <p class="vote-stage__eyebrow">限流黑名单</p>
+          <p class="vote-stage__eyebrow">账号风险名单</p>
           <strong>{{ blacklistPage.items.length }} 条</strong>
         </div>
         <button class="nickname-form__ghost" type="button" :disabled="loadingBlacklist" @click="fetchBlacklist()">
@@ -24,27 +24,25 @@ defineProps({
       </div>
 
       <div v-if="loadingBlacklist" class="feedback-panel">
-        <p>黑名单加载中...</p>
+        <p>风险名单加载中...</p>
       </div>
       <div v-else-if="blacklistPage.items.length === 0" class="feedback-panel">
-        <p>当前没有封禁中的昵称。</p>
+        <p>当前没有有分账号。</p>
       </div>
       <ul v-else class="inventory-list">
-        <li v-for="entry in blacklistPage.items" :key="entry.clientId" class="inventory-item inventory-item--stacked">
+        <li v-for="entry in blacklistPage.items" :key="entry.nickname" class="inventory-item inventory-item--stacked">
           <div>
             <strong>{{ entry.nickname }}</strong>
-            <p v-if="entry.clientId.startsWith('ip:')">IP：{{ entry.clientId.slice(3) }}</p>
-            <p>封禁开始：{{ formatTime(entry.blockedAt) }}</p>
-            <p>封禁结束：{{ formatTime(entry.blockedUntil) }}</p>
-            <p>剩余时间：{{ formatDuration(entry.remainingSeconds) }}</p>
+            <p>当前积分：{{ entry.score }}</p>
+            <p v-if="entry.banUntil">封禁截止：{{ formatTime(entry.banUntil) }}</p>
           </div>
           <button
               class="nickname-form__ghost"
               type="button"
               :disabled="saving"
-              @click="unblockBlacklistEntry(entry.clientId, entry.nickname)"
+              @click="unblockBlacklistEntry(entry.nickname)"
           >
-            手动解封
+            清除风险状态
           </button>
         </li>
       </ul>

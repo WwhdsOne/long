@@ -263,11 +263,11 @@ export function useAdminPage() {
         try {
             const response = await fetchWithTimeout('/api/admin/blacklist')
             if (!response.ok) {
-                throw new Error(await readErrorMessage(response, '黑名单加载失败'))
+                throw new Error(await readErrorMessage(response, '风险名单加载失败'))
             }
             blacklistPage.value = normalizeBlacklistPage(await response.json())
         } catch (error) {
-            errorMessage.value = error.message || '黑名单加载失败'
+            errorMessage.value = error.message || '风险名单加载失败'
         } finally {
             loadingBlacklist.value = false
         }

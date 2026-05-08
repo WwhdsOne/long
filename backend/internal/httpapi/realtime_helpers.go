@@ -4,22 +4,18 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
 
 	"long/internal/core"
-	"long/internal/ratelimit"
 )
 
 type apiResponseError struct {
-	Status     int
-	Code       string
-	Message    string
-	RetryAfter time.Duration
+	Status  int
+	Code    string
+	Message string
 }
 
 type clickRequestContext struct {
@@ -34,9 +30,6 @@ type clickRequestContext struct {
 func (e *apiResponseError) writeTo(c *app.RequestContext) {
 	if e == nil {
 		return
-	}
-	if e.RetryAfter > 0 {
-		c.Header("Retry-After", strconv.FormatInt(int64(e.RetryAfter/time.Second), 10))
 	}
 	payload := map[string]string{"error": e.Code}
 	if strings.TrimSpace(e.Message) != "" {
@@ -76,8 +69,8 @@ func resolveClickNickname(request clickRequestContext) (string, *apiResponseErro
 	return nickname, nil
 }
 
-func enforceClickRateLimitForClient(guard ClickGuard, clientID string, nickname string) *apiResponseError {
-	if guard == nil {
+func enforceClickRateLimitForClient(ctx context.Context, detector ClickRiskDetector, accountRisk AccountRiskManager, clientID string, nickname string) *apiResponseError {
+	if detector == nil || accountRisk == nil {
 		return nil
 	}
 
@@ -86,22 +79,26 @@ func enforceClickRateLimitForClient(guard ClickGuard, clientID string, nickname 
 		"nickname:" + strings.TrimSpace(nickname),
 	}
 	for _, key := range keys {
-		retryAfter, err := guard.Allow(key)
-		if err == nil {
+		hit, err := detector.Detect(key)
+		if err == nil && !hit {
 			continue
 		}
-		if errors.Is(err, ratelimit.ErrTooManyRequests) {
-			return &apiResponseError{
-				Status:     consts.StatusTooManyRequests,
-				Code:       "TOO_MANY_REQUESTS",
-				Message:    "点得太快了，先歇 10 分钟再来。",
-				RetryAfter: retryAfter,
+		if err == nil && hit {
+			if strings.HasPrefix(key, "nickname:") {
+				if _, recordErr := accountRisk.RecordAccountRiskEvent(ctx, nickname, core.AccountRiskEventClickRateLimitHit); recordErr != nil {
+					return &apiResponseError{
+						Status:  consts.StatusInternalServerError,
+						Code:    "ACCOUNT_RISK_FAILED",
+						Message: "风险积分记录失败，请稍后重试。",
+					}
+				}
 			}
+			continue
 		}
 		return &apiResponseError{
 			Status:  consts.StatusInternalServerError,
-			Code:    "RATE_LIMIT_FAILED",
-			Message: "限流检查失败，请稍后重试。",
+			Code:    "RATE_LIMIT_DETECT_FAILED",
+			Message: "点击异常检测失败，请稍后重试。",
 		}
 	}
 
@@ -151,11 +148,11 @@ func clickRequestError(err error) *apiResponseError {
 			Code:    "SENSITIVE_NICKNAME",
 			Message: "昵称包含敏感词，请换一个试试。",
 		}
-	case errors.Is(err, core.ErrStaminaRiskBanned):
+	case errors.Is(err, core.ErrAccountRiskBanned):
 		return &apiResponseError{
 			Status:  consts.StatusLocked,
-			Code:    "ACCOUNT_STAMINA_BANNED",
-			Message: "账号异常，8 小时内不可手点/挂机/购买体力。",
+			Code:    "ACCOUNT_RISK_BANNED",
+			Message: "账号风险过高，当前不可手点/挂机/购买体力。",
 		}
 	default:
 		return &apiResponseError{
@@ -173,7 +170,7 @@ func executeButtonClick(ctx context.Context, options Options, request clickReque
 	}
 
 	if !shouldSkipClickRateLimit(request.AuthenticatorEnabled, nickname, options.RateLimitNicknameWhitelist) {
-		if apiErr := enforceClickRateLimitForClient(options.ClickGuard, request.ClientID, nickname); apiErr != nil {
+		if apiErr := enforceClickRateLimitForClient(ctx, options.ClickRiskDetector, options.AccountRisk, request.ClientID, nickname); apiErr != nil {
 			return "", core.ClickResult{}, apiErr
 		}
 	}

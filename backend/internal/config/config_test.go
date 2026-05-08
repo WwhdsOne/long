@@ -30,19 +30,28 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
               min_idle_conns: 5
               tls_enabled: false
             redis_prefix: "hai-world:"
-            rate_limit:
-              limit: 30
-              window_ms: 2000
-              blacklist_ms: 600000
-              blacklist_multiplier: 2.0
-              offense_decay_ms: 86400000
-              nickname_whitelist: ["压测账号"]
-              medium:
-                limit: 1000
-                window_ms: 600000
-              long:
-                limit: 2500
-                window_ms: 3600000
+            anti_script:
+              score_window_seconds: 86400
+              purchase_click_cooldown_seconds: 3
+              ban_threshold_8h: 6
+              ban_threshold_24h: 10
+              ban_threshold_72h: 14
+              points:
+                click_rate_limit_hit: 2
+                login_turnstile_invalid: 3
+                stamina_turnstile_invalid: 3
+                post_stamina_purchase_click: 4
+              click_rate_limit:
+                nickname_whitelist: ["压测账号"]
+                short:
+                  limit: 30
+                  window_ms: 2000
+                medium:
+                  limit: 1000
+                  window_ms: 600000
+                long:
+                  limit: 2500
+                  window_ms: 3600000
             admin:
               username: "admin"
               password: "secret"
@@ -111,23 +120,23 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if cfg.Redis.MinIdleConns != 5 {
 		t.Fatalf("expected redis min idle conns 5, got %d", cfg.Redis.MinIdleConns)
 	}
-	if cfg.RateLimit.Limit != 30 {
-		t.Fatalf("expected rate limit 30, got %d", cfg.RateLimit.Limit)
+	if cfg.AntiScript.ScoreWindow != 24*time.Hour {
+		t.Fatalf("expected anti script score window 24h, got %s", cfg.AntiScript.ScoreWindow)
 	}
-	if cfg.RateLimit.BlacklistMultiplier != 2 {
-		t.Fatalf("expected blacklist multiplier 2, got %v", cfg.RateLimit.BlacklistMultiplier)
+	if cfg.AntiScript.PurchaseClickCooldown != 3*time.Second {
+		t.Fatalf("expected purchase click cooldown 3s, got %s", cfg.AntiScript.PurchaseClickCooldown)
 	}
-	if cfg.RateLimit.OffenseDecay != 24*time.Hour {
-		t.Fatalf("expected offense decay 24h, got %s", cfg.RateLimit.OffenseDecay)
+	if cfg.AntiScript.ClickRateLimit.Short.Limit != 30 || cfg.AntiScript.ClickRateLimit.Short.Window != 2*time.Second {
+		t.Fatalf("expected short window 30/2s, got %+v", cfg.AntiScript.ClickRateLimit.Short)
 	}
-	if cfg.RateLimit.Medium.Limit != 1000 || cfg.RateLimit.Medium.Window != 10*time.Minute {
-		t.Fatalf("expected medium window 1000/10m, got %+v", cfg.RateLimit.Medium)
+	if cfg.AntiScript.ClickRateLimit.Medium.Limit != 1000 || cfg.AntiScript.ClickRateLimit.Medium.Window != 10*time.Minute {
+		t.Fatalf("expected medium window 1000/10m, got %+v", cfg.AntiScript.ClickRateLimit.Medium)
 	}
-	if cfg.RateLimit.Long.Limit != 2500 || cfg.RateLimit.Long.Window != time.Hour {
-		t.Fatalf("expected long window 2500/1h, got %+v", cfg.RateLimit.Long)
+	if cfg.AntiScript.ClickRateLimit.Long.Limit != 2500 || cfg.AntiScript.ClickRateLimit.Long.Window != time.Hour {
+		t.Fatalf("expected long window 2500/1h, got %+v", cfg.AntiScript.ClickRateLimit.Long)
 	}
-	if len(cfg.RateLimit.NicknameWhitelist) != 1 || cfg.RateLimit.NicknameWhitelist[0] != "压测账号" {
-		t.Fatalf("expected rate limit nickname whitelist to contain 压测账号, got %v", cfg.RateLimit.NicknameWhitelist)
+	if len(cfg.AntiScript.ClickRateLimit.NicknameWhitelist) != 1 || cfg.AntiScript.ClickRateLimit.NicknameWhitelist[0] != "压测账号" {
+		t.Fatalf("expected click risk nickname whitelist to contain 压测账号, got %v", cfg.AntiScript.ClickRateLimit.NicknameWhitelist)
 	}
 	if cfg.Admin.Username != "admin" {
 		t.Fatalf("expected admin username admin, got %q", cfg.Admin.Username)
@@ -235,10 +244,27 @@ func TestLoadDefaultsInvalidRoomCount(t *testing.T) {
               db: 0
               tls_enabled: false
             redis_prefix: "hai-world:"
-            rate_limit:
-              limit: 30
-              window_ms: 2000
-              blacklist_ms: 600000
+            anti_script:
+              score_window_seconds: 86400
+              purchase_click_cooldown_seconds: 3
+              ban_threshold_8h: 6
+              ban_threshold_24h: 10
+              ban_threshold_72h: 14
+              points:
+                click_rate_limit_hit: 2
+                login_turnstile_invalid: 3
+                stamina_turnstile_invalid: 3
+                post_stamina_purchase_click: 4
+              click_rate_limit:
+                short:
+                  limit: 30
+                  window_ms: 2000
+                medium:
+                  limit: 1000
+                  window_ms: 600000
+                long:
+                  limit: 2500
+                  window_ms: 3600000
             admin:
               username: "admin"
               password: "secret"
@@ -431,10 +457,23 @@ func validConfigForTest() Config {
 			Port: 6379,
 		},
 		RedisPrefix: "hai-world:",
-		RateLimit: RateLimitConfig{
-			Limit:             30,
-			Window:            2 * time.Second,
-			BlacklistDuration: 10 * time.Minute,
+		AntiScript: AntiScriptConfig{
+			ScoreWindow:           24 * time.Hour,
+			PurchaseClickCooldown: 3 * time.Second,
+			BanThreshold8h:        6,
+			BanThreshold24h:       10,
+			BanThreshold72h:       14,
+			Points: AntiScriptPointsConfig{
+				ClickRateLimitHit:        2,
+				LoginTurnstileInvalid:    3,
+				StaminaTurnstileInvalid:  3,
+				PostStaminaPurchaseClick: 4,
+			},
+			ClickRateLimit: AntiScriptClickRateLimitConfig{
+				Short:  RateLimitWindowConfig{Limit: 30, Window: 2 * time.Second},
+				Medium: RateLimitWindowConfig{Limit: 1000, Window: 10 * time.Minute},
+				Long:   RateLimitWindowConfig{Limit: 2500, Window: time.Hour},
+			},
 		},
 		Admin: AdminConfig{
 			Username:      "admin",

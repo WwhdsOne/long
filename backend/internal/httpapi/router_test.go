@@ -15,31 +15,6 @@ import (
 	ossupload "long/internal/oss"
 )
 
-type mockAdminClickGuard struct {
-	entries       []core.BlacklistEntry
-	lastUnblockID string
-}
-
-func (m *mockAdminClickGuard) Allow(string) (time.Duration, error) {
-	return 0, nil
-}
-
-func (m *mockAdminClickGuard) ListBlacklist() []core.BlacklistEntry {
-	return append([]core.BlacklistEntry(nil), m.entries...)
-}
-
-func (m *mockAdminClickGuard) Unblock(clientID string) bool {
-	m.lastUnblockID = clientID
-	for index, entry := range m.entries {
-		if entry.ClientID != clientID {
-			continue
-		}
-		m.entries = append(m.entries[:index], m.entries[index+1:]...)
-		return true
-	}
-	return false
-}
-
 type mockStore struct {
 	state                     core.State
 	talentState               *core.TalentState
@@ -472,19 +447,17 @@ func TestAdminTaskRoutesReturnReadableMessagesOnBusinessErrors(t *testing.T) {
 }
 
 func TestAdminBlacklistRoutesListAndUnblock(t *testing.T) {
-	guard := &mockAdminClickGuard{
-		entries: []core.BlacklistEntry{{
-			ClientID:         "nickname:阿明",
-			Nickname:         "阿明",
-			BlockedAt:        1714903200,
-			BlockedUntil:     1714903800,
-			RemainingSeconds: 600,
+	accountRisk := &mockAccountRiskManager{
+		entries: []core.AccountRiskState{{
+			Nickname: "阿明",
+			Score:    8,
+			BanUntil: 1714903800,
 		}},
 	}
 	handler := NewHandler(Options{
 		Store:       &mockStore{},
 		Broadcaster: &mockBroadcaster{},
-		ClickGuard:  guard,
+		AccountRisk: accountRisk,
 		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
 			Username:      "admin",
 			Password:      "secret",
@@ -508,19 +481,19 @@ func TestAdminBlacklistRoutesListAndUnblock(t *testing.T) {
 	if listResponse.Code != http.StatusOK {
 		t.Fatalf("expected 200 from blacklist list, got %d", listResponse.Code)
 	}
-	if !strings.Contains(listResponse.Body.String(), `"nickname":"阿明"`) {
-		t.Fatalf("expected nickname in blacklist response, got %s", listResponse.Body.String())
+	if !strings.Contains(listResponse.Body.String(), `"score":8`) {
+		t.Fatalf("expected score in risk response, got %s", listResponse.Body.String())
 	}
 
-	unblockRequest := httptest.NewRequest(http.MethodPost, "/api/admin/blacklist/nickname:%E9%98%BF%E6%98%8E/unblock", nil)
+	unblockRequest := httptest.NewRequest(http.MethodPost, "/api/admin/blacklist/%E9%98%BF%E6%98%8E/unblock", nil)
 	unblockRequest.AddCookie(cookies[0])
 	unblockResponse := httptest.NewRecorder()
 	handler.ServeHTTP(unblockResponse, unblockRequest)
 	if unblockResponse.Code != http.StatusOK {
 		t.Fatalf("expected 200 from blacklist unblock, got %d", unblockResponse.Code)
 	}
-	if guard.lastUnblockID != "nickname:阿明" {
-		t.Fatalf("expected unblock target nickname:阿明, got %q", guard.lastUnblockID)
+	if accountRisk.lastClearedNickname != "阿明" {
+		t.Fatalf("expected cleared nickname 阿明, got %q", accountRisk.lastClearedNickname)
 	}
 }
 
@@ -687,7 +660,7 @@ func TestShopStaminaRoutesSupportPurchaseAndUpgrade(t *testing.T) {
 
 func TestShopStaminaRoutesReturnReadableRiskBanError(t *testing.T) {
 	store := &mockStore{
-		purchaseStaminaErr: core.ErrStaminaRiskBanned,
+		purchaseStaminaErr: core.ErrAccountRiskBanned,
 	}
 	handler := NewHandler(Options{
 		Store:       store,
@@ -715,7 +688,7 @@ func TestShopStaminaRoutesReturnReadableRiskBanError(t *testing.T) {
 	if refillResponse.Code != http.StatusLocked {
 		t.Fatalf("expected 423 from banned stamina purchase, got %d", refillResponse.Code)
 	}
-	if !strings.Contains(refillResponse.Body.String(), "8 小时内不可手点") {
+	if !strings.Contains(refillResponse.Body.String(), "账号风险过高") {
 		t.Fatalf("expected readable risk ban message, got %s", refillResponse.Body.String())
 	}
 }

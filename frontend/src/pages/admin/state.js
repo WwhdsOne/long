@@ -395,11 +395,9 @@ export function normalizeBlacklistPage(payload) {
     return {
         items: Array.isArray(payload)
             ? payload.map((entry) => ({
-                clientId: entry?.clientId || '',
                 nickname: entry?.nickname || '',
-                blockedAt: Number(entry?.blockedAt ?? 0),
-                blockedUntil: Number(entry?.blockedUntil ?? 0),
-                remainingSeconds: Number(entry?.remainingSeconds ?? 0),
+                score: Math.max(0, Number(entry?.score ?? 0)),
+                banUntil: Math.max(0, Number(entry?.banUntil ?? 0)),
             }))
             : [],
     }

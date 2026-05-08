@@ -148,11 +148,17 @@ type DomainEventWriter interface {
 	WriteDomainEvent(context.Context, core.DomainEvent) error
 }
 
-// ClickGuard 点击频率限制接口。
-type ClickGuard interface {
-	Allow(string) (time.Duration, error)
-	ListBlacklist() []core.BlacklistEntry
-	Unblock(string) bool
+// ClickRiskDetector 点击异常探测接口。
+type ClickRiskDetector interface {
+	Detect(string) (bool, error)
+}
+
+// AccountRiskManager 管理统一账号风险状态。
+type AccountRiskManager interface {
+	RecordAccountRiskEvent(context.Context, string, core.AccountRiskEvent) (core.AccountRiskState, error)
+	GetAccountRiskState(context.Context, string) (core.AccountRiskState, error)
+	ListAccountRiskEntries(context.Context) ([]core.AccountRiskState, error)
+	ClearAccountRiskState(context.Context, string) error
 }
 
 // AfkController 负责离页挂机状态流转与结算。
@@ -205,7 +211,8 @@ type Options struct {
 	ChangePublisher             ChangePublisher
 	StaminaPurchaseTurnstile    StaminaPurchaseTurnstile
 	PlayerLoginTurnstile        PlayerLoginTurnstile
-	ClickGuard                  ClickGuard
+	ClickRiskDetector           ClickRiskDetector
+	AccountRisk                 AccountRiskManager
 	RateLimitNicknameWhitelist  []string
 	AutoClick                   AutoClickController
 	Afk                         AfkController

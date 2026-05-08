@@ -1,52 +1,37 @@
 package ratelimit
 
 import (
-	"errors"
 	"sync"
 	"time"
-
-	"long/internal/core"
 )
-
-var ErrTooManyRequests = errors.New("too many requests")
 
 type WindowConfig struct {
 	Limit  int
 	Window time.Duration
 }
 
-// Config defines the burst window and blacklist duration for click abuse control.
+// Config 定义点击异常探测窗口。
 type Config struct {
-	Limit               int
-	Window              time.Duration
-	BlacklistDuration   time.Duration
-	BlacklistMultiplier float64
-	OffenseDecay        time.Duration
-	Medium              WindowConfig
-	Long                WindowConfig
-	Now                 func() time.Time
+	Limit  int
+	Window time.Duration
+	Medium WindowConfig
+	Long   WindowConfig
+	Now    func() time.Time
 }
 
 type clientState struct {
-	hits                  []time.Time
-	blockedAt             time.Time
-	blockedUntil          time.Time
-	lastOffenseAt         time.Time
-	lastBlacklistDuration time.Duration
+	hits []time.Time
 }
 
-// Limiter tracks recent click bursts per client in memory.
+// Limiter 仅负责命中异常窗口探测，不执行封禁。
 type Limiter struct {
-	mu                  sync.Mutex
-	short               WindowConfig
-	medium              WindowConfig
-	long                WindowConfig
-	maxWindow           time.Duration
-	blacklistDuration   time.Duration
-	blacklistMultiplier float64
-	offenseDecay        time.Duration
-	now                 func() time.Time
-	clients             map[string]*clientState
+	mu        sync.Mutex
+	short     WindowConfig
+	medium    WindowConfig
+	long      WindowConfig
+	maxWindow time.Duration
+	now       func() time.Time
+	clients   map[string]*clientState
 }
 
 func normalizeWindowConfig(limit int, window time.Duration, defaultLimit int, defaultWindow time.Duration) WindowConfig {
@@ -79,59 +64,22 @@ func maxDuration(values ...time.Duration) time.Duration {
 	return max
 }
 
-// NewLimiter creates a limiter with single-instance defaults for this project.
 func NewLimiter(config Config) *Limiter {
 	short := normalizeWindowConfig(config.Limit, config.Window, 42, 2*time.Second)
 	medium := enabledWindowConfig(config.Medium)
 	long := enabledWindowConfig(config.Long)
-
-	blacklistDuration := config.BlacklistDuration
-	if blacklistDuration <= 0 {
-		blacklistDuration = 10 * time.Minute
-	}
-	blacklistMultiplier := config.BlacklistMultiplier
-	if blacklistMultiplier <= 1 {
-		blacklistMultiplier = 2
-	}
-	offenseDecay := config.OffenseDecay
-	if offenseDecay <= 0 {
-		offenseDecay = 24 * time.Hour
-	}
-
 	now := config.Now
 	if now == nil {
 		now = time.Now
 	}
-
 	return &Limiter{
-		short:               short,
-		medium:              medium,
-		long:                long,
-		maxWindow:           maxDuration(short.Window, medium.Window, long.Window),
-		blacklistDuration:   blacklistDuration,
-		blacklistMultiplier: blacklistMultiplier,
-		offenseDecay:        offenseDecay,
-		now:                 now,
-		clients:             make(map[string]*clientState),
+		short:     short,
+		medium:    medium,
+		long:      long,
+		maxWindow: maxDuration(short.Window, medium.Window, long.Window),
+		now:       now,
+		clients:   make(map[string]*clientState),
 	}
-}
-
-func (l *Limiter) nextBlacklistDuration(state *clientState, now time.Time) time.Duration {
-	if state == nil {
-		return l.blacklistDuration
-	}
-	if state.lastOffenseAt.IsZero() || now.Sub(state.lastOffenseAt) >= l.offenseDecay {
-		return l.blacklistDuration
-	}
-	if state.lastBlacklistDuration <= 0 {
-		return l.blacklistDuration
-	}
-
-	duration := time.Duration(float64(state.lastBlacklistDuration) * l.blacklistMultiplier)
-	if duration < l.blacklistDuration {
-		return l.blacklistDuration
-	}
-	return duration
 }
 
 func countHitsInWindow(hits []time.Time, cutoff time.Time) int {
@@ -151,8 +99,7 @@ func exceedsWindowLimit(hits []time.Time, now time.Time, window WindowConfig) bo
 	return countHitsInWindow(hits, now.Add(-window.Window)) > window.Limit
 }
 
-// Allow records one click attempt and returns a block duration when abuse is detected.
-func (l *Limiter) Allow(clientID string) (time.Duration, error) {
+func (l *Limiter) Detect(clientID string) (bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -163,10 +110,6 @@ func (l *Limiter) Allow(clientID string) (time.Duration, error) {
 		l.clients[clientID] = state
 	}
 
-	if state.blockedUntil.After(now) {
-		return state.blockedUntil.Sub(now), ErrTooManyRequests
-	}
-
 	cutoff := now.Add(-l.maxWindow)
 	filtered := state.hits[:0]
 	for _, hit := range state.hits {
@@ -175,65 +118,9 @@ func (l *Limiter) Allow(clientID string) (time.Duration, error) {
 		}
 	}
 	state.hits = filtered
-
 	state.hits = append(state.hits, now)
-	if exceedsWindowLimit(state.hits, now, l.short) ||
+
+	return exceedsWindowLimit(state.hits, now, l.short) ||
 		exceedsWindowLimit(state.hits, now, l.medium) ||
-		exceedsWindowLimit(state.hits, now, l.long) {
-		nextDuration := l.nextBlacklistDuration(state, now)
-		state.hits = nil
-		state.blockedAt = now
-		state.blockedUntil = now.Add(nextDuration)
-		state.lastOffenseAt = now
-		state.lastBlacklistDuration = nextDuration
-		return nextDuration, ErrTooManyRequests
-	}
-
-	return 0, nil
-}
-
-// ListBlacklist returns current active blocked clients.
-func (l *Limiter) ListBlacklist() []core.BlacklistEntry {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	now := l.now()
-	entries := make([]core.BlacklistEntry, 0, len(l.clients))
-	for clientID, state := range l.clients {
-		if state == nil || !state.blockedUntil.After(now) {
-			continue
-		}
-		nickname := clientID
-		switch {
-		case len(clientID) > len("nickname:") && clientID[:len("nickname:")] == "nickname:":
-			nickname = clientID[len("nickname:"):]
-		case len(clientID) > len("ip:") && clientID[:len("ip:")] == "ip:":
-			nickname = "IP 封禁"
-		}
-		entries = append(entries, core.BlacklistEntry{
-			ClientID:         clientID,
-			Nickname:         nickname,
-			BlockedAt:        state.blockedAt.Unix(),
-			BlockedUntil:     state.blockedUntil.Unix(),
-			RemainingSeconds: int64(state.blockedUntil.Sub(now) / time.Second),
-		})
-	}
-	return entries
-}
-
-// Unblock removes a client from blacklist immediately.
-func (l *Limiter) Unblock(clientID string) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	state := l.clients[clientID]
-	if state == nil {
-		return false
-	}
-	state.hits = nil
-	state.blockedAt = time.Time{}
-	state.blockedUntil = time.Time{}
-	state.lastOffenseAt = time.Time{}
-	state.lastBlacklistDuration = 0
-	return true
+		exceedsWindowLimit(state.hits, now, l.long), nil
 }

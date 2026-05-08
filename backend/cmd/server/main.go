@@ -99,6 +99,7 @@ func run() error {
 	var shopItemStore *mongostore.ShopItemStore
 	var shopPurchaseLogStore *mongostore.ShopPurchaseLogStore
 	var staminaPurchaseLogStore *mongostore.StaminaPurchaseLogStore
+	var accountRiskEventWriter accountRiskEventQueueWriter
 	var equipmentDraftFailureWriter httpapi.EquipmentDraftFailureWriter
 	var adminAuditWriter httpapi.AdminAuditWriter
 	var domainEventWriter httpapi.DomainEventWriter
@@ -159,6 +160,10 @@ func run() error {
 		if err := staminaPurchaseLogStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo stamina purchase log indexes: %w", err)
 		}
+		accountRiskEventStore := mongostore.NewAccountRiskEventStore(mongoDB, cfg.Mongo.WriteTimeout)
+		if err := accountRiskEventStore.EnsureIndexes(startupCtx); err != nil {
+			return fmt.Errorf("ensure mongo account risk event indexes: %w", err)
+		}
 		equipmentDraftFailureStore := mongostore.NewEquipmentDraftFailureStore(mongoDB, cfg.Mongo.WriteTimeout)
 		if err := equipmentDraftFailureStore.EnsureIndexes(startupCtx); err != nil {
 			return fmt.Errorf("ensure mongo equipment draft failure indexes: %w", err)
@@ -184,6 +189,16 @@ func run() error {
 		domainEventQueue.Start()
 		defer domainEventQueue.Close()
 		domainEventWriter = domainEventQueueWriter{queue: domainEventQueue}
+
+		accountRiskEventQueue := archive.NewAsyncQueue[core.AccountRiskEventLog](archive.AsyncQueueConfig{
+			Name:         "account-risk-events",
+			BufferSize:   512,
+			WorkerCount:  2,
+			WriteTimeout: cfg.Mongo.WriteTimeout,
+		}, accountRiskEventStore.WriteAccountRiskEvent)
+		accountRiskEventQueue.Start()
+		defer accountRiskEventQueue.Close()
+		accountRiskEventWriter = accountRiskEventQueueWriter{queue: accountRiskEventQueue}
 
 		systemLogQueue := archive.NewAsyncQueue[xlog.SystemLogEntry](archive.AsyncQueueConfig{
 			Name:         "system-logs",
@@ -235,21 +250,35 @@ func run() error {
 	nicknameValidator := nickname.NewSensitiveLexiconValidator()
 	store := core.NewStore(redisClient, cfg.RedisPrefix, core.StoreOptions{
 		CriticalChancePercent: 5,
+		AccountRisk: core.AccountRiskConfig{
+			ScoreWindow:           cfg.AntiScript.ScoreWindow,
+			PurchaseClickCooldown: cfg.AntiScript.PurchaseClickCooldown,
+			BanThreshold8h:        cfg.AntiScript.BanThreshold8h,
+			BanThreshold24h:       cfg.AntiScript.BanThreshold24h,
+			BanThreshold72h:       cfg.AntiScript.BanThreshold72h,
+			Points: core.AccountRiskPoints{
+				ClickRateLimitHit:        cfg.AntiScript.Points.ClickRateLimitHit,
+				LoginTurnstileInvalid:    cfg.AntiScript.Points.LoginTurnstileInvalid,
+				StaminaTurnstileInvalid:  cfg.AntiScript.Points.StaminaTurnstileInvalid,
+				PostStaminaPurchaseClick: cfg.AntiScript.Points.PostStaminaPurchaseClick,
+			},
+		},
 		Room: core.RoomConfig{
 			Enabled:        cfg.Room.Enabled,
 			Count:          cfg.Room.Count,
 			DefaultRoom:    cfg.Room.DefaultRoom,
 			SwitchCooldown: cfg.Room.SwitchCooldown,
 		},
-		BossHistoryStore:        bossHistoryStore,
-		BossHistoryArchiver:     bossHistoryQueue,
-		MessageStore:            mongoMessageStore,
-		TaskDefinitionStore:     taskDefinitionStore,
-		TaskClaimLogStore:       taskClaimLogStore,
-		TaskCycleArchiveStore:   taskCycleArchiveStore,
-		ShopCatalogStore:        shopItemStore,
-		ShopPurchaseLogStore:    shopPurchaseLogStore,
-		StaminaPurchaseLogStore: staminaPurchaseLogStore,
+		BossHistoryStore:         bossHistoryStore,
+		BossHistoryArchiver:      bossHistoryQueue,
+		MessageStore:             mongoMessageStore,
+		TaskDefinitionStore:      taskDefinitionStore,
+		TaskClaimLogStore:        taskClaimLogStore,
+		TaskCycleArchiveStore:    taskCycleArchiveStore,
+		ShopCatalogStore:         shopItemStore,
+		ShopPurchaseLogStore:     shopPurchaseLogStore,
+		StaminaPurchaseLogStore:  staminaPurchaseLogStore,
+		AccountRiskEventLogStore: accountRiskEventWriter,
 	}, nicknameValidator)
 	hub := events.NewHub()
 	stateCache := events.NewCache(store)
@@ -264,18 +293,15 @@ func run() error {
 		return httpapi.AuthenticatedPlayerNickname(ctx, c, playerAuthenticator)
 	})
 	clickLimiter := ratelimit.NewLimiter(ratelimit.Config{
-		Limit:               cfg.RateLimit.Limit,
-		Window:              cfg.RateLimit.Window,
-		BlacklistDuration:   cfg.RateLimit.BlacklistDuration,
-		BlacklistMultiplier: cfg.RateLimit.BlacklistMultiplier,
-		OffenseDecay:        cfg.RateLimit.OffenseDecay,
+		Limit:  cfg.AntiScript.ClickRateLimit.Short.Limit,
+		Window: cfg.AntiScript.ClickRateLimit.Short.Window,
 		Medium: ratelimit.WindowConfig{
-			Limit:  cfg.RateLimit.Medium.Limit,
-			Window: cfg.RateLimit.Medium.Window,
+			Limit:  cfg.AntiScript.ClickRateLimit.Medium.Limit,
+			Window: cfg.AntiScript.ClickRateLimit.Medium.Window,
 		},
 		Long: ratelimit.WindowConfig{
-			Limit:  cfg.RateLimit.Long.Limit,
-			Window: cfg.RateLimit.Long.Window,
+			Limit:  cfg.AntiScript.ClickRateLimit.Long.Limit,
+			Window: cfg.AntiScript.ClickRateLimit.Long.Window,
 		},
 	})
 	afkService := httpapi.NewAfkService(store, changeBus, redisClient, cfg.RedisPrefix)
@@ -320,8 +346,9 @@ func run() error {
 		ChangePublisher:             changeBus,
 		StaminaPurchaseTurnstile:    staminaPurchaseTurnstile,
 		PlayerLoginTurnstile:        playerLoginTurnstile,
-		ClickGuard:                  clickLimiter,
-		RateLimitNicknameWhitelist:  cfg.RateLimit.NicknameWhitelist,
+		ClickRiskDetector:           clickLimiter,
+		AccountRisk:                 store,
+		RateLimitNicknameWhitelist:  cfg.AntiScript.ClickRateLimit.NicknameWhitelist,
 		Afk:                         afkService,
 		PlayerAuthenticator:         playerAuthenticator,
 		Events:                      eventHandler,
@@ -564,6 +591,17 @@ type domainEventQueueWriter struct {
 }
 
 func (w domainEventQueueWriter) WriteDomainEvent(_ context.Context, item core.DomainEvent) error {
+	if w.queue != nil {
+		w.queue.Enqueue(item)
+	}
+	return nil
+}
+
+type accountRiskEventQueueWriter struct {
+	queue *archive.AsyncQueue[core.AccountRiskEventLog]
+}
+
+func (w accountRiskEventQueueWriter) WriteAccountRiskEvent(_ context.Context, item core.AccountRiskEventLog) error {
 	if w.queue != nil {
 		w.queue.Enqueue(item)
 	}

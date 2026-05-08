@@ -34,16 +34,28 @@ type RateLimitWindowConfig struct {
 	Window time.Duration
 }
 
-// RateLimitConfig controls the in-memory anti-abuse policy for click requests.
-type RateLimitConfig struct {
-	Limit               int
-	Window              time.Duration
-	BlacklistDuration   time.Duration
-	BlacklistMultiplier float64
-	OffenseDecay        time.Duration
-	Medium              RateLimitWindowConfig
-	Long                RateLimitWindowConfig
-	NicknameWhitelist   []string
+type AntiScriptPointsConfig struct {
+	ClickRateLimitHit        int64
+	LoginTurnstileInvalid    int64
+	StaminaTurnstileInvalid  int64
+	PostStaminaPurchaseClick int64
+}
+
+type AntiScriptClickRateLimitConfig struct {
+	NicknameWhitelist []string
+	Short             RateLimitWindowConfig
+	Medium            RateLimitWindowConfig
+	Long              RateLimitWindowConfig
+}
+
+type AntiScriptConfig struct {
+	ScoreWindow           time.Duration
+	PurchaseClickCooldown time.Duration
+	BanThreshold8h        int64
+	BanThreshold24h       int64
+	BanThreshold72h       int64
+	Points                AntiScriptPointsConfig
+	ClickRateLimit        AntiScriptClickRateLimitConfig
 }
 
 // AdminConfig 管理后台鉴权配置
@@ -125,7 +137,7 @@ type RoomConfig struct {
 type Config struct {
 	Port        int
 	Redis       RedisConfig
-	RateLimit   RateLimitConfig
+	AntiScript  AntiScriptConfig
 	Admin       AdminConfig
 	PlayerAuth  PlayerAuthConfig
 	OSS         OSSConfig
@@ -152,22 +164,34 @@ type fileConfig struct {
 		TLSEnabled   bool   `yaml:"tls_enabled"`
 	} `yaml:"redis"`
 	RedisPrefix string `yaml:"redis_prefix"`
-	RateLimit   struct {
-		Limit               int      `yaml:"limit"`
-		WindowMS            int      `yaml:"window_ms"`
-		BlacklistMS         int      `yaml:"blacklist_ms"`
-		BlacklistMultiplier float64  `yaml:"blacklist_multiplier"`
-		OffenseDecayMS      int      `yaml:"offense_decay_ms"`
-		NicknameWhitelist   []string `yaml:"nickname_whitelist"`
-		Medium              struct {
-			Limit    int `yaml:"limit"`
-			WindowMS int `yaml:"window_ms"`
-		} `yaml:"medium"`
-		Long struct {
-			Limit    int `yaml:"limit"`
-			WindowMS int `yaml:"window_ms"`
-		} `yaml:"long"`
-	} `yaml:"rate_limit"`
+	AntiScript  struct {
+		ScoreWindowSeconds           int64 `yaml:"score_window_seconds"`
+		PurchaseClickCooldownSeconds int64 `yaml:"purchase_click_cooldown_seconds"`
+		BanThreshold8h               int64 `yaml:"ban_threshold_8h"`
+		BanThreshold24h              int64 `yaml:"ban_threshold_24h"`
+		BanThreshold72h              int64 `yaml:"ban_threshold_72h"`
+		Points                       struct {
+			ClickRateLimitHit        int64 `yaml:"click_rate_limit_hit"`
+			LoginTurnstileInvalid    int64 `yaml:"login_turnstile_invalid"`
+			StaminaTurnstileInvalid  int64 `yaml:"stamina_turnstile_invalid"`
+			PostStaminaPurchaseClick int64 `yaml:"post_stamina_purchase_click"`
+		} `yaml:"points"`
+		ClickRateLimit struct {
+			NicknameWhitelist []string `yaml:"nickname_whitelist"`
+			Short             struct {
+				Limit    int `yaml:"limit"`
+				WindowMS int `yaml:"window_ms"`
+			} `yaml:"short"`
+			Medium struct {
+				Limit    int `yaml:"limit"`
+				WindowMS int `yaml:"window_ms"`
+			} `yaml:"medium"`
+			Long struct {
+				Limit    int `yaml:"limit"`
+				WindowMS int `yaml:"window_ms"`
+			} `yaml:"long"`
+		} `yaml:"click_rate_limit"`
+	} `yaml:"anti_script"`
 	Admin struct {
 		Username      string `yaml:"username"`
 		Password      string `yaml:"password"`
@@ -283,21 +307,33 @@ func loadFromConsul() (Config, consulSource, error) {
 			MinIdleConns: parsed.Redis.MinIdleConns,
 			TLSEnabled:   parsed.Redis.TLSEnabled,
 		},
-		RateLimit: RateLimitConfig{
-			Limit:               parsed.RateLimit.Limit,
-			Window:              time.Duration(parsed.RateLimit.WindowMS) * time.Millisecond,
-			BlacklistDuration:   time.Duration(parsed.RateLimit.BlacklistMS) * time.Millisecond,
-			BlacklistMultiplier: defaultRateLimitBlacklistMultiplier(parsed.RateLimit.BlacklistMultiplier),
-			OffenseDecay:        defaultRateLimitOffenseDecay(parsed.RateLimit.OffenseDecayMS),
-			Medium: RateLimitWindowConfig{
-				Limit:  parsed.RateLimit.Medium.Limit,
-				Window: time.Duration(parsed.RateLimit.Medium.WindowMS) * time.Millisecond,
+		AntiScript: AntiScriptConfig{
+			ScoreWindow:           time.Duration(parsed.AntiScript.ScoreWindowSeconds) * time.Second,
+			PurchaseClickCooldown: time.Duration(parsed.AntiScript.PurchaseClickCooldownSeconds) * time.Second,
+			BanThreshold8h:        parsed.AntiScript.BanThreshold8h,
+			BanThreshold24h:       parsed.AntiScript.BanThreshold24h,
+			BanThreshold72h:       parsed.AntiScript.BanThreshold72h,
+			Points: AntiScriptPointsConfig{
+				ClickRateLimitHit:        parsed.AntiScript.Points.ClickRateLimitHit,
+				LoginTurnstileInvalid:    parsed.AntiScript.Points.LoginTurnstileInvalid,
+				StaminaTurnstileInvalid:  parsed.AntiScript.Points.StaminaTurnstileInvalid,
+				PostStaminaPurchaseClick: parsed.AntiScript.Points.PostStaminaPurchaseClick,
 			},
-			Long: RateLimitWindowConfig{
-				Limit:  parsed.RateLimit.Long.Limit,
-				Window: time.Duration(parsed.RateLimit.Long.WindowMS) * time.Millisecond,
+			ClickRateLimit: AntiScriptClickRateLimitConfig{
+				NicknameWhitelist: normalizeStringList(parsed.AntiScript.ClickRateLimit.NicknameWhitelist),
+				Short: RateLimitWindowConfig{
+					Limit:  parsed.AntiScript.ClickRateLimit.Short.Limit,
+					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Short.WindowMS) * time.Millisecond,
+				},
+				Medium: RateLimitWindowConfig{
+					Limit:  parsed.AntiScript.ClickRateLimit.Medium.Limit,
+					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Medium.WindowMS) * time.Millisecond,
+				},
+				Long: RateLimitWindowConfig{
+					Limit:  parsed.AntiScript.ClickRateLimit.Long.Limit,
+					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Long.WindowMS) * time.Millisecond,
+				},
 			},
-			NicknameWhitelist: normalizeStringList(parsed.RateLimit.NicknameWhitelist),
 		},
 		Admin: AdminConfig{
 			Username:      parsed.Admin.Username,
@@ -385,12 +421,36 @@ func validate(config Config) error {
 		return errors.New("redis.port must be greater than 0")
 	case config.RedisPrefix == "":
 		return errors.New("redis_prefix is required")
-	case config.RateLimit.Limit <= 0:
-		return errors.New("rate_limit.limit must be greater than 0")
-	case config.RateLimit.Window <= 0:
-		return errors.New("rate_limit.window_ms must be greater than 0")
-	case config.RateLimit.BlacklistDuration <= 0:
-		return errors.New("rate_limit.blacklist_ms must be greater than 0")
+	case config.AntiScript.ScoreWindow <= 0:
+		return errors.New("anti_script.score_window_seconds must be greater than 0")
+	case config.AntiScript.PurchaseClickCooldown < 0:
+		return errors.New("anti_script.purchase_click_cooldown_seconds must be greater than or equal to 0")
+	case config.AntiScript.BanThreshold8h <= 0:
+		return errors.New("anti_script.ban_threshold_8h must be greater than 0")
+	case config.AntiScript.BanThreshold24h <= config.AntiScript.BanThreshold8h:
+		return errors.New("anti_script.ban_threshold_24h must be greater than ban_threshold_8h")
+	case config.AntiScript.BanThreshold72h <= config.AntiScript.BanThreshold24h:
+		return errors.New("anti_script.ban_threshold_72h must be greater than ban_threshold_24h")
+	case config.AntiScript.Points.ClickRateLimitHit <= 0:
+		return errors.New("anti_script.points.click_rate_limit_hit must be greater than 0")
+	case config.AntiScript.Points.LoginTurnstileInvalid <= 0:
+		return errors.New("anti_script.points.login_turnstile_invalid must be greater than 0")
+	case config.AntiScript.Points.StaminaTurnstileInvalid <= 0:
+		return errors.New("anti_script.points.stamina_turnstile_invalid must be greater than 0")
+	case config.AntiScript.Points.PostStaminaPurchaseClick <= 0:
+		return errors.New("anti_script.points.post_stamina_purchase_click must be greater than 0")
+	case config.AntiScript.ClickRateLimit.Short.Limit <= 0:
+		return errors.New("anti_script.click_rate_limit.short.limit must be greater than 0")
+	case config.AntiScript.ClickRateLimit.Short.Window <= 0:
+		return errors.New("anti_script.click_rate_limit.short.window_ms must be greater than 0")
+	case config.AntiScript.ClickRateLimit.Medium.Limit <= 0:
+		return errors.New("anti_script.click_rate_limit.medium.limit must be greater than 0")
+	case config.AntiScript.ClickRateLimit.Medium.Window <= 0:
+		return errors.New("anti_script.click_rate_limit.medium.window_ms must be greater than 0")
+	case config.AntiScript.ClickRateLimit.Long.Limit <= 0:
+		return errors.New("anti_script.click_rate_limit.long.limit must be greater than 0")
+	case config.AntiScript.ClickRateLimit.Long.Window <= 0:
+		return errors.New("anti_script.click_rate_limit.long.window_ms must be greater than 0")
 	case strings.TrimSpace(config.Admin.Username) == "":
 		return errors.New("admin.username is required")
 	case strings.TrimSpace(config.Admin.Password) == "":
@@ -591,18 +651,4 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 		xlog.L().Info("consul config changed, exiting for restart")
 		exitProcess(0)
 	}
-}
-
-func defaultRateLimitBlacklistMultiplier(value float64) float64 {
-	if value <= 1 {
-		return 2
-	}
-	return value
-}
-
-func defaultRateLimitOffenseDecay(valueMS int) time.Duration {
-	if valueMS <= 0 {
-		return 24 * time.Hour
-	}
-	return time.Duration(valueMS) * time.Millisecond
 }

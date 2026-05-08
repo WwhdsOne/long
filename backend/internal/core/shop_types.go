@@ -55,12 +55,6 @@ type StaminaPurchaseLog struct {
 	MaxStamina          int64  `json:"maxStamina" bson:"max_stamina"`
 	DailyBuyCountBefore int64  `json:"dailyBuyCountBefore" bson:"daily_buy_count_before"`
 	DailyBuyCountAfter  int64  `json:"dailyBuyCountAfter" bson:"daily_buy_count_after"`
-	ZeroAt              int64  `json:"zeroAt,omitempty" bson:"zero_at,omitempty"`
-	SecondsSinceZero    int64  `json:"secondsSinceZero,omitempty" bson:"seconds_since_zero,omitempty"`
-	TriggeredRiskBan    bool   `json:"triggeredRiskBan" bson:"triggered_risk_ban"`
-	RiskBanStrike       int64  `json:"riskBanStrike" bson:"risk_ban_strike"`
-	RiskBanDurationSec  int64  `json:"riskBanDurationSec" bson:"risk_ban_duration_sec"`
-	RiskBanUntil        int64  `json:"riskBanUntil,omitempty" bson:"risk_ban_until,omitempty"`
 }
 
 // ShopActionResult 用于返回购买/切换后的玩家态。

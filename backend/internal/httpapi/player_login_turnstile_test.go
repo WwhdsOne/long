@@ -9,6 +9,7 @@ import (
 
 	"github.com/bytedance/sonic"
 
+	"long/internal/core"
 	playerauth "long/internal/playerauth"
 )
 
@@ -60,6 +61,7 @@ func TestPlayerLoginRequiresCaptchaWhenEnabled(t *testing.T) {
 
 func TestPlayerLoginRejectsInvalidCaptchaToken(t *testing.T) {
 	authenticator := &mockPlayerAuthenticator{loginToken: "player-token", loginNickname: "阿明"}
+	accountRisk := &mockAccountRiskManager{}
 	turnstile := &mockPlayerLoginTurnstile{
 		result: PlayerLoginTurnstileResult{Decision: PlayerLoginTurnstileInvalid},
 	}
@@ -68,6 +70,7 @@ func TestPlayerLoginRejectsInvalidCaptchaToken(t *testing.T) {
 		Broadcaster:          &mockBroadcaster{},
 		PlayerAuthenticator:  authenticator,
 		PlayerLoginTurnstile: turnstile,
+		AccountRisk:          accountRisk,
 	})
 
 	request := httptest.NewRequest(http.MethodPost, "/api/player/auth/login", strings.NewReader(`{"nickname":"阿明","password":"secret","turnstileToken":"login-token"}`))
@@ -81,6 +84,9 @@ func TestPlayerLoginRejectsInvalidCaptchaToken(t *testing.T) {
 	}
 	if turnstile.lastRequest.Token != "login-token" {
 		t.Fatalf("expected login token to be forwarded, got %q", turnstile.lastRequest.Token)
+	}
+	if len(accountRisk.recorded) != 1 || accountRisk.recorded[0].event != core.AccountRiskEventLoginTurnstileInvalid {
+		t.Fatalf("expected login turnstile risk event, got %+v", accountRisk.recorded)
 	}
 	if !strings.Contains(response.Body.String(), "CAPTCHA_INVALID") {
 		t.Fatalf("expected CAPTCHA_INVALID, got %s", response.Body.String())

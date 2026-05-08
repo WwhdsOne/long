@@ -11,7 +11,6 @@ import (
 
 	"long/internal/core"
 	"long/internal/events"
-	"long/internal/ratelimit"
 	"long/internal/realtimepb"
 )
 
@@ -26,30 +25,6 @@ func (p *dispatchingChangePublisher) PublishChange(ctx context.Context, change c
 		return nil
 	}
 	return p.dispatcher.HandleChange(ctx, change)
-}
-
-type mockClickGuard struct {
-	err   error
-	calls []string
-}
-
-func (m *mockClickGuard) Allow(key string) (time.Duration, error) {
-	m.calls = append(m.calls, key)
-	if m.err != nil {
-		if m.err == ratelimit.ErrTooManyRequests {
-			return 10 * time.Minute, m.err
-		}
-		return 0, m.err
-	}
-	return 0, nil
-}
-
-func (m *mockClickGuard) ListBlacklist() []core.BlacklistEntry {
-	return nil
-}
-
-func (m *mockClickGuard) Unblock(string) bool {
-	return false
 }
 
 type capturedRealtimeFrame struct {
@@ -714,12 +689,14 @@ func TestRealtimeSessionClickRequiresAuthenticatedNicknameWhenConfigured(t *test
 	}
 }
 
-func TestRealtimeSessionClickReturnsRateLimitError(t *testing.T) {
+func TestRealtimeSessionClickRecordsRiskAndStillReturnsAck(t *testing.T) {
+	accountRisk := &mockAccountRiskManager{}
 	session := newRealtimeSession(realtimeSessionOptions{
 		stateView:            &mockStore{},
 		store:                &mockStore{},
 		hub:                  events.NewHub(),
-		clickGuard:           &mockClickGuard{err: ratelimit.ErrTooManyRequests},
+		clickRiskDetector:    &mockClickRiskDetector{hit: true},
+		accountRisk:          accountRisk,
 		authenticatorEnabled: false,
 		clientID:             "127.0.0.1",
 	})
@@ -727,28 +704,28 @@ func TestRealtimeSessionClickReturnsRateLimitError(t *testing.T) {
 		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"hello","nickname":"阿明"}`), send)
 	})
 
-	messages := captureRealtimeMessages(t, func(send func(realtimeOutboundFrame) error) error {
+	frames := captureRealtimeFrames(t, func(send func(realtimeOutboundFrame) error) error {
 		return session.handleMessage(context.Background(), websocket.TextMessage, []byte(`{"type":"click","slug":"feel"}`), send)
 	})
-	if len(messages) != 1 {
-		t.Fatalf("expected one realtime error, got %d", len(messages))
+	if len(frames) != 1 {
+		t.Fatalf("expected one realtime response, got %d", len(frames))
 	}
-
-	response := decodeRealtimeMessage[struct {
-		Type string `json:"type"`
-		Code string `json:"code"`
-	}](t, messages[0])
-	if response.Type != realtimeMessageTypeError || response.Code != "TOO_MANY_REQUESTS" {
-		t.Fatalf("unexpected rate limit response: %+v", response)
+	if frames[0].messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary click ack, got %d", frames[0].messageType)
+	}
+	if len(accountRisk.recorded) != 1 || accountRisk.recorded[0].event != core.AccountRiskEventClickRateLimitHit {
+		t.Fatalf("expected click risk record, got %+v", accountRisk.recorded)
 	}
 }
 
 func TestRealtimeSessionClickSkipsRateLimitForWhitelistedAuthenticatedNickname(t *testing.T) {
+	detector := &mockClickRiskDetector{hit: true}
 	session := newRealtimeSession(realtimeSessionOptions{
 		stateView:                  &mockStore{},
 		store:                      &mockStore{},
 		hub:                        events.NewHub(),
-		clickGuard:                 &mockClickGuard{err: ratelimit.ErrTooManyRequests},
+		clickRiskDetector:          detector,
+		accountRisk:                &mockAccountRiskManager{},
 		authenticatorEnabled:       true,
 		authenticatedNickname:      "压测账号",
 		rateLimitNicknameWhitelist: []string{"压测账号"},
@@ -763,6 +740,9 @@ func TestRealtimeSessionClickSkipsRateLimitForWhitelistedAuthenticatedNickname(t
 	}
 	if frames[0].messageType != websocket.BinaryMessage {
 		t.Fatalf("expected binary click ack, got %d", frames[0].messageType)
+	}
+	if len(detector.calls) != 0 {
+		t.Fatalf("expected click detector to be skipped, got %v", detector.calls)
 	}
 	ack := decodeRealtimeBinaryClickAckForTest(t, frames[0].payload)
 	if ack.GetDelta() != 1 {

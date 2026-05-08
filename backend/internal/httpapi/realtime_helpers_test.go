@@ -5,16 +5,16 @@ import (
 	"testing"
 
 	"long/internal/core"
-	"long/internal/ratelimit"
 )
 
 func TestExecuteButtonClickSkipsRateLimitForWhitelistedAuthenticatedNickname(t *testing.T) {
 	store := &mockStore{}
-	guard := &mockClickGuard{err: ratelimit.ErrTooManyRequests}
+	detector := &mockClickRiskDetector{hit: true}
 
 	nickname, _, apiErr := executeButtonClick(context.Background(), Options{
 		Store:                      store,
-		ClickGuard:                 guard,
+		ClickRiskDetector:          detector,
+		AccountRisk:                &mockAccountRiskManager{},
 		RateLimitNicknameWhitelist: []string{"压测账号"},
 	}, clickRequestContext{
 		Slug:                  "feel",
@@ -28,8 +28,8 @@ func TestExecuteButtonClickSkipsRateLimitForWhitelistedAuthenticatedNickname(t *
 	if nickname != "压测账号" {
 		t.Fatalf("expected nickname 压测账号, got %q", nickname)
 	}
-	if len(guard.calls) != 0 {
-		t.Fatalf("expected click guard to be skipped, got calls %v", guard.calls)
+	if len(detector.calls) != 0 {
+		t.Fatalf("expected click detector to be skipped, got calls %v", detector.calls)
 	}
 	if store.lastClickNickname != "压测账号" {
 		t.Fatalf("expected click to use authenticated nickname, got %q", store.lastClickNickname)
@@ -38,11 +38,13 @@ func TestExecuteButtonClickSkipsRateLimitForWhitelistedAuthenticatedNickname(t *
 
 func TestExecuteButtonClickStillEnforcesRateLimitForNonWhitelistedNickname(t *testing.T) {
 	store := &mockStore{}
-	guard := &mockClickGuard{err: ratelimit.ErrTooManyRequests}
+	detector := &mockClickRiskDetector{hit: true}
+	accountRisk := &mockAccountRiskManager{}
 
-	_, _, apiErr := executeButtonClick(context.Background(), Options{
+	nickname, _, apiErr := executeButtonClick(context.Background(), Options{
 		Store:                      store,
-		ClickGuard:                 guard,
+		ClickRiskDetector:          detector,
+		AccountRisk:                accountRisk,
 		RateLimitNicknameWhitelist: []string{"压测账号"},
 	}, clickRequestContext{
 		Slug:                  "feel",
@@ -50,19 +52,25 @@ func TestExecuteButtonClickStillEnforcesRateLimitForNonWhitelistedNickname(t *te
 		AuthenticatorEnabled:  true,
 		ClientID:              "127.0.0.1",
 	})
-	if apiErr == nil {
-		t.Fatal("expected non-whitelisted nickname to still hit rate limit")
+	if apiErr != nil {
+		t.Fatalf("expected click to continue after risk detect, got %+v", apiErr)
 	}
-	if apiErr.Code != "TOO_MANY_REQUESTS" {
-		t.Fatalf("expected TOO_MANY_REQUESTS, got %+v", apiErr)
+	if nickname != "普通账号" {
+		t.Fatalf("expected nickname 普通账号, got %q", nickname)
 	}
-	if len(guard.calls) == 0 {
-		t.Fatal("expected click guard to be called for non-whitelisted nickname")
+	if len(detector.calls) == 0 {
+		t.Fatal("expected click detector to be called for non-whitelisted nickname")
+	}
+	if len(accountRisk.recorded) != 1 {
+		t.Fatalf("expected one risk record, got %+v", accountRisk.recorded)
+	}
+	if accountRisk.recorded[0].event != core.AccountRiskEventClickRateLimitHit {
+		t.Fatalf("expected click rate limit event, got %+v", accountRisk.recorded[0])
 	}
 }
 
 func TestExecuteButtonClickReturnsReadableRiskBanError(t *testing.T) {
-	store := &mockStore{clickErr: core.ErrStaminaRiskBanned}
+	store := &mockStore{clickErr: core.ErrAccountRiskBanned}
 
 	_, _, apiErr := executeButtonClick(context.Background(), Options{
 		Store: store,
@@ -75,7 +83,7 @@ func TestExecuteButtonClickReturnsReadableRiskBanError(t *testing.T) {
 	if apiErr == nil {
 		t.Fatal("expected risk ban error")
 	}
-	if apiErr.Code != "ACCOUNT_STAMINA_BANNED" {
-		t.Fatalf("expected ACCOUNT_STAMINA_BANNED, got %+v", apiErr)
+	if apiErr.Code != "ACCOUNT_RISK_BANNED" {
+		t.Fatalf("expected ACCOUNT_RISK_BANNED, got %+v", apiErr)
 	}
 }

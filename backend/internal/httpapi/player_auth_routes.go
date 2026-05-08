@@ -50,6 +50,12 @@ func registerPlayerAuthRoutes(router route.IRouter, options Options) {
 				})
 				return
 			case PlayerLoginTurnstileInvalid:
+				if options.AccountRisk != nil {
+					if _, err := options.AccountRisk.RecordAccountRiskEvent(ctx, strings.TrimSpace(body.Nickname), core.AccountRiskEventLoginTurnstileInvalid); err != nil {
+						writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ACCOUNT_RISK_FAILED"})
+						return
+					}
+				}
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "CAPTCHA_INVALID",
 					"message": "验证失败，请重试",

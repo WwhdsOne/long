@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 
 	"long/internal/nickname"
 )
@@ -79,7 +80,10 @@ func newShopTestStore(t *testing.T, items []ShopItem) (*Store, *stubShopCatalogS
 	catalogStore := &stubShopCatalogStore{items: items}
 	logStore := &stubShopPurchaseLogStore{}
 	store := NewStore(baseStore.client, "hai-world:", StoreOptions{
-		CriticalChancePercent:   5,
+		CriticalChancePercent: 5,
+		AccountRisk: AccountRiskConfig{
+			PurchaseClickCooldown: 3 * time.Second,
+		},
 		ShopCatalogStore:        catalogStore,
 		ShopPurchaseLogStore:    logStore,
 		StaminaPurchaseLogStore: logStore,

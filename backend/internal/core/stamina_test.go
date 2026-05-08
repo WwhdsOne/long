@@ -62,7 +62,6 @@ func TestGetUserStateRecoversStaminaOverTime(t *testing.T) {
 		Max:           50,
 		ClickProgress: 0,
 		LastRecoverAt: baseTime.Unix(),
-		ZeroAt:        baseTime.Unix(),
 	}); err != nil {
 		t.Fatalf("seed stamina: %v", err)
 	}
@@ -75,9 +74,6 @@ func TestGetUserStateRecoversStaminaOverTime(t *testing.T) {
 	if state.Stamina.Current != 3 {
 		t.Fatalf("expected recovered stamina 3, got %+v", state.Stamina)
 	}
-	if state.Stamina.ZeroAt != 0 {
-		t.Fatalf("expected zero timestamp to clear after recovery, got %+v", state.Stamina)
-	}
 
 	store.now = func() time.Time { return baseTime.Add(staminaFullRecoverDuration) }
 	state, err = store.GetUserState(ctx, nickname)
@@ -89,106 +85,7 @@ func TestGetUserStateRecoversStaminaOverTime(t *testing.T) {
 	}
 }
 
-func TestPurchaseStaminaFullTriggersRiskBanWithinOneSecond(t *testing.T) {
-	store, _, _, cleanup := newShopTestStore(t, nil)
-	defer cleanup()
-
-	ctx := context.Background()
-	nickname := "阿明"
-	baseTime := time.Unix(1_700_000_000, 0)
-	store.now = func() time.Time { return baseTime }
-
-	if err := store.client.HSet(ctx, store.resourceKey(nickname), "gold", "500000").Err(); err != nil {
-		t.Fatalf("seed gold: %v", err)
-	}
-	if err := store.saveStaminaSnapshot(ctx, nickname, staminaSnapshot{
-		Current:       0,
-		MaxLevel:      0,
-		Max:           50,
-		ClickProgress: 0,
-		LastRecoverAt: baseTime.Unix(),
-		ZeroAt:        baseTime.Unix(),
-	}); err != nil {
-		t.Fatalf("seed stamina: %v", err)
-	}
-
-	state, err := store.PurchaseStaminaFull(ctx, nickname)
-	if err != nil {
-		t.Fatalf("purchase stamina full: %v", err)
-	}
-	if state.Stamina.Current != 50 {
-		t.Fatalf("expected stamina to refill to 50, got %+v", state.Stamina)
-	}
-	if state.Stamina.RiskBanUntil != baseTime.Add(8*time.Hour).Unix() {
-		t.Fatalf("expected 8 hour risk ban, got %+v", state.Stamina)
-	}
-
-	_, err = store.PurchaseStaminaFull(ctx, nickname)
-	if err != ErrStaminaRiskBanned {
-		t.Fatalf("expected banned account to reject refill, got %v", err)
-	}
-}
-
-func TestPurchaseStaminaFullRiskBanEscalatesPermanently(t *testing.T) {
-	store, _, logStore, cleanup := newShopTestStore(t, nil)
-	defer cleanup()
-
-	ctx := context.Background()
-	nickname := "阿明"
-	baseTime := time.Unix(1_700_000_000, 0)
-
-	for attempt, expectedDuration := range []time.Duration{
-		8 * time.Hour,
-		24 * time.Hour,
-		72 * time.Hour,
-	} {
-		now := baseTime.Add(time.Duration(attempt) * 100 * time.Hour)
-		store.now = func() time.Time { return now }
-
-		if err := store.client.HSet(ctx, store.resourceKey(nickname), "gold", "999999999").Err(); err != nil {
-			t.Fatalf("seed gold for attempt %d: %v", attempt+1, err)
-		}
-		if err := store.saveStaminaSnapshot(ctx, nickname, staminaSnapshot{
-			Current:       0,
-			MaxLevel:      0,
-			Max:           50,
-			ClickProgress: 0,
-			LastRecoverAt: now.Unix(),
-			ZeroAt:        now.Unix(),
-		}); err != nil {
-			t.Fatalf("seed stamina for attempt %d: %v", attempt+1, err)
-		}
-		_ = store.client.Del(ctx, store.staminaRiskBanKey(nickname)).Err()
-
-		state, err := store.PurchaseStaminaFull(ctx, nickname)
-		if err != nil {
-			t.Fatalf("purchase attempt %d failed: %v", attempt+1, err)
-		}
-		expectedUntil := now.Add(expectedDuration).Unix()
-		if state.Stamina.RiskBanUntil != expectedUntil {
-			t.Fatalf("attempt %d expected ban until %d, got %+v", attempt+1, expectedUntil, state.Stamina)
-		}
-		strikeCount, err := store.client.Get(ctx, store.staminaRiskBanStrikeKey(nickname)).Int64()
-		if err != nil {
-			t.Fatalf("load strike count attempt %d: %v", attempt+1, err)
-		}
-		if strikeCount != int64(attempt+1) {
-			t.Fatalf("attempt %d expected strike count %d, got %d", attempt+1, attempt+1, strikeCount)
-		}
-	}
-
-	if len(logStore.staminaLogs) != 3 {
-		t.Fatalf("expected 3 stamina logs, got %+v", logStore.staminaLogs)
-	}
-	if logStore.staminaLogs[2].RiskBanStrike != 3 {
-		t.Fatalf("expected third stamina log strike=3, got %+v", logStore.staminaLogs[2])
-	}
-	if logStore.staminaLogs[2].RiskBanDurationSec != int64((72 * time.Hour).Seconds()) {
-		t.Fatalf("expected third stamina log duration 72h, got %+v", logStore.staminaLogs[2])
-	}
-}
-
-func TestPurchaseStaminaFullWritesAttemptLogWithSecondsSinceZero(t *testing.T) {
+func TestPurchaseStaminaFullMarksLastPurchaseTime(t *testing.T) {
 	store, _, logStore, cleanup := newShopTestStore(t, nil)
 	defer cleanup()
 
@@ -206,7 +103,6 @@ func TestPurchaseStaminaFullWritesAttemptLogWithSecondsSinceZero(t *testing.T) {
 		Max:           50,
 		ClickProgress: 0,
 		LastRecoverAt: baseTime.Unix(),
-		ZeroAt:        baseTime.Add(-3 * time.Second).Unix(),
 	}); err != nil {
 		t.Fatalf("seed stamina: %v", err)
 	}
@@ -214,47 +110,43 @@ func TestPurchaseStaminaFullWritesAttemptLogWithSecondsSinceZero(t *testing.T) {
 	if _, err := store.PurchaseStaminaFull(ctx, nickname); err != nil {
 		t.Fatalf("purchase stamina full: %v", err)
 	}
-	if len(logStore.staminaLogs) != 1 {
-		t.Fatalf("expected one stamina log, got %+v", logStore.staminaLogs)
+	raw, err := store.client.Get(ctx, store.accountRiskLastStaminaPurchaseKey(nickname)).Result()
+	if err != nil {
+		t.Fatalf("load last purchase time: %v", err)
 	}
-	entry := logStore.staminaLogs[0]
-	if entry.SecondsSinceZero != 3 {
-		t.Fatalf("expected secondsSinceZero=3, got %+v", entry)
+	if raw != strconv.FormatInt(baseTime.Unix(), 10) {
+		t.Fatalf("expected last purchase time %d, got %q", baseTime.Unix(), raw)
 	}
-	if !entry.Succeeded || entry.FailureReason != "" {
-		t.Fatalf("expected successful attempt log, got %+v", entry)
+	if len(logStore.staminaLogs) != 1 || !logStore.staminaLogs[0].Succeeded {
+		t.Fatalf("expected one success stamina log, got %+v", logStore.staminaLogs)
 	}
 }
 
-func TestPurchaseStaminaFullPastWindowDoesNotTriggerRiskBan(t *testing.T) {
-	store, _, _, cleanup := newShopTestStore(t, nil)
+func TestPurchaseStaminaFullReturnsUnifiedRiskBan(t *testing.T) {
+	store, _, logStore, cleanup := newShopTestStore(t, nil)
 	defer cleanup()
 
 	ctx := context.Background()
 	nickname := "阿明"
 	baseTime := time.Unix(1_700_000_000, 0)
 	store.now = func() time.Time { return baseTime }
-
 	if err := store.client.HSet(ctx, store.resourceKey(nickname), "gold", "500000").Err(); err != nil {
 		t.Fatalf("seed gold: %v", err)
 	}
-	if err := store.saveStaminaSnapshot(ctx, nickname, staminaSnapshot{
-		Current:       0,
-		MaxLevel:      0,
-		Max:           50,
-		ClickProgress: 0,
-		LastRecoverAt: baseTime.Unix(),
-		ZeroAt:        baseTime.Add(-2 * time.Second).Unix(),
-	}); err != nil {
-		t.Fatalf("seed stamina: %v", err)
+
+	if _, err := store.RecordAccountRiskEvent(ctx, nickname, AccountRiskEventLoginTurnstileInvalid); err != nil {
+		t.Fatalf("record account risk event: %v", err)
+	}
+	if _, err := store.RecordAccountRiskEvent(ctx, nickname, AccountRiskEventLoginTurnstileInvalid); err != nil {
+		t.Fatalf("record account risk event: %v", err)
 	}
 
-	state, err := store.PurchaseStaminaFull(ctx, nickname)
-	if err != nil {
-		t.Fatalf("purchase stamina full: %v", err)
+	_, err := store.PurchaseStaminaFull(ctx, nickname)
+	if err != ErrAccountRiskBanned {
+		t.Fatalf("expected unified risk ban, got %v", err)
 	}
-	if state.Stamina.RiskBanUntil != 0 {
-		t.Fatalf("expected no risk ban after 1 second window, got %+v", state.Stamina)
+	if len(logStore.staminaLogs) != 1 || logStore.staminaLogs[0].FailureReason != "account_risk_banned" {
+		t.Fatalf("expected banned purchase log, got %+v", logStore.staminaLogs)
 	}
 }
 

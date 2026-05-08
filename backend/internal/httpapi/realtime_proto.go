@@ -293,7 +293,6 @@ func toProtoStaminaState(state *core.StaminaState) *realtimepb.StaminaState {
 		Max:                state.Max,
 		ClickProgress:      state.ClickProgress,
 		NextRecoverAt:      state.NextRecoverAt,
-		ZeroAt:             state.ZeroAt,
 		DailyFullBuyCount:  state.DailyFullBuyCount,
 		NextFullBuyPrice:   state.NextFullBuyPrice,
 		NextCapUpgradeCost: state.NextCapUpgradeCost,

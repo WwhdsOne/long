@@ -176,43 +176,48 @@ func registerAdminOverviewRoutes(router route.IRouter, options Options) {
 }
 
 func registerAdminBlacklistRoutes(router route.IRouter, options Options) {
-	router.GET("/api/admin/blacklist", func(_ context.Context, c *app.RequestContext) {
+	router.GET("/api/admin/blacklist", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
 			return
 		}
-		if options.ClickGuard == nil {
-			writeJSON(c, consts.StatusOK, []core.BlacklistEntry{})
+		if options.AccountRisk == nil {
+			writeJSON(c, consts.StatusOK, []core.AccountRiskState{})
 			return
 		}
-		writeJSON(c, consts.StatusOK, options.ClickGuard.ListBlacklist())
+		items, err := options.AccountRisk.ListAccountRiskEntries(ctx)
+		if err != nil {
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ACCOUNT_RISK_LIST_FAILED"})
+			return
+		}
+		writeJSON(c, consts.StatusOK, items)
 	})
 
-	router.POST("/api/admin/blacklist/:clientId/unblock", func(ctx context.Context, c *app.RequestContext) {
+	router.POST("/api/admin/blacklist/:nickname/unblock", func(ctx context.Context, c *app.RequestContext) {
 		if !isAdminAuthenticated(c, options.AdminAuthenticator) {
 			writeJSON(c, consts.StatusUnauthorized, map[string]string{"error": "UNAUTHORIZED"})
 			return
 		}
-		if options.ClickGuard == nil {
-			writeJSON(c, consts.StatusServiceUnavailable, map[string]string{"error": "BLACKLIST_UNAVAILABLE"})
+		if options.AccountRisk == nil {
+			writeJSON(c, consts.StatusServiceUnavailable, map[string]string{"error": "ACCOUNT_RISK_UNAVAILABLE"})
 			return
 		}
 
-		clientID := strings.TrimSpace(c.Param("clientId"))
-		if clientID == "" {
-			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_CLIENT_ID"})
+		nickname := strings.TrimSpace(c.Param("nickname"))
+		if nickname == "" {
+			writeJSON(c, consts.StatusBadRequest, map[string]string{"error": "INVALID_NICKNAME"})
 			return
 		}
-		if !options.ClickGuard.Unblock(clientID) {
-			writeJSON(c, consts.StatusNotFound, map[string]string{"error": "BLACKLIST_ENTRY_NOT_FOUND"})
+		if err := options.AccountRisk.ClearAccountRiskState(ctx, nickname); err != nil {
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ACCOUNT_RISK_CLEAR_FAILED"})
 			return
 		}
 
 		writeAdminAudit(ctx, options.AdminAuditWriter, core.AdminAuditLog{
 			Operator:    options.AdminAuthenticator.Username(),
-			Action:      "blacklist.unblock",
-			TargetType:  "client",
-			TargetID:    clientID,
+			Action:      "account_risk.clear",
+			TargetType:  "nickname",
+			TargetID:    nickname,
 			RequestPath: requestPath(c),
 			RequestIP:   requestIP(c),
 			Result:      "success",

@@ -68,6 +68,9 @@ func newTestStore(t *testing.T) (*Store, func()) {
 
 	return NewStore(client, "hai-world:", StoreOptions{
 			CriticalChancePercent: 5,
+			AccountRisk: AccountRiskConfig{
+				PurchaseClickCooldown: 3 * time.Second,
+			},
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
 			_ = client.Close()
 			server.Close()
@@ -89,6 +92,9 @@ func newCountingTestStore(t *testing.T) (*Store, *countingRedisClient, func()) {
 
 	return NewStore(client, "hai-world:", StoreOptions{
 			CriticalChancePercent: 5,
+			AccountRisk: AccountRiskConfig{
+				PurchaseClickCooldown: 3 * time.Second,
+			},
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), client, func() {
 			_ = baseClient.Close()
 			server.Close()

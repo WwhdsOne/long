@@ -180,9 +180,9 @@ func (s *AfkService) runOnce(ctx context.Context) {
 
 func (s *AfkService) runPlayerOnce(ctx context.Context, nickname string, nowUnix int64) {
 	if banChecker, ok := s.store.(interface {
-		GetStaminaRiskBanStatus(context.Context, string) (int64, bool, error)
+		GetAccountRiskBanStatus(context.Context, string) (int64, bool, error)
 	}); ok {
-		_, banned, err := banChecker.GetStaminaRiskBanStatus(ctx, nickname)
+		_, banned, err := banChecker.GetAccountRiskBanStatus(ctx, nickname)
 		if err != nil {
 			xlog.L().Error("afk risk ban check failed", xlog.Err(err))
 			return

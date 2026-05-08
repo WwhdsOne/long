@@ -133,6 +133,12 @@ func registerShopRoutes(router route.IRouter, options Options) {
 				})
 				return
 			case StaminaPurchaseTurnstileInvalid:
+				if options.AccountRisk != nil {
+					if _, err := options.AccountRisk.RecordAccountRiskEvent(ctx, nickname, core.AccountRiskEventStaminaTurnstileInvalid); err != nil {
+						writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "ACCOUNT_RISK_FAILED"})
+						return
+					}
+				}
 				writeJSON(c, consts.StatusBadRequest, map[string]string{
 					"error":   "CAPTCHA_INVALID",
 					"message": "验证失败，请重试",
@@ -226,10 +232,10 @@ func writeShopError(c *app.RequestContext, err error) bool {
 			"message": "当前体力已经是满的。",
 		})
 		return true
-	case errors.Is(err, core.ErrStaminaRiskBanned):
+	case errors.Is(err, core.ErrAccountRiskBanned):
 		writeJSON(c, consts.StatusLocked, map[string]string{
-			"error":   "ACCOUNT_STAMINA_BANNED",
-			"message": "账号异常，8 小时内不可手点/挂机/购买体力。",
+			"error":   "ACCOUNT_RISK_BANNED",
+			"message": "账号风险过高，当前不可手点/挂机/购买体力。",
 		})
 		return true
 	default:

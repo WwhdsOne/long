@@ -27,3 +27,14 @@ type DomainEvent struct {
 	Payload   map[string]any `json:"payload,omitempty"`
 	CreatedAt int64          `json:"createdAt"`
 }
+
+// AccountRiskEventLog 记录账号风险事件历史，仅用于 Mongo 留痕，不参与实时判定。
+type AccountRiskEventLog struct {
+	Nickname      string         `json:"nickname"`
+	EventType     string         `json:"eventType"`
+	Points        int64          `json:"points,omitempty"`
+	ScoreAfter    int64          `json:"scoreAfter,omitempty"`
+	BanUntilAfter int64          `json:"banUntilAfter,omitempty"`
+	Payload       map[string]any `json:"payload,omitempty"`
+	CreatedAt     int64          `json:"createdAt"`
+}

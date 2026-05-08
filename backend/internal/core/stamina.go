@@ -16,7 +16,6 @@ const (
 	staminaMaxUpgradeLevels    int64         = 50
 	staminaRecoverInterval     time.Duration = 5 * time.Minute
 	staminaFullRecoverDuration time.Duration = staminaRecoverInterval * time.Duration(staminaBaseMax)
-	staminaRiskWindow          time.Duration = time.Second
 	staminaFirstFullBuyPrice   int64         = 200_000
 )
 
@@ -26,7 +25,6 @@ type staminaSnapshot struct {
 	Max           int64
 	ClickProgress int64
 	LastRecoverAt int64
-	ZeroAt        int64
 }
 
 type StaminaState struct {
@@ -35,7 +33,6 @@ type StaminaState struct {
 	Max                int64 `json:"max"`
 	ClickProgress      int64 `json:"clickProgress"`
 	NextRecoverAt      int64 `json:"nextRecoverAt"`
-	ZeroAt             int64 `json:"zeroAt,omitempty"`
 	DailyFullBuyCount  int64 `json:"dailyFullBuyCount"`
 	NextFullBuyPrice   int64 `json:"nextFullBuyPrice"`
 	NextCapUpgradeCost int64 `json:"nextCapUpgradeCost"`
@@ -69,11 +66,10 @@ func (s *Store) PurchaseStaminaFull(ctx context.Context, nickname string) (UserS
 	if err != nil {
 		return UserState{}, err
 	}
-	zeroAt := snapshot.ZeroAt
 	currentStaminaBefore := snapshot.Current
 	maxStamina := snapshot.Max
 	nowUnix := s.now().Unix()
-	currentBanUntil, banned, err := s.GetStaminaRiskBanStatus(ctx, normalizedNickname)
+	_, banned, err := s.GetAccountRiskBanStatus(ctx, normalizedNickname)
 	if err != nil {
 		return UserState{}, err
 	}
@@ -83,17 +79,13 @@ func (s *Store) PurchaseStaminaFull(ctx context.Context, nickname string) (UserS
 			PriceGold:           price,
 			PurchasedAt:         nowUnix,
 			Succeeded:           false,
-			FailureReason:       "stamina_risk_banned",
+			FailureReason:       "account_risk_banned",
 			CurrentStamina:      currentStaminaBefore,
 			MaxStamina:          maxStamina,
 			DailyBuyCountBefore: count,
 			DailyBuyCountAfter:  count,
-			ZeroAt:              zeroAt,
-			SecondsSinceZero:    secondsSinceZero(zeroAt, nowUnix),
-			TriggeredRiskBan:    true,
-			RiskBanUntil:        currentBanUntil,
 		})
-		return UserState{}, ErrStaminaRiskBanned
+		return UserState{}, ErrAccountRiskBanned
 	}
 	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
 	if err != nil {
@@ -110,37 +102,23 @@ func (s *Store) PurchaseStaminaFull(ctx context.Context, nickname string) (UserS
 			MaxStamina:          maxStamina,
 			DailyBuyCountBefore: count,
 			DailyBuyCountAfter:  count,
-			ZeroAt:              zeroAt,
-			SecondsSinceZero:    secondsSinceZero(zeroAt, nowUnix),
 		})
 		return UserState{}, ErrShopInsufficientGold
 	}
 
-	banUntil := int64(0)
-	riskBanStrike := int64(0)
-	riskBanDurationSec := int64(0)
-	if snapshot.ZeroAt > 0 && nowUnix-snapshot.ZeroAt <= int64(staminaRiskWindow.Seconds()) {
-		riskBanStrike, err = s.client.Incr(ctx, s.staminaRiskBanStrikeKey(normalizedNickname)).Result()
-		if err != nil {
-			return UserState{}, err
-		}
-		riskBanDurationSec = int64(staminaRiskBanDurationForStrike(riskBanStrike).Seconds())
-		banUntil = s.now().Add(time.Duration(riskBanDurationSec) * time.Second).Unix()
-	}
 	snapshot.Current = snapshot.Max
 	snapshot.ClickProgress = 0
 	snapshot.LastRecoverAt = nowUnix
-	snapshot.ZeroAt = 0
 
 	pipe := s.client.TxPipeline()
 	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "gold", -price)
 	saveStaminaSnapshotToPipe(ctx, pipe, s.staminaKey(normalizedNickname), snapshot)
 	pipe.Incr(ctx, s.staminaDailyBuyKey(normalizedNickname, s.now()))
 	pipe.ExpireAt(ctx, s.staminaDailyBuyKey(normalizedNickname, s.now()), endOfDay(s.now()))
-	if banUntil > 0 {
-		pipe.Set(ctx, s.staminaRiskBanKey(normalizedNickname), strconv.FormatInt(banUntil, 10), time.Until(time.Unix(banUntil, 0)))
-	}
 	if _, err := pipe.Exec(ctx); err != nil {
+		return UserState{}, err
+	}
+	if err := s.MarkStaminaPurchase(ctx, normalizedNickname); err != nil {
 		return UserState{}, err
 	}
 	s.writeStaminaPurchaseLog(ctx, StaminaPurchaseLog{
@@ -152,12 +130,6 @@ func (s *Store) PurchaseStaminaFull(ctx context.Context, nickname string) (UserS
 		MaxStamina:          maxStamina,
 		DailyBuyCountBefore: count,
 		DailyBuyCountAfter:  count + 1,
-		ZeroAt:              zeroAt,
-		SecondsSinceZero:    secondsSinceZero(zeroAt, nowUnix),
-		TriggeredRiskBan:    banUntil > 0,
-		RiskBanStrike:       riskBanStrike,
-		RiskBanDurationSec:  riskBanDurationSec,
-		RiskBanUntil:        banUntil,
 	})
 	return s.GetUserState(ctx, normalizedNickname)
 }
@@ -167,10 +139,10 @@ func (s *Store) UpgradeStaminaCap(ctx context.Context, nickname string) (UserSta
 	if err != nil {
 		return UserState{}, err
 	}
-	if _, banned, err := s.GetStaminaRiskBanStatus(ctx, normalizedNickname); err != nil {
+	if _, banned, err := s.GetAccountRiskBanStatus(ctx, normalizedNickname); err != nil {
 		return UserState{}, err
 	} else if banned {
-		return UserState{}, ErrStaminaRiskBanned
+		return UserState{}, ErrAccountRiskBanned
 	}
 
 	snapshot, err := s.loadAndRefreshStaminaSnapshot(ctx, normalizedNickname)
@@ -206,22 +178,6 @@ func (s *Store) UpgradeStaminaCap(ctx context.Context, nickname string) (UserSta
 	return s.GetUserState(ctx, normalizedNickname)
 }
 
-func (s *Store) GetStaminaRiskBanStatus(ctx context.Context, nickname string) (int64, bool, error) {
-	raw, err := s.client.Get(ctx, s.staminaRiskBanKey(nickname)).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return 0, false, nil
-		}
-		return 0, false, err
-	}
-	until := int64FromString(raw)
-	if until <= s.now().Unix() {
-		_ = s.client.Del(ctx, s.staminaRiskBanKey(nickname)).Err()
-		return 0, false, nil
-	}
-	return until, true, nil
-}
-
 func (s *Store) loadAndRefreshStaminaSnapshot(ctx context.Context, nickname string) (staminaSnapshot, error) {
 	snapshot, err := s.loadStaminaSnapshot(ctx, nickname)
 	if err != nil {
@@ -245,7 +201,6 @@ func (s *Store) loadStaminaSnapshot(ctx context.Context, nickname string) (stami
 		"max",
 		"click_progress",
 		"last_recover_at",
-		"zero_at",
 	).Result()
 	if err != nil {
 		return staminaSnapshot{}, err
@@ -281,7 +236,6 @@ func (s *Store) loadStaminaSnapshot(ctx context.Context, nickname string) (stami
 		Max:           maxValue,
 		ClickProgress: maxInt64(0, int64Value(values, 3)),
 		LastRecoverAt: lastRecoverAt,
-		ZeroAt:        maxInt64(0, int64Value(values, 5)),
 	}, nil
 }
 
@@ -300,7 +254,6 @@ func staminaSnapshotValues(snapshot staminaSnapshot) map[string]any {
 		"max":             strconv.FormatInt(snapshot.Max, 10),
 		"click_progress":  strconv.FormatInt(snapshot.ClickProgress, 10),
 		"last_recover_at": strconv.FormatInt(snapshot.LastRecoverAt, 10),
-		"zero_at":         strconv.FormatInt(snapshot.ZeroAt, 10),
 	}
 }
 
@@ -314,10 +267,6 @@ func applyStaminaRecovery(snapshot *staminaSnapshot, now time.Time) bool {
 		snapshot.Current = snapshot.Max
 		if snapshot.LastRecoverAt != now.Unix() {
 			snapshot.LastRecoverAt = now.Unix()
-			changed = true
-		}
-		if snapshot.ZeroAt != 0 {
-			snapshot.ZeroAt = 0
 			changed = true
 		}
 		return changed
@@ -336,9 +285,6 @@ func applyStaminaRecovery(snapshot *staminaSnapshot, now time.Time) bool {
 	}
 	snapshot.Current = minInt64(snapshot.Max, snapshot.Current+recovered)
 	snapshot.LastRecoverAt += recovered * int64(staminaRecoverInterval.Seconds())
-	if snapshot.Current > 0 && snapshot.ZeroAt != 0 {
-		snapshot.ZeroAt = 0
-	}
 	return true
 }
 
@@ -353,11 +299,7 @@ func (s *Store) consumeManualStamina(ctx context.Context, nickname string) (Stam
 		if snapshot.ClickProgress >= staminaClicksPerPoint {
 			spent := snapshot.ClickProgress / staminaClicksPerPoint
 			snapshot.ClickProgress %= staminaClicksPerPoint
-			before := snapshot.Current
 			snapshot.Current = maxInt64(0, snapshot.Current-spent)
-			if before > 0 && snapshot.Current <= 0 && snapshot.ZeroAt == 0 {
-				snapshot.ZeroAt = s.now().Unix()
-			}
 		}
 		if snapshot.Current < snapshot.Max && snapshot.LastRecoverAt <= 0 {
 			snapshot.LastRecoverAt = s.now().Unix()
@@ -375,7 +317,7 @@ func (s *Store) composeStaminaState(ctx context.Context, nickname string, snapsh
 	if err != nil {
 		return StaminaState{}, err
 	}
-	banUntil, _, err := s.GetStaminaRiskBanStatus(ctx, nickname)
+	banUntil, _, err := s.GetAccountRiskBanStatus(ctx, nickname)
 	if err != nil {
 		return StaminaState{}, err
 	}
@@ -384,7 +326,6 @@ func (s *Store) composeStaminaState(ctx context.Context, nickname string, snapsh
 		MaxLevel:           snapshot.MaxLevel,
 		Max:                snapshot.Max,
 		ClickProgress:      snapshot.ClickProgress,
-		ZeroAt:             snapshot.ZeroAt,
 		DailyFullBuyCount:  buyCount,
 		NextFullBuyPrice:   staminaFullBuyPriceForCount(buyCount),
 		NextCapUpgradeCost: staminaUpgradeCost(snapshot.MaxLevel + 1),
@@ -428,17 +369,6 @@ func staminaFullBuyPriceForCount(count int64) int64 {
 	return staminaFirstFullBuyPrice << count
 }
 
-func staminaRiskBanDurationForStrike(strike int64) time.Duration {
-	if strike <= 1 {
-		return 8 * time.Hour
-	}
-	hours := int64(8)
-	for i := int64(1); i < strike; i++ {
-		hours *= 3
-	}
-	return time.Duration(hours) * time.Hour
-}
-
 func staminaUpgradeCost(nextLevel int64) int64 {
 	switch {
 	case nextLevel <= 0:
@@ -470,21 +400,6 @@ func (s *Store) staminaKey(nickname string) string {
 
 func (s *Store) staminaDailyBuyKey(nickname string, now time.Time) string {
 	return s.staminaDailyBuyPrefix + strings.TrimSpace(nickname) + ":" + now.Format("20060102")
-}
-
-func (s *Store) staminaRiskBanKey(nickname string) string {
-	return s.staminaRiskBanPrefix + strings.TrimSpace(nickname)
-}
-
-func (s *Store) staminaRiskBanStrikeKey(nickname string) string {
-	return s.staminaRiskBanStrikePrefix + strings.TrimSpace(nickname)
-}
-
-func secondsSinceZero(zeroAt int64, nowUnix int64) int64 {
-	if zeroAt <= 0 || nowUnix < zeroAt {
-		return 0
-	}
-	return nowUnix - zeroAt
 }
 
 func (s *Store) writeStaminaPurchaseLog(ctx context.Context, item StaminaPurchaseLog) {

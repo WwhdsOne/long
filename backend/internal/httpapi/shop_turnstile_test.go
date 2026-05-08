@@ -113,6 +113,7 @@ func TestPurchaseStaminaFullRequiresCaptchaToken(t *testing.T) {
 
 func TestPurchaseStaminaFullRejectsInvalidCaptchaToken(t *testing.T) {
 	store := &mockStore{}
+	accountRisk := &mockAccountRiskManager{}
 	turnstile := &mockStaminaPurchaseTurnstile{
 		result: StaminaPurchaseTurnstileResult{Decision: StaminaPurchaseTurnstileInvalid},
 	}
@@ -120,6 +121,7 @@ func TestPurchaseStaminaFullRejectsInvalidCaptchaToken(t *testing.T) {
 		Store:                    store,
 		Broadcaster:              &mockBroadcaster{},
 		StaminaPurchaseTurnstile: turnstile,
+		AccountRisk:              accountRisk,
 		PlayerAuthenticator: &mockPlayerAuthenticator{
 			loginToken:     "player-token",
 			loginNickname:  "阿明",
@@ -142,6 +144,9 @@ func TestPurchaseStaminaFullRejectsInvalidCaptchaToken(t *testing.T) {
 	}
 	if turnstile.lastRequest.Token != "token-1" {
 		t.Fatalf("expected token forwarded, got %q", turnstile.lastRequest.Token)
+	}
+	if len(accountRisk.recorded) != 1 || accountRisk.recorded[0].event != core.AccountRiskEventStaminaTurnstileInvalid {
+		t.Fatalf("expected stamina turnstile risk event, got %+v", accountRisk.recorded)
 	}
 	if !strings.Contains(response.Body.String(), "CAPTCHA_INVALID") {
 		t.Fatalf("expected CAPTCHA_INVALID, got %s", response.Body.String())

@@ -57,7 +57,7 @@ var ErrShopItemAlreadyOwned = errors.New("shop item already owned")
 var ErrShopItemNotOwned = errors.New("shop item not owned")
 var ErrShopInsufficientGold = errors.New("shop insufficient gold")
 var ErrShopUnsupportedItemType = errors.New("shop unsupported item type")
-var ErrStaminaRiskBanned = errors.New("stamina risk banned")
+var ErrAccountRiskBanned = errors.New("account risk banned")
 var ErrStaminaAlreadyFull = errors.New("stamina already full")
 var ErrStaminaMaxLevelReached = errors.New("stamina max level reached")
 
@@ -492,6 +492,7 @@ type StateChange struct {
 type StoreOptions struct {
 	CriticalChancePercent int
 	Room                  RoomConfig
+	AccountRisk           AccountRiskConfig
 	BossHistoryArchiver   interface{ Enqueue(BossHistoryEntry) bool }
 	BossHistoryStore      interface {
 		SaveBossHistory(context.Context, BossHistoryEntry) error
@@ -534,6 +535,9 @@ type StoreOptions struct {
 	StaminaPurchaseLogStore interface {
 		WriteStaminaPurchaseLog(context.Context, StaminaPurchaseLog) error
 	}
+	AccountRiskEventLogStore interface {
+		WriteAccountRiskEvent(context.Context, AccountRiskEventLog) error
+	}
 }
 
 // Store Redis 投票存储，管理按钮列表、点击计数、Boss 与装备状态
@@ -568,8 +572,11 @@ type Store struct {
 	lastRewardPrefix              string
 	staminaPrefix                 string
 	staminaDailyBuyPrefix         string
-	staminaRiskBanPrefix          string
-	staminaRiskBanStrikePrefix    string
+	accountRiskIndexKey           string
+	accountRiskEventPrefix        string
+	accountRiskEventSeqPrefix     string
+	accountRiskBanPrefix          string
+	accountRiskLastPurchasePrefix string
 	equipmentInstanceSeqKey       string
 	equipmentSpentPrefix          string
 	equipmentEnhancePrefix        string
@@ -578,6 +585,7 @@ type Store struct {
 	taskProgressPrefix            string
 	taskParticipantsPrefix        string
 	critical                      StoreOptions
+	accountRiskConfig             AccountRiskConfig
 	roomConfig                    RoomConfig
 	luaRunner                     luaScriptRunner
 	clickCountScript              *cachedLuaScript
@@ -626,6 +634,9 @@ type Store struct {
 	}
 	staminaPurchaseLogStore interface {
 		WriteStaminaPurchaseLog(context.Context, StaminaPurchaseLog) error
+	}
+	accountRiskEventLogStore interface {
+		WriteAccountRiskEvent(context.Context, AccountRiskEventLog) error
 	}
 
 	combatStatsCache   map[string]CombatStats
@@ -684,8 +695,11 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		lastRewardPrefix:              namespace + "user-last-reward:",
 		staminaPrefix:                 namespace + "player:stamina:",
 		staminaDailyBuyPrefix:         namespace + "player:stamina:buy-count:",
-		staminaRiskBanPrefix:          namespace + "player:stamina:risk-ban:",
-		staminaRiskBanStrikePrefix:    namespace + "player:stamina:risk-ban-strike:",
+		accountRiskIndexKey:           namespace + "anti-script:players",
+		accountRiskEventPrefix:        namespace + "anti-script:events:",
+		accountRiskEventSeqPrefix:     namespace + "anti-script:event-seq:",
+		accountRiskBanPrefix:          namespace + "anti-script:ban:",
+		accountRiskLastPurchasePrefix: namespace + "player:stamina:last-purchase-at:",
 		equipmentInstanceSeqKey:       namespace + "instance:seq",
 		equipmentSpentPrefix:          namespace + "user-equipment-spent:",
 		equipmentEnhancePrefix:        namespace + "user-equipment-enhance:",
@@ -694,6 +708,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		taskProgressPrefix:            namespace + "task:progress:",
 		taskParticipantsPrefix:        namespace + "task:participants:",
 		critical:                      options,
+		accountRiskConfig:             normalizeAccountRiskConfig(options.AccountRisk),
 		roomConfig:                    roomConfig,
 		luaRunner: redisLuaRunner{
 			client: client,
@@ -714,6 +729,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		shopCatalogStore:         options.ShopCatalogStore,
 		shopPurchaseLogStore:     options.ShopPurchaseLogStore,
 		staminaPurchaseLogStore:  options.StaminaPurchaseLogStore,
+		accountRiskEventLogStore: options.AccountRiskEventLogStore,
 		combatStatsCache:         make(map[string]CombatStats),
 		equipmentDefinitionCache: make(map[string]cachedEquipmentDefinition),
 		compiledTalentCache:      make(map[string]*CompiledTalentSet),
@@ -1098,10 +1114,17 @@ func (s *Store) ClickButton(ctx context.Context, slug string, nickname string, c
 	if err != nil {
 		return ClickResult{}, err
 	}
-	if _, banned, err := s.GetStaminaRiskBanStatus(ctx, normalizedNickname); err != nil {
+	if _, banned, err := s.GetAccountRiskBanStatus(ctx, normalizedNickname); err != nil {
 		return ClickResult{}, err
 	} else if banned {
-		return ClickResult{}, ErrStaminaRiskBanned
+		return ClickResult{}, ErrAccountRiskBanned
+	}
+	if recordRisk, err := s.shouldRecordPostStaminaPurchaseClick(ctx, normalizedNickname); err != nil {
+		return ClickResult{}, err
+	} else if recordRisk {
+		if _, err := s.RecordAccountRiskEvent(ctx, normalizedNickname, AccountRiskEventPostStaminaPurchaseClick); err != nil {
+			return ClickResult{}, err
+		}
 	}
 	slug = strings.TrimSpace(slug)
 	if !strings.HasPrefix(slug, bossPartClickSlugPrefix) {
@@ -1780,6 +1803,11 @@ func (s *Store) AttackBossPartAFKInRoom(ctx context.Context, nickname string, ro
 	normalizedNickname, err := s.validatedNickname(nickname)
 	if err != nil {
 		return ClickResult{}, err
+	}
+	if _, banned, err := s.GetAccountRiskBanStatus(ctx, normalizedNickname); err != nil {
+		return ClickResult{}, err
+	} else if banned {
+		return ClickResult{}, ErrAccountRiskBanned
 	}
 	roomID = s.normalizeRoomID(roomID)
 	boss, err := s.currentBossForRoom(ctx, roomID)
