@@ -215,7 +215,12 @@ function handleLoginCaptchaExpired() {
 }
 
 function handleLoginCaptchaError() {
-  resetLoginTurnstileWidget('验证失败，请重试')
+  loginTurnstileToken.value = ''
+  loginTurnstileError.value = '验证组件加载失败，请关闭后重新打开登录窗口重试'
+  if (window.turnstile && loginTurnstileWidgetId.value !== null) {
+    window.turnstile.remove?.(loginTurnstileWidgetId.value)
+  }
+  loginTurnstileWidgetId.value = null
 }
 
 onBeforeUnmount(() => {

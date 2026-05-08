@@ -194,7 +194,12 @@ function handlePurchaseStaminaCaptchaExpired() {
 }
 
 function handlePurchaseStaminaCaptchaError() {
-  resetStaminaTurnstileWidget('验证失败，请重试')
+  staminaTurnstileToken.value = ''
+  staminaTurnstileError.value = '验证组件加载失败，请关闭后重新打开购买窗口重试'
+  if (window.turnstile && staminaTurnstileWidgetId.value !== null) {
+    window.turnstile.remove?.(staminaTurnstileWidgetId.value)
+  }
+  staminaTurnstileWidgetId.value = null
 }
 
 async function handleUpgradeStaminaCap() {
