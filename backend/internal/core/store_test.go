@@ -1136,6 +1136,288 @@ func TestGetTalentStateMigratesLegacyStringSliceToState(t *testing.T) {
 	}
 }
 
+func TestCurrentBossForRoomReadsLegacyJSONParts(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	roomID := store.defaultRoomID()
+	parts := []BossPart{
+		{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 120, CurrentHP: 88, Armor: 3, Alive: true},
+	}
+
+	raw, err := sonic.Marshal(parts)
+	if err != nil {
+		t.Fatalf("marshal legacy parts: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.bossCurrentKeyForRoom(roomID), map[string]any{
+		"id":         "legacy-json-boss",
+		"room_id":    roomID,
+		"queue_id":   roomID,
+		"name":       "旧JSON Boss",
+		"status":     bossStatusActive,
+		"max_hp":     "120",
+		"current_hp": "88",
+		"parts":      string(raw),
+	}).Err(); err != nil {
+		t.Fatalf("seed legacy boss: %v", err)
+	}
+
+	boss, err := store.currentBossForRoom(ctx, roomID)
+	if err != nil {
+		t.Fatalf("current boss for room: %v", err)
+	}
+	if boss == nil || len(boss.Parts) != 1 {
+		t.Fatalf("expected one boss part, got %+v", boss)
+	}
+	if boss.Parts[0].CurrentHP != 88 || boss.Parts[0].Armor != 3 || boss.Parts[0].Type != PartTypeSoft {
+		t.Fatalf("unexpected boss parts: %+v", boss.Parts)
+	}
+}
+
+func TestCurrentBossForRoomReadsMessagePackParts(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	roomID := store.defaultRoomID()
+	parts := []BossPart{
+		{X: 1, Y: 2, Type: PartTypeWeak, MaxHP: 240, CurrentHP: 99, Armor: 0, Alive: true},
+	}
+
+	raw, err := msgpack.Marshal(parts)
+	if err != nil {
+		t.Fatalf("marshal msgpack parts: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.bossCurrentKeyForRoom(roomID), map[string]any{
+		"id":         "msgpack-boss",
+		"room_id":    roomID,
+		"queue_id":   roomID,
+		"name":       "MessagePack Boss",
+		"status":     bossStatusActive,
+		"max_hp":     "240",
+		"current_hp": "99",
+		"parts":      raw,
+	}).Err(); err != nil {
+		t.Fatalf("seed msgpack boss: %v", err)
+	}
+
+	boss, err := store.currentBossForRoom(ctx, roomID)
+	if err != nil {
+		t.Fatalf("current boss for room: %v", err)
+	}
+	if boss == nil || len(boss.Parts) != 1 {
+		t.Fatalf("expected one boss part, got %+v", boss)
+	}
+	if boss.Parts[0].X != 1 || boss.Parts[0].Y != 2 || boss.Parts[0].CurrentHP != 99 || boss.Parts[0].Type != PartTypeWeak {
+		t.Fatalf("unexpected boss parts: %+v", boss.Parts)
+	}
+}
+
+func TestNormalizeBossReadsMessagePackParts(t *testing.T) {
+	parts := []BossPart{
+		{X: 3, Y: 4, Type: PartTypeHeavy, MaxHP: 300, CurrentHP: 177, Armor: 11, Alive: true},
+	}
+
+	raw, err := msgpack.Marshal(parts)
+	if err != nil {
+		t.Fatalf("marshal msgpack parts: %v", err)
+	}
+
+	boss := normalizeBoss(map[string]string{
+		"id":         "normalize-msgpack-boss",
+		"name":       "normalize boss",
+		"status":     bossStatusActive,
+		"max_hp":     "300",
+		"current_hp": "177",
+		"parts":      string(raw),
+	})
+	if boss == nil || len(boss.Parts) != 1 {
+		t.Fatalf("expected one boss part, got %+v", boss)
+	}
+	if boss.Parts[0].Armor != 11 || boss.Parts[0].CurrentHP != 177 || boss.Parts[0].Type != PartTypeHeavy {
+		t.Fatalf("unexpected normalized parts: %+v", boss.Parts)
+	}
+}
+
+func TestClickBossPartMigratesLegacyJSONBossPartsToMessagePack(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	store.critical.CriticalChancePercent = 0
+	store.roll = func(limit int) int { return 0 }
+
+	roomID := store.defaultRoomID()
+	nickname := "Boss部位迁移"
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "boss-parts-migration-test",
+		Name:  "部位迁移Boss",
+		MaxHP: 180,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 180, CurrentHP: 180, Armor: 0, Alive: true},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	legacyParts, err := sonic.Marshal([]BossPart{
+		{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 180, CurrentHP: 180, Armor: 0, Alive: true},
+	})
+	if err != nil {
+		t.Fatalf("marshal legacy parts: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.bossCurrentKeyForRoom(roomID), "parts", string(legacyParts)).Err(); err != nil {
+		t.Fatalf("override legacy boss parts: %v", err)
+	}
+
+	if _, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname); err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+
+	migratedRaw, err := store.client.HGet(ctx, store.bossCurrentKeyForRoom(roomID), "parts").Bytes()
+	if err != nil {
+		t.Fatalf("read migrated parts: %v", err)
+	}
+	var migrated []BossPart
+	if err := msgpack.Unmarshal(migratedRaw, &migrated); err != nil {
+		t.Fatalf("expected msgpack parts after writeback, got err: %v", err)
+	}
+	if len(migrated) != 1 {
+		t.Fatalf("expected one migrated part, got %+v", migrated)
+	}
+	if migrated[0].CurrentHP >= 180 {
+		t.Fatalf("expected migrated part hp reduced after click, got %+v", migrated)
+	}
+
+	stored, err := store.currentBossForRoom(ctx, roomID)
+	if err != nil {
+		t.Fatalf("reload current boss: %v", err)
+	}
+	if stored == nil || len(stored.Parts) != 1 || stored.Parts[0].CurrentHP != migrated[0].CurrentHP {
+		t.Fatalf("expected reloaded boss to match migrated parts, boss=%+v migrated=%+v", stored, migrated)
+	}
+}
+
+func TestGetTalentCombatStateReadsLegacyJSONAndNormalizesMaps(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "旧战斗态"
+	bossID := "legacy-combat-state-test"
+
+	raw, err := sonic.Marshal(map[string]any{
+		"omenStacks": 7,
+	})
+	if err != nil {
+		t.Fatalf("marshal legacy combat state: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentCombatStateKey(nickname, bossID), "state", string(raw)).Err(); err != nil {
+		t.Fatalf("seed legacy combat state: %v", err)
+	}
+
+	state, err := store.GetTalentCombatState(ctx, nickname, bossID)
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if state.OmenStacks != 7 {
+		t.Fatalf("expected omen stacks 7, got %+v", state)
+	}
+	if state.Bleeds == nil || state.JudgmentDayUsed == nil || state.PartHeavyClickCount == nil || state.PartJudgmentDayCount == nil {
+		t.Fatalf("expected nil maps normalized, got %+v", state)
+	}
+	if state.PartStormComboCount == nil || state.PartRetainedClicks == nil || state.SkinnerParts == nil || state.SkinnerDurationByPart == nil {
+		t.Fatalf("expected combat state maps initialized, got %+v", state)
+	}
+	if state.DoomMarkCumDamage == nil || state.PartMagicTriggerCount == nil {
+		t.Fatalf("expected doom/magic maps initialized, got %+v", state)
+	}
+}
+
+func TestGetTalentCombatStateReadsMessagePackState(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "MessagePack战斗态"
+	bossID := "msgpack-combat-state-test"
+
+	raw, err := msgpack.Marshal(&TalentCombatState{
+		OmenStacks:          4,
+		MagicEchoStacks:     2,
+		JudgmentDayUsed:     map[string]int64{TalentPartKey(0, 0): 1},
+		PartHeavyClickCount: map[string]int64{TalentPartKey(0, 0): 5},
+		PartMagicTriggerCount: map[string]int64{
+			TalentPartKey(0, 0): 3,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal msgpack combat state: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentCombatStateKey(nickname, bossID), "state", raw).Err(); err != nil {
+		t.Fatalf("seed msgpack combat state: %v", err)
+	}
+
+	state, err := store.GetTalentCombatState(ctx, nickname, bossID)
+	if err != nil {
+		t.Fatalf("get combat state: %v", err)
+	}
+	if state.OmenStacks != 4 || state.MagicEchoStacks != 2 {
+		t.Fatalf("unexpected combat state core fields: %+v", state)
+	}
+	if state.JudgmentDayUsed[TalentPartKey(0, 0)] != 1 || state.PartHeavyClickCount[TalentPartKey(0, 0)] != 5 {
+		t.Fatalf("unexpected combat state maps: %+v", state)
+	}
+	if state.PartMagicTriggerCount[TalentPartKey(0, 0)] != 3 {
+		t.Fatalf("unexpected magic trigger count: %+v", state.PartMagicTriggerCount)
+	}
+}
+
+func TestSaveTalentCombatStateMigratesLegacyJSONToMessagePack(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "战斗态迁移"
+	bossID := "combat-state-migration-test"
+
+	legacyRaw, err := sonic.Marshal(map[string]any{
+		"omenStacks":          2,
+		"partHeavyClickCount": map[string]int64{TalentPartKey(0, 0): 9},
+	})
+	if err != nil {
+		t.Fatalf("marshal legacy combat state: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentCombatStateKey(nickname, bossID), "state", string(legacyRaw)).Err(); err != nil {
+		t.Fatalf("seed legacy combat state: %v", err)
+	}
+
+	state, err := store.GetTalentCombatState(ctx, nickname, bossID)
+	if err != nil {
+		t.Fatalf("get legacy combat state: %v", err)
+	}
+	state.OmenStacks++
+	if err := store.SaveTalentCombatState(ctx, nickname, bossID, state); err != nil {
+		t.Fatalf("save combat state: %v", err)
+	}
+
+	migratedRaw, err := store.client.HGet(ctx, store.talentCombatStateKey(nickname, bossID), "state").Bytes()
+	if err != nil {
+		t.Fatalf("read migrated combat state: %v", err)
+	}
+	var migrated TalentCombatState
+	if err := msgpack.Unmarshal(migratedRaw, &migrated); err != nil {
+		t.Fatalf("expected msgpack combat state after save, got err: %v", err)
+	}
+	if migrated.OmenStacks != 3 {
+		t.Fatalf("expected omen stacks 3 after migration, got %+v", migrated)
+	}
+	if migrated.PartHeavyClickCount[TalentPartKey(0, 0)] != 9 {
+		t.Fatalf("expected heavy click count preserved, got %+v", migrated.PartHeavyClickCount)
+	}
+}
+
 func TestUpgradeOverflowTalentConsumesPointsAndAccumulatesBonus(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()

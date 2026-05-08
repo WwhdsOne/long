@@ -9,7 +9,8 @@ const publicPageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue
 
 describe('TalentBuffDemoPage 隐藏入口', () => {
     it('只通过隐藏路径挂载 demo 页面', () => {
-        expect(appSource).toContain("talentBuffDemo: () => import('./pages/TalentBuffDemoPage.vue')")
+        expect(appSource).toContain("import TalentBuffDemoPage from './pages/TalentBuffDemoPage.vue'")
+        expect(appSource).toContain('talentBuffDemo: TalentBuffDemoPage')
         expect(appSource).toContain("currentPath.startsWith('/__talent-buff-demo')")
     })
 

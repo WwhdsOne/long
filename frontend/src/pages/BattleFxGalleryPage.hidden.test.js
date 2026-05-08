@@ -9,7 +9,8 @@ const publicPageSource = readFileSync(path.resolve(currentDir, './PublicPage.vue
 
 describe('BattleFxGalleryPage 隐藏入口', () => {
     it('通过 /internal/battle-fx-gallery 路径挂载', () => {
-        expect(appSource).toContain("battleFxGallery: () => import('./pages/BattleFxGalleryPage.vue')")
+        expect(appSource).toContain("import BattleFxGalleryPage from './pages/BattleFxGalleryPage.vue'")
+        expect(appSource).toContain('battleFxGallery: BattleFxGalleryPage')
         expect(appSource).toContain("currentPath.startsWith('/internal/battle-fx-gallery')")
     })
 

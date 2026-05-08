@@ -1,11 +1,14 @@
 <script setup>
-import {defineAsyncComponent} from 'vue'
+import AdminPage from './pages/AdminPage.vue'
+import BattleFxGalleryPage from './pages/BattleFxGalleryPage.vue'
+import TalentBuffDemoPage from './pages/TalentBuffDemoPage.vue'
+import PublicPage from './pages/PublicPage.vue'
 
 const pageMap = {
-    admin: () => import('./pages/AdminPage.vue'),
-    battleFxGallery: () => import('./pages/BattleFxGalleryPage.vue'),
-    talentBuffDemo: () => import('./pages/TalentBuffDemoPage.vue'),
-    public: () => import('./pages/PublicPage.vue'),
+    admin: AdminPage,
+    battleFxGallery: BattleFxGalleryPage,
+    talentBuffDemo: TalentBuffDemoPage,
+    public: PublicPage,
 }
 
 const currentPath = window.location.pathname
@@ -17,7 +20,7 @@ const pageKey = currentPath.startsWith('/admin')
             ? 'talentBuffDemo'
             : 'public'
 
-const currentView = defineAsyncComponent(pageMap[pageKey])
+const currentView = pageMap[pageKey]
 </script>
 
 <template>

@@ -109,15 +109,15 @@ func (p PartType) DamageCoefficient() float64 {
 
 // BossPart Boss 的战斗部位
 type BossPart struct {
-	X           int      `json:"x"`
-	Y           int      `json:"y"`
-	Type        PartType `json:"type"`
-	DisplayName string   `json:"displayName,omitempty"`
-	ImagePath   string   `json:"imagePath,omitempty"`
-	MaxHP       int64    `json:"maxHp"`
-	CurrentHP   int64    `json:"currentHp"`
-	Armor       int64    `json:"armor"`
-	Alive       bool     `json:"alive"`
+	X           int      `msgpack:"x" json:"x"`
+	Y           int      `msgpack:"y" json:"y"`
+	Type        PartType `msgpack:"type" json:"type"`
+	DisplayName string   `msgpack:"displayName,omitempty" json:"displayName,omitempty"`
+	ImagePath   string   `msgpack:"imagePath,omitempty" json:"imagePath,omitempty"`
+	MaxHP       int64    `msgpack:"maxHp" json:"maxHp"`
+	CurrentHP   int64    `msgpack:"currentHp" json:"currentHp"`
+	Armor       int64    `msgpack:"armor" json:"armor"`
+	Alive       bool     `msgpack:"alive" json:"alive"`
 }
 
 // Boss 世界 Boss 状态
@@ -1788,12 +1788,12 @@ func (s *Store) AttackBossPartAFKInRoom(ctx context.Context, nickname string, ro
 		boss.DefeatedAt = s.now().Unix()
 	}
 
-	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
+	partsRaw, marshalErr := encodeBossParts(boss.Parts)
 	if marshalErr != nil {
 		return ClickResult{}, nil
 	}
 	bossValues := map[string]any{
-		"parts":      string(partsRaw),
+		"parts":      partsRaw,
 		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
 		"status":     boss.Status,
 	}
@@ -2172,20 +2172,20 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		boss.DefeatedAt = s.now().Unix()
 	}
 
-	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
+	partsRaw, marshalErr := encodeBossParts(boss.Parts)
 	if marshalErr != nil {
 		return result, nil
 	}
 
 	bossValues := map[string]any{
-		"parts":      string(partsRaw),
+		"parts":      partsRaw,
 		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
 		"status":     boss.Status,
 	}
 	if boss.DefeatedAt != 0 {
 		bossValues["defeated_at"] = strconv.FormatInt(boss.DefeatedAt, 10)
 	}
-	combatStateRaw, marshalCombatStateErr := sonic.Marshal(combatState)
+	combatStateRaw, marshalCombatStateErr := encodeTalentCombatState(combatState)
 	if marshalCombatStateErr != nil {
 		return result, nil
 	}
@@ -2195,7 +2195,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if totalDamage > 0 {
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
-	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
+	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", combatStateRaw)
 	pipe.SAdd(ctx, s.talentCombatStateIndexKey(boss.ID), nickname)
 	if _, execErr := pipe.Exec(ctx); execErr != nil {
 		return result, nil
@@ -2268,12 +2268,12 @@ func (s *Store) applyFixedBossPartDamage(ctx context.Context, boss *Boss, nickna
 		boss.DefeatedAt = s.now().Unix()
 	}
 
-	partsRaw, marshalErr := sonic.Marshal(boss.Parts)
+	partsRaw, marshalErr := encodeBossParts(boss.Parts)
 	if marshalErr != nil {
 		return result, nil
 	}
 	bossValues := map[string]any{
-		"parts":      string(partsRaw),
+		"parts":      partsRaw,
 		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
 		"status":     boss.Status,
 	}
@@ -2478,17 +2478,17 @@ func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname
 		boss.DefeatedAt = s.now().Unix()
 	}
 
-	partsRaw, err := sonic.Marshal(boss.Parts)
+	partsRaw, err := encodeBossParts(boss.Parts)
 	if err != nil {
 		return err
 	}
-	combatStateRaw, err := sonic.Marshal(combatState)
+	combatStateRaw, err := encodeTalentCombatState(combatState)
 	if err != nil {
 		return err
 	}
 
 	bossValues := map[string]any{
-		"parts":      string(partsRaw),
+		"parts":      partsRaw,
 		"current_hp": strconv.FormatInt(boss.CurrentHP, 10),
 		"status":     boss.Status,
 	}
@@ -2501,7 +2501,7 @@ func (s *Store) persistTalentTickState(ctx context.Context, boss *Boss, nickname
 	if totalDamage > 0 {
 		pipe.ZIncrBy(ctx, s.bossDamageKey(boss.ID), float64(totalDamage), nickname)
 	}
-	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", string(combatStateRaw))
+	pipe.HSet(ctx, s.talentCombatStateKey(nickname, boss.ID), "state", combatStateRaw)
 	pipe.SAdd(ctx, s.talentCombatStateIndexKey(boss.ID), nickname)
 	_, err = pipe.Exec(ctx)
 	return err
@@ -3095,8 +3095,8 @@ func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable
 	}
 
 	var parts []BossPart
-	if partsRaw := strings.TrimSpace(stringValue(values, 11)); partsRaw != "" {
-		_ = sonic.Unmarshal([]byte(partsRaw), &parts)
+	if partsRaw := stringValue(values, 11); partsRaw != "" {
+		parts, _ = decodeBossParts([]byte(partsRaw))
 	}
 
 	return &Boss{
@@ -3126,7 +3126,7 @@ func normalizeBoss(values map[string]string) *Boss {
 
 	var parts []BossPart
 	if partsRaw, ok := values["parts"]; ok && partsRaw != "" {
-		_ = sonic.Unmarshal([]byte(partsRaw), &parts)
+		parts, _ = decodeBossParts([]byte(partsRaw))
 	}
 
 	return &Boss{

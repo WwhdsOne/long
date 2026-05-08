@@ -1646,60 +1646,60 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 }
 
 type TalentBleedState struct {
-	StartedAtMs    int64 `json:"startedAtMs"`
-	NextTickAtMs   int64 `json:"nextTickAtMs"`
-	EndsAtMs       int64 `json:"endsAtMs"`
-	DurationMs     int64 `json:"durationMs"`
-	TickIntervalMs int64 `json:"tickIntervalMs"`
-	TotalTicks     int64 `json:"totalTicks"`
-	AppliedTicks   int64 `json:"appliedTicks"`
-	TotalDamage    int64 `json:"totalDamage"`
-	AppliedDamage  int64 `json:"appliedDamage"`
+	StartedAtMs    int64 `msgpack:"startedAtMs" json:"startedAtMs"`
+	NextTickAtMs   int64 `msgpack:"nextTickAtMs" json:"nextTickAtMs"`
+	EndsAtMs       int64 `msgpack:"endsAtMs" json:"endsAtMs"`
+	DurationMs     int64 `msgpack:"durationMs" json:"durationMs"`
+	TickIntervalMs int64 `msgpack:"tickIntervalMs" json:"tickIntervalMs"`
+	TotalTicks     int64 `msgpack:"totalTicks" json:"totalTicks"`
+	AppliedTicks   int64 `msgpack:"appliedTicks" json:"appliedTicks"`
+	TotalDamage    int64 `msgpack:"totalDamage" json:"totalDamage"`
+	AppliedDamage  int64 `msgpack:"appliedDamage" json:"appliedDamage"`
 }
 
 // TalentCombatState 玩家在单场 Boss 战中的天赋战斗状态。
 type TalentCombatState struct {
-	OmenStacks              int                         `json:"omenStacks"`
-	Bleeds                  map[string]TalentBleedState `json:"bleeds"`
-	CollapseParts           []int                       `json:"collapseParts"`
-	CollapseEndsAt          int64                       `json:"collapseEndsAt"`
-	CollapseDuration        int64                       `json:"collapseDuration"`
-	DoomMarks               []int                       `json:"doomMarks"`
-	HasTriggeredDoom        bool                        `json:"hasTriggeredDoom"`
-	DoomMarkCumDamage       map[string]int64            `json:"doomMarkCumDamage"`
-	SilverStormRemaining    int                         `json:"silverStormRemaining"`
-	SilverStormEndsAt       int64                       `json:"silverStormEndsAt"`
-	SilverStormActive       bool                        `json:"silverStormActive"`
-	AutoStrikeTargetPart    string                      `json:"autoStrikeTargetPart"`
-	AutoStrikeComboCount    int64                       `json:"autoStrikeComboCount"`
-	AutoStrikeExpiresAt     int64                       `json:"autoStrikeExpiresAt"`
-	LastFinalCutAt          int64                       `json:"lastFinalCutAt"`
-	JudgmentDayUsed         map[string]int64            `json:"judgmentDayUsed"`
-	JudgmentDayCooldownSec  int64                       `json:"judgmentDayCooldownSec"`
-	PartHeavyClickCount     map[string]int64            `json:"partHeavyClickCount"`
-	PartJudgmentDayCount    map[string]int64            `json:"partJudgmentDayCount"`
-	PartRetainedClicks      map[string]int64            `json:"partRetainedClicks"`
-	PartStormComboCount     map[string]int64            `json:"partStormComboCount"`
-	SkinnerParts            map[string]int64            `json:"skinnerParts"`
-	SkinnerDurationByPart   map[string]int64            `json:"skinnerDurationByPart"`
-	SkinnerCooldownEndsAt   int64                       `json:"skinnerCooldownEndsAt"`
-	SkinnerCooldownDuration int64                       `json:"skinnerCooldownDuration"`
-	NormalTriggerCount      int64                       `json:"normalTriggerCount"`
-	ArmorTriggerCount       int64                       `json:"armorTriggerCount"`
-	JudgmentDayTriggerCount int64                       `json:"judgmentDayTriggerCount"`
-	AutoStrikeTriggerCount  int64                       `json:"autoStrikeTriggerCount"`
-	AutoStrikeWindowSec     int64                       `json:"autoStrikeWindowSec"`
-	MagicEchoTargetPart     string                      `json:"magicEchoTargetPart"`
-	MagicEchoStacks         int64                       `json:"magicEchoStacks"`
-	MagicEchoExpiresAt      int64                       `json:"magicEchoExpiresAt"`
-	MagicEchoCooldownEndsAt int64                       `json:"magicEchoCooldownEndsAt"`
-	MagicEchoWindowSec      int64                       `json:"magicEchoWindowSec"`
-	MagicEchoRequiredHits   int64                       `json:"magicEchoRequiredHits"`
-	MagicEchoCooldownSec    int64                       `json:"magicEchoCooldownSec"`
-	MagicUltimateTrigger    int64                       `json:"magicUltimateTrigger"`
-	MagicUltimateCooldown   int64                       `json:"magicUltimateCooldown"`
-	MagicUltimateCooldownAt int64                       `json:"magicUltimateCooldownAt"`
-	PartMagicTriggerCount   map[string]int64            `json:"partMagicTriggerCount"`
+	OmenStacks              int                         `msgpack:"omenStacks" json:"omenStacks"`
+	Bleeds                  map[string]TalentBleedState `msgpack:"bleeds" json:"bleeds"`
+	CollapseParts           []int                       `msgpack:"collapseParts" json:"collapseParts"`
+	CollapseEndsAt          int64                       `msgpack:"collapseEndsAt" json:"collapseEndsAt"`
+	CollapseDuration        int64                       `msgpack:"collapseDuration" json:"collapseDuration"`
+	DoomMarks               []int                       `msgpack:"doomMarks" json:"doomMarks"`
+	HasTriggeredDoom        bool                        `msgpack:"hasTriggeredDoom" json:"hasTriggeredDoom"`
+	DoomMarkCumDamage       map[string]int64            `msgpack:"doomMarkCumDamage" json:"doomMarkCumDamage"`
+	SilverStormRemaining    int                         `msgpack:"silverStormRemaining" json:"silverStormRemaining"`
+	SilverStormEndsAt       int64                       `msgpack:"silverStormEndsAt" json:"silverStormEndsAt"`
+	SilverStormActive       bool                        `msgpack:"silverStormActive" json:"silverStormActive"`
+	AutoStrikeTargetPart    string                      `msgpack:"autoStrikeTargetPart" json:"autoStrikeTargetPart"`
+	AutoStrikeComboCount    int64                       `msgpack:"autoStrikeComboCount" json:"autoStrikeComboCount"`
+	AutoStrikeExpiresAt     int64                       `msgpack:"autoStrikeExpiresAt" json:"autoStrikeExpiresAt"`
+	LastFinalCutAt          int64                       `msgpack:"lastFinalCutAt" json:"lastFinalCutAt"`
+	JudgmentDayUsed         map[string]int64            `msgpack:"judgmentDayUsed" json:"judgmentDayUsed"`
+	JudgmentDayCooldownSec  int64                       `msgpack:"judgmentDayCooldownSec" json:"judgmentDayCooldownSec"`
+	PartHeavyClickCount     map[string]int64            `msgpack:"partHeavyClickCount" json:"partHeavyClickCount"`
+	PartJudgmentDayCount    map[string]int64            `msgpack:"partJudgmentDayCount" json:"partJudgmentDayCount"`
+	PartRetainedClicks      map[string]int64            `msgpack:"partRetainedClicks" json:"partRetainedClicks"`
+	PartStormComboCount     map[string]int64            `msgpack:"partStormComboCount" json:"partStormComboCount"`
+	SkinnerParts            map[string]int64            `msgpack:"skinnerParts" json:"skinnerParts"`
+	SkinnerDurationByPart   map[string]int64            `msgpack:"skinnerDurationByPart" json:"skinnerDurationByPart"`
+	SkinnerCooldownEndsAt   int64                       `msgpack:"skinnerCooldownEndsAt" json:"skinnerCooldownEndsAt"`
+	SkinnerCooldownDuration int64                       `msgpack:"skinnerCooldownDuration" json:"skinnerCooldownDuration"`
+	NormalTriggerCount      int64                       `msgpack:"normalTriggerCount" json:"normalTriggerCount"`
+	ArmorTriggerCount       int64                       `msgpack:"armorTriggerCount" json:"armorTriggerCount"`
+	JudgmentDayTriggerCount int64                       `msgpack:"judgmentDayTriggerCount" json:"judgmentDayTriggerCount"`
+	AutoStrikeTriggerCount  int64                       `msgpack:"autoStrikeTriggerCount" json:"autoStrikeTriggerCount"`
+	AutoStrikeWindowSec     int64                       `msgpack:"autoStrikeWindowSec" json:"autoStrikeWindowSec"`
+	MagicEchoTargetPart     string                      `msgpack:"magicEchoTargetPart" json:"magicEchoTargetPart"`
+	MagicEchoStacks         int64                       `msgpack:"magicEchoStacks" json:"magicEchoStacks"`
+	MagicEchoExpiresAt      int64                       `msgpack:"magicEchoExpiresAt" json:"magicEchoExpiresAt"`
+	MagicEchoCooldownEndsAt int64                       `msgpack:"magicEchoCooldownEndsAt" json:"magicEchoCooldownEndsAt"`
+	MagicEchoWindowSec      int64                       `msgpack:"magicEchoWindowSec" json:"magicEchoWindowSec"`
+	MagicEchoRequiredHits   int64                       `msgpack:"magicEchoRequiredHits" json:"magicEchoRequiredHits"`
+	MagicEchoCooldownSec    int64                       `msgpack:"magicEchoCooldownSec" json:"magicEchoCooldownSec"`
+	MagicUltimateTrigger    int64                       `msgpack:"magicUltimateTrigger" json:"magicUltimateTrigger"`
+	MagicUltimateCooldown   int64                       `msgpack:"magicUltimateCooldown" json:"magicUltimateCooldown"`
+	MagicUltimateCooldownAt int64                       `msgpack:"magicUltimateCooldownAt" json:"magicUltimateCooldownAt"`
+	PartMagicTriggerCount   map[string]int64            `msgpack:"partMagicTriggerCount" json:"partMagicTriggerCount"`
 }
 
 // NewTalentCombatState 创建空天赋战斗状态。
@@ -1737,41 +1737,11 @@ func (s *Store) GetTalentCombatState(ctx context.Context, nickname, bossID strin
 	if err != nil || raw == "" {
 		return NewTalentCombatState(), nil
 	}
-	var state TalentCombatState
-	if err := sonic.Unmarshal([]byte(raw), &state); err != nil {
+	state, err := decodeTalentCombatState([]byte(raw))
+	if err != nil {
 		return NewTalentCombatState(), nil
 	}
-	if state.JudgmentDayUsed == nil {
-		state.JudgmentDayUsed = make(map[string]int64)
-	}
-	if state.PartHeavyClickCount == nil {
-		state.PartHeavyClickCount = make(map[string]int64)
-	}
-	if state.PartJudgmentDayCount == nil {
-		state.PartJudgmentDayCount = make(map[string]int64)
-	}
-	if state.PartStormComboCount == nil {
-		state.PartStormComboCount = make(map[string]int64)
-	}
-	if state.PartRetainedClicks == nil {
-		state.PartRetainedClicks = make(map[string]int64)
-	}
-	if state.Bleeds == nil {
-		state.Bleeds = make(map[string]TalentBleedState)
-	}
-	if state.SkinnerParts == nil {
-		state.SkinnerParts = make(map[string]int64)
-	}
-	if state.SkinnerDurationByPart == nil {
-		state.SkinnerDurationByPart = make(map[string]int64)
-	}
-	if state.DoomMarkCumDamage == nil {
-		state.DoomMarkCumDamage = make(map[string]int64)
-	}
-	if state.PartMagicTriggerCount == nil {
-		state.PartMagicTriggerCount = make(map[string]int64)
-	}
-	return &state, nil
+	return state, nil
 }
 
 // SaveTalentCombatState 保存天赋战斗状态。
@@ -1779,12 +1749,12 @@ func (s *Store) SaveTalentCombatState(ctx context.Context, nickname, bossID stri
 	if state == nil {
 		return nil
 	}
-	raw, err := sonic.Marshal(state)
+	raw, err := encodeTalentCombatState(state)
 	if err != nil {
 		return err
 	}
 	pipe := s.client.TxPipeline()
-	pipe.HSet(ctx, s.talentCombatStateKey(nickname, bossID), "state", string(raw))
+	pipe.HSet(ctx, s.talentCombatStateKey(nickname, bossID), "state", raw)
 	pipe.SAdd(ctx, s.talentCombatStateIndexKey(bossID), nickname)
 	_, err = pipe.Exec(ctx)
 	return err
