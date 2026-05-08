@@ -1,26 +1,17 @@
 <script setup>
 import AdminPage from './pages/AdminPage.vue'
 import BattleFxGalleryPage from './pages/BattleFxGalleryPage.vue'
-import TalentBuffDemoPage from './pages/TalentBuffDemoPage.vue'
 import PublicPage from './pages/PublicPage.vue'
-
-const pageMap = {
-    admin: AdminPage,
-    battleFxGallery: BattleFxGalleryPage,
-    talentBuffDemo: TalentBuffDemoPage,
-    public: PublicPage,
-}
+import TalentBuffDemoPage from './pages/TalentBuffDemoPage.vue'
 
 const currentPath = window.location.pathname
-const pageKey = currentPath.startsWith('/admin')
-    ? 'admin'
+const currentView = currentPath.startsWith('/admin')
+    ? AdminPage
     : currentPath.startsWith('/internal/battle-fx-gallery')
-        ? 'battleFxGallery'
+        ? BattleFxGalleryPage
         : currentPath.startsWith('/__talent-buff-demo')
-            ? 'talentBuffDemo'
-            : 'public'
-
-const currentView = pageMap[pageKey]
+            ? TalentBuffDemoPage
+            : PublicPage
 </script>
 
 <template>
