@@ -26,7 +26,7 @@ func TestCollectPlayerBossKillsReadsResourceKeys(t *testing.T) {
 	defer client.Close()
 
 	ctx := context.Background()
-	prefix := "vote:"
+	prefix := "hai-world:"
 	if err := client.HSet(ctx, playerResourceKey(prefix, "阿明"), "boss_kills", "7").Err(); err != nil {
 		t.Fatalf("seed player resource: %v", err)
 	}

@@ -25,9 +25,11 @@ describe('PublicPage 体力与风控展示', () => {
         expect(battleSource).toContain("class=\"stamina-float__bubble\"")
         expect(battleSource).toContain("class=\"stamina-float__plus\"")
         expect(battleSource).toContain("class=\"stamina-float__tooltip\"")
+        expect(battleSource).toContain("class=\"stamina-float__rule-card\"")
         expect(battleSource).toContain("navigatePublicPage('shop')")
         expect(battleSource).toContain('下一点恢复还需要')
         expect(battleSource).toContain('1 点体力 = 50 次点击')
+        expect(battleSource).toContain('每 5 分钟恢复 1 点')
         expect(battleSource).toContain('手点伤害固定为 1')
         expect(battleSource).toContain('挂机伤害不受体力系统限制')
         expect(battleSource).toContain('当前不可手点/挂机/购买体力')
@@ -35,6 +37,7 @@ describe('PublicPage 体力与风控展示', () => {
         expect(styleSource).toContain('position: fixed;')
         expect(styleSource).toContain('.stamina-float__bubble {')
         expect(styleSource).toContain('.stamina-float__plus {')
+        expect(styleSource).toContain('.stamina-float__rule-card {')
     })
 
     it('商店页展示买满体力、升级上限和确认弹窗', () => {

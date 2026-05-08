@@ -26,7 +26,7 @@ func TestCollectCleanupKeys包含历史Boss残留键且不误删当前Boss(t *te
 	client := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
 	defer client.Close()
 
-	store := core.NewStore(client, "vote:", core.StoreOptions{
+	store := core.NewStore(client, "hai-world:", core.StoreOptions{
 		CriticalChancePercent: 5,
 	}, nickname.NewSensitiveLexiconValidator())
 
@@ -45,9 +45,9 @@ func TestCollectCleanupKeys包含历史Boss残留键且不误删当前Boss(t *te
 	}
 
 	historyKeys := []string{
-		"vote:boss:history-1:damage",
-		"vote:boss:history-1:loot",
-		"vote:boss:history-1:reward-lock",
+		"hai-world:boss:history-1:damage",
+		"hai-world:boss:history-1:loot",
+		"hai-world:boss:history-1:reward-lock",
 	}
 	for _, key := range historyKeys {
 		if err := client.Set(ctx, key, "1", 0).Err(); err != nil {
@@ -55,9 +55,9 @@ func TestCollectCleanupKeys包含历史Boss残留键且不误删当前Boss(t *te
 		}
 	}
 	currentKeys := []string{
-		"vote:boss:current-1:damage",
-		"vote:boss:current-1:loot",
-		"vote:boss:current-1:reward-lock",
+		"hai-world:boss:current-1:damage",
+		"hai-world:boss:current-1:loot",
+		"hai-world:boss:current-1:reward-lock",
 	}
 	for _, key := range currentKeys {
 		if err := client.Set(ctx, key, "1", 0).Err(); err != nil {
@@ -65,11 +65,11 @@ func TestCollectCleanupKeys包含历史Boss残留键且不误删当前Boss(t *te
 		}
 	}
 
-	if err := client.Set(ctx, "vote:message:1", "x", 0).Err(); err != nil {
+	if err := client.Set(ctx, "hai-world:message:1", "x", 0).Err(); err != nil {
 		t.Fatalf("seed message item: %v", err)
 	}
 
-	keys, err := collectCleanupKeys(ctx, config.Config{RedisPrefix: "vote:"}, client, store)
+	keys, err := collectCleanupKeys(ctx, config.Config{RedisPrefix: "hai-world:"}, client, store)
 	if err != nil {
 		t.Fatalf("collect cleanup keys: %v", err)
 	}

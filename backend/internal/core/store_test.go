@@ -66,7 +66,7 @@ func newTestStore(t *testing.T) (*Store, func()) {
 		Addr: server.Addr(),
 	})
 
-	return NewStore(client, "vote:", StoreOptions{
+	return NewStore(client, "hai-world:", StoreOptions{
 			CriticalChancePercent: 5,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
 			_ = client.Close()
@@ -87,7 +87,7 @@ func newCountingTestStore(t *testing.T) (*Store, *countingRedisClient, func()) {
 	})
 	client := newCountingRedisClient(baseClient)
 
-	return NewStore(client, "vote:", StoreOptions{
+	return NewStore(client, "hai-world:", StoreOptions{
 			CriticalChancePercent: 5,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), client, func() {
 			_ = baseClient.Close()
@@ -100,7 +100,7 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:button:feel", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:button:feel", map[string]any{
 		"label":   "有感觉吗",
 		"count":   "3",
 		"sort":    "20",
@@ -108,7 +108,7 @@ func TestListButtonsFiltersDisabledAndSortsBySortThenKey(t *testing.T) {
 	}).Err(); err != nil {
 		t.Fatalf("seed button: %v", err)
 	}
-	if err := store.client.HSet(ctx, "vote:button:other", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:button:other", map[string]any{
 		"label":   "其他",
 		"count":   "5",
 		"sort":    "10",
@@ -177,7 +177,7 @@ func newTestStoreWithRoomConfig(t *testing.T, roomCfg RoomConfig) (*Store, func(
 		Addr: server.Addr(),
 	})
 
-	return NewStore(client, "vote:", StoreOptions{
+	return NewStore(client, "hai-world:", StoreOptions{
 			CriticalChancePercent: 5,
 			Room:                  roomCfg,
 		}, nickname.NewValidator([]string{"习近平", "xjp"})), func() {
@@ -2414,7 +2414,7 @@ func TestClickButtonWithBossPartsPersistsBossAndPartHealth(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:feel", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:feel", map[string]any{
 		"label":   "有感觉吗",
 		"count":   "0",
 		"sort":    "10",
@@ -2476,7 +2476,7 @@ func TestClickButtonWithBossPartsPersistsDefeatedStatus(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:feel", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:feel", map[string]any{
 		"label":   "有感觉吗",
 		"count":   "0",
 		"sort":    "10",
@@ -2522,7 +2522,7 @@ func TestManualBossPartClickCountsOneButDamageUsesCombatFormula(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:feel", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:feel", map[string]any{
 		"label":   "有感觉吗",
 		"count":   "0",
 		"sort":    "10",

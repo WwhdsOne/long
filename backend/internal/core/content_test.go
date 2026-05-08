@@ -116,7 +116,7 @@ func TestGetStateIgnoresLegacyEquipmentUpgradeFields(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
-	if err := store.client.HSet(ctx, "vote:equip:def:wood-sword", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:equip:def:wood-sword", map[string]any{
 		"name":         "木剑",
 		"slot":         "weapon",
 		"bonus_clicks": "2",
@@ -124,7 +124,7 @@ func TestGetStateIgnoresLegacyEquipmentUpgradeFields(t *testing.T) {
 		t.Fatalf("seed equipment definition: %v", err)
 	}
 	_ = seedOwnedInstance(t, store, ctx, "阿明", "wood-sword")
-	if err := store.client.HSet(ctx, "vote:user-equip-upgrade:阿明:wood-sword", map[string]any{
+	if err := store.client.HSet(ctx, "hai-world:user-equip-upgrade:阿明:wood-sword", map[string]any{
 		"star_level":                    "9",
 		"bonus_clicks":                  "99",
 		"bonus_critical_chance_percent": "50",

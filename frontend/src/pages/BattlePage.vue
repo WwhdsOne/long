@@ -1617,10 +1617,15 @@ const silverStormActive = computed(() => {
       </div>
       <div class="stamina-float__tooltip">
         <span>{{ staminaTooltipText }}</span>
-        <span>1 点体力 = 50 次点击</span>
         <span v-if="recoveredStamina <= 0">手点伤害固定为 1</span>
         <span>挂机伤害不受体力系统限制</span>
         <span v-if="isStaminaRiskBanned">账号异常，当前不可手点/挂机/购买体力</span>
+      </div>
+      <div class="stamina-float__rule-card" aria-label="体力规则说明">
+        <strong>体力规则</strong>
+        <span>1 点体力 = 50 次点击</span>
+        <span>每 5 分钟恢复 1 点</span>
+        <span>体力耗尽后，点击伤害锁定为1</span>
       </div>
     </aside>
   </div>

@@ -32,7 +32,7 @@ func TestServiceCreatesAccountAndVerifiesJWT(t *testing.T) {
 
 	now := time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC)
 	service := NewService(client, Config{
-		Namespace: "vote:",
+		Namespace: "hai-world:",
 		JWTSecret: "player-secret",
 		TokenTTL:  time.Hour,
 		Now: func() time.Time {
@@ -53,7 +53,7 @@ func TestServiceCreatesAccountAndVerifiesJWT(t *testing.T) {
 		t.Fatalf("expected nickname 阿明, got %q", nickname)
 	}
 
-	authRecord, err := client.HGetAll(context.Background(), "vote:player-auth:阿明").Result()
+	authRecord, err := client.HGetAll(context.Background(), "hai-world:player-auth:阿明").Result()
 	if err != nil {
 		t.Fatalf("read auth record: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestServiceResetPasswordInvalidatesExistingJWT(t *testing.T) {
 
 	now := time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC)
 	service := NewService(client, Config{
-		Namespace: "vote:",
+		Namespace: "hai-world:",
 		JWTSecret: "player-secret",
 		TokenTTL:  time.Hour,
 		Now: func() time.Time {
@@ -128,7 +128,7 @@ func TestServiceRejectsInvalidNicknameAndPassword(t *testing.T) {
 	defer client.Close()
 
 	service := NewService(client, Config{
-		Namespace: "vote:",
+		Namespace: "hai-world:",
 		JWTSecret: "player-secret",
 		TokenTTL:  time.Hour,
 	}, nicknameValidator{err: core.ErrSensitiveNickname})
