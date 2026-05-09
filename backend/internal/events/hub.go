@@ -164,7 +164,11 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 }
 
 func (h *Hub) BroadcastPublic(snapshot core.Snapshot) error {
-	payload, err := sonic.Marshal(h.buildPublicStatePayload(snapshot))
+	return h.BroadcastPublicWithVersion(snapshot, h.CurrentBossVersion(currentBossID(snapshot.Boss)))
+}
+
+func (h *Hub) BroadcastPublicWithVersion(snapshot core.Snapshot, bossVersion int64) error {
+	payload, err := sonic.Marshal(h.buildPublicStatePayloadWithVersion(snapshot, bossVersion))
 	if err != nil {
 		return err
 	}
@@ -182,11 +186,15 @@ func (h *Hub) BroadcastPublic(snapshot core.Snapshot) error {
 }
 
 func (h *Hub) BroadcastPublicTo(nickname string, snapshot core.Snapshot) error {
+	return h.BroadcastPublicToWithVersion(nickname, snapshot, h.CurrentBossVersion(currentBossID(snapshot.Boss)))
+}
+
+func (h *Hub) BroadcastPublicToWithVersion(nickname string, snapshot core.Snapshot, bossVersion int64) error {
 	normalizedNickname := strings.TrimSpace(nickname)
 	if normalizedNickname == "" {
 		return nil
 	}
-	payload, err := sonic.Marshal(h.buildPublicStatePayload(snapshot))
+	payload, err := sonic.Marshal(h.buildPublicStatePayloadWithVersion(snapshot, bossVersion))
 	if err != nil {
 		return err
 	}
@@ -244,6 +252,10 @@ func (h *Hub) BroadcastPublicMetaTo(nickname string, snapshot core.Snapshot, inc
 }
 
 func (h *Hub) buildPublicStatePayload(snapshot core.Snapshot) publicStatePayload {
+	return h.buildPublicStatePayloadWithVersion(snapshot, h.CurrentBossVersion(currentBossID(snapshot.Boss)))
+}
+
+func (h *Hub) buildPublicStatePayloadWithVersion(snapshot core.Snapshot, bossVersion int64) publicStatePayload {
 	payload := publicStatePayload{
 		TotalVotes: snapshot.TotalVotes,
 		RoomID:     snapshot.RoomID,
@@ -253,7 +265,7 @@ func (h *Hub) buildPublicStatePayload(snapshot core.Snapshot) publicStatePayload
 		return payload
 	}
 	payload.BossID = snapshot.Boss.ID
-	payload.BossVersion = h.nextBossVersion(snapshot.TotalVotes, snapshot.Boss)
+	payload.BossVersion = bossVersion
 	payload.BossStatic = buildBossStaticPayload(snapshot.Boss)
 	payload.BossRuntime = buildBossRuntimePayload(snapshot.Boss)
 	return payload
@@ -311,25 +323,30 @@ func buildBossRuntimePayload(boss *core.Boss) *bossRuntimePayload {
 	}
 }
 
-func bossVersionSignature(totalVotes int64, boss *core.Boss) string {
+func currentBossID(boss *core.Boss) string {
 	if boss == nil {
 		return ""
 	}
-	signatureBody, _ := sonic.Marshal(struct {
-		TotalVotes int64               `json:"totalVotes"`
-		Runtime    *bossRuntimePayload `json:"runtime"`
-	}{
-		TotalVotes: totalVotes,
-		Runtime:    buildBossRuntimePayload(boss),
-	})
+	return strings.TrimSpace(boss.ID)
+}
+
+func bossVersionSignature(boss *core.Boss) string {
+	if boss == nil {
+		return ""
+	}
+	signatureBody, _ := sonic.Marshal(buildBossRuntimePayload(boss))
 	return string(signatureBody)
 }
 
-func (h *Hub) nextBossVersion(totalVotes int64, boss *core.Boss) int64 {
+func (h *Hub) AdvanceBossVersion(snapshot core.Snapshot) int64 {
+	return h.advanceBossVersion(snapshot.Boss)
+}
+
+func (h *Hub) advanceBossVersion(boss *core.Boss) int64 {
 	if h == nil || boss == nil {
 		return 0
 	}
-	signature := bossVersionSignature(totalVotes, boss)
+	signature := bossVersionSignature(boss)
 	h.bossVersionM.Lock()
 	defer h.bossVersionM.Unlock()
 

@@ -123,7 +123,21 @@ func (d *Dispatcher) broadcastPublic(ctx context.Context, includeMeta bool, incl
 	if snapshot.Boss != nil {
 		_, _ = d.cache.RefreshBossResources(ctx)
 	}
-	if err := d.hub.BroadcastPublic(snapshot); err != nil {
+	snapshotByKey := make(map[string]core.Snapshot)
+	versionByKey := make(map[string]int64)
+	cacheSnapshot := func(candidate core.Snapshot) (core.Snapshot, int64) {
+		key := publicSnapshotReuseKey(candidate)
+		if cached, ok := snapshotByKey[key]; ok {
+			return cached, versionByKey[key]
+		}
+		version := d.hub.AdvanceBossVersion(candidate)
+		snapshotByKey[key] = candidate
+		versionByKey[key] = version
+		return candidate, version
+	}
+
+	snapshot, snapshotVersion := cacheSnapshot(snapshot)
+	if err := d.hub.BroadcastPublicWithVersion(snapshot, snapshotVersion); err != nil {
 		return err
 	}
 	if includeMeta {
@@ -137,7 +151,8 @@ func (d *Dispatcher) broadcastPublic(ctx context.Context, includeMeta bool, incl
 		if err != nil {
 			return err
 		}
-		if err := d.hub.BroadcastPublicTo(nickname, snapshot); err != nil {
+		snapshot, snapshotVersion := cacheSnapshot(snapshot)
+		if err := d.hub.BroadcastPublicToWithVersion(nickname, snapshot, snapshotVersion); err != nil {
 			return err
 		}
 		if includeMeta {
@@ -156,6 +171,14 @@ func (d *Dispatcher) broadcastPublic(ctx context.Context, includeMeta bool, incl
 		}
 	}
 	return nil
+}
+
+func publicSnapshotReuseKey(snapshot core.Snapshot) string {
+	bossID := ""
+	if snapshot.Boss != nil {
+		bossID = snapshot.Boss.ID
+	}
+	return snapshot.RoomID + "\n" + bossID
 }
 
 func affectsPublicState(changeType core.StateChangeType) bool {

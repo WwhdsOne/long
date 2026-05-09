@@ -129,6 +129,30 @@ func TestHubBroadcastsPublicAndMatchingUserEvents(t *testing.T) {
 	assertNoEvent(t, xiaohong, "小红")
 }
 
+func TestHubBuildPublicStatePayloadReadOnlyDoesNotAdvanceBossVersion(t *testing.T) {
+	hub := NewHub()
+	snapshot := core.Snapshot{
+		RoomID: "2",
+		Boss: &core.Boss{
+			ID:        "boss-1",
+			Name:      "木桩王",
+			Status:    "active",
+			MaxHP:     100,
+			CurrentHP: 80,
+		},
+	}
+
+	first := hub.buildPublicStatePayload(snapshot)
+	second := hub.buildPublicStatePayload(snapshot)
+
+	if first.BossVersion != 0 || second.BossVersion != 0 {
+		t.Fatalf("expected read-only payload build to keep boss version at 0, got first=%d second=%d", first.BossVersion, second.BossVersion)
+	}
+	if hub.CurrentBossVersion("boss-1") != 0 {
+		t.Fatalf("expected read-only payload build not to mutate stored version, got %d", hub.CurrentBossVersion("boss-1"))
+	}
+}
+
 func assertNoEvent(t *testing.T, ch <-chan ServerEvent, label string) {
 	t.Helper()
 

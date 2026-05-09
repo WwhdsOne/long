@@ -6,19 +6,31 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/sonic"
+
 	"long/internal/core"
 )
 
 type dispatcherTestReader struct {
-	snapshot          core.Snapshot
-	userState         core.UserState
-	realtimeUserState core.UserState
-	roomList          core.RoomList
-	fullCalls         int
-	realtimeCalls     int
+	snapshot           core.Snapshot
+	snapshotByNickname map[string]core.Snapshot
+	userState          core.UserState
+	realtimeUserState  core.UserState
+	roomList           core.RoomList
+	fullCalls          int
+	realtimeCalls      int
 }
 
 func (r *dispatcherTestReader) GetSnapshot(context.Context) (core.Snapshot, error) {
+	return r.snapshot, nil
+}
+
+func (r *dispatcherTestReader) GetSnapshotForNickname(_ context.Context, nickname string) (core.Snapshot, error) {
+	if r.snapshotByNickname != nil {
+		if snapshot, ok := r.snapshotByNickname[nickname]; ok {
+			return snapshot, nil
+		}
+	}
 	return r.snapshot, nil
 }
 
@@ -313,6 +325,69 @@ func TestDispatcherThrottlePublicBroadcastWithinWindow(t *testing.T) {
 	assertNoEventWithin(t, client, 10*time.Millisecond, "expected throttle window to suppress immediate extra public_state")
 	_ = readEventByName(t, client, PublicStateEventName)
 	assertNoEventWithin(t, client, 30*time.Millisecond, "expected only one deferred public_state within throttle window")
+}
+
+func TestDispatcherBroadcastPublicReusesSameRoomBossSnapshotAndVersionWithinOneFlush(t *testing.T) {
+	reader := &dispatcherTestReader{
+		snapshotByNickname: map[string]core.Snapshot{
+			"阿明": {
+				RoomID: "2",
+				Boss: &core.Boss{
+					ID:        "boss-1",
+					Name:      "木桩王",
+					Status:    "active",
+					MaxHP:     100,
+					CurrentHP: 80,
+				},
+			},
+			"小红": {
+				RoomID: "2",
+				Boss: &core.Boss{
+					ID:        "boss-1",
+					Name:      "木桩王",
+					Status:    "active",
+					MaxHP:     100,
+					CurrentHP: 79,
+				},
+			},
+		},
+	}
+	cache := NewCache(reader)
+	hub := NewHub()
+	dispatcher := NewDispatcher(cache, hub, 1)
+
+	aming, unsubscribeAming := hub.Subscribe("阿明")
+	defer unsubscribeAming()
+	xiaohong, unsubscribeXiaohong := hub.Subscribe("小红")
+	defer unsubscribeXiaohong()
+	_ = readEventByName(t, aming, OnlineCountEventName)
+	_ = readEventByName(t, xiaohong, OnlineCountEventName)
+
+	if err := dispatcher.HandleChange(context.Background(), core.StateChange{Type: core.StateChangeButtonClicked}); err != nil {
+		t.Fatalf("handle change: %v", err)
+	}
+
+	amingEvent := readEventByName(t, aming, PublicStateEventName)
+	xiaohongEvent := readEventByName(t, xiaohong, PublicStateEventName)
+
+	var amingPayload publicStatePayload
+	if err := sonic.Unmarshal(amingEvent.Payload, &amingPayload); err != nil {
+		t.Fatalf("decode aming public_state: %v", err)
+	}
+	var xiaohongPayload publicStatePayload
+	if err := sonic.Unmarshal(xiaohongEvent.Payload, &xiaohongPayload); err != nil {
+		t.Fatalf("decode xiaohong public_state: %v", err)
+	}
+
+	if amingPayload.BossVersion != xiaohongPayload.BossVersion {
+		t.Fatalf("expected same-room clients to share one boss version within a flush, got %d and %d", amingPayload.BossVersion, xiaohongPayload.BossVersion)
+	}
+	if amingPayload.BossRuntime == nil || xiaohongPayload.BossRuntime == nil {
+		t.Fatalf("expected boss runtime payloads, got aming=%+v xiaohong=%+v", amingPayload, xiaohongPayload)
+	}
+	if amingPayload.BossRuntime.CurrentHP != xiaohongPayload.BossRuntime.CurrentHP {
+		t.Fatalf("expected same-room clients to reuse one boss runtime snapshot within a flush, got %d and %d", amingPayload.BossRuntime.CurrentHP, xiaohongPayload.BossRuntime.CurrentHP)
+	}
 }
 
 func assertNoEventWithin(t *testing.T, ch <-chan ServerEvent, wait time.Duration, message string) {
