@@ -177,7 +177,7 @@ function canJoin(room) {
   /* 改为：第一行头部20px，第二行占满剩余空间 */
   grid-template-rows: 20px 1fr;
   /* 给整体一个最大高度（按需调整），防止无限撑高 */
-  max-height: 600px; /* 也可用 height: 100% 继承父级高度 */
+  max-height: 920px; /* 放大到足够容纳 3 列 * 5 行房间卡 */
 
   overflow: hidden; /* 溢出交给内部列表处理 */
 }

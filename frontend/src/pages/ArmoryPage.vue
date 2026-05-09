@@ -51,6 +51,7 @@ const salvageRuleModalOpen = ref(false)
 
 const enhanceAttackGrowth = 1.12
 const enhancePercentGrowth = 1.08
+const enhanceMagicProcRateStep = 0.001
 
 function formatTrimmedNumber(value, digits = 2) {
   const normalized = Number(value ?? 0)
@@ -82,6 +83,13 @@ function formatArmorPenPercent(value) {
   return formatRatioPercentValue(value)
 }
 
+function formatMagicProcRateValue(value) {
+  const normalized = Number(value ?? 0)
+  if (!Number.isFinite(normalized)) return '0%'
+  const percent = Math.abs(normalized) <= 1 ? normalized * 100 : normalized
+  return formatPercentValue(percent)
+}
+
 const combatStatSummaryItems = computed(() => [
   {label: '攻击力', value: formatNumber(combatStats.value?.attackPower ?? 0)},
   {label: '暴击伤害', value: formatNumber(combatStats.value?.criticalDamage ?? 0)},
@@ -89,7 +97,7 @@ const combatStatSummaryItems = computed(() => [
   {label: '护甲穿透', value: formatArmorPenPercent(combatStats.value?.armorPenPercent ?? 0)},
   {label: '暴击倍率', value: formatCritDamageBonus(combatStats.value?.critDamageMultiplier ?? 0)},
   {label: '全伤害加成', value: formatRatioPercentValue(combatStats.value?.allDamageAmplify ?? 0)},
-  {label: '魔法触发率', value: formatRatioPercentValue(combatStats.value?.magicProcRate ?? 0)},
+  {label: '魔法触发率', value: formatMagicProcRateValue(combatStats.value?.magicProcRate ?? 0)},
   {label: '魔法伤害加成', value: formatRatioPercentValue((combatStats.value?.magicDamageMultiplier ?? 1) - 1)},
   {label: '软组织增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageSoft ?? 0)},
   {label: '重甲增伤', value: formatRatioPercentValue(combatStats.value?.partTypeDamageHeavy ?? 0)},
@@ -382,6 +390,17 @@ function previewScaledStat(currentValue, currentLevel, targetLevel) {
   return baseValue * (enhancePercentGrowth ** safeTargetLevel)
 }
 
+function previewMagicProcRateBonus(currentValue, currentLevel, targetLevel) {
+  const safeCurrentValue = Number(currentValue || 0)
+  const safeCurrentLevel = Math.max(0, Number(currentLevel || 0))
+  const safeTargetLevel = Math.max(safeCurrentLevel, Number(targetLevel || 0))
+  if (!Number.isFinite(safeCurrentValue) || safeCurrentValue === 0) return 0
+  if (safeTargetLevel === safeCurrentLevel) return safeCurrentValue
+
+  const baseValue = safeCurrentValue - safeCurrentLevel * enhanceMagicProcRateStep
+  return baseValue + safeTargetLevel * enhanceMagicProcRateStep
+}
+
 function buildEnhancePreviewItem(item, levels) {
   if (!item) return null
 
@@ -413,7 +432,7 @@ function buildEnhancePreviewItem(item, levels) {
   preview.partTypeDamageSoft = previewScaledStat(preview.partTypeDamageSoft, currentLevel, targetLevel)
   preview.partTypeDamageHeavy = previewScaledStat(preview.partTypeDamageHeavy, currentLevel, targetLevel)
   preview.partTypeDamageWeak = previewScaledStat(preview.partTypeDamageWeak, currentLevel, targetLevel)
-  preview.magicProcRateBonus = previewScaledStat(preview.magicProcRateBonus, currentLevel, targetLevel)
+  preview.magicProcRateBonus = previewMagicProcRateBonus(preview.magicProcRateBonus, currentLevel, targetLevel)
   preview.magicDamageBonus = previewScaledStat(preview.magicDamageBonus, currentLevel, targetLevel)
 
   return preview
@@ -453,7 +472,7 @@ const enhancePreviewStatRows = computed(() => {
   pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatRatioPercentValue)
   pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatRatioPercentValue)
   pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatRatioPercentValue)
-  pushEnhancePreviewRow(rows, '魔法触发率', item.magicProcRateBonus, preview.magicProcRateBonus, formatRatioPercentValue)
+  pushEnhancePreviewRow(rows, '魔法触发率', item.magicProcRateBonus, preview.magicProcRateBonus, formatMagicProcRateValue)
   pushEnhancePreviewRow(rows, '魔法伤害加成', item.magicDamageBonus, preview.magicDamageBonus, formatRatioPercentValue)
   return rows
 })

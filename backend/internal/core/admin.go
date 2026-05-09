@@ -221,8 +221,7 @@ func (s *Store) ActivateBossInRoom(ctx context.Context, roomID string, boss Boss
 	if len(parts) == 0 {
 		return nil, ErrBossPartsRequired
 	}
-	maxHP := maxInt64(1, boss.MaxHP)
-	maxHP = sumBossPartMaxHP(parts)
+	maxHP := sumBossPartMaxHP(parts)
 
 	current := &Boss{
 		ID:                 bossID,

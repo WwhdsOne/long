@@ -4154,6 +4154,7 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 	enhanceLevel = maxInt(0, enhanceLevel)
 	multValue := math.Pow(1.12, float64(enhanceLevel))
 	multPercent := math.Pow(1.08, float64(enhanceLevel))
+	magicProcRateStep := 0.001
 
 	name := displayItemName(definition.Name, enhanceLevel)
 	attackPower := int64(math.Round(float64(definition.AttackPower) * multValue))
@@ -4163,7 +4164,7 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 	partTypeDamageSoft := definition.PartTypeDamageSoft * multPercent
 	partTypeDamageHeavy := definition.PartTypeDamageHeavy * multPercent
 	partTypeDamageWeak := definition.PartTypeDamageWeak * multPercent
-	magicProcRateBonus := definition.MagicProcRateBonus * multPercent
+	magicProcRateBonus := definition.MagicProcRateBonus + float64(enhanceLevel)*magicProcRateStep
 	magicDamageBonus := definition.MagicDamageBonus * multPercent
 
 	return InventoryItem{

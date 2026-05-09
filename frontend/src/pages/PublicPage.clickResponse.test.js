@@ -5,14 +5,6 @@ import {fileURLToPath} from 'node:url'
 import {describe, expect, it} from 'vitest'
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const pageSource = [
-    './PublicPage.vue',
-    './BattlePage.vue',
-    './ArmoryPage.vue',
-    './MessagesPage.vue',
-]
-    .map((file) => readFileSync(path.resolve(currentDir, file), 'utf8'))
-    .join('\n')
 const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'), 'utf8')
 
 describe('PublicPage 点击响应链路', () => {

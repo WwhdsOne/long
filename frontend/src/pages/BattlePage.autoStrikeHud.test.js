@@ -11,9 +11,9 @@ const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'
 describe('碎甲重击 HUD', () => {
     it('终末血斩 HUD 改为读取死兆资源态与最近触发状态', () => {
         expect(stateSource).toContain('const globalStatusList = computed(() => {')
-        expect(stateSource).toContain('const finalCutLastTriggerAt = Math.max(0, Number(talentCombatState.value?.lastFinalCutAt) || 0)')
-        expect(stateSource).toContain('const finalCutRecentWindowSec = 3')
-        expect(stateSource).toContain('const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0')
+        expect(stateSource).not.toContain('const finalCutLastTriggerAt = Math.max(0, Number(talentCombatState.value?.lastFinalCutAt) || 0)')
+        expect(stateSource).not.toContain('const finalCutRecentWindowSec = 3')
+        expect(stateSource).not.toContain('const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0')
         expect(stateSource).toContain('const omenStacks = Math.max(0, Number(talentVisualState.value?.omenStacks) || 0)')
         expect(stateSource).toContain("kind: 'omen'")
         expect(battleSource).toContain('globalStatusList')

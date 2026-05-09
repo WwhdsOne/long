@@ -44,6 +44,7 @@ build: frontend-build ## 构建前端产物到 backend/public
 test: backend-test ## 运行后端测试
 
 check: test backend-vet frontend-test build ## 执行 CI 校验
+check: backend-lint frontend-lint ## 执行 CI 校验
 
 backend-run: ## 单独启动后端服务
 	$(GO) -C backend run ./cmd/server
@@ -53,6 +54,9 @@ backend-test: ## 运行后端测试
 
 backend-vet: ## 运行 go vet
 	$(GO) -C backend vet ./...
+
+backend-lint: ## 运行 golangci-lint
+	cd backend && golangci-lint run --disable-all -E staticcheck ./...
 
 backend-fix: ## 运行 go fix
 	$(GO) -C backend fix ./...
@@ -68,6 +72,9 @@ frontend-dev: ## 单独启动前端开发服务器
 
 frontend-build: ## 构建前端产物
 	$(BUN) --cwd=frontend run build
+
+frontend-lint: ## 运行前端 ESLint
+	$(BUN) --cwd=frontend run lint
 
 frontend-test: ## 运行前端测试
 	$(BUN) --cwd=frontend run test

@@ -3,9 +3,13 @@ pre-commit:
   commands:
     backend-fix:
       run: go -C backend fix ./...
+    backend-lint:
+      run: cd backend && golangci-lint run --disable-all -E staticcheck ./...
     backend-test:
       run: go -C backend test ./...
     backend-vet:
       run: go -C backend vet ./...
+    frontend-lint:
+      run: ~/.bun/bin/bun --cwd=frontend run lint
     frontend-test:
       run: ~/.bun/bin/bun --cwd=frontend run test

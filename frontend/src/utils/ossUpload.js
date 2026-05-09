@@ -73,7 +73,7 @@ export async function uploadImageWithPolicy(file, policy, options = {}) {
         if (!uploadResponse.ok) {
             throw new Error('上传到 OSS 失败，请检查桶权限和上传策略。')
         }
-    } catch (error) {
+    } catch (_error) {
         const reachable = await verifyPublicImage(finalURL)
         if (!reachable) {
             throw new Error('图片可能已经传到 OSS，但浏览器无法确认上传结果。请给 OSS 配置 CORS，或检查 public_base_url 是否可公开访问。')
