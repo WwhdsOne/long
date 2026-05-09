@@ -18,6 +18,8 @@ describe('BattlePage 战斗特效覆盖层', () => {
         expect(battleSource).toContain(':entries="battleEffectEntries"')
         expect(battleSource).toContain(':canvas-width="talentOverlayCanvasSize.width"')
         expect(battleSource).toContain(':canvas-height="talentOverlayCanvasSize.height"')
+        expect(battleSource).toContain('ref="bossGridRef"')
+        expect(battleSource).toContain('ref="talentEffectOverlayRef" class="talent-effect-overlay"')
         expect(battleSource).not.toContain('<PixelEffectCanvas effect="storm_combo"')
         expect(battleSource).not.toContain('<PixelEffectCanvas effect="auto_strike"')
         expect(battleSource).not.toContain('<PixelEffectCanvas effect="bleed"')
@@ -77,8 +79,8 @@ describe('BattlePage 战斗特效覆盖层', () => {
 
     it('瞬发特效尺寸按格子边长倍率换算，而不是继续写死像素值', () => {
         expect(battleSource).toContain('const bossCellSizePx = ref(56)')
-        expect(battleSource).toContain('function measureBossCellSize() {')
-        expect(battleSource).toContain("const cell = grid?.querySelector?.('.boss-part-cell')")
+        expect(battleSource).toContain('function refreshCachedLayout() {')
+        expect(battleSource).toContain("const cell = grid.querySelector('.boss-part-cell--center') || grid.querySelector('.boss-part-cell')")
         expect(battleSource).toContain('function effectCanvasSize(scale) {')
         expect(battleSource).toContain('function ultimateEffectCanvasSize() {')
         expect(battleSource).toContain('Math.round(bossCellSizePx.value * scale)')

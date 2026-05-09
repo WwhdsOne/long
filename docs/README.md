@@ -53,6 +53,7 @@
   - [implementation/2026-05-06-部署后测试与性能验收方案.md](./implementation/2026-05-06-部署后测试与性能验收方案.md)
   - [implementation/2026-05-08-购买体力接入Cloudflare-Turnstile.md](./implementation/2026-05-08-购买体力接入Cloudflare-Turnstile.md)
   - [implementation/2026-05-09-Boss实时状态Delta化实施计划.md](./implementation/2026-05-09-Boss实时状态Delta化实施计划.md)
+  - [implementation/2026-05-10-战斗区域首行点击死循环Bug修复记录.md](./implementation/2026-05-10-战斗区域首行点击死循环Bug修复记录.md)
 
 ### 天赋与伤害链路
 

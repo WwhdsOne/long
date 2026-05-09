@@ -250,6 +250,11 @@ let bossCursorFrame = 0
 let pendingBossCursorPoint = null
 let appliedBossCursorPoint = null
 
+// 缓存 DOM 测量结果，仅供 computed 读取，由 ResizeObserver 统一更新
+let cachedOverlayRect = null
+let cachedGridRect = null
+const cachedZoneRects = new Map()
+
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
 let tickTimer = 0
@@ -328,6 +333,42 @@ function invalidateBossGridRect() {
   bossGridRect = null
 }
 
+// 统一刷新所有 DOM 测量缓存，仅在 onMounted / ResizeObserver 中调用，不在 computed 内调用
+function refreshCachedLayout() {
+  const overlay = talentEffectOverlayRef.value
+  const grid = bossGridRef.value
+
+  if (overlay instanceof HTMLElement) {
+    const or = overlay.getBoundingClientRect()
+    cachedOverlayRect = {left: or.left, top: or.top, width: or.width, height: or.height}
+    talentOverlayCanvasSize.value = {
+      width: Math.max(1, Math.round(or.width || 0)),
+      height: Math.max(1, Math.round(or.height || 0)),
+    }
+  }
+
+  if (grid instanceof HTMLElement) {
+    const gr = grid.getBoundingClientRect()
+    cachedGridRect = {left: gr.left, top: gr.top, width: gr.width, height: gr.height}
+    bossGridRect = gr
+    const cell = grid.querySelector('.boss-part-cell--center') || grid.querySelector('.boss-part-cell')
+    if (cell instanceof HTMLElement) {
+      const cr = cell.getBoundingClientRect()
+      if (cr.width > 0) {
+        bossCellSizePx.value = Math.round(cr.width)
+      }
+    }
+  }
+
+  cachedZoneRects.clear()
+  for (const [key, el] of bossZoneElementMap.entries()) {
+    if (el instanceof HTMLElement) {
+      const zr = el.getBoundingClientRect()
+      cachedZoneRects.set(key, {left: zr.left, top: zr.top, width: zr.width, height: zr.height})
+    }
+  }
+}
+
 function updateCursorPos(e) {
   const rect = measureBossGridRect()
   if (!rect) return
@@ -335,27 +376,7 @@ function updateCursorPos(e) {
 }
 
 function measureTalentOverlaySize() {
-  const overlay = talentEffectOverlayRef.value
-  if (!(overlay instanceof HTMLElement)) {
-    talentOverlayCanvasSize.value = {width: 1, height: 1}
-    return talentOverlayCanvasSize.value
-  }
-  const rect = overlay.getBoundingClientRect()
-  talentOverlayCanvasSize.value = {
-    width: Math.max(1, Math.round(rect.width || 0)),
-    height: Math.max(1, Math.round(rect.height || 0)),
-  }
   return talentOverlayCanvasSize.value
-}
-
-function measureBossCellSize() {
-  const grid = bossGridRef.value
-  const cell = grid?.querySelector?.('.boss-part-cell')
-  if (!(cell instanceof HTMLElement)) return
-  const rect = cell.getBoundingClientRect()
-  if (rect.width > 0) {
-    bossCellSizePx.value = Math.round(rect.width)
-  }
 }
 
 function effectCanvasSize(scale) {
@@ -367,9 +388,10 @@ function ultimateEffectCanvasSize() {
 }
 
 function bossGridEffectSize() {
-  const rect = bossGridRef.value?.getBoundingClientRect?.()
-  const width = Math.round(rect?.width || 0)
-  const height = Math.round(rect?.height || 0)
+  const rect = cachedGridRect
+  if (!rect) return Math.max(1, Math.round(bossCellSizePx.value * 5))
+  const width = Math.round(rect.width || 0)
+  const height = Math.round(rect.height || 0)
   return Math.max(1, Math.max(width, height, Math.round(bossCellSizePx.value * 5)))
 }
 
@@ -614,16 +636,12 @@ function handleBossGridClick(e) {
 }
 
 onMounted(() => {
-  measureBossGridRect()
-  measureBossCellSize()
-  measureTalentOverlaySize()
+  refreshCachedLayout()
   window.addEventListener('scroll', invalidateBossGridRect, {passive: true})
   window.addEventListener('resize', invalidateBossGridRect)
   if (typeof ResizeObserver !== 'undefined') {
     bossGridResizeObserver = new ResizeObserver(() => {
-      measureBossGridRect()
-      measureBossCellSize()
-      measureTalentOverlaySize()
+      refreshCachedLayout()
     })
     if (bossGridRef.value instanceof HTMLElement) {
       bossGridResizeObserver.observe(bossGridRef.value)
@@ -809,7 +827,6 @@ const clickSparkEntries = computed(() => {
 
 const battleEffectEntries = computed(() => {
   void nowTick.value
-  measureTalentOverlaySize()
   const entries = []
 
   const stormComboLayout = hasRecentTrigger('storm_combo') ? effectEntryLayout('storm_combo', {scale: 1.65, fallback: { top: '50%', left: '50%' }}) : null
@@ -986,24 +1003,13 @@ const battleEffectEntries = computed(() => {
   return entries
 })
 
-function findBossZoneElement(partX, partY) {
-  const x = Number(partX)
-  const y = Number(partY)
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
-  const key = `${Math.floor(x)}-${Math.floor(y)}`
-  return bossZoneElementMap.get(key) || null
-}
-
 function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS, entryOverride = null) {
   const entry = entryOverride || latestTrigger(type)
   if (!isTriggerFresh(entry, windowMs)) return null
-  const overlayEl = talentEffectOverlayRef.value
-  const zoneEl = findBossZoneElement(entry.partX, entry.partY)
-  if (!(overlayEl instanceof HTMLElement) || !(zoneEl instanceof HTMLElement)) {
-    return null
-  }
-  const overlayRect = overlayEl.getBoundingClientRect()
-  const zoneRect = zoneEl.getBoundingClientRect()
+  const key = `${Number(entry.partX)}-${Number(entry.partY)}`
+  const overlayRect = cachedOverlayRect
+  const zoneRect = cachedZoneRects.get(key)
+  if (!overlayRect || !zoneRect) return null
   return {
     left: zoneRect.left - overlayRect.left + zoneRect.width / 2,
     top: zoneRect.top - overlayRect.top + zoneRect.height / 2,
@@ -1011,13 +1017,9 @@ function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS, entryOverride =
 }
 
 function gridOverlayAnchor() {
-  const overlayEl = talentEffectOverlayRef.value
-  const gridEl = bossGridRef.value
-  if (!(overlayEl instanceof HTMLElement) || !(gridEl instanceof HTMLElement)) {
-    return null
-  }
-  const overlayRect = overlayEl.getBoundingClientRect()
-  const gridRect = gridEl.getBoundingClientRect()
+  const overlayRect = cachedOverlayRect
+  const gridRect = cachedGridRect
+  if (!overlayRect || !gridRect) return null
   return {
     left: gridRect.left - overlayRect.left + gridRect.width / 2,
     top: gridRect.top - overlayRect.top + gridRect.height / 2,
@@ -1465,6 +1467,15 @@ const silverStormActive = computed(() => {
                     <span v-else class="boss-part-cell__empty"></span>
                   </button>
                 </div>
+                <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
+                  <PixelEffectCanvas
+                      class="talent-effect-overlay__canvas"
+                      :entries="battleEffectEntries"
+                      :canvas-width="talentOverlayCanvasSize.width"
+                      :canvas-height="talentOverlayCanvasSize.height"
+                      :loop="false"
+                  />
+                </div>
                 <div
                     id="boss-sword-cursor"
                     ref="swordCursorRef"
@@ -1543,16 +1554,6 @@ const silverStormActive = computed(() => {
               </div>
             </div>
 
-          </div>
-          <!-- 天赋瞬发特效覆盖层（Canvas 像素粒子） -->
-          <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
-            <PixelEffectCanvas
-                class="talent-effect-overlay__canvas"
-                :entries="battleEffectEntries"
-                :canvas-width="talentOverlayCanvasSize.width"
-                :canvas-height="talentOverlayCanvasSize.height"
-                :loop="false"
-            />
           </div>
           <div class="vote-stage__boss-note vote-stage__boss-note--rules">
             <strong>挂机规则</strong>
