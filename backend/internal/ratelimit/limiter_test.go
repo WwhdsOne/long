@@ -32,6 +32,14 @@ func TestLimiterDetectsBurstOverflow(t *testing.T) {
 	if !hit {
 		t.Fatal("expected fourth request to trigger detector")
 	}
+
+	hit, err = limiter.Detect("203.0.113.10")
+	if err != nil {
+		t.Fatalf("detect repeated overflow: %v", err)
+	}
+	if hit {
+		t.Fatal("expected repeated overflow to stay quiet after the first trigger")
+	}
 }
 
 func TestLimiterKeepsDifferentKeysIndependent(t *testing.T) {
@@ -72,6 +80,52 @@ func TestLimiterUsesWindowDefaults(t *testing.T) {
 	}
 	if !hit {
 		t.Fatal("expected request 43 to overflow default threshold")
+	}
+}
+
+func TestLimiterSuppressesRepeatedOverflowSignalsUntilWindowResets(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Limit:  2,
+		Window: 2 * time.Second,
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	for i := range 2 {
+		hit, err := limiter.Detect("burst")
+		if err != nil {
+			t.Fatalf("detect warmup %d: %v", i+1, err)
+		}
+		if hit {
+			t.Fatalf("expected warmup request %d to stay below threshold", i+1)
+		}
+	}
+
+	hit, err := limiter.Detect("burst")
+	if err != nil {
+		t.Fatalf("detect first overflow: %v", err)
+	}
+	if !hit {
+		t.Fatal("expected first overflow to trigger detector")
+	}
+
+	hit, err = limiter.Detect("burst")
+	if err != nil {
+		t.Fatalf("detect repeated overflow: %v", err)
+	}
+	if hit {
+		t.Fatal("expected repeated overflow to stay suppressed")
+	}
+
+	now = now.Add(3 * time.Second)
+	hit, err = limiter.Detect("burst")
+	if err != nil {
+		t.Fatalf("detect after window reset: %v", err)
+	}
+	if hit {
+		t.Fatal("expected post-reset request to stay below threshold")
 	}
 }
 
