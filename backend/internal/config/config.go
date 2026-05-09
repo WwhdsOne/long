@@ -43,9 +43,7 @@ type AntiScriptPointsConfig struct {
 
 type AntiScriptClickRateLimitConfig struct {
 	NicknameWhitelist []string
-	Short             RateLimitWindowConfig
-	Medium            RateLimitWindowConfig
-	Long              RateLimitWindowConfig
+	Rules             []RateLimitWindowConfig
 }
 
 type AntiScriptConfig struct {
@@ -178,18 +176,10 @@ type fileConfig struct {
 		} `yaml:"points"`
 		ClickRateLimit struct {
 			NicknameWhitelist []string `yaml:"nickname_whitelist"`
-			Short             struct {
-				Limit    int `yaml:"limit"`
-				WindowMS int `yaml:"window_ms"`
-			} `yaml:"short"`
-			Medium struct {
-				Limit    int `yaml:"limit"`
-				WindowMS int `yaml:"window_ms"`
-			} `yaml:"medium"`
-			Long struct {
-				Limit    int `yaml:"limit"`
-				WindowMS int `yaml:"window_ms"`
-			} `yaml:"long"`
+				Rules             []struct {
+					Limit    int `yaml:"limit"`
+					WindowMS int `yaml:"window_ms"`
+				} `yaml:"rules"`
 		} `yaml:"click_rate_limit"`
 	} `yaml:"anti_script"`
 	Admin struct {
@@ -321,18 +311,7 @@ func loadFromConsul() (Config, consulSource, error) {
 			},
 			ClickRateLimit: AntiScriptClickRateLimitConfig{
 				NicknameWhitelist: normalizeStringList(parsed.AntiScript.ClickRateLimit.NicknameWhitelist),
-				Short: RateLimitWindowConfig{
-					Limit:  parsed.AntiScript.ClickRateLimit.Short.Limit,
-					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Short.WindowMS) * time.Millisecond,
-				},
-				Medium: RateLimitWindowConfig{
-					Limit:  parsed.AntiScript.ClickRateLimit.Medium.Limit,
-					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Medium.WindowMS) * time.Millisecond,
-				},
-				Long: RateLimitWindowConfig{
-					Limit:  parsed.AntiScript.ClickRateLimit.Long.Limit,
-					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Long.WindowMS) * time.Millisecond,
-				},
+				Rules:             convertRateLimitRules(parsed.AntiScript.ClickRateLimit.Rules),
 			},
 		},
 		Admin: AdminConfig{
@@ -439,18 +418,10 @@ func validate(config Config) error {
 		return errors.New("anti_script.points.stamina_turnstile_invalid must be greater than 0")
 	case config.AntiScript.Points.PostStaminaPurchaseClick <= 0:
 		return errors.New("anti_script.points.post_stamina_purchase_click must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Short.Limit <= 0:
-		return errors.New("anti_script.click_rate_limit.short.limit must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Short.Window <= 0:
-		return errors.New("anti_script.click_rate_limit.short.window_ms must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Medium.Limit <= 0:
-		return errors.New("anti_script.click_rate_limit.medium.limit must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Medium.Window <= 0:
-		return errors.New("anti_script.click_rate_limit.medium.window_ms must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Long.Limit <= 0:
-		return errors.New("anti_script.click_rate_limit.long.limit must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Long.Window <= 0:
-		return errors.New("anti_script.click_rate_limit.long.window_ms must be greater than 0")
+	case len(config.AntiScript.ClickRateLimit.Rules) == 0:
+		return errors.New("anti_script.click_rate_limit.rules must not be empty")
+	case !validateClickRateLimitRules(config.AntiScript.ClickRateLimit.Rules):
+		return errors.New("anti_script.click_rate_limit.rules[].limit must be greater than 0 and window_ms must be greater than 0")
 	case strings.TrimSpace(config.Admin.Username) == "":
 		return errors.New("admin.username is required")
 	case strings.TrimSpace(config.Admin.Password) == "":
@@ -534,6 +505,33 @@ func normalizeStringList(items []string) []string {
 	}
 	return normalized
 }
+
+func convertRateLimitRules(rules []struct {
+	Limit    int `yaml:"limit"`
+	WindowMS int `yaml:"window_ms"`
+}) []RateLimitWindowConfig {
+	if len(rules) == 0 {
+		return nil
+	}
+	result := make([]RateLimitWindowConfig, 0, len(rules))
+	for _, r := range rules {
+		result = append(result, RateLimitWindowConfig{
+			Limit:  r.Limit,
+			Window: time.Duration(r.WindowMS) * time.Millisecond,
+		})
+	}
+	return result
+}
+
+func validateClickRateLimitRules(rules []RateLimitWindowConfig) bool {
+	for _, r := range rules {
+		if r.Limit <= 0 || r.Window <= 0 {
+			return false
+		}
+	}
+	return true
+}
+
 
 func normalizeLLMBaseURL(baseURL string) string {
 	trimmed := strings.TrimSpace(baseURL)

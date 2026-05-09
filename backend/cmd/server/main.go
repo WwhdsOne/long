@@ -293,16 +293,7 @@ func run() error {
 		return httpapi.AuthenticatedPlayerNickname(ctx, c, playerAuthenticator)
 	})
 	clickLimiter := ratelimit.NewLimiter(ratelimit.Config{
-		Limit:  cfg.AntiScript.ClickRateLimit.Short.Limit,
-		Window: cfg.AntiScript.ClickRateLimit.Short.Window,
-		Medium: ratelimit.WindowConfig{
-			Limit:  cfg.AntiScript.ClickRateLimit.Medium.Limit,
-			Window: cfg.AntiScript.ClickRateLimit.Medium.Window,
-		},
-		Long: ratelimit.WindowConfig{
-			Limit:  cfg.AntiScript.ClickRateLimit.Long.Limit,
-			Window: cfg.AntiScript.ClickRateLimit.Long.Window,
-		},
+		Rules: convertRateLimitWindowConfigs(cfg.AntiScript.ClickRateLimit.Rules),
 	})
 	afkService := httpapi.NewAfkService(store, changeBus, redisClient, cfg.RedisPrefix)
 	defer afkService.Close()
@@ -317,6 +308,9 @@ func run() error {
 			UploadDirPrefix: cfg.OSS.UploadDirPrefix,
 			ExpireSeconds:   cfg.OSS.ExpireSeconds,
 		})
+
+
+
 	}
 	var equipmentDraftGenerator httpapi.EquipmentDraftGenerator
 	if cfg.LLM.Enabled {
@@ -618,3 +612,14 @@ func (w systemLogQueueWriter) WriteSystemLog(_ context.Context, item xlog.System
 	}
 	return nil
 }
+func convertRateLimitWindowConfigs(cfgs []config.RateLimitWindowConfig) []ratelimit.WindowConfig {
+	result := make([]ratelimit.WindowConfig, 0, len(cfgs))
+	for _, c := range cfgs {
+		result = append(result, ratelimit.WindowConfig{
+			Limit:  c.Limit,
+			Window: c.Window,
+		})
+	}
+	return result
+}
+

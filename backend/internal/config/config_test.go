@@ -43,15 +43,13 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
                 post_stamina_purchase_click: 4
               click_rate_limit:
                 nickname_whitelist: ["压测账号"]
-                short:
-                  limit: 30
-                  window_ms: 2000
-                medium:
-                  limit: 1000
-                  window_ms: 600000
-                long:
-                  limit: 2500
-                  window_ms: 3600000
+                rules:
+                  - limit: 30
+                    window_ms: 2000
+                  - limit: 1000
+                    window_ms: 600000
+                  - limit: 2500
+                    window_ms: 3600000
             admin:
               username: "admin"
               password: "secret"
@@ -126,14 +124,17 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 	if cfg.AntiScript.PurchaseClickCooldown != 3*time.Second {
 		t.Fatalf("expected purchase click cooldown 3s, got %s", cfg.AntiScript.PurchaseClickCooldown)
 	}
-	if cfg.AntiScript.ClickRateLimit.Short.Limit != 30 || cfg.AntiScript.ClickRateLimit.Short.Window != 2*time.Second {
-		t.Fatalf("expected short window 30/2s, got %+v", cfg.AntiScript.ClickRateLimit.Short)
+	if len(cfg.AntiScript.ClickRateLimit.Rules) != 3 {
+		t.Fatalf("expected 3 rate limit rules, got %d", len(cfg.AntiScript.ClickRateLimit.Rules))
 	}
-	if cfg.AntiScript.ClickRateLimit.Medium.Limit != 1000 || cfg.AntiScript.ClickRateLimit.Medium.Window != 10*time.Minute {
-		t.Fatalf("expected medium window 1000/10m, got %+v", cfg.AntiScript.ClickRateLimit.Medium)
+	if cfg.AntiScript.ClickRateLimit.Rules[0].Limit != 30 || cfg.AntiScript.ClickRateLimit.Rules[0].Window != 2*time.Second {
+		t.Fatalf("expected rule[0] 30/2s, got %+v", cfg.AntiScript.ClickRateLimit.Rules[0])
 	}
-	if cfg.AntiScript.ClickRateLimit.Long.Limit != 2500 || cfg.AntiScript.ClickRateLimit.Long.Window != time.Hour {
-		t.Fatalf("expected long window 2500/1h, got %+v", cfg.AntiScript.ClickRateLimit.Long)
+	if cfg.AntiScript.ClickRateLimit.Rules[1].Limit != 1000 || cfg.AntiScript.ClickRateLimit.Rules[1].Window != 10*time.Minute {
+		t.Fatalf("expected rule[1] 1000/10m, got %+v", cfg.AntiScript.ClickRateLimit.Rules[1])
+	}
+	if cfg.AntiScript.ClickRateLimit.Rules[2].Limit != 2500 || cfg.AntiScript.ClickRateLimit.Rules[2].Window != time.Hour {
+		t.Fatalf("expected rule[2] 2500/1h, got %+v", cfg.AntiScript.ClickRateLimit.Rules[2])
 	}
 	if len(cfg.AntiScript.ClickRateLimit.NicknameWhitelist) != 1 || cfg.AntiScript.ClickRateLimit.NicknameWhitelist[0] != "压测账号" {
 		t.Fatalf("expected click risk nickname whitelist to contain 压测账号, got %v", cfg.AntiScript.ClickRateLimit.NicknameWhitelist)
@@ -256,15 +257,13 @@ func TestLoadDefaultsInvalidRoomCount(t *testing.T) {
                 stamina_turnstile_invalid: 3
                 post_stamina_purchase_click: 4
               click_rate_limit:
-                short:
-                  limit: 30
-                  window_ms: 2000
-                medium:
-                  limit: 1000
-                  window_ms: 600000
-                long:
-                  limit: 2500
-                  window_ms: 3600000
+                rules:
+                  - limit: 30
+                    window_ms: 2000
+                  - limit: 1000
+                    window_ms: 600000
+                  - limit: 2500
+                    window_ms: 3600000
             admin:
               username: "admin"
               password: "secret"
@@ -470,9 +469,11 @@ func validConfigForTest() Config {
 				PostStaminaPurchaseClick: 4,
 			},
 			ClickRateLimit: AntiScriptClickRateLimitConfig{
-				Short:  RateLimitWindowConfig{Limit: 30, Window: 2 * time.Second},
-				Medium: RateLimitWindowConfig{Limit: 1000, Window: 10 * time.Minute},
-				Long:   RateLimitWindowConfig{Limit: 2500, Window: time.Hour},
+				Rules: []RateLimitWindowConfig{
+					{Limit: 30, Window: 2 * time.Second},
+					{Limit: 1000, Window: 10 * time.Minute},
+					{Limit: 2500, Window: time.Hour},
+				},
 			},
 		},
 		Admin: AdminConfig{
