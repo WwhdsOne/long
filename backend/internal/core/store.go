@@ -576,6 +576,7 @@ type Store struct {
 	accountRiskEventPrefix        string
 	accountRiskEventSeqPrefix     string
 	accountRiskBanPrefix          string
+	accountRiskBanStartPrefix     string
 	accountRiskLastPurchasePrefix string
 	equipmentInstanceSeqKey       string
 	equipmentSpentPrefix          string
@@ -699,6 +700,7 @@ func NewStore(client redis.UniversalClient, namespace string, options StoreOptio
 		accountRiskEventPrefix:        namespace + "anti-script:events:",
 		accountRiskEventSeqPrefix:     namespace + "anti-script:event-seq:",
 		accountRiskBanPrefix:          namespace + "anti-script:ban:",
+		accountRiskBanStartPrefix:     namespace + "anti-script:ban-start:",
 		accountRiskLastPurchasePrefix: namespace + "player:stamina:last-purchase-at:",
 		equipmentInstanceSeqKey:       namespace + "instance:seq",
 		equipmentSpentPrefix:          namespace + "user-equipment-spent:",

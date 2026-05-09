@@ -122,8 +122,50 @@ func TestAccountRiskBanUsesMaxRule(t *testing.T) {
 	if state.Score != 8 {
 		t.Fatalf("expected score 8, got %+v", state)
 	}
-	if state.BanUntil != baseTime.Add(10*time.Hour).Unix() {
-		t.Fatalf("expected ban to extend by max rule to now+8h, got %+v", state)
+	if state.BanUntil != baseTime.Add(8*time.Hour).Unix() {
+		t.Fatalf("expected same tier not to extend ban, got %+v", state)
+	}
+
+	state, err = store.RecordAccountRiskEvent(ctx, nickname, AccountRiskEventPostStaminaPurchaseClick)
+	if err != nil {
+		t.Fatalf("record tier-up risk event: %v", err)
+	}
+	if state.Score != 12 {
+		t.Fatalf("expected score 12, got %+v", state)
+	}
+	if state.BanUntil != baseTime.Add(24*time.Hour).Unix() {
+		t.Fatalf("expected tier-up to extend ban from original start, got %+v", state)
+	}
+}
+
+func TestAccountRiskBanReadDoesNotExtend(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "阿明"
+	baseTime := time.Unix(1_700_000_000, 0)
+	store.now = func() time.Time { return baseTime }
+
+	if _, err := store.RecordAccountRiskEvent(ctx, nickname, AccountRiskEventLoginTurnstileInvalid); err != nil {
+		t.Fatalf("record first risk event: %v", err)
+	}
+	state, err := store.RecordAccountRiskEvent(ctx, nickname, AccountRiskEventLoginTurnstileInvalid)
+	if err != nil {
+		t.Fatalf("record second risk event: %v", err)
+	}
+	initialBanUntil := baseTime.Add(8 * time.Hour).Unix()
+	if state.BanUntil != initialBanUntil {
+		t.Fatalf("expected initial 8h ban, got %+v", state)
+	}
+
+	store.now = func() time.Time { return baseTime.Add(2 * time.Hour) }
+	state, err = store.GetAccountRiskState(ctx, nickname)
+	if err != nil {
+		t.Fatalf("get account risk state: %v", err)
+	}
+	if state.BanUntil != initialBanUntil {
+		t.Fatalf("expected read not to extend ban, got %+v", state)
 	}
 }
 
