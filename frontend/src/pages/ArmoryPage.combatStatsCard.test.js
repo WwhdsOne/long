@@ -27,6 +27,8 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
         expect(pageSource).toContain('class="armory-combat-summary__item"')
         expect(pageSource).toContain('formatArmorPenPercent')
         expect(pageSource).toContain('formatCritDamageBonus')
+        expect(pageSource).toContain('function formatMagicProcRateValue(value) {')
+        expect(pageSource).toContain("{label: '魔法触发率', value: formatMagicProcRateValue(combatStats.value?.magicProcRate ?? 0)}")
     })
 
     it('装备栏改为左右 3 + 3 的正方形槽位，并复用装备详情浮层', () => {
@@ -51,10 +53,14 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
     it('强化预期中的比例属性按真实百分比展示', () => {
         expect(pageSource).toContain('function formatCritDamageExtraBonus(value) {')
         expect(pageSource).toContain('return `+${formatTrimmedNumber(Number(value ?? 0) * 100, 2)}%`')
+        expect(pageSource).toContain('const enhanceMagicProcRateStep = 0.001')
+        expect(pageSource).toContain('function previewMagicProcRateBonus(currentValue, currentLevel, targetLevel) {')
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '暴击倍率', item.critDamageMultiplier, preview.critDamageMultiplier, formatCritDamageExtraBonus)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatRatioPercentValue)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatRatioPercentValue)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatRatioPercentValue)")
+        expect(pageSource).toContain('preview.magicProcRateBonus = previewMagicProcRateBonus(preview.magicProcRateBonus, currentLevel, targetLevel)')
+        expect(pageSource).toContain("pushEnhancePreviewRow(rows, '魔法触发率', item.magicProcRateBonus, preview.magicProcRateBonus, formatMagicProcRateValue)")
     })
 
     it('一键分解预估与规则文案同步保留每种装备一件最高强化', () => {

@@ -26,7 +26,6 @@ const {
   formatTime,
   registerPublicPageLifecycle,
   isLoggedIn,
-  nickname,
   nicknameDraft,
   passwordDraft,
   errorMessage,

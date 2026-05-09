@@ -54,4 +54,10 @@ describe('RoomSelector 紧凑卡片', () => {
         expect(source).not.toContain('background: rgb(118 227 214 / 0.98);')
         expect(source).not.toContain('background: radial-gradient(circle at 50% 50%')
     })
+
+    it('大厅房间列表保持三列，并把容器高度扩到至少能在五行内容纳 15 个房间', () => {
+        expect(source).toContain('.room-selector__list {')
+        expect(source).toContain('grid-template-columns: repeat(3, minmax(0, 1fr));')
+        expect(source).toContain('max-height: 920px;')
+    })
 })

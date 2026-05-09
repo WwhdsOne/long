@@ -4,9 +4,6 @@ import {usePublicPageState} from './publicPageState'
 const {
   leaderboard,
   latestAnnouncement,
-  nickname,
-  nicknameDraft,
-  passwordDraft,
   messages,
   messageNextCursor,
   loadingMessages,
@@ -17,8 +14,6 @@ const {
   formatTime,
   loadMessages,
   submitMessage,
-  submitNickname,
-  resetNickname,
 } = usePublicPageState()
 </script>
 

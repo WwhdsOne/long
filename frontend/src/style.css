@@ -4453,14 +4453,6 @@ select {
 
 /* ===== 像素剑光标 ===== */
 
-.sword-spark {
-    position: fixed;
-    pointer-events: none;
-    z-index: 9998;
-    image-rendering: pixelated;
-    border-radius: 1px;
-}
-
 #boss-sword-cursor {
     position: absolute;
     left: 0;
@@ -4480,25 +4472,83 @@ select {
     object-fit: contain;
     object-position: center;
     image-rendering: pixelated;
-    transition: transform 0.08s ease-out;
-    will-change: transform;
+    transform: rotate(0deg);
+    will-change: transform, opacity;
 }
 
-.boss-sword-cursor__image.swinging {
-    transition: transform 0.06s ease-out;
+.boss-sword-cursor__image--swing-a {
+    animation: boss-sword-swing-a 0.08s ease-out;
 }
 
-.boss-sword-cursor__image.recovering {
-    transition: transform 0.12s ease-out;
+.boss-sword-cursor__image--swing-b {
+    animation: boss-sword-swing-b 0.08s ease-out;
+}
+
+.boss-sword-cursor__image--recover-a {
+    animation: boss-sword-recover-a 0.12s ease-out forwards;
+}
+
+.boss-sword-cursor__image--recover-b {
+    animation: boss-sword-recover-b 0.12s ease-out forwards;
+}
+
+@keyframes boss-sword-swing-a {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(60deg);
+    }
+}
+
+@keyframes boss-sword-swing-b {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(60deg);
+    }
+}
+
+@keyframes boss-sword-recover-a {
+    0% {
+        transform: rotate(60deg);
+    }
+    100% {
+        transform: rotate(0deg);
+    }
+}
+
+@keyframes boss-sword-recover-b {
+    0% {
+        transform: rotate(60deg);
+    }
+    100% {
+        transform: rotate(0deg);
+    }
 }
 
 /* ===== Boss 命中闪光 ===== */
 
-.boss-part-cell.hit-flash {
+.boss-part-cell--hit-flash-a {
     animation: boss-hit-flash 0.25s ease-out;
 }
 
+.boss-part-cell--hit-flash-b {
+    animation: boss-hit-flash-b 0.25s ease-out;
+}
+
 @keyframes boss-hit-flash {
+    0% {
+        background: rgba(255, 255, 255, 0.3);
+        box-shadow: 0 0 24px rgba(255, 255, 255, 0.25);
+    }
+    100% {
+        background: rgba(30, 41, 59, 0.7);
+    }
+}
+
+@keyframes boss-hit-flash-b {
     0% {
         background: rgba(255, 255, 255, 0.3);
         box-shadow: 0 0 24px rgba(255, 255, 255, 0.25);
@@ -4788,6 +4838,15 @@ select {
     pointer-events: none;
     z-index: 40;
     overflow: visible;
+}
+
+.talent-effect-overlay__canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 41;
+    image-rendering: pixelated;
 }
 
 .talent-canvas-fx {

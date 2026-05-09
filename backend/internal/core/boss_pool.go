@@ -80,8 +80,7 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 	if len(layout) == 0 {
 		return ErrBossPartsRequired
 	}
-	maxHP := maxInt64(1, template.MaxHP)
-	maxHP = sumBossPartMaxHP(layout)
+	maxHP := sumBossPartMaxHP(layout)
 
 	values := map[string]any{
 		"name":                  firstNonEmpty(strings.TrimSpace(template.Name), templateID),
@@ -394,8 +393,7 @@ func (s *Store) activateBossTemplateInstanceForRoom(ctx context.Context, roomID 
 	if len(parts) == 0 {
 		return nil, ErrBossPartsRequired
 	}
-	maxHP := maxInt64(1, template.MaxHP)
-	maxHP = sumBossPartMaxHP(parts)
+	maxHP := sumBossPartMaxHP(parts)
 
 	current := &Boss{
 		ID:                 instanceID,

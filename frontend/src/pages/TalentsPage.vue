@@ -232,18 +232,6 @@ function formatOverflowBonus(item) {
   return `${item.label}：${item.count} 次（+${percent}%）`
 }
 
-function isLearned(id) {
-  return nodeLevel(id) > 0
-}
-
-function canLearn(def) {
-  if (!def) return false
-  if (nodeLevel(def.id) >= (def.maxLevel || 5)) return false
-  if (isLearned(def.id)) return false
-  if (isLayerLocked(def)) return false
-  return availableTalentPoints.value >= talentCostForLevel(def, 1)
-}
-
 function nodeState(def) {
   const lv = nodeLevel(def.id)
   if (lv >= (def.maxLevel || 5)) return 'maxed'
@@ -273,7 +261,7 @@ function effectDescription(def) {
       || '暂无效果说明'
 }
 
-function effectLines(def, curLv) {
+function effectLines(def) {
   return talentEffectLines.value?.[def?.id] || []
 }
 

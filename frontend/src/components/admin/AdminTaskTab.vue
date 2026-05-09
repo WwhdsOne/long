@@ -105,18 +105,6 @@ function taskMetaLabel(item) {
   return `${eventLabel(item?.eventKind)} · ${windowLabel(item?.windowKind)}`
 }
 
-function cycleLabel(kind) {
-  switch (kind) {
-    case 'weekly':
-      return '周周期'
-    case 'fixed_range':
-      return '时间窗'
-    case 'daily':
-    default:
-      return kind || '未设置'
-  }
-}
-
 function archiveStatusLabel(status) {
   switch (status) {
     case 'claimed':

@@ -23,11 +23,6 @@ const taskGroups = [
   {key: 'longTerm', title: '长期有效'},
 ]
 
-const groupedTasks = computed(() => taskGroups.map((group) => ({
-  ...group,
-  items: tasks.value.filter((task) => taskGroupKey(task) === group.key),
-})).filter((group) => group.items.length > 0))
-
 const visibleTaskGroups = computed(() => taskGroups.filter((group) =>
     tasks.value.some((task) => taskGroupKey(task) === group.key),
 ))

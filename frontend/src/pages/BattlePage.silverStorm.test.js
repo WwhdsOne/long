@@ -44,7 +44,17 @@ describe('白银风暴秒级状态', () => {
         expect(battleSource).toContain("hasRecentTrigger('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)")
         expect(battleSource).toContain("effectOverlayStyle('silver_storm', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })")
         expect(battleSource).toContain('function ultimateEffectCanvasSize() {')
-        expect(battleSource).toContain('<PixelEffectCanvas effect="silver_storm" :size="ultimateEffectCanvasSize()" :loop="false"/>')
+        expect(battleSource).toContain("pushBattleEffect(entries, 'silver_storm', {")
+        expect(battleSource).toContain('size: ultimateEffectCanvasSize()')
+        expect(readFileSync(path.resolve(currentDir, '../components/PixelEffectCanvas.vue'), 'utf8')).toContain("return s.phase === 'done' && s.timer > 900")
+    })
+
+    it('白银风暴保持逐条落下，但会等全部刀光到位后再统一进入爆裂阶段', () => {
+        const canvasSource = readFileSync(path.resolve(currentDir, '../components/PixelEffectCanvas.vue'), 'utf8')
+        expect(canvasSource).toContain("if (s.phase === 'slash' && arrivedCount === s.slashes.length) {")
+        expect(canvasSource).toContain("s.phase = 'hold'")
+        expect(canvasSource).toContain("if (s.phase === 'hold' && s.timer >= 500) {")
+        expect(canvasSource).toContain("s.phase = 'shatter'")
     })
 
     it('战斗页不再保留旧的暴伤x3和死亡狂喜持续 Buff 占位', () => {

@@ -98,20 +98,6 @@ export function createRealtimeTransport(options = {}) {
         reconnectTimer = 0
     }
 
-    function scheduleWebSocketRetry() {
-        if (closed || reconnectTimer) {
-            return
-        }
-
-        reconnectTimer = globalThis.setTimeout(() => {
-            reconnectTimer = 0
-            if (closed) {
-                return
-            }
-            connectWebSocket()
-        }, 3000)
-    }
-
     function handleSocketMessage(raw) {
         if (typeof raw !== 'string') {
             try {
