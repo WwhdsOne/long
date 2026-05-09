@@ -173,6 +173,7 @@ func (s *Store) ClearAccountRiskState(ctx context.Context, nickname string) erro
 		s.accountRiskEventKey(normalizedNickname),
 		s.accountRiskEventSeqKey(normalizedNickname),
 		s.accountRiskBanKey(normalizedNickname),
+		s.accountRiskBanStartKey(normalizedNickname),
 		s.accountRiskLastStaminaPurchaseKey(normalizedNickname),
 	).Result()
 	if err != nil {
@@ -281,6 +282,7 @@ func (s *Store) recalculateAccountRiskState(ctx context.Context, nickname string
 	}
 
 	banKey := s.accountRiskBanKey(nickname)
+	banStartKey := s.accountRiskBanStartKey(nickname)
 	currentBanUntil := int64(0)
 	rawBan, err := s.client.Get(ctx, banKey).Result()
 	if err != nil && err != redis.Nil {
@@ -289,18 +291,33 @@ func (s *Store) recalculateAccountRiskState(ctx context.Context, nickname string
 	if err == nil {
 		currentBanUntil, _ = strconv.ParseInt(strings.TrimSpace(rawBan), 10, 64)
 	}
-	if currentBanUntil <= nowUnix {
+	if currentBanUntil > 0 && currentBanUntil <= nowUnix {
 		currentBanUntil = 0
-		_ = s.client.Del(ctx, banKey).Err()
+		_ = s.client.Del(ctx, banKey, banStartKey).Err()
 	}
 
 	nextBanUntil := currentBanUntil
 	if duration := s.accountRiskBanDuration(score); duration > 0 {
-		candidate := s.now().Add(duration).Unix()
+		banStartUnix := int64(0)
+		rawBanStart, err := s.client.Get(ctx, banStartKey).Result()
+		if err != nil && err != redis.Nil {
+			return AccountRiskState{}, err
+		}
+		if err == nil {
+			banStartUnix, _ = strconv.ParseInt(strings.TrimSpace(rawBanStart), 10, 64)
+		}
+		if banStartUnix <= 0 {
+			banStartUnix = nowUnix
+			if err := s.client.Set(ctx, banStartKey, strconv.FormatInt(banStartUnix, 10), s.accountRiskConfig.ScoreWindow+72*time.Hour).Err(); err != nil {
+				return AccountRiskState{}, err
+			}
+		}
+
+		candidate := banStartUnix + int64(duration.Seconds())
 		if candidate > nextBanUntil {
 			nextBanUntil = candidate
 		}
-		ttl := time.Until(time.Unix(nextBanUntil, 0))
+		ttl := time.Unix(nextBanUntil, 0).Sub(s.now())
 		if ttl > 0 {
 			if err := s.client.Set(ctx, banKey, strconv.FormatInt(nextBanUntil, 10), ttl).Err(); err != nil {
 				return AccountRiskState{}, err
@@ -334,6 +351,10 @@ func (s *Store) accountRiskEventKey(nickname string) string {
 
 func (s *Store) accountRiskBanKey(nickname string) string {
 	return s.accountRiskBanPrefix + strings.TrimSpace(nickname)
+}
+
+func (s *Store) accountRiskBanStartKey(nickname string) string {
+	return s.accountRiskBanStartPrefix + strings.TrimSpace(nickname)
 }
 
 func (s *Store) accountRiskEventSeqKey(nickname string) string {
