@@ -83,7 +83,51 @@ func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 	assertNoEventWithin(t, client, 50*time.Millisecond, "expected click change to skip room_state broadcast")
 }
 
-func TestDispatcherHandleBossChangeBroadcastsRoomState(t *testing.T) {
+func TestDispatcherHandleBossChangeWithBroadcastAllBroadcastsRoomState(t *testing.T) {
+	reader := &dispatcherTestReader{
+		snapshot: core.Snapshot{
+			RoomID: "2",
+			Boss: &core.Boss{
+				ID:        "boss-1",
+				Name:      "木桩王",
+				Status:    "active",
+				MaxHP:     100,
+				CurrentHP: 80,
+			},
+		},
+		roomList: core.RoomList{
+			CurrentRoomID:                  "2",
+			SwitchCooldownRemainingSeconds: 7,
+			Rooms: []core.RoomInfo{
+				{ID: "2", DisplayName: "二线", Current: true, OnlineCount: 3},
+			},
+		},
+	}
+	cache := NewCache(reader)
+	hub := NewHub()
+	dispatcher := NewDispatcher(cache, hub, 1)
+
+	client, unsubscribe := hub.Subscribe("阿明")
+	defer unsubscribe()
+	_ = readEventByName(t, client, OnlineCountEventName)
+
+	if err := dispatcher.HandleChange(context.Background(), core.StateChange{Type: core.StateChangeBossChanged, BroadcastUserAll: true}); err != nil {
+		t.Fatalf("handle boss change: %v", err)
+	}
+
+	_ = readEventByName(t, client, PublicStateEventName)
+	metaEvent := readEventByName(t, client, PublicMetaEventName)
+	if !strings.Contains(string(metaEvent.Payload), `"bossLeaderboard":[]`) {
+		t.Fatalf("expected boss change to carry public_meta payload, got %s", string(metaEvent.Payload))
+	}
+	roomEvent := readEventByName(t, client, RoomStateEventName)
+	roomPayload := string(roomEvent.Payload)
+	if !strings.Contains(roomPayload, `"currentRoomId":"2"`) || !strings.Contains(roomPayload, `"switchCooldownRemainingSeconds":7`) {
+		t.Fatalf("expected room state payload, got %s", roomPayload)
+	}
+}
+
+func TestDispatcherHandleBossChangeWithoutBroadcastAllSkipsRoomState(t *testing.T) {
 	reader := &dispatcherTestReader{
 		snapshot: core.Snapshot{
 			RoomID: "2",
@@ -116,15 +160,8 @@ func TestDispatcherHandleBossChangeBroadcastsRoomState(t *testing.T) {
 	}
 
 	_ = readEventByName(t, client, PublicStateEventName)
-	metaEvent := readEventByName(t, client, PublicMetaEventName)
-	if !strings.Contains(string(metaEvent.Payload), `"bossLeaderboard":[]`) {
-		t.Fatalf("expected boss change to carry public_meta payload, got %s", string(metaEvent.Payload))
-	}
-	roomEvent := readEventByName(t, client, RoomStateEventName)
-	roomPayload := string(roomEvent.Payload)
-	if !strings.Contains(roomPayload, `"currentRoomId":"2"`) || !strings.Contains(roomPayload, `"switchCooldownRemainingSeconds":7`) {
-		t.Fatalf("expected room state payload, got %s", roomPayload)
-	}
+	_ = readEventByName(t, client, PublicMetaEventName)
+	assertNoEventWithin(t, client, 50*time.Millisecond, "expected non-global boss change to skip room_state broadcast")
 }
 
 func TestDispatcherBroadcastLeaderboardIncludesLeaderboard(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/rand/v2"
 	"net/http"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -146,6 +147,9 @@ func (s *staminaPurchaseTurnstileService) CheckPurchaseStamina(ctx context.Conte
 	if !s.enabled {
 		return StaminaPurchaseTurnstileResult{Decision: StaminaPurchaseTurnstileAllow}, nil
 	}
+	if isLocalTurnstileRequest(req.RemoteIP) {
+		return StaminaPurchaseTurnstileResult{Decision: StaminaPurchaseTurnstileAllow}, nil
+	}
 
 	if token == "" {
 		if !s.shouldRequireVerification() {
@@ -173,6 +177,9 @@ func (s *staminaPurchaseTurnstileService) shouldRequireVerification() bool {
 func (s *playerLoginTurnstileService) CheckPlayerLogin(ctx context.Context, req PlayerLoginTurnstileRequest) (PlayerLoginTurnstileResult, error) {
 	token := strings.TrimSpace(req.Token)
 	if !s.enabled {
+		return PlayerLoginTurnstileResult{Decision: PlayerLoginTurnstileAllow}, nil
+	}
+	if isLocalTurnstileRequest(req.RemoteIP) {
 		return PlayerLoginTurnstileResult{Decision: PlayerLoginTurnstileAllow}, nil
 	}
 	if token == "" {
@@ -266,6 +273,21 @@ func (v *turnstileVerifier) verifyToken(ctx context.Context, nickname string, re
 		zap.String("nickname", strings.TrimSpace(nickname)),
 		zap.Strings("error_codes", payload.ErrorCodes))
 	return turnstileVerifyInvalid
+}
+
+func isLocalTurnstileRequest(remoteIP string) bool {
+	normalized := strings.TrimSpace(remoteIP)
+	if normalized == "" {
+		return false
+	}
+	if parts := strings.Split(normalized, ","); len(parts) > 0 {
+		normalized = strings.TrimSpace(parts[0])
+	}
+	if host, _, err := net.SplitHostPort(normalized); err == nil {
+		normalized = strings.TrimSpace(host)
+	}
+	normalized = strings.Trim(normalized, "[]")
+	return normalized == "127.0.0.1" || normalized == "::1"
 }
 
 func containsTurnstileServerError(codes []string) bool {

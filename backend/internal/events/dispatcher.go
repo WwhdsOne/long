@@ -42,7 +42,7 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change core.StateChange) 
 	}
 
 	if affectsPublicState(change.Type) {
-		d.schedulePublicFlush(change.Type)
+		d.schedulePublicFlush(change)
 	}
 
 	targetNicknames := userTargetsForChange(change, d.hub.ActiveNicknames())
@@ -64,11 +64,11 @@ func (d *Dispatcher) HandleChange(ctx context.Context, change core.StateChange) 
 	return nil
 }
 
-func (d *Dispatcher) schedulePublicFlush(changeType core.StateChangeType) {
+func (d *Dispatcher) schedulePublicFlush(change core.StateChange) {
 	d.mu.Lock()
 	d.publicDirty = true
-	d.publicMeta = d.publicMeta || shouldBroadcastPublicMeta(changeType)
-	d.publicRoomState = d.publicRoomState || shouldBroadcastRoomState(changeType)
+	d.publicMeta = d.publicMeta || shouldBroadcastPublicMeta(change.Type)
+	d.publicRoomState = d.publicRoomState || shouldBroadcastRoomState(change)
 
 	window := time.Duration(d.debounceMs) * time.Millisecond
 	now := time.Now()
@@ -201,11 +201,6 @@ func shouldBroadcastPublicMeta(changeType core.StateChangeType) bool {
 	}
 }
 
-func shouldBroadcastRoomState(changeType core.StateChangeType) bool {
-	switch changeType {
-	case core.StateChangeButtonClicked:
-		return false
-	default:
-		return true
-	}
+func shouldBroadcastRoomState(change core.StateChange) bool {
+	return change.Type == core.StateChangeBossChanged && change.BroadcastUserAll
 }
