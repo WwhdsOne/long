@@ -52,6 +52,52 @@ message PublicMeta {
   string announcement_version = 3;
 }
 
+message BossPartStatic {
+  int32 x = 1;
+  int32 y = 2;
+  string type = 3;
+  string display_name = 4;
+  string image_path = 5;
+  int64 max_hp = 6;
+  int64 armor = 7;
+}
+
+message BossStatic {
+  string id = 1;
+  string template_id = 2;
+  string room_id = 3;
+  string queue_id = 4;
+  string name = 5;
+  int64 max_hp = 6;
+  int64 gold_on_kill = 7;
+  int64 stone_on_kill = 8;
+  int64 talent_points_on_kill = 9;
+  repeated BossPartStatic parts = 10;
+  int64 started_at = 11;
+}
+
+message BossPartRuntime {
+  int32 x = 1;
+  int32 y = 2;
+  int64 current_hp = 3;
+  bool alive = 4;
+}
+
+message BossRuntime {
+  string status = 1;
+  int64 current_hp = 2;
+  repeated BossPartRuntime parts = 3;
+  int64 defeated_at = 4;
+}
+
+message BossDelta {
+  int64 total_votes = 1;
+  string room_id = 2;
+  string boss_id = 3;
+  int64 boss_version = 4;
+  BossRuntime runtime = 5;
+}
+
 message RoomInfo {
   string id = 1;
   string display_name = 2;

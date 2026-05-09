@@ -114,6 +114,16 @@ func decodeRealtimeBinaryPublicMetaForTest(t *testing.T, payload []byte) *realti
 	return message
 }
 
+func decodeRealtimeBinaryBossDeltaForTest(t *testing.T, payload []byte) *realtimepb.BossDelta {
+	t.Helper()
+
+	message := &realtimepb.BossDelta{}
+	if err := unpackRealtimeBinaryMessage(payload, realtimeBinaryTypeBossDelta, message); err != nil {
+		t.Fatalf("decode realtime binary boss delta: %v", err)
+	}
+	return message
+}
+
 func readHubEventByName(t *testing.T, ch <-chan events.ServerEvent, name string) events.ServerEvent {
 	t.Helper()
 
@@ -294,6 +304,26 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 			Leaderboard: []core.LeaderboardEntry{
 				{Rank: 1, Nickname: "阿明", ClickCount: 3},
 			},
+			RoomID: "2",
+			Boss: &core.Boss{
+				ID:                 "boss-1",
+				TemplateID:         "boss-template-1",
+				RoomID:             "2",
+				QueueID:            "queue-1",
+				Name:               "木桩王",
+				Status:             "active",
+				MaxHP:              100,
+				CurrentHP:          91,
+				GoldOnKill:         8,
+				StoneOnKill:        3,
+				TalentPointsOnKill: 1,
+				Parts: []core.BossPart{
+					{X: 0, Y: 0, Type: "soft", DisplayName: "头部", ImagePath: "/boss/head.png", MaxHP: 50, CurrentHP: 41, Armor: 2, Alive: true},
+					{X: 1, Y: 0, Type: "heavy", DisplayName: "甲壳", ImagePath: "/boss/shell.png", MaxHP: 50, CurrentHP: 50, Armor: 6, Alive: true},
+				},
+				StartedAt:  11,
+				DefeatedAt: 0,
+			},
 			AnnouncementVersion: "7",
 		},
 		state: core.State{
@@ -318,12 +348,52 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 	}
 
 	response := decodeRealtimeMessage[struct {
-		Type   string          `json:"type"`
-		Public core.Snapshot   `json:"public"`
-		User   *core.UserState `json:"user"`
+		Type string `json:"type"`
+		Public struct {
+			AnnouncementVersion string `json:"announcementVersion"`
+			RoomID              string `json:"roomId"`
+			BossID              string `json:"bossId"`
+			BossVersion         int64  `json:"bossVersion"`
+			BossStatic          *struct {
+				Name  string `json:"name"`
+				MaxHP int64  `json:"maxHp"`
+				Parts []struct {
+					DisplayName string `json:"displayName"`
+					MaxHP       int64  `json:"maxHp"`
+					Armor       int64  `json:"armor"`
+				} `json:"parts"`
+			} `json:"bossStatic"`
+			BossRuntime *struct {
+				Status    string `json:"status"`
+				CurrentHP int64  `json:"currentHp"`
+				Parts     []struct {
+					CurrentHP int64 `json:"currentHp"`
+					Alive     bool  `json:"alive"`
+				} `json:"parts"`
+			} `json:"bossRuntime"`
+		} `json:"public"`
+		User *core.UserState `json:"user"`
 	}](t, messages[0])
 	if response.Public.AnnouncementVersion != "7" {
 		t.Fatalf("expected announcement version in snapshot, got %+v", response.Public)
+	}
+	if response.Public.RoomID != "2" || response.Public.BossID != "boss-1" || response.Public.BossVersion != 0 {
+		t.Fatalf("expected snapshot boss envelope, got %+v", response.Public)
+	}
+	if response.Public.BossStatic == nil || response.Public.BossRuntime == nil {
+		t.Fatalf("expected snapshot to include boss static/runtime, got %+v", response.Public)
+	}
+	if response.Public.BossStatic.Name != "木桩王" || response.Public.BossStatic.MaxHP != 100 {
+		t.Fatalf("expected boss static payload, got %+v", response.Public.BossStatic)
+	}
+	if len(response.Public.BossStatic.Parts) != 2 || response.Public.BossStatic.Parts[0].DisplayName != "头部" {
+		t.Fatalf("expected boss static parts, got %+v", response.Public.BossStatic)
+	}
+	if response.Public.BossRuntime.Status != "active" || response.Public.BossRuntime.CurrentHP != 91 {
+		t.Fatalf("expected boss runtime payload, got %+v", response.Public.BossRuntime)
+	}
+	if len(response.Public.BossRuntime.Parts) != 2 || response.Public.BossRuntime.Parts[0].CurrentHP != 41 {
+		t.Fatalf("expected boss runtime parts, got %+v", response.Public.BossRuntime)
 	}
 
 	encoded, err := sonic.Marshal(response.Public)
@@ -335,6 +405,52 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 	}
 	if strings.Contains(string(encoded), "\"latestAnnouncement\"") {
 		t.Fatalf("expected websocket public snapshot to omit latestAnnouncement, got %s", string(encoded))
+	}
+	if strings.Contains(string(encoded), "\"boss\":{\"") {
+		t.Fatalf("expected websocket public snapshot to avoid full boss payload, got %s", string(encoded))
+	}
+}
+
+func TestRealtimeMessageFromPublicStateEventEncodesBossDeltaBinaryFrame(t *testing.T) {
+	frame, ok, err := realtimeMessageFromEvent(events.ServerEvent{
+		Name: events.PublicStateEventName,
+		Payload: []byte(`{
+			"totalVotes":12,
+			"roomId":"2",
+			"bossId":"boss-1",
+			"bossVersion":5,
+			"bossRuntime":{
+				"status":"active",
+				"currentHp":91,
+				"parts":[
+					{"x":0,"y":0,"currentHp":41,"alive":true},
+					{"x":1,"y":0,"currentHp":50,"alive":true}
+				]
+			}
+		}`),
+	})
+	if err != nil {
+		t.Fatalf("encode boss_delta event: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected public_state event to be encoded")
+	}
+	if frame.messageType != websocket.BinaryMessage {
+		t.Fatalf("expected binary frame, got %d", frame.messageType)
+	}
+
+	message := decodeRealtimeBinaryBossDeltaForTest(t, frame.payload)
+	if message.GetBossId() != "boss-1" || message.GetBossVersion() != 5 {
+		t.Fatalf("unexpected boss delta envelope: %+v", message)
+	}
+	if message.GetTotalVotes() != 12 || message.GetRoomId() != "2" {
+		t.Fatalf("unexpected boss delta metadata: %+v", message)
+	}
+	if message.GetRuntime() == nil || message.GetRuntime().GetCurrentHp() != 91 || message.GetRuntime().GetStatus() != "active" {
+		t.Fatalf("unexpected boss runtime payload: %+v", message.GetRuntime())
+	}
+	if len(message.GetRuntime().GetParts()) != 2 || message.GetRuntime().GetParts()[0].GetCurrentHp() != 41 {
+		t.Fatalf("unexpected boss runtime parts: %+v", message.GetRuntime().GetParts())
 	}
 }
 

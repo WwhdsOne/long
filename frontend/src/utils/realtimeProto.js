@@ -7,6 +7,7 @@ export const realtimeBinaryType = {
     userDelta: 4,
     roomState: 5,
     publicMeta: 6,
+    bossDelta: 7,
 }
 
 const decodeOptions = {
@@ -71,6 +72,16 @@ function normalizePartStateDeltasFromMessage(payload, message) {
     return payload
 }
 
+function normalizeBossRuntimePartsFromMessage(payload, message) {
+    if (!payload?.bossRuntime || !message?.runtime?.parts) {
+        return payload
+    }
+    payload.bossRuntime.parts = message.runtime.parts.map((part) => (
+        realtime.BossPartRuntime.toObject(part, nestedDecodeOptions)
+    ))
+    return payload
+}
+
 export function encodeRealtimeClickRequest({slug, comboCount = 0}) {
     const encoded = realtime.ClickRequest.encode(realtime.ClickRequest.create({
         slug,
@@ -118,6 +129,19 @@ export function decodeRealtimeBinaryMessage(frame) {
                 type: 'public_meta',
                 payload: toPlain(realtime.PublicMeta, realtime.PublicMeta.decode(body), sparseDecodeOptions),
             }
+        case realtimeBinaryType.bossDelta: {
+            const message = realtime.BossDelta.decode(body)
+            return {
+                type: 'boss_delta',
+                payload: normalizeBossRuntimePartsFromMessage({
+                    totalVotes: Number(message.totalVotes || 0),
+                    roomId: message.roomId || '',
+                    bossId: message.bossId || '',
+                    bossVersion: Number(message.bossVersion || 0),
+                    bossRuntime: message.runtime ? realtime.BossRuntime.toObject(message.runtime, sparseDecodeOptions) : null,
+                }, message),
+            }
+        }
         default:
             throw new Error('unsupported realtime binary message')
     }

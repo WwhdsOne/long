@@ -31,6 +31,8 @@ export function createRealtimeTransport(options = {}) {
     const buildEventSourceUrl = options.buildEventSourceUrl || defaultEventSourceUrl
     const onSnapshot = options.onSnapshot || (() => {
     })
+    const onBossDelta = options.onBossDelta || (() => {
+    })
     const onPublicDelta = options.onPublicDelta || (() => {
     })
     const onPublicMeta = options.onPublicMeta || (() => {
@@ -149,6 +151,15 @@ export function createRealtimeTransport(options = {}) {
             case 'public_delta':
                 clearReconnectTimer()
                 onPublicDelta(message.payload ?? {})
+                updateState({
+                    connected: true,
+                    degraded: false,
+                    mode: 'ws',
+                })
+                return
+            case 'boss_delta':
+                clearReconnectTimer()
+                onBossDelta(message.payload ?? {})
                 updateState({
                     connected: true,
                     degraded: false,

@@ -1,6 +1,6 @@
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 
-import {applyBossPartStateDeltas, mergeBossState} from '../utils/bossState'
+import {applyBossDeltaMessage, applyBossPartStateDeltas, buildBossStateFromSnapshot, mergeBossState} from '../utils/bossState'
 import {ratioPercent} from '../utils/formatNumber'
 import {formatDropRate} from '../utils/buttonBoard'
 import {mergeClickFallbackState} from '../utils/clickResponse'
@@ -139,6 +139,8 @@ const hallLeaderboardError = ref('')
 const hallLeaderboardPage = ref(0)
 const hallLeaderboardLoadedRoomId = ref('')
 const boss = ref(null)
+const bossStaticById = ref({})
+const bossVersion = ref(0)
 const currentRoomId = ref('1')
 const rooms = ref([])
 const roomSwitching = ref(false)
@@ -1637,8 +1639,38 @@ function applyPublicState(payload) {
         currentRoomId.value = String(payload.roomId || currentRoomId.value || '1')
     }
     const previousBoss = boss.value
-    if ('boss' in payload) {
+    const usedBossSnapshot = applyBossSnapshotState(payload)
+    if (!usedBossSnapshot && 'boss' in payload) {
         boss.value = mergeBossState(boss.value, payload.boss)
+    }
+    if ('bossVersion' in payload && !usedBossSnapshot) {
+        bossVersion.value = Math.max(0, Number(payload.bossVersion || bossVersion.value || 0))
+    }
+    if (!usedBossSnapshot && boss.value?.id && !bossStaticById.value[boss.value.id]) {
+        bossStaticById.value = {
+            ...bossStaticById.value,
+            [boss.value.id]: {
+                id: boss.value.id,
+                templateId: boss.value.templateId,
+                roomId: boss.value.roomId,
+                queueId: boss.value.queueId,
+                name: boss.value.name,
+                maxHp: boss.value.maxHp,
+                goldOnKill: boss.value.goldOnKill,
+                stoneOnKill: boss.value.stoneOnKill,
+                talentPointsOnKill: boss.value.talentPointsOnKill,
+                parts: Array.isArray(boss.value.parts) ? boss.value.parts.map((part) => ({
+                    x: part.x,
+                    y: part.y,
+                    type: part.type,
+                    displayName: part.displayName,
+                    imagePath: part.imagePath,
+                    maxHp: part.maxHp,
+                    armor: part.armor,
+                })) : [],
+                startedAt: boss.value.startedAt,
+            },
+        }
     }
     applyPublicMeta(payload)
     if ('bossGoldRange' in payload && payload.bossGoldRange) {
@@ -1650,16 +1682,7 @@ function applyPublicState(payload) {
     if ('bossTalentPointsOnKill' in payload) {
         bossTalentPointsOnKill.value = Math.max(0, Number(payload.bossTalentPointsOnKill ?? 0))
     }
-    if (bossResourceVersion(previousBoss) !== bossResourceVersion()) {
-        void loadBossResources(true)
-        if (previousBoss?.id && boss.value?.id && previousBoss.id !== boss.value.id) {
-            clearTalentVisualState()
-            clearComboState()
-            talentCombatState.value = null
-        }
-    } else if (boss.value?.id && !lastBossResourceVersion) {
-        void loadBossResources(true)
-    }
+    updateBossResourceState(previousBoss)
     syncing.value = false
     markUpdated()
 }
@@ -2297,6 +2320,76 @@ function applyRealtimeSnapshot(publicState, userState) {
     maybePromptAnnouncement()
 }
 
+function cacheBossStaticPayload(payload) {
+    const bossId = String(payload?.bossId || '').trim()
+    if (!bossId || !payload?.bossStatic || typeof payload.bossStatic !== 'object') {
+        return
+    }
+    bossStaticById.value = {
+        ...bossStaticById.value,
+        [bossId]: payload.bossStatic,
+    }
+}
+
+function updateBossResourceState(previousBoss) {
+    if (bossResourceVersion(previousBoss) !== bossResourceVersion()) {
+        void loadBossResources(true)
+        if (previousBoss?.id && boss.value?.id && previousBoss.id !== boss.value.id) {
+            clearTalentVisualState()
+            clearComboState()
+            talentCombatState.value = null
+        }
+    } else if (boss.value?.id && !lastBossResourceVersion) {
+        void loadBossResources(true)
+    }
+}
+
+function applyBossSnapshotState(payload) {
+    cacheBossStaticPayload(payload)
+    const nextBoss = buildBossStateFromSnapshot(payload)
+    if (!nextBoss) {
+        return false
+    }
+    boss.value = nextBoss
+    bossVersion.value = Math.max(0, Number(payload?.bossVersion || 0))
+    return true
+}
+
+function requestRealtimeBossSync() {
+    syncing.value = true
+    if (realtimeTransport?.requestSync()) {
+        return
+    }
+    connectRealtime()
+}
+
+function applyBossDeltaState(payload) {
+    if (!payload || typeof payload !== 'object') {
+        return
+    }
+    if ('totalVotes' in payload) {
+        buttonTotalVotes.value = Number(payload.totalVotes ?? buttonTotalVotes.value)
+    }
+    if ('roomId' in payload) {
+        currentRoomId.value = String(payload.roomId || currentRoomId.value || '1')
+    }
+    const previousBoss = boss.value
+    const result = applyBossDeltaMessage({
+        bossStaticById: bossStaticById.value,
+        bossVersion: bossVersion.value,
+        boss: boss.value,
+    }, payload)
+    if (result.shouldSync) {
+        requestRealtimeBossSync()
+        return
+    }
+    bossVersion.value = result.bossVersion
+    boss.value = result.boss
+    updateBossResourceState(previousBoss)
+    syncing.value = false
+    markUpdated()
+}
+
 function ensureRealtimeTransport() {
     if (realtimeTransport) {
         return realtimeTransport
@@ -2305,6 +2398,11 @@ function ensureRealtimeTransport() {
     realtimeTransport = createRealtimeTransport({
         onSnapshot(publicState, userState) {
             applyRealtimeSnapshot(publicState, userState)
+        },
+        onBossDelta(payload) {
+            applyBossDeltaState(payload)
+            loading.value = false
+            errorMessage.value = ''
         },
         onPublicDelta(payload) {
             applyPublicState(payload)

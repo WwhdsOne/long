@@ -28,6 +28,52 @@ type realtimePublicMetaPayload struct {
 	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
 }
 
+type realtimeBossPartStaticPayload struct {
+	X           int    `json:"x"`
+	Y           int    `json:"y"`
+	Type        string `json:"type,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	ImagePath   string `json:"imagePath,omitempty"`
+	MaxHP       int64  `json:"maxHp,omitempty"`
+	Armor       int64  `json:"armor,omitempty"`
+}
+
+type realtimeBossStaticPayload struct {
+	ID                 string                         `json:"id,omitempty"`
+	TemplateID         string                         `json:"templateId,omitempty"`
+	RoomID             string                         `json:"roomId,omitempty"`
+	QueueID            string                         `json:"queueId,omitempty"`
+	Name               string                         `json:"name,omitempty"`
+	MaxHP              int64                          `json:"maxHp,omitempty"`
+	GoldOnKill         int64                          `json:"goldOnKill,omitempty"`
+	StoneOnKill        int64                          `json:"stoneOnKill,omitempty"`
+	TalentPointsOnKill int64                          `json:"talentPointsOnKill,omitempty"`
+	Parts              []realtimeBossPartStaticPayload `json:"parts,omitempty"`
+	StartedAt          int64                          `json:"startedAt,omitempty"`
+}
+
+type realtimeBossPartRuntimePayload struct {
+	X         int   `json:"x"`
+	Y         int   `json:"y"`
+	CurrentHP int64 `json:"currentHp,omitempty"`
+	Alive     bool  `json:"alive"`
+}
+
+type realtimeBossRuntimePayload struct {
+	Status     string                           `json:"status,omitempty"`
+	CurrentHP  int64                            `json:"currentHp,omitempty"`
+	Parts      []realtimeBossPartRuntimePayload `json:"parts,omitempty"`
+	DefeatedAt int64                            `json:"defeatedAt,omitempty"`
+}
+
+type realtimeBossDeltaPayload struct {
+	TotalVotes  int64                     `json:"totalVotes"`
+	RoomID      string                    `json:"roomId,omitempty"`
+	BossID      string                    `json:"bossId,omitempty"`
+	BossVersion int64                     `json:"bossVersion,omitempty"`
+	BossRuntime *realtimeBossRuntimePayload `json:"bossRuntime,omitempty"`
+}
+
 type realtimeUserDeltaPayload struct {
 	UserStats                          *core.UserStats           `json:"userStats,omitempty"`
 	MyBossStats                        *core.BossUserStats       `json:"myBossStats,omitempty"`
@@ -83,6 +129,7 @@ const (
 	realtimeBinaryTypeUserDelta    byte = 4
 	realtimeBinaryTypeRoomState    byte = 5
 	realtimeBinaryTypePublicMeta   byte = 6
+	realtimeBinaryTypeBossDelta    byte = 7
 )
 
 var errRealtimeBinaryFrameInvalid = errors.New("invalid realtime binary frame")
@@ -150,6 +197,16 @@ func encodeRealtimeBinaryPublicMeta(payload realtimePublicMetaPayload) ([]byte, 
 	})
 }
 
+func encodeRealtimeBinaryBossDelta(payload realtimeBossDeltaPayload) ([]byte, error) {
+	return packRealtimeBinaryMessage(realtimeBinaryTypeBossDelta, &realtimepb.BossDelta{
+		TotalVotes:  payload.TotalVotes,
+		RoomId:      payload.RoomID,
+		BossId:      payload.BossID,
+		BossVersion: payload.BossVersion,
+		Runtime:     toProtoBossRuntime(payload.BossRuntime),
+	})
+}
+
 func encodeRealtimeBinaryUserDelta(payload realtimeUserDeltaPayload) ([]byte, error) {
 	return packRealtimeBinaryMessage(realtimeBinaryTypeUserDelta, &realtimepb.UserDelta{
 		UserStats:                          toProtoUserStats(payload.UserStats),
@@ -193,6 +250,14 @@ func encodeRealtimeBinaryPublicMetaFromJSON(raw []byte) ([]byte, error) {
 		return nil, err
 	}
 	return encodeRealtimeBinaryPublicMeta(payload)
+}
+
+func encodeRealtimeBinaryBossDeltaFromJSON(raw []byte) ([]byte, error) {
+	var payload realtimeBossDeltaPayload
+	if err := sonic.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	return encodeRealtimeBinaryBossDelta(payload)
 }
 
 func encodeRealtimeBinaryUserDeltaFromJSON(raw []byte) ([]byte, error) {
@@ -362,6 +427,118 @@ func toProtoBoss(boss *core.Boss) *realtimepb.Boss {
 		Parts:              parts,
 		StartedAt:          boss.StartedAt,
 		DefeatedAt:         boss.DefeatedAt,
+	}
+}
+
+func toProtoBossPartStatic(part realtimeBossPartStaticPayload) *realtimepb.BossPartStatic {
+	return &realtimepb.BossPartStatic{
+		X:           int32(part.X),
+		Y:           int32(part.Y),
+		Type:        part.Type,
+		DisplayName: part.DisplayName,
+		ImagePath:   part.ImagePath,
+		MaxHp:       part.MaxHP,
+		Armor:       part.Armor,
+	}
+}
+
+func toProtoBossStatic(payload *realtimeBossStaticPayload) *realtimepb.BossStatic {
+	if payload == nil {
+		return nil
+	}
+	parts := make([]*realtimepb.BossPartStatic, 0, len(payload.Parts))
+	for _, part := range payload.Parts {
+		parts = append(parts, toProtoBossPartStatic(part))
+	}
+	return &realtimepb.BossStatic{
+		Id:                 payload.ID,
+		TemplateId:         payload.TemplateID,
+		RoomId:             payload.RoomID,
+		QueueId:            payload.QueueID,
+		Name:               payload.Name,
+		MaxHp:              payload.MaxHP,
+		GoldOnKill:         payload.GoldOnKill,
+		StoneOnKill:        payload.StoneOnKill,
+		TalentPointsOnKill: payload.TalentPointsOnKill,
+		Parts:              parts,
+		StartedAt:          payload.StartedAt,
+	}
+}
+
+func toProtoBossPartRuntime(payload realtimeBossPartRuntimePayload) *realtimepb.BossPartRuntime {
+	return &realtimepb.BossPartRuntime{
+		X:         int32(payload.X),
+		Y:         int32(payload.Y),
+		CurrentHp: payload.CurrentHP,
+		Alive:     payload.Alive,
+	}
+}
+
+func toProtoBossRuntime(payload *realtimeBossRuntimePayload) *realtimepb.BossRuntime {
+	if payload == nil {
+		return nil
+	}
+	parts := make([]*realtimepb.BossPartRuntime, 0, len(payload.Parts))
+	for _, part := range payload.Parts {
+		parts = append(parts, toProtoBossPartRuntime(part))
+	}
+	return &realtimepb.BossRuntime{
+		Status:     payload.Status,
+		CurrentHp:  payload.CurrentHP,
+		Parts:      parts,
+		DefeatedAt: payload.DefeatedAt,
+	}
+}
+
+func buildRealtimeBossStaticPayload(boss *core.Boss) *realtimeBossStaticPayload {
+	if boss == nil {
+		return nil
+	}
+	parts := make([]realtimeBossPartStaticPayload, 0, len(boss.Parts))
+	for _, part := range boss.Parts {
+		parts = append(parts, realtimeBossPartStaticPayload{
+			X:           part.X,
+			Y:           part.Y,
+			Type:        string(part.Type),
+			DisplayName: part.DisplayName,
+			ImagePath:   part.ImagePath,
+			MaxHP:       part.MaxHP,
+			Armor:       part.Armor,
+		})
+	}
+	return &realtimeBossStaticPayload{
+		ID:                 boss.ID,
+		TemplateID:         boss.TemplateID,
+		RoomID:             boss.RoomID,
+		QueueID:            boss.QueueID,
+		Name:               boss.Name,
+		MaxHP:              boss.MaxHP,
+		GoldOnKill:         boss.GoldOnKill,
+		StoneOnKill:        boss.StoneOnKill,
+		TalentPointsOnKill: boss.TalentPointsOnKill,
+		Parts:              parts,
+		StartedAt:          boss.StartedAt,
+	}
+}
+
+func buildRealtimeBossRuntimePayload(boss *core.Boss) *realtimeBossRuntimePayload {
+	if boss == nil {
+		return nil
+	}
+	parts := make([]realtimeBossPartRuntimePayload, 0, len(boss.Parts))
+	for _, part := range boss.Parts {
+		parts = append(parts, realtimeBossPartRuntimePayload{
+			X:         part.X,
+			Y:         part.Y,
+			CurrentHP: part.CurrentHP,
+			Alive:     part.Alive,
+		})
+	}
+	return &realtimeBossRuntimePayload{
+		Status:     boss.Status,
+		CurrentHP:  boss.CurrentHP,
+		Parts:      parts,
+		DefeatedAt: boss.DefeatedAt,
 	}
 }
 

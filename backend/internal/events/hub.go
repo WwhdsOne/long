@@ -45,9 +45,13 @@ type realtimeUserStatePayload struct {
 }
 
 type publicStatePayload struct {
-	TotalVotes int64      `json:"totalVotes"`
-	RoomID     string     `json:"roomId,omitempty"`
-	Boss       *core.Boss `json:"boss,omitempty"`
+	TotalVotes  int64               `json:"totalVotes"`
+	RoomID      string              `json:"roomId,omitempty"`
+	Boss        *core.Boss          `json:"boss,omitempty"`
+	BossID      string              `json:"bossId,omitempty"`
+	BossVersion int64               `json:"bossVersion,omitempty"`
+	BossStatic  *bossStaticPayload  `json:"bossStatic,omitempty"`
+	BossRuntime *bossRuntimePayload `json:"bossRuntime,omitempty"`
 }
 
 type publicMetaPayload struct {
@@ -77,14 +81,62 @@ type subscriber struct {
 	ch       chan ServerEvent
 }
 
+type bossStaticPayload struct {
+	ID                 string                  `json:"id,omitempty"`
+	TemplateID         string                  `json:"templateId,omitempty"`
+	RoomID             string                  `json:"roomId,omitempty"`
+	QueueID            string                  `json:"queueId,omitempty"`
+	Name               string                  `json:"name,omitempty"`
+	MaxHP              int64                   `json:"maxHp,omitempty"`
+	GoldOnKill         int64                   `json:"goldOnKill,omitempty"`
+	StoneOnKill        int64                   `json:"stoneOnKill,omitempty"`
+	TalentPointsOnKill int64                   `json:"talentPointsOnKill,omitempty"`
+	Parts              []bossPartStaticPayload `json:"parts,omitempty"`
+	StartedAt          int64                   `json:"startedAt,omitempty"`
+}
+
+type bossPartStaticPayload struct {
+	X           int    `json:"x"`
+	Y           int    `json:"y"`
+	Type        string `json:"type,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+	ImagePath   string `json:"imagePath,omitempty"`
+	MaxHP       int64  `json:"maxHp,omitempty"`
+	Armor       int64  `json:"armor,omitempty"`
+}
+
+type bossRuntimePayload struct {
+	Status     string                   `json:"status,omitempty"`
+	CurrentHP  int64                    `json:"currentHp,omitempty"`
+	Parts      []bossPartRuntimePayload `json:"parts,omitempty"`
+	DefeatedAt int64                    `json:"defeatedAt,omitempty"`
+}
+
+type bossPartRuntimePayload struct {
+	X         int   `json:"x"`
+	Y         int   `json:"y"`
+	CurrentHP int64 `json:"currentHp,omitempty"`
+	Alive     bool  `json:"alive"`
+}
+
+type bossVersionState struct {
+	signature string
+	version   int64
+}
+
 // Hub 按事件类型向浏览器广播公共态和个人态。
 type Hub struct {
-	mu      sync.RWMutex
-	clients map[*subscriber]struct{}
+	mu           sync.RWMutex
+	clients      map[*subscriber]struct{}
+	bossVersionM sync.RWMutex
+	bossVersions map[string]bossVersionState
 }
 
 func NewHub() *Hub {
-	return &Hub{clients: make(map[*subscriber]struct{})}
+	return &Hub{
+		clients:      make(map[*subscriber]struct{}),
+		bossVersions: make(map[string]bossVersionState),
+	}
 }
 
 func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
@@ -112,7 +164,7 @@ func (h *Hub) Subscribe(nickname string) (<-chan ServerEvent, func()) {
 }
 
 func (h *Hub) BroadcastPublic(snapshot core.Snapshot) error {
-	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot))
+	payload, err := sonic.Marshal(h.buildPublicStatePayload(snapshot))
 	if err != nil {
 		return err
 	}
@@ -134,7 +186,7 @@ func (h *Hub) BroadcastPublicTo(nickname string, snapshot core.Snapshot) error {
 	if normalizedNickname == "" {
 		return nil
 	}
-	payload, err := sonic.Marshal(buildPublicStatePayload(snapshot))
+	payload, err := sonic.Marshal(h.buildPublicStatePayload(snapshot))
 	if err != nil {
 		return err
 	}
@@ -191,13 +243,117 @@ func (h *Hub) BroadcastPublicMetaTo(nickname string, snapshot core.Snapshot, inc
 	return nil
 }
 
-func buildPublicStatePayload(snapshot core.Snapshot) publicStatePayload {
+func (h *Hub) buildPublicStatePayload(snapshot core.Snapshot) publicStatePayload {
 	payload := publicStatePayload{
 		TotalVotes: snapshot.TotalVotes,
 		RoomID:     snapshot.RoomID,
 		Boss:       snapshot.Boss,
 	}
+	if snapshot.Boss == nil {
+		return payload
+	}
+	payload.BossID = snapshot.Boss.ID
+	payload.BossVersion = h.nextBossVersion(snapshot.TotalVotes, snapshot.Boss)
+	payload.BossStatic = buildBossStaticPayload(snapshot.Boss)
+	payload.BossRuntime = buildBossRuntimePayload(snapshot.Boss)
 	return payload
+}
+
+func buildBossStaticPayload(boss *core.Boss) *bossStaticPayload {
+	if boss == nil {
+		return nil
+	}
+	parts := make([]bossPartStaticPayload, 0, len(boss.Parts))
+	for _, part := range boss.Parts {
+		parts = append(parts, bossPartStaticPayload{
+			X:           part.X,
+			Y:           part.Y,
+			Type:        string(part.Type),
+			DisplayName: part.DisplayName,
+			ImagePath:   part.ImagePath,
+			MaxHP:       part.MaxHP,
+			Armor:       part.Armor,
+		})
+	}
+	return &bossStaticPayload{
+		ID:                 boss.ID,
+		TemplateID:         boss.TemplateID,
+		RoomID:             boss.RoomID,
+		QueueID:            boss.QueueID,
+		Name:               boss.Name,
+		MaxHP:              boss.MaxHP,
+		GoldOnKill:         boss.GoldOnKill,
+		StoneOnKill:        boss.StoneOnKill,
+		TalentPointsOnKill: boss.TalentPointsOnKill,
+		Parts:              parts,
+		StartedAt:          boss.StartedAt,
+	}
+}
+
+func buildBossRuntimePayload(boss *core.Boss) *bossRuntimePayload {
+	if boss == nil {
+		return nil
+	}
+	parts := make([]bossPartRuntimePayload, 0, len(boss.Parts))
+	for _, part := range boss.Parts {
+		parts = append(parts, bossPartRuntimePayload{
+			X:         part.X,
+			Y:         part.Y,
+			CurrentHP: part.CurrentHP,
+			Alive:     part.Alive,
+		})
+	}
+	return &bossRuntimePayload{
+		Status:     boss.Status,
+		CurrentHP:  boss.CurrentHP,
+		Parts:      parts,
+		DefeatedAt: boss.DefeatedAt,
+	}
+}
+
+func bossVersionSignature(totalVotes int64, boss *core.Boss) string {
+	if boss == nil {
+		return ""
+	}
+	signatureBody, _ := sonic.Marshal(struct {
+		TotalVotes int64               `json:"totalVotes"`
+		Runtime    *bossRuntimePayload `json:"runtime"`
+	}{
+		TotalVotes: totalVotes,
+		Runtime:    buildBossRuntimePayload(boss),
+	})
+	return string(signatureBody)
+}
+
+func (h *Hub) nextBossVersion(totalVotes int64, boss *core.Boss) int64 {
+	if h == nil || boss == nil {
+		return 0
+	}
+	signature := bossVersionSignature(totalVotes, boss)
+	h.bossVersionM.Lock()
+	defer h.bossVersionM.Unlock()
+
+	current := h.bossVersions[boss.ID]
+	if current.signature == signature {
+		return current.version
+	}
+	if current.version <= 0 {
+		current.version = 1
+	} else {
+		current.version++
+	}
+	current.signature = signature
+	h.bossVersions[boss.ID] = current
+	return current.version
+}
+
+func (h *Hub) CurrentBossVersion(bossID string) int64 {
+	if h == nil || strings.TrimSpace(bossID) == "" {
+		return 0
+	}
+	h.bossVersionM.RLock()
+	defer h.bossVersionM.RUnlock()
+	return h.bossVersions[bossID].version
 }
 
 func buildPublicMetaPayload(snapshot core.Snapshot, includeLeaderboard bool) publicMetaPayload {
@@ -344,7 +500,7 @@ func NewHandler(hub *Hub, reader StateReader, resolveNickname func(context.Conte
 		writer := sse.NewWriter(c)
 		defer writer.Close()
 
-		if err := writeEvent(writer, PublicStateEventName, buildPublicStatePayload(snapshot)); err != nil {
+		if err := writeEvent(writer, PublicStateEventName, hub.buildPublicStatePayload(snapshot)); err != nil {
 			return
 		}
 		if err := writeEvent(writer, PublicMetaEventName, buildPublicMetaPayload(snapshot, true)); err != nil {

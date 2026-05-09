@@ -44,10 +44,21 @@ type realtimeClientMessage struct {
 }
 
 type realtimeSnapshotMessage struct {
-	Type      string        `json:"type"`
-	Public    core.Snapshot `json:"public"`
-	User      any           `json:"user"`
-	RoomState core.RoomList `json:"roomState"`
+	Type      string                     `json:"type"`
+	Public    realtimeSnapshotPublic     `json:"public"`
+	User      any                        `json:"user"`
+	RoomState core.RoomList              `json:"roomState"`
+}
+
+type realtimeSnapshotPublic struct {
+	TotalVotes          int64                    `json:"totalVotes"`
+	Leaderboard         []core.LeaderboardEntry  `json:"leaderboard"`
+	RoomID              string                   `json:"roomId,omitempty"`
+	BossID              string                   `json:"bossId,omitempty"`
+	BossVersion         int64                    `json:"bossVersion,omitempty"`
+	BossStatic          *realtimeBossStaticPayload `json:"bossStatic,omitempty"`
+	BossRuntime         *realtimeBossRuntimePayload `json:"bossRuntime,omitempty"`
+	AnnouncementVersion string                   `json:"announcementVersion,omitempty"`
 }
 
 type realtimeDeltaMessage struct {
@@ -399,7 +410,7 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(realtimeOu
 
 	if err := sendText(send, realtimeSnapshotMessage{
 		Type:      realtimeMessageTypeSnapshot,
-		Public:    snapshot,
+		Public:    buildRealtimeSnapshotPublic(snapshot, s.currentBossVersion(snapshot.Boss)),
 		User:      userState,
 		RoomState: roomState,
 	}); err != nil {
@@ -422,6 +433,33 @@ func (s *realtimeSession) sendSnapshot(ctx context.Context, send func(realtimeOu
 		}
 	}
 	return nil
+}
+
+func (s *realtimeSession) currentBossVersion(boss *core.Boss) int64 {
+	if boss == nil || s.hub == nil {
+		return 0
+	}
+	if provider, ok := s.hub.(interface{ CurrentBossVersion(string) int64 }); ok {
+		return provider.CurrentBossVersion(boss.ID)
+	}
+	return 0
+}
+
+func buildRealtimeSnapshotPublic(snapshot core.Snapshot, bossVersion int64) realtimeSnapshotPublic {
+	payload := realtimeSnapshotPublic{
+		TotalVotes:          snapshot.TotalVotes,
+		Leaderboard:         snapshot.Leaderboard,
+		RoomID:              snapshot.RoomID,
+		AnnouncementVersion: snapshot.AnnouncementVersion,
+	}
+	if snapshot.Boss == nil {
+		return payload
+	}
+	payload.BossID = snapshot.Boss.ID
+	payload.BossVersion = bossVersion
+	payload.BossStatic = buildRealtimeBossStaticPayload(snapshot.Boss)
+	payload.BossRuntime = buildRealtimeBossRuntimePayload(snapshot.Boss)
+	return payload
 }
 
 func buildRealtimeSnapshotUser(state core.UserState) realtimeSnapshotUser {
@@ -509,7 +547,7 @@ func sendText(send func(realtimeOutboundFrame) error, message any) error {
 func realtimeMessageFromEvent(event events.ServerEvent) (realtimeOutboundFrame, bool, error) {
 	switch event.Name {
 	case events.PublicStateEventName:
-		payload, err := encodeRealtimeBinaryPublicDeltaFromJSON(event.Payload)
+		payload, err := encodeRealtimeBinaryBossDeltaFromJSON(event.Payload)
 		if err != nil {
 			return realtimeOutboundFrame{}, false, err
 		}

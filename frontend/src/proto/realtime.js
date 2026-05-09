@@ -2194,6 +2194,1911 @@ export const realtime = $root.realtime = (() => {
         return PublicMeta;
     })();
 
+    realtime.BossPartStatic = (function() {
+
+        /**
+         * Properties of a BossPartStatic.
+         * @memberof realtime
+         * @interface IBossPartStatic
+         * @property {number|null} [x] BossPartStatic x
+         * @property {number|null} [y] BossPartStatic y
+         * @property {string|null} [type] BossPartStatic type
+         * @property {string|null} [displayName] BossPartStatic displayName
+         * @property {string|null} [imagePath] BossPartStatic imagePath
+         * @property {number|Long|null} [maxHp] BossPartStatic maxHp
+         * @property {number|Long|null} [armor] BossPartStatic armor
+         */
+
+        /**
+         * Constructs a new BossPartStatic.
+         * @memberof realtime
+         * @classdesc Represents a BossPartStatic.
+         * @implements IBossPartStatic
+         * @constructor
+         * @param {realtime.IBossPartStatic=} [properties] Properties to set
+         */
+        function BossPartStatic(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * BossPartStatic x.
+         * @member {number} x
+         * @memberof realtime.BossPartStatic
+         * @instance
+         */
+        BossPartStatic.prototype.x = 0;
+
+        /**
+         * BossPartStatic y.
+         * @member {number} y
+         * @memberof realtime.BossPartStatic
+         * @instance
+         */
+        BossPartStatic.prototype.y = 0;
+
+        /**
+         * BossPartStatic type.
+         * @member {string} type
+         * @memberof realtime.BossPartStatic
+         * @instance
+         */
+        BossPartStatic.prototype.type = "";
+
+        /**
+         * BossPartStatic displayName.
+         * @member {string} displayName
+         * @memberof realtime.BossPartStatic
+         * @instance
+         */
+        BossPartStatic.prototype.displayName = "";
+
+        /**
+         * BossPartStatic imagePath.
+         * @member {string} imagePath
+         * @memberof realtime.BossPartStatic
+         * @instance
+         */
+        BossPartStatic.prototype.imagePath = "";
+
+        /**
+         * BossPartStatic maxHp.
+         * @member {number|Long} maxHp
+         * @memberof realtime.BossPartStatic
+         * @instance
+         */
+        BossPartStatic.prototype.maxHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossPartStatic armor.
+         * @member {number|Long} armor
+         * @memberof realtime.BossPartStatic
+         * @instance
+         */
+        BossPartStatic.prototype.armor = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * Creates a new BossPartStatic instance using the specified properties.
+         * @function create
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {realtime.IBossPartStatic=} [properties] Properties to set
+         * @returns {realtime.BossPartStatic} BossPartStatic instance
+         */
+        BossPartStatic.create = function create(properties) {
+            return new BossPartStatic(properties);
+        };
+
+        /**
+         * Encodes the specified BossPartStatic message. Does not implicitly {@link realtime.BossPartStatic.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {realtime.IBossPartStatic} message BossPartStatic message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossPartStatic.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.x != null && Object.hasOwnProperty.call(message, "x"))
+                writer.uint32(/* id 1, wireType 0 =*/8).int32(message.x);
+            if (message.y != null && Object.hasOwnProperty.call(message, "y"))
+                writer.uint32(/* id 2, wireType 0 =*/16).int32(message.y);
+            if (message.type != null && Object.hasOwnProperty.call(message, "type"))
+                writer.uint32(/* id 3, wireType 2 =*/26).string(message.type);
+            if (message.displayName != null && Object.hasOwnProperty.call(message, "displayName"))
+                writer.uint32(/* id 4, wireType 2 =*/34).string(message.displayName);
+            if (message.imagePath != null && Object.hasOwnProperty.call(message, "imagePath"))
+                writer.uint32(/* id 5, wireType 2 =*/42).string(message.imagePath);
+            if (message.maxHp != null && Object.hasOwnProperty.call(message, "maxHp"))
+                writer.uint32(/* id 6, wireType 0 =*/48).int64(message.maxHp);
+            if (message.armor != null && Object.hasOwnProperty.call(message, "armor"))
+                writer.uint32(/* id 7, wireType 0 =*/56).int64(message.armor);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified BossPartStatic message, length delimited. Does not implicitly {@link realtime.BossPartStatic.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {realtime.IBossPartStatic} message BossPartStatic message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossPartStatic.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a BossPartStatic message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.BossPartStatic} BossPartStatic
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossPartStatic.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossPartStatic();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.x = reader.int32();
+                        break;
+                    }
+                case 2: {
+                        message.y = reader.int32();
+                        break;
+                    }
+                case 3: {
+                        message.type = reader.string();
+                        break;
+                    }
+                case 4: {
+                        message.displayName = reader.string();
+                        break;
+                    }
+                case 5: {
+                        message.imagePath = reader.string();
+                        break;
+                    }
+                case 6: {
+                        message.maxHp = reader.int64();
+                        break;
+                    }
+                case 7: {
+                        message.armor = reader.int64();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a BossPartStatic message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.BossPartStatic} BossPartStatic
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossPartStatic.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a BossPartStatic message.
+         * @function verify
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        BossPartStatic.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.x != null && message.hasOwnProperty("x"))
+                if (!$util.isInteger(message.x))
+                    return "x: integer expected";
+            if (message.y != null && message.hasOwnProperty("y"))
+                if (!$util.isInteger(message.y))
+                    return "y: integer expected";
+            if (message.type != null && message.hasOwnProperty("type"))
+                if (!$util.isString(message.type))
+                    return "type: string expected";
+            if (message.displayName != null && message.hasOwnProperty("displayName"))
+                if (!$util.isString(message.displayName))
+                    return "displayName: string expected";
+            if (message.imagePath != null && message.hasOwnProperty("imagePath"))
+                if (!$util.isString(message.imagePath))
+                    return "imagePath: string expected";
+            if (message.maxHp != null && message.hasOwnProperty("maxHp"))
+                if (!$util.isInteger(message.maxHp) && !(message.maxHp && $util.isInteger(message.maxHp.low) && $util.isInteger(message.maxHp.high)))
+                    return "maxHp: integer|Long expected";
+            if (message.armor != null && message.hasOwnProperty("armor"))
+                if (!$util.isInteger(message.armor) && !(message.armor && $util.isInteger(message.armor.low) && $util.isInteger(message.armor.high)))
+                    return "armor: integer|Long expected";
+            return null;
+        };
+
+        /**
+         * Creates a BossPartStatic message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.BossPartStatic} BossPartStatic
+         */
+        BossPartStatic.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.BossPartStatic)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.BossPartStatic();
+            if (object.x != null)
+                message.x = object.x | 0;
+            if (object.y != null)
+                message.y = object.y | 0;
+            if (object.type != null)
+                message.type = String(object.type);
+            if (object.displayName != null)
+                message.displayName = String(object.displayName);
+            if (object.imagePath != null)
+                message.imagePath = String(object.imagePath);
+            if (object.maxHp != null)
+                if ($util.Long)
+                    (message.maxHp = $util.Long.fromValue(object.maxHp)).unsigned = false;
+                else if (typeof object.maxHp === "string")
+                    message.maxHp = parseInt(object.maxHp, 10);
+                else if (typeof object.maxHp === "number")
+                    message.maxHp = object.maxHp;
+                else if (typeof object.maxHp === "object")
+                    message.maxHp = new $util.LongBits(object.maxHp.low >>> 0, object.maxHp.high >>> 0).toNumber();
+            if (object.armor != null)
+                if ($util.Long)
+                    (message.armor = $util.Long.fromValue(object.armor)).unsigned = false;
+                else if (typeof object.armor === "string")
+                    message.armor = parseInt(object.armor, 10);
+                else if (typeof object.armor === "number")
+                    message.armor = object.armor;
+                else if (typeof object.armor === "object")
+                    message.armor = new $util.LongBits(object.armor.low >>> 0, object.armor.high >>> 0).toNumber();
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a BossPartStatic message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {realtime.BossPartStatic} message BossPartStatic
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        BossPartStatic.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults) {
+                object.x = 0;
+                object.y = 0;
+                object.type = "";
+                object.displayName = "";
+                object.imagePath = "";
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.maxHp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.maxHp = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.armor = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.armor = options.longs === String ? "0" : 0;
+            }
+            if (message.x != null && message.hasOwnProperty("x"))
+                object.x = message.x;
+            if (message.y != null && message.hasOwnProperty("y"))
+                object.y = message.y;
+            if (message.type != null && message.hasOwnProperty("type"))
+                object.type = message.type;
+            if (message.displayName != null && message.hasOwnProperty("displayName"))
+                object.displayName = message.displayName;
+            if (message.imagePath != null && message.hasOwnProperty("imagePath"))
+                object.imagePath = message.imagePath;
+            if (message.maxHp != null && message.hasOwnProperty("maxHp"))
+                if (typeof message.maxHp === "number")
+                    object.maxHp = options.longs === String ? String(message.maxHp) : message.maxHp;
+                else
+                    object.maxHp = options.longs === String ? $util.Long.prototype.toString.call(message.maxHp) : options.longs === Number ? new $util.LongBits(message.maxHp.low >>> 0, message.maxHp.high >>> 0).toNumber() : message.maxHp;
+            if (message.armor != null && message.hasOwnProperty("armor"))
+                if (typeof message.armor === "number")
+                    object.armor = options.longs === String ? String(message.armor) : message.armor;
+                else
+                    object.armor = options.longs === String ? $util.Long.prototype.toString.call(message.armor) : options.longs === Number ? new $util.LongBits(message.armor.low >>> 0, message.armor.high >>> 0).toNumber() : message.armor;
+            return object;
+        };
+
+        /**
+         * Converts this BossPartStatic to JSON.
+         * @function toJSON
+         * @memberof realtime.BossPartStatic
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        BossPartStatic.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for BossPartStatic
+         * @function getTypeUrl
+         * @memberof realtime.BossPartStatic
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        BossPartStatic.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.BossPartStatic";
+        };
+
+        return BossPartStatic;
+    })();
+
+    realtime.BossStatic = (function() {
+
+        /**
+         * Properties of a BossStatic.
+         * @memberof realtime
+         * @interface IBossStatic
+         * @property {string|null} [id] BossStatic id
+         * @property {string|null} [templateId] BossStatic templateId
+         * @property {string|null} [roomId] BossStatic roomId
+         * @property {string|null} [queueId] BossStatic queueId
+         * @property {string|null} [name] BossStatic name
+         * @property {number|Long|null} [maxHp] BossStatic maxHp
+         * @property {number|Long|null} [goldOnKill] BossStatic goldOnKill
+         * @property {number|Long|null} [stoneOnKill] BossStatic stoneOnKill
+         * @property {number|Long|null} [talentPointsOnKill] BossStatic talentPointsOnKill
+         * @property {Array.<realtime.IBossPartStatic>|null} [parts] BossStatic parts
+         * @property {number|Long|null} [startedAt] BossStatic startedAt
+         */
+
+        /**
+         * Constructs a new BossStatic.
+         * @memberof realtime
+         * @classdesc Represents a BossStatic.
+         * @implements IBossStatic
+         * @constructor
+         * @param {realtime.IBossStatic=} [properties] Properties to set
+         */
+        function BossStatic(properties) {
+            this.parts = [];
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * BossStatic id.
+         * @member {string} id
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.id = "";
+
+        /**
+         * BossStatic templateId.
+         * @member {string} templateId
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.templateId = "";
+
+        /**
+         * BossStatic roomId.
+         * @member {string} roomId
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.roomId = "";
+
+        /**
+         * BossStatic queueId.
+         * @member {string} queueId
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.queueId = "";
+
+        /**
+         * BossStatic name.
+         * @member {string} name
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.name = "";
+
+        /**
+         * BossStatic maxHp.
+         * @member {number|Long} maxHp
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.maxHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossStatic goldOnKill.
+         * @member {number|Long} goldOnKill
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.goldOnKill = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossStatic stoneOnKill.
+         * @member {number|Long} stoneOnKill
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.stoneOnKill = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossStatic talentPointsOnKill.
+         * @member {number|Long} talentPointsOnKill
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.talentPointsOnKill = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossStatic parts.
+         * @member {Array.<realtime.IBossPartStatic>} parts
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.parts = $util.emptyArray;
+
+        /**
+         * BossStatic startedAt.
+         * @member {number|Long} startedAt
+         * @memberof realtime.BossStatic
+         * @instance
+         */
+        BossStatic.prototype.startedAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * Creates a new BossStatic instance using the specified properties.
+         * @function create
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {realtime.IBossStatic=} [properties] Properties to set
+         * @returns {realtime.BossStatic} BossStatic instance
+         */
+        BossStatic.create = function create(properties) {
+            return new BossStatic(properties);
+        };
+
+        /**
+         * Encodes the specified BossStatic message. Does not implicitly {@link realtime.BossStatic.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {realtime.IBossStatic} message BossStatic message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossStatic.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.id != null && Object.hasOwnProperty.call(message, "id"))
+                writer.uint32(/* id 1, wireType 2 =*/10).string(message.id);
+            if (message.templateId != null && Object.hasOwnProperty.call(message, "templateId"))
+                writer.uint32(/* id 2, wireType 2 =*/18).string(message.templateId);
+            if (message.roomId != null && Object.hasOwnProperty.call(message, "roomId"))
+                writer.uint32(/* id 3, wireType 2 =*/26).string(message.roomId);
+            if (message.queueId != null && Object.hasOwnProperty.call(message, "queueId"))
+                writer.uint32(/* id 4, wireType 2 =*/34).string(message.queueId);
+            if (message.name != null && Object.hasOwnProperty.call(message, "name"))
+                writer.uint32(/* id 5, wireType 2 =*/42).string(message.name);
+            if (message.maxHp != null && Object.hasOwnProperty.call(message, "maxHp"))
+                writer.uint32(/* id 6, wireType 0 =*/48).int64(message.maxHp);
+            if (message.goldOnKill != null && Object.hasOwnProperty.call(message, "goldOnKill"))
+                writer.uint32(/* id 7, wireType 0 =*/56).int64(message.goldOnKill);
+            if (message.stoneOnKill != null && Object.hasOwnProperty.call(message, "stoneOnKill"))
+                writer.uint32(/* id 8, wireType 0 =*/64).int64(message.stoneOnKill);
+            if (message.talentPointsOnKill != null && Object.hasOwnProperty.call(message, "talentPointsOnKill"))
+                writer.uint32(/* id 9, wireType 0 =*/72).int64(message.talentPointsOnKill);
+            if (message.parts != null && message.parts.length)
+                for (let i = 0; i < message.parts.length; ++i)
+                    $root.realtime.BossPartStatic.encode(message.parts[i], writer.uint32(/* id 10, wireType 2 =*/82).fork()).ldelim();
+            if (message.startedAt != null && Object.hasOwnProperty.call(message, "startedAt"))
+                writer.uint32(/* id 11, wireType 0 =*/88).int64(message.startedAt);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified BossStatic message, length delimited. Does not implicitly {@link realtime.BossStatic.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {realtime.IBossStatic} message BossStatic message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossStatic.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a BossStatic message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.BossStatic} BossStatic
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossStatic.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossStatic();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.id = reader.string();
+                        break;
+                    }
+                case 2: {
+                        message.templateId = reader.string();
+                        break;
+                    }
+                case 3: {
+                        message.roomId = reader.string();
+                        break;
+                    }
+                case 4: {
+                        message.queueId = reader.string();
+                        break;
+                    }
+                case 5: {
+                        message.name = reader.string();
+                        break;
+                    }
+                case 6: {
+                        message.maxHp = reader.int64();
+                        break;
+                    }
+                case 7: {
+                        message.goldOnKill = reader.int64();
+                        break;
+                    }
+                case 8: {
+                        message.stoneOnKill = reader.int64();
+                        break;
+                    }
+                case 9: {
+                        message.talentPointsOnKill = reader.int64();
+                        break;
+                    }
+                case 10: {
+                        if (!(message.parts && message.parts.length))
+                            message.parts = [];
+                        message.parts.push($root.realtime.BossPartStatic.decode(reader, reader.uint32(), undefined, long + 1));
+                        break;
+                    }
+                case 11: {
+                        message.startedAt = reader.int64();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a BossStatic message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.BossStatic} BossStatic
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossStatic.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a BossStatic message.
+         * @function verify
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        BossStatic.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.id != null && message.hasOwnProperty("id"))
+                if (!$util.isString(message.id))
+                    return "id: string expected";
+            if (message.templateId != null && message.hasOwnProperty("templateId"))
+                if (!$util.isString(message.templateId))
+                    return "templateId: string expected";
+            if (message.roomId != null && message.hasOwnProperty("roomId"))
+                if (!$util.isString(message.roomId))
+                    return "roomId: string expected";
+            if (message.queueId != null && message.hasOwnProperty("queueId"))
+                if (!$util.isString(message.queueId))
+                    return "queueId: string expected";
+            if (message.name != null && message.hasOwnProperty("name"))
+                if (!$util.isString(message.name))
+                    return "name: string expected";
+            if (message.maxHp != null && message.hasOwnProperty("maxHp"))
+                if (!$util.isInteger(message.maxHp) && !(message.maxHp && $util.isInteger(message.maxHp.low) && $util.isInteger(message.maxHp.high)))
+                    return "maxHp: integer|Long expected";
+            if (message.goldOnKill != null && message.hasOwnProperty("goldOnKill"))
+                if (!$util.isInteger(message.goldOnKill) && !(message.goldOnKill && $util.isInteger(message.goldOnKill.low) && $util.isInteger(message.goldOnKill.high)))
+                    return "goldOnKill: integer|Long expected";
+            if (message.stoneOnKill != null && message.hasOwnProperty("stoneOnKill"))
+                if (!$util.isInteger(message.stoneOnKill) && !(message.stoneOnKill && $util.isInteger(message.stoneOnKill.low) && $util.isInteger(message.stoneOnKill.high)))
+                    return "stoneOnKill: integer|Long expected";
+            if (message.talentPointsOnKill != null && message.hasOwnProperty("talentPointsOnKill"))
+                if (!$util.isInteger(message.talentPointsOnKill) && !(message.talentPointsOnKill && $util.isInteger(message.talentPointsOnKill.low) && $util.isInteger(message.talentPointsOnKill.high)))
+                    return "talentPointsOnKill: integer|Long expected";
+            if (message.parts != null && message.hasOwnProperty("parts")) {
+                if (!Array.isArray(message.parts))
+                    return "parts: array expected";
+                for (let i = 0; i < message.parts.length; ++i) {
+                    let error = $root.realtime.BossPartStatic.verify(message.parts[i], long + 1);
+                    if (error)
+                        return "parts." + error;
+                }
+            }
+            if (message.startedAt != null && message.hasOwnProperty("startedAt"))
+                if (!$util.isInteger(message.startedAt) && !(message.startedAt && $util.isInteger(message.startedAt.low) && $util.isInteger(message.startedAt.high)))
+                    return "startedAt: integer|Long expected";
+            return null;
+        };
+
+        /**
+         * Creates a BossStatic message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.BossStatic} BossStatic
+         */
+        BossStatic.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.BossStatic)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.BossStatic();
+            if (object.id != null)
+                message.id = String(object.id);
+            if (object.templateId != null)
+                message.templateId = String(object.templateId);
+            if (object.roomId != null)
+                message.roomId = String(object.roomId);
+            if (object.queueId != null)
+                message.queueId = String(object.queueId);
+            if (object.name != null)
+                message.name = String(object.name);
+            if (object.maxHp != null)
+                if ($util.Long)
+                    (message.maxHp = $util.Long.fromValue(object.maxHp)).unsigned = false;
+                else if (typeof object.maxHp === "string")
+                    message.maxHp = parseInt(object.maxHp, 10);
+                else if (typeof object.maxHp === "number")
+                    message.maxHp = object.maxHp;
+                else if (typeof object.maxHp === "object")
+                    message.maxHp = new $util.LongBits(object.maxHp.low >>> 0, object.maxHp.high >>> 0).toNumber();
+            if (object.goldOnKill != null)
+                if ($util.Long)
+                    (message.goldOnKill = $util.Long.fromValue(object.goldOnKill)).unsigned = false;
+                else if (typeof object.goldOnKill === "string")
+                    message.goldOnKill = parseInt(object.goldOnKill, 10);
+                else if (typeof object.goldOnKill === "number")
+                    message.goldOnKill = object.goldOnKill;
+                else if (typeof object.goldOnKill === "object")
+                    message.goldOnKill = new $util.LongBits(object.goldOnKill.low >>> 0, object.goldOnKill.high >>> 0).toNumber();
+            if (object.stoneOnKill != null)
+                if ($util.Long)
+                    (message.stoneOnKill = $util.Long.fromValue(object.stoneOnKill)).unsigned = false;
+                else if (typeof object.stoneOnKill === "string")
+                    message.stoneOnKill = parseInt(object.stoneOnKill, 10);
+                else if (typeof object.stoneOnKill === "number")
+                    message.stoneOnKill = object.stoneOnKill;
+                else if (typeof object.stoneOnKill === "object")
+                    message.stoneOnKill = new $util.LongBits(object.stoneOnKill.low >>> 0, object.stoneOnKill.high >>> 0).toNumber();
+            if (object.talentPointsOnKill != null)
+                if ($util.Long)
+                    (message.talentPointsOnKill = $util.Long.fromValue(object.talentPointsOnKill)).unsigned = false;
+                else if (typeof object.talentPointsOnKill === "string")
+                    message.talentPointsOnKill = parseInt(object.talentPointsOnKill, 10);
+                else if (typeof object.talentPointsOnKill === "number")
+                    message.talentPointsOnKill = object.talentPointsOnKill;
+                else if (typeof object.talentPointsOnKill === "object")
+                    message.talentPointsOnKill = new $util.LongBits(object.talentPointsOnKill.low >>> 0, object.talentPointsOnKill.high >>> 0).toNumber();
+            if (object.parts) {
+                if (!Array.isArray(object.parts))
+                    throw TypeError(".realtime.BossStatic.parts: array expected");
+                message.parts = [];
+                for (let i = 0; i < object.parts.length; ++i) {
+                    if (typeof object.parts[i] !== "object")
+                        throw TypeError(".realtime.BossStatic.parts: object expected");
+                    message.parts[i] = $root.realtime.BossPartStatic.fromObject(object.parts[i], long + 1);
+                }
+            }
+            if (object.startedAt != null)
+                if ($util.Long)
+                    (message.startedAt = $util.Long.fromValue(object.startedAt)).unsigned = false;
+                else if (typeof object.startedAt === "string")
+                    message.startedAt = parseInt(object.startedAt, 10);
+                else if (typeof object.startedAt === "number")
+                    message.startedAt = object.startedAt;
+                else if (typeof object.startedAt === "object")
+                    message.startedAt = new $util.LongBits(object.startedAt.low >>> 0, object.startedAt.high >>> 0).toNumber();
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a BossStatic message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {realtime.BossStatic} message BossStatic
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        BossStatic.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.arrays || options.defaults)
+                object.parts = [];
+            if (options.defaults) {
+                object.id = "";
+                object.templateId = "";
+                object.roomId = "";
+                object.queueId = "";
+                object.name = "";
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.maxHp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.maxHp = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.goldOnKill = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.goldOnKill = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.stoneOnKill = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.stoneOnKill = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.talentPointsOnKill = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.talentPointsOnKill = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.startedAt = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.startedAt = options.longs === String ? "0" : 0;
+            }
+            if (message.id != null && message.hasOwnProperty("id"))
+                object.id = message.id;
+            if (message.templateId != null && message.hasOwnProperty("templateId"))
+                object.templateId = message.templateId;
+            if (message.roomId != null && message.hasOwnProperty("roomId"))
+                object.roomId = message.roomId;
+            if (message.queueId != null && message.hasOwnProperty("queueId"))
+                object.queueId = message.queueId;
+            if (message.name != null && message.hasOwnProperty("name"))
+                object.name = message.name;
+            if (message.maxHp != null && message.hasOwnProperty("maxHp"))
+                if (typeof message.maxHp === "number")
+                    object.maxHp = options.longs === String ? String(message.maxHp) : message.maxHp;
+                else
+                    object.maxHp = options.longs === String ? $util.Long.prototype.toString.call(message.maxHp) : options.longs === Number ? new $util.LongBits(message.maxHp.low >>> 0, message.maxHp.high >>> 0).toNumber() : message.maxHp;
+            if (message.goldOnKill != null && message.hasOwnProperty("goldOnKill"))
+                if (typeof message.goldOnKill === "number")
+                    object.goldOnKill = options.longs === String ? String(message.goldOnKill) : message.goldOnKill;
+                else
+                    object.goldOnKill = options.longs === String ? $util.Long.prototype.toString.call(message.goldOnKill) : options.longs === Number ? new $util.LongBits(message.goldOnKill.low >>> 0, message.goldOnKill.high >>> 0).toNumber() : message.goldOnKill;
+            if (message.stoneOnKill != null && message.hasOwnProperty("stoneOnKill"))
+                if (typeof message.stoneOnKill === "number")
+                    object.stoneOnKill = options.longs === String ? String(message.stoneOnKill) : message.stoneOnKill;
+                else
+                    object.stoneOnKill = options.longs === String ? $util.Long.prototype.toString.call(message.stoneOnKill) : options.longs === Number ? new $util.LongBits(message.stoneOnKill.low >>> 0, message.stoneOnKill.high >>> 0).toNumber() : message.stoneOnKill;
+            if (message.talentPointsOnKill != null && message.hasOwnProperty("talentPointsOnKill"))
+                if (typeof message.talentPointsOnKill === "number")
+                    object.talentPointsOnKill = options.longs === String ? String(message.talentPointsOnKill) : message.talentPointsOnKill;
+                else
+                    object.talentPointsOnKill = options.longs === String ? $util.Long.prototype.toString.call(message.talentPointsOnKill) : options.longs === Number ? new $util.LongBits(message.talentPointsOnKill.low >>> 0, message.talentPointsOnKill.high >>> 0).toNumber() : message.talentPointsOnKill;
+            if (message.parts && message.parts.length) {
+                object.parts = [];
+                for (let j = 0; j < message.parts.length; ++j)
+                    object.parts[j] = $root.realtime.BossPartStatic.toObject(message.parts[j], options);
+            }
+            if (message.startedAt != null && message.hasOwnProperty("startedAt"))
+                if (typeof message.startedAt === "number")
+                    object.startedAt = options.longs === String ? String(message.startedAt) : message.startedAt;
+                else
+                    object.startedAt = options.longs === String ? $util.Long.prototype.toString.call(message.startedAt) : options.longs === Number ? new $util.LongBits(message.startedAt.low >>> 0, message.startedAt.high >>> 0).toNumber() : message.startedAt;
+            return object;
+        };
+
+        /**
+         * Converts this BossStatic to JSON.
+         * @function toJSON
+         * @memberof realtime.BossStatic
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        BossStatic.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for BossStatic
+         * @function getTypeUrl
+         * @memberof realtime.BossStatic
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        BossStatic.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.BossStatic";
+        };
+
+        return BossStatic;
+    })();
+
+    realtime.BossPartRuntime = (function() {
+
+        /**
+         * Properties of a BossPartRuntime.
+         * @memberof realtime
+         * @interface IBossPartRuntime
+         * @property {number|null} [x] BossPartRuntime x
+         * @property {number|null} [y] BossPartRuntime y
+         * @property {number|Long|null} [currentHp] BossPartRuntime currentHp
+         * @property {boolean|null} [alive] BossPartRuntime alive
+         */
+
+        /**
+         * Constructs a new BossPartRuntime.
+         * @memberof realtime
+         * @classdesc Represents a BossPartRuntime.
+         * @implements IBossPartRuntime
+         * @constructor
+         * @param {realtime.IBossPartRuntime=} [properties] Properties to set
+         */
+        function BossPartRuntime(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * BossPartRuntime x.
+         * @member {number} x
+         * @memberof realtime.BossPartRuntime
+         * @instance
+         */
+        BossPartRuntime.prototype.x = 0;
+
+        /**
+         * BossPartRuntime y.
+         * @member {number} y
+         * @memberof realtime.BossPartRuntime
+         * @instance
+         */
+        BossPartRuntime.prototype.y = 0;
+
+        /**
+         * BossPartRuntime currentHp.
+         * @member {number|Long} currentHp
+         * @memberof realtime.BossPartRuntime
+         * @instance
+         */
+        BossPartRuntime.prototype.currentHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossPartRuntime alive.
+         * @member {boolean} alive
+         * @memberof realtime.BossPartRuntime
+         * @instance
+         */
+        BossPartRuntime.prototype.alive = false;
+
+        /**
+         * Creates a new BossPartRuntime instance using the specified properties.
+         * @function create
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {realtime.IBossPartRuntime=} [properties] Properties to set
+         * @returns {realtime.BossPartRuntime} BossPartRuntime instance
+         */
+        BossPartRuntime.create = function create(properties) {
+            return new BossPartRuntime(properties);
+        };
+
+        /**
+         * Encodes the specified BossPartRuntime message. Does not implicitly {@link realtime.BossPartRuntime.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {realtime.IBossPartRuntime} message BossPartRuntime message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossPartRuntime.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.x != null && Object.hasOwnProperty.call(message, "x"))
+                writer.uint32(/* id 1, wireType 0 =*/8).int32(message.x);
+            if (message.y != null && Object.hasOwnProperty.call(message, "y"))
+                writer.uint32(/* id 2, wireType 0 =*/16).int32(message.y);
+            if (message.currentHp != null && Object.hasOwnProperty.call(message, "currentHp"))
+                writer.uint32(/* id 3, wireType 0 =*/24).int64(message.currentHp);
+            if (message.alive != null && Object.hasOwnProperty.call(message, "alive"))
+                writer.uint32(/* id 4, wireType 0 =*/32).bool(message.alive);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified BossPartRuntime message, length delimited. Does not implicitly {@link realtime.BossPartRuntime.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {realtime.IBossPartRuntime} message BossPartRuntime message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossPartRuntime.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a BossPartRuntime message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.BossPartRuntime} BossPartRuntime
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossPartRuntime.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossPartRuntime();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.x = reader.int32();
+                        break;
+                    }
+                case 2: {
+                        message.y = reader.int32();
+                        break;
+                    }
+                case 3: {
+                        message.currentHp = reader.int64();
+                        break;
+                    }
+                case 4: {
+                        message.alive = reader.bool();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a BossPartRuntime message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.BossPartRuntime} BossPartRuntime
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossPartRuntime.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a BossPartRuntime message.
+         * @function verify
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        BossPartRuntime.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.x != null && message.hasOwnProperty("x"))
+                if (!$util.isInteger(message.x))
+                    return "x: integer expected";
+            if (message.y != null && message.hasOwnProperty("y"))
+                if (!$util.isInteger(message.y))
+                    return "y: integer expected";
+            if (message.currentHp != null && message.hasOwnProperty("currentHp"))
+                if (!$util.isInteger(message.currentHp) && !(message.currentHp && $util.isInteger(message.currentHp.low) && $util.isInteger(message.currentHp.high)))
+                    return "currentHp: integer|Long expected";
+            if (message.alive != null && message.hasOwnProperty("alive"))
+                if (typeof message.alive !== "boolean")
+                    return "alive: boolean expected";
+            return null;
+        };
+
+        /**
+         * Creates a BossPartRuntime message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.BossPartRuntime} BossPartRuntime
+         */
+        BossPartRuntime.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.BossPartRuntime)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.BossPartRuntime();
+            if (object.x != null)
+                message.x = object.x | 0;
+            if (object.y != null)
+                message.y = object.y | 0;
+            if (object.currentHp != null)
+                if ($util.Long)
+                    (message.currentHp = $util.Long.fromValue(object.currentHp)).unsigned = false;
+                else if (typeof object.currentHp === "string")
+                    message.currentHp = parseInt(object.currentHp, 10);
+                else if (typeof object.currentHp === "number")
+                    message.currentHp = object.currentHp;
+                else if (typeof object.currentHp === "object")
+                    message.currentHp = new $util.LongBits(object.currentHp.low >>> 0, object.currentHp.high >>> 0).toNumber();
+            if (object.alive != null)
+                message.alive = Boolean(object.alive);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a BossPartRuntime message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {realtime.BossPartRuntime} message BossPartRuntime
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        BossPartRuntime.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults) {
+                object.x = 0;
+                object.y = 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.currentHp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.currentHp = options.longs === String ? "0" : 0;
+                object.alive = false;
+            }
+            if (message.x != null && message.hasOwnProperty("x"))
+                object.x = message.x;
+            if (message.y != null && message.hasOwnProperty("y"))
+                object.y = message.y;
+            if (message.currentHp != null && message.hasOwnProperty("currentHp"))
+                if (typeof message.currentHp === "number")
+                    object.currentHp = options.longs === String ? String(message.currentHp) : message.currentHp;
+                else
+                    object.currentHp = options.longs === String ? $util.Long.prototype.toString.call(message.currentHp) : options.longs === Number ? new $util.LongBits(message.currentHp.low >>> 0, message.currentHp.high >>> 0).toNumber() : message.currentHp;
+            if (message.alive != null && message.hasOwnProperty("alive"))
+                object.alive = message.alive;
+            return object;
+        };
+
+        /**
+         * Converts this BossPartRuntime to JSON.
+         * @function toJSON
+         * @memberof realtime.BossPartRuntime
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        BossPartRuntime.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for BossPartRuntime
+         * @function getTypeUrl
+         * @memberof realtime.BossPartRuntime
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        BossPartRuntime.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.BossPartRuntime";
+        };
+
+        return BossPartRuntime;
+    })();
+
+    realtime.BossRuntime = (function() {
+
+        /**
+         * Properties of a BossRuntime.
+         * @memberof realtime
+         * @interface IBossRuntime
+         * @property {string|null} [status] BossRuntime status
+         * @property {number|Long|null} [currentHp] BossRuntime currentHp
+         * @property {Array.<realtime.IBossPartRuntime>|null} [parts] BossRuntime parts
+         * @property {number|Long|null} [defeatedAt] BossRuntime defeatedAt
+         */
+
+        /**
+         * Constructs a new BossRuntime.
+         * @memberof realtime
+         * @classdesc Represents a BossRuntime.
+         * @implements IBossRuntime
+         * @constructor
+         * @param {realtime.IBossRuntime=} [properties] Properties to set
+         */
+        function BossRuntime(properties) {
+            this.parts = [];
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * BossRuntime status.
+         * @member {string} status
+         * @memberof realtime.BossRuntime
+         * @instance
+         */
+        BossRuntime.prototype.status = "";
+
+        /**
+         * BossRuntime currentHp.
+         * @member {number|Long} currentHp
+         * @memberof realtime.BossRuntime
+         * @instance
+         */
+        BossRuntime.prototype.currentHp = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossRuntime parts.
+         * @member {Array.<realtime.IBossPartRuntime>} parts
+         * @memberof realtime.BossRuntime
+         * @instance
+         */
+        BossRuntime.prototype.parts = $util.emptyArray;
+
+        /**
+         * BossRuntime defeatedAt.
+         * @member {number|Long} defeatedAt
+         * @memberof realtime.BossRuntime
+         * @instance
+         */
+        BossRuntime.prototype.defeatedAt = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * Creates a new BossRuntime instance using the specified properties.
+         * @function create
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {realtime.IBossRuntime=} [properties] Properties to set
+         * @returns {realtime.BossRuntime} BossRuntime instance
+         */
+        BossRuntime.create = function create(properties) {
+            return new BossRuntime(properties);
+        };
+
+        /**
+         * Encodes the specified BossRuntime message. Does not implicitly {@link realtime.BossRuntime.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {realtime.IBossRuntime} message BossRuntime message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossRuntime.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.status != null && Object.hasOwnProperty.call(message, "status"))
+                writer.uint32(/* id 1, wireType 2 =*/10).string(message.status);
+            if (message.currentHp != null && Object.hasOwnProperty.call(message, "currentHp"))
+                writer.uint32(/* id 2, wireType 0 =*/16).int64(message.currentHp);
+            if (message.parts != null && message.parts.length)
+                for (let i = 0; i < message.parts.length; ++i)
+                    $root.realtime.BossPartRuntime.encode(message.parts[i], writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+            if (message.defeatedAt != null && Object.hasOwnProperty.call(message, "defeatedAt"))
+                writer.uint32(/* id 4, wireType 0 =*/32).int64(message.defeatedAt);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified BossRuntime message, length delimited. Does not implicitly {@link realtime.BossRuntime.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {realtime.IBossRuntime} message BossRuntime message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossRuntime.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a BossRuntime message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.BossRuntime} BossRuntime
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossRuntime.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossRuntime();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.status = reader.string();
+                        break;
+                    }
+                case 2: {
+                        message.currentHp = reader.int64();
+                        break;
+                    }
+                case 3: {
+                        if (!(message.parts && message.parts.length))
+                            message.parts = [];
+                        message.parts.push($root.realtime.BossPartRuntime.decode(reader, reader.uint32(), undefined, long + 1));
+                        break;
+                    }
+                case 4: {
+                        message.defeatedAt = reader.int64();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a BossRuntime message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.BossRuntime} BossRuntime
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossRuntime.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a BossRuntime message.
+         * @function verify
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        BossRuntime.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.status != null && message.hasOwnProperty("status"))
+                if (!$util.isString(message.status))
+                    return "status: string expected";
+            if (message.currentHp != null && message.hasOwnProperty("currentHp"))
+                if (!$util.isInteger(message.currentHp) && !(message.currentHp && $util.isInteger(message.currentHp.low) && $util.isInteger(message.currentHp.high)))
+                    return "currentHp: integer|Long expected";
+            if (message.parts != null && message.hasOwnProperty("parts")) {
+                if (!Array.isArray(message.parts))
+                    return "parts: array expected";
+                for (let i = 0; i < message.parts.length; ++i) {
+                    let error = $root.realtime.BossPartRuntime.verify(message.parts[i], long + 1);
+                    if (error)
+                        return "parts." + error;
+                }
+            }
+            if (message.defeatedAt != null && message.hasOwnProperty("defeatedAt"))
+                if (!$util.isInteger(message.defeatedAt) && !(message.defeatedAt && $util.isInteger(message.defeatedAt.low) && $util.isInteger(message.defeatedAt.high)))
+                    return "defeatedAt: integer|Long expected";
+            return null;
+        };
+
+        /**
+         * Creates a BossRuntime message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.BossRuntime} BossRuntime
+         */
+        BossRuntime.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.BossRuntime)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.BossRuntime();
+            if (object.status != null)
+                message.status = String(object.status);
+            if (object.currentHp != null)
+                if ($util.Long)
+                    (message.currentHp = $util.Long.fromValue(object.currentHp)).unsigned = false;
+                else if (typeof object.currentHp === "string")
+                    message.currentHp = parseInt(object.currentHp, 10);
+                else if (typeof object.currentHp === "number")
+                    message.currentHp = object.currentHp;
+                else if (typeof object.currentHp === "object")
+                    message.currentHp = new $util.LongBits(object.currentHp.low >>> 0, object.currentHp.high >>> 0).toNumber();
+            if (object.parts) {
+                if (!Array.isArray(object.parts))
+                    throw TypeError(".realtime.BossRuntime.parts: array expected");
+                message.parts = [];
+                for (let i = 0; i < object.parts.length; ++i) {
+                    if (typeof object.parts[i] !== "object")
+                        throw TypeError(".realtime.BossRuntime.parts: object expected");
+                    message.parts[i] = $root.realtime.BossPartRuntime.fromObject(object.parts[i], long + 1);
+                }
+            }
+            if (object.defeatedAt != null)
+                if ($util.Long)
+                    (message.defeatedAt = $util.Long.fromValue(object.defeatedAt)).unsigned = false;
+                else if (typeof object.defeatedAt === "string")
+                    message.defeatedAt = parseInt(object.defeatedAt, 10);
+                else if (typeof object.defeatedAt === "number")
+                    message.defeatedAt = object.defeatedAt;
+                else if (typeof object.defeatedAt === "object")
+                    message.defeatedAt = new $util.LongBits(object.defeatedAt.low >>> 0, object.defeatedAt.high >>> 0).toNumber();
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a BossRuntime message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {realtime.BossRuntime} message BossRuntime
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        BossRuntime.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.arrays || options.defaults)
+                object.parts = [];
+            if (options.defaults) {
+                object.status = "";
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.currentHp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.currentHp = options.longs === String ? "0" : 0;
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.defeatedAt = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.defeatedAt = options.longs === String ? "0" : 0;
+            }
+            if (message.status != null && message.hasOwnProperty("status"))
+                object.status = message.status;
+            if (message.currentHp != null && message.hasOwnProperty("currentHp"))
+                if (typeof message.currentHp === "number")
+                    object.currentHp = options.longs === String ? String(message.currentHp) : message.currentHp;
+                else
+                    object.currentHp = options.longs === String ? $util.Long.prototype.toString.call(message.currentHp) : options.longs === Number ? new $util.LongBits(message.currentHp.low >>> 0, message.currentHp.high >>> 0).toNumber() : message.currentHp;
+            if (message.parts && message.parts.length) {
+                object.parts = [];
+                for (let j = 0; j < message.parts.length; ++j)
+                    object.parts[j] = $root.realtime.BossPartRuntime.toObject(message.parts[j], options);
+            }
+            if (message.defeatedAt != null && message.hasOwnProperty("defeatedAt"))
+                if (typeof message.defeatedAt === "number")
+                    object.defeatedAt = options.longs === String ? String(message.defeatedAt) : message.defeatedAt;
+                else
+                    object.defeatedAt = options.longs === String ? $util.Long.prototype.toString.call(message.defeatedAt) : options.longs === Number ? new $util.LongBits(message.defeatedAt.low >>> 0, message.defeatedAt.high >>> 0).toNumber() : message.defeatedAt;
+            return object;
+        };
+
+        /**
+         * Converts this BossRuntime to JSON.
+         * @function toJSON
+         * @memberof realtime.BossRuntime
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        BossRuntime.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for BossRuntime
+         * @function getTypeUrl
+         * @memberof realtime.BossRuntime
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        BossRuntime.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.BossRuntime";
+        };
+
+        return BossRuntime;
+    })();
+
+    realtime.BossDelta = (function() {
+
+        /**
+         * Properties of a BossDelta.
+         * @memberof realtime
+         * @interface IBossDelta
+         * @property {number|Long|null} [totalVotes] BossDelta totalVotes
+         * @property {string|null} [roomId] BossDelta roomId
+         * @property {string|null} [bossId] BossDelta bossId
+         * @property {number|Long|null} [bossVersion] BossDelta bossVersion
+         * @property {realtime.IBossRuntime|null} [runtime] BossDelta runtime
+         */
+
+        /**
+         * Constructs a new BossDelta.
+         * @memberof realtime
+         * @classdesc Represents a BossDelta.
+         * @implements IBossDelta
+         * @constructor
+         * @param {realtime.IBossDelta=} [properties] Properties to set
+         */
+        function BossDelta(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * BossDelta totalVotes.
+         * @member {number|Long} totalVotes
+         * @memberof realtime.BossDelta
+         * @instance
+         */
+        BossDelta.prototype.totalVotes = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossDelta roomId.
+         * @member {string} roomId
+         * @memberof realtime.BossDelta
+         * @instance
+         */
+        BossDelta.prototype.roomId = "";
+
+        /**
+         * BossDelta bossId.
+         * @member {string} bossId
+         * @memberof realtime.BossDelta
+         * @instance
+         */
+        BossDelta.prototype.bossId = "";
+
+        /**
+         * BossDelta bossVersion.
+         * @member {number|Long} bossVersion
+         * @memberof realtime.BossDelta
+         * @instance
+         */
+        BossDelta.prototype.bossVersion = $util.Long ? $util.Long.fromBits(0,0,false) : 0;
+
+        /**
+         * BossDelta runtime.
+         * @member {realtime.IBossRuntime|null|undefined} runtime
+         * @memberof realtime.BossDelta
+         * @instance
+         */
+        BossDelta.prototype.runtime = null;
+
+        /**
+         * Creates a new BossDelta instance using the specified properties.
+         * @function create
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {realtime.IBossDelta=} [properties] Properties to set
+         * @returns {realtime.BossDelta} BossDelta instance
+         */
+        BossDelta.create = function create(properties) {
+            return new BossDelta(properties);
+        };
+
+        /**
+         * Encodes the specified BossDelta message. Does not implicitly {@link realtime.BossDelta.verify|verify} messages.
+         * @function encode
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {realtime.IBossDelta} message BossDelta message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossDelta.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.totalVotes != null && Object.hasOwnProperty.call(message, "totalVotes"))
+                writer.uint32(/* id 1, wireType 0 =*/8).int64(message.totalVotes);
+            if (message.roomId != null && Object.hasOwnProperty.call(message, "roomId"))
+                writer.uint32(/* id 2, wireType 2 =*/18).string(message.roomId);
+            if (message.bossId != null && Object.hasOwnProperty.call(message, "bossId"))
+                writer.uint32(/* id 3, wireType 2 =*/26).string(message.bossId);
+            if (message.bossVersion != null && Object.hasOwnProperty.call(message, "bossVersion"))
+                writer.uint32(/* id 4, wireType 0 =*/32).int64(message.bossVersion);
+            if (message.runtime != null && Object.hasOwnProperty.call(message, "runtime"))
+                $root.realtime.BossRuntime.encode(message.runtime, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+            return writer;
+        };
+
+        /**
+         * Encodes the specified BossDelta message, length delimited. Does not implicitly {@link realtime.BossDelta.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {realtime.IBossDelta} message BossDelta message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        BossDelta.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a BossDelta message from the specified reader or buffer.
+         * @function decode
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {realtime.BossDelta} BossDelta
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossDelta.decode = function decode(reader, length, error, long) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.realtime.BossDelta();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.totalVotes = reader.int64();
+                        break;
+                    }
+                case 2: {
+                        message.roomId = reader.string();
+                        break;
+                    }
+                case 3: {
+                        message.bossId = reader.string();
+                        break;
+                    }
+                case 4: {
+                        message.bossVersion = reader.int64();
+                        break;
+                    }
+                case 5: {
+                        message.runtime = $root.realtime.BossRuntime.decode(reader, reader.uint32(), undefined, long + 1);
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7, long);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a BossDelta message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {realtime.BossDelta} BossDelta
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        BossDelta.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a BossDelta message.
+         * @function verify
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        BossDelta.verify = function verify(message, long) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
+            if (message.totalVotes != null && message.hasOwnProperty("totalVotes"))
+                if (!$util.isInteger(message.totalVotes) && !(message.totalVotes && $util.isInteger(message.totalVotes.low) && $util.isInteger(message.totalVotes.high)))
+                    return "totalVotes: integer|Long expected";
+            if (message.roomId != null && message.hasOwnProperty("roomId"))
+                if (!$util.isString(message.roomId))
+                    return "roomId: string expected";
+            if (message.bossId != null && message.hasOwnProperty("bossId"))
+                if (!$util.isString(message.bossId))
+                    return "bossId: string expected";
+            if (message.bossVersion != null && message.hasOwnProperty("bossVersion"))
+                if (!$util.isInteger(message.bossVersion) && !(message.bossVersion && $util.isInteger(message.bossVersion.low) && $util.isInteger(message.bossVersion.high)))
+                    return "bossVersion: integer|Long expected";
+            if (message.runtime != null && message.hasOwnProperty("runtime")) {
+                let error = $root.realtime.BossRuntime.verify(message.runtime, long + 1);
+                if (error)
+                    return "runtime." + error;
+            }
+            return null;
+        };
+
+        /**
+         * Creates a BossDelta message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {realtime.BossDelta} BossDelta
+         */
+        BossDelta.fromObject = function fromObject(object, long) {
+            if (object instanceof $root.realtime.BossDelta)
+                return object;
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
+            let message = new $root.realtime.BossDelta();
+            if (object.totalVotes != null)
+                if ($util.Long)
+                    (message.totalVotes = $util.Long.fromValue(object.totalVotes)).unsigned = false;
+                else if (typeof object.totalVotes === "string")
+                    message.totalVotes = parseInt(object.totalVotes, 10);
+                else if (typeof object.totalVotes === "number")
+                    message.totalVotes = object.totalVotes;
+                else if (typeof object.totalVotes === "object")
+                    message.totalVotes = new $util.LongBits(object.totalVotes.low >>> 0, object.totalVotes.high >>> 0).toNumber();
+            if (object.roomId != null)
+                message.roomId = String(object.roomId);
+            if (object.bossId != null)
+                message.bossId = String(object.bossId);
+            if (object.bossVersion != null)
+                if ($util.Long)
+                    (message.bossVersion = $util.Long.fromValue(object.bossVersion)).unsigned = false;
+                else if (typeof object.bossVersion === "string")
+                    message.bossVersion = parseInt(object.bossVersion, 10);
+                else if (typeof object.bossVersion === "number")
+                    message.bossVersion = object.bossVersion;
+                else if (typeof object.bossVersion === "object")
+                    message.bossVersion = new $util.LongBits(object.bossVersion.low >>> 0, object.bossVersion.high >>> 0).toNumber();
+            if (object.runtime != null) {
+                if (typeof object.runtime !== "object")
+                    throw TypeError(".realtime.BossDelta.runtime: object expected");
+                message.runtime = $root.realtime.BossRuntime.fromObject(object.runtime, long + 1);
+            }
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a BossDelta message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {realtime.BossDelta} message BossDelta
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        BossDelta.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults) {
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.totalVotes = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.totalVotes = options.longs === String ? "0" : 0;
+                object.roomId = "";
+                object.bossId = "";
+                if ($util.Long) {
+                    let long = new $util.Long(0, 0, false);
+                    object.bossVersion = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                } else
+                    object.bossVersion = options.longs === String ? "0" : 0;
+                object.runtime = null;
+            }
+            if (message.totalVotes != null && message.hasOwnProperty("totalVotes"))
+                if (typeof message.totalVotes === "number")
+                    object.totalVotes = options.longs === String ? String(message.totalVotes) : message.totalVotes;
+                else
+                    object.totalVotes = options.longs === String ? $util.Long.prototype.toString.call(message.totalVotes) : options.longs === Number ? new $util.LongBits(message.totalVotes.low >>> 0, message.totalVotes.high >>> 0).toNumber() : message.totalVotes;
+            if (message.roomId != null && message.hasOwnProperty("roomId"))
+                object.roomId = message.roomId;
+            if (message.bossId != null && message.hasOwnProperty("bossId"))
+                object.bossId = message.bossId;
+            if (message.bossVersion != null && message.hasOwnProperty("bossVersion"))
+                if (typeof message.bossVersion === "number")
+                    object.bossVersion = options.longs === String ? String(message.bossVersion) : message.bossVersion;
+                else
+                    object.bossVersion = options.longs === String ? $util.Long.prototype.toString.call(message.bossVersion) : options.longs === Number ? new $util.LongBits(message.bossVersion.low >>> 0, message.bossVersion.high >>> 0).toNumber() : message.bossVersion;
+            if (message.runtime != null && message.hasOwnProperty("runtime"))
+                object.runtime = $root.realtime.BossRuntime.toObject(message.runtime, options);
+            return object;
+        };
+
+        /**
+         * Converts this BossDelta to JSON.
+         * @function toJSON
+         * @memberof realtime.BossDelta
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        BossDelta.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for BossDelta
+         * @function getTypeUrl
+         * @memberof realtime.BossDelta
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        BossDelta.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/realtime.BossDelta";
+        };
+
+        return BossDelta;
+    })();
+
     realtime.RoomInfo = (function() {
 
         /**

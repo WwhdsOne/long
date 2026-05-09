@@ -45,12 +45,14 @@
   - [architecture/2026-05-06-Redis-降载一期用户态与装备链路优化方案.md](./architecture/2026-05-06-Redis-降载一期用户态与装备链路优化方案.md)
   - [architecture/2026-05-04-天赋战斗态索引改造方案.md](./architecture/2026-05-04-天赋战斗态索引改造方案.md)
   - [architecture/2026-05-08-战斗热链路MessagePack渐进迁移方案.md](./architecture/2026-05-08-战斗热链路MessagePack渐进迁移方案.md)
+  - [architecture/2026-05-09-Boss实时状态Delta化与首包重同步方案.md](./architecture/2026-05-09-Boss实时状态Delta化与首包重同步方案.md)
 - 任务系统实施：
   - [implementation/2026-05-02-任务模型升级实施计划.md](./implementation/2026-05-02-任务模型升级实施计划.md)
   - [implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md](./implementation/2026-05-02-任务红点轮询与资料页稀有度样式实施计划.md)
   - [implementation/2026-05-02-资料页装备栏与生成失败日志实施计划.md](./implementation/2026-05-02-资料页装备栏与生成失败日志实施计划.md)
   - [implementation/2026-05-06-部署后测试与性能验收方案.md](./implementation/2026-05-06-部署后测试与性能验收方案.md)
   - [implementation/2026-05-08-购买体力接入Cloudflare-Turnstile.md](./implementation/2026-05-08-购买体力接入Cloudflare-Turnstile.md)
+  - [implementation/2026-05-09-Boss实时状态Delta化实施计划.md](./implementation/2026-05-09-Boss实时状态Delta化实施计划.md)
 
 ### 天赋与伤害链路
 

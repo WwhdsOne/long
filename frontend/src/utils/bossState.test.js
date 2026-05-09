@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest'
 
-import {applyBossPartStateDeltas, mergeBossState} from './bossState'
+import {applyBossDeltaMessage, applyBossPartStateDeltas, buildBossStateFromSnapshot, mergeBossState} from './bossState'
 
 describe('mergeBossState', () => {
     it('同一只活动 Boss 收到更高血量的旧消息时，不会把血量回退', () => {
@@ -261,6 +261,137 @@ describe('applyBossPartStateDeltas', () => {
                 {x: 0, y: 0, currentHp: '100', maxHp: '100', armor: '0', alive: true, type: 'soft'},
                 {x: 1, y: 0, currentHp: '100', maxHp: '100', armor: '0', alive: true, type: 'heavy'},
             ],
+        })
+    })
+})
+
+describe('Boss Delta 状态机', () => {
+    it('snapshot 会把静态态与运行态合并成完整 Boss 基线', () => {
+        expect(buildBossStateFromSnapshot({
+            bossId: 'boss-1',
+            bossStatic: {
+                name: '木桩王',
+                maxHp: 100,
+                parts: [
+                    {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: 50, armor: 3},
+                    {x: 1, y: 0, type: 'heavy', displayName: '甲壳', maxHp: 50, armor: 8},
+                ],
+            },
+            bossRuntime: {
+                status: 'active',
+                currentHp: 91,
+                parts: [
+                    {x: 0, y: 0, currentHp: 41, alive: true},
+                    {x: 1, y: 0, currentHp: 50, alive: true},
+                ],
+            },
+        })).toMatchObject({
+            id: 'boss-1',
+            name: '木桩王',
+            status: 'active',
+            maxHp: '100',
+            currentHp: '91',
+            parts: [
+                {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: '50', currentHp: '41', armor: '3', alive: true},
+                {x: 1, y: 0, type: 'heavy', displayName: '甲壳', maxHp: '50', currentHp: '50', armor: '8', alive: true},
+            ],
+        })
+    })
+
+    it('版本连续时会合并 boss delta 并推进版本号', () => {
+        const current = {
+            bossStaticById: {
+                'boss-1': {
+                    name: '木桩王',
+                    maxHp: 100,
+                    parts: [
+                        {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: 50, armor: 3},
+                        {x: 1, y: 0, type: 'heavy', displayName: '甲壳', maxHp: 50, armor: 8},
+                    ],
+                },
+            },
+            bossVersion: 5,
+            boss: {
+                id: 'boss-1',
+                name: '木桩王',
+                status: 'active',
+                maxHp: 100,
+                currentHp: 91,
+                parts: [
+                    {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: 50, currentHp: 41, armor: 3, alive: true},
+                    {x: 1, y: 0, type: 'heavy', displayName: '甲壳', maxHp: 50, currentHp: 50, armor: 8, alive: true},
+                ],
+            },
+        }
+
+        expect(applyBossDeltaMessage(current, {
+            bossId: 'boss-1',
+            bossVersion: 6,
+            bossRuntime: {
+                status: 'active',
+                currentHp: 80,
+                parts: [
+                    {x: 1, y: 0, currentHp: 39, alive: true},
+                ],
+            },
+        })).toMatchObject({
+            bossStaticById: current.bossStaticById,
+            bossVersion: 6,
+            boss: {
+                id: 'boss-1',
+                name: '木桩王',
+                status: 'active',
+                maxHp: '100',
+                currentHp: '80',
+                parts: [
+                    {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: '50', currentHp: '41', armor: '3', alive: true},
+                    {x: 1, y: 0, type: 'heavy', displayName: '甲壳', maxHp: '50', currentHp: '39', armor: '8', alive: true},
+                ],
+            },
+            shouldSync: false,
+        })
+    })
+
+    it('版本跳号时会要求重同步而不是盲目 merge', () => {
+        const current = {
+            bossStaticById: {
+                'boss-1': {
+                    name: '木桩王',
+                    maxHp: 100,
+                    parts: [{x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: 100, armor: 3}],
+                },
+            },
+            bossVersion: 6,
+            boss: {
+                id: 'boss-1',
+                name: '木桩王',
+                status: 'active',
+                maxHp: 100,
+                currentHp: 80,
+                parts: [{x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: 100, currentHp: 80, armor: 3, alive: true}],
+            },
+        }
+
+        expect(applyBossDeltaMessage(current, {
+            bossId: 'boss-1',
+            bossVersion: 8,
+            bossRuntime: {
+                status: 'active',
+                currentHp: 70,
+                parts: [{x: 0, y: 0, currentHp: 70, alive: true}],
+            },
+        })).toMatchObject({
+            bossStaticById: current.bossStaticById,
+            bossVersion: 6,
+            boss: {
+                id: 'boss-1',
+                name: '木桩王',
+                status: 'active',
+                maxHp: '100',
+                currentHp: '80',
+                parts: [{x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: '100', currentHp: '80', armor: '3', alive: true}],
+            },
+            shouldSync: true,
         })
     })
 })
