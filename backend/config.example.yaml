@@ -74,12 +74,10 @@ anti_script:
     post_stamina_purchase_click: 4
   click_rate_limit:
     nickname_whitelist: ["压测账号"]
-    short:
-      limit: 60
-      window_ms: 5000
-    medium:
-      limit: 1000
-      window_ms: 600000
-    long:
-      limit: 2500
-      window_ms: 3600000
+    rules:
+      - limit: 60
+        window_ms: 5000
+      - limit: 1000
+        window_ms: 600000
+      - limit: 2500
+        window_ms: 3600000

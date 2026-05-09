@@ -8,8 +8,9 @@ import (
 func TestLimiterDetectsBurstOverflow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Limit:  3,
-		Window: 2 * time.Second,
+		Rules: []WindowConfig{
+			{Limit: 3, Window: 2 * time.Second},
+		},
 		Now: func() time.Time {
 			return now
 		},
@@ -44,8 +45,9 @@ func TestLimiterDetectsBurstOverflow(t *testing.T) {
 
 func TestLimiterKeepsDifferentKeysIndependent(t *testing.T) {
 	limiter := NewLimiter(Config{
-		Limit:  1,
-		Window: time.Second,
+		Rules: []WindowConfig{
+			{Limit: 1, Window: time.Second},
+		},
 	})
 
 	if hit, err := limiter.Detect("198.51.100.10"); err != nil || hit {
@@ -61,7 +63,9 @@ func TestLimiterKeepsDifferentKeysIndependent(t *testing.T) {
 
 func TestLimiterUsesWindowDefaults(t *testing.T) {
 	limiter := NewLimiter(Config{
-		Window: 2 * time.Second,
+		Rules: []WindowConfig{
+			{Window: 2 * time.Second},
+		},
 	})
 
 	for i := range 42 {
@@ -86,8 +90,9 @@ func TestLimiterUsesWindowDefaults(t *testing.T) {
 func TestLimiterSuppressesRepeatedOverflowSignalsUntilWindowResets(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Limit:  2,
-		Window: 2 * time.Second,
+		Rules: []WindowConfig{
+			{Limit: 2, Window: 2 * time.Second},
+		},
 		Now: func() time.Time {
 			return now
 		},
@@ -129,14 +134,12 @@ func TestLimiterSuppressesRepeatedOverflowSignalsUntilWindowResets(t *testing.T)
 	}
 }
 
-func TestLimiterDetectsMediumWindow(t *testing.T) {
+func TestLimiterDetectsSecondRuleWindow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Limit:  10,
-		Window: time.Second,
-		Medium: WindowConfig{
-			Limit:  5,
-			Window: 10 * time.Second,
+		Rules: []WindowConfig{
+			{Limit: 10, Window: time.Second},
+			{Limit: 5, Window: 10 * time.Second},
 		},
 		Now: func() time.Time {
 			return now
@@ -149,27 +152,26 @@ func TestLimiterDetectsMediumWindow(t *testing.T) {
 			t.Fatalf("medium detect %d: %v", i+1, err)
 		}
 		if hit {
-			t.Fatalf("expected medium detect %d below threshold", i+1)
+			t.Fatalf("expected second-rule detect %d below threshold", i+1)
 		}
 		now = now.Add(2 * time.Second)
 	}
 	hit, err := limiter.Detect("medium")
 	if err != nil {
-		t.Fatalf("medium overflow detect: %v", err)
+		t.Fatalf("second-rule overflow detect: %v", err)
 	}
 	if !hit {
-		t.Fatal("expected medium window overflow")
+		t.Fatal("expected second rule window overflow")
 	}
 }
 
-func TestLimiterDetectsLongWindow(t *testing.T) {
+func TestLimiterDetectsThirdRuleWindow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Limit:  10,
-		Window: time.Second,
-		Long: WindowConfig{
-			Limit:  3,
-			Window: time.Hour,
+		Rules: []WindowConfig{
+			{Limit: 10, Window: time.Second},
+			{Limit: 20, Window: 10 * time.Second},
+			{Limit: 3, Window: time.Hour},
 		},
 		Now: func() time.Time {
 			return now

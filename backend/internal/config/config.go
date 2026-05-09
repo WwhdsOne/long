@@ -43,9 +43,7 @@ type AntiScriptPointsConfig struct {
 
 type AntiScriptClickRateLimitConfig struct {
 	NicknameWhitelist []string
-	Short             RateLimitWindowConfig
-	Medium            RateLimitWindowConfig
-	Long              RateLimitWindowConfig
+	Rules             []RateLimitWindowConfig
 }
 
 type AntiScriptConfig struct {
@@ -178,18 +176,10 @@ type fileConfig struct {
 		} `yaml:"points"`
 		ClickRateLimit struct {
 			NicknameWhitelist []string `yaml:"nickname_whitelist"`
-			Short             struct {
+			Rules             []struct {
 				Limit    int `yaml:"limit"`
 				WindowMS int `yaml:"window_ms"`
-			} `yaml:"short"`
-			Medium struct {
-				Limit    int `yaml:"limit"`
-				WindowMS int `yaml:"window_ms"`
-			} `yaml:"medium"`
-			Long struct {
-				Limit    int `yaml:"limit"`
-				WindowMS int `yaml:"window_ms"`
-			} `yaml:"long"`
+			} `yaml:"rules"`
 		} `yaml:"click_rate_limit"`
 	} `yaml:"anti_script"`
 	Admin struct {
@@ -321,18 +311,7 @@ func loadFromConsul() (Config, consulSource, error) {
 			},
 			ClickRateLimit: AntiScriptClickRateLimitConfig{
 				NicknameWhitelist: normalizeStringList(parsed.AntiScript.ClickRateLimit.NicknameWhitelist),
-				Short: RateLimitWindowConfig{
-					Limit:  parsed.AntiScript.ClickRateLimit.Short.Limit,
-					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Short.WindowMS) * time.Millisecond,
-				},
-				Medium: RateLimitWindowConfig{
-					Limit:  parsed.AntiScript.ClickRateLimit.Medium.Limit,
-					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Medium.WindowMS) * time.Millisecond,
-				},
-				Long: RateLimitWindowConfig{
-					Limit:  parsed.AntiScript.ClickRateLimit.Long.Limit,
-					Window: time.Duration(parsed.AntiScript.ClickRateLimit.Long.WindowMS) * time.Millisecond,
-				},
+				Rules:             normalizeRateLimitRules(parsed.AntiScript.ClickRateLimit.Rules),
 			},
 		},
 		Admin: AdminConfig{
@@ -412,6 +391,17 @@ func loadFromConsul() (Config, consulSource, error) {
 }
 
 func validate(config Config) error {
+	if len(config.AntiScript.ClickRateLimit.Rules) == 0 {
+		return errors.New("anti_script.click_rate_limit.rules must contain at least one rule")
+	}
+	for index, rule := range config.AntiScript.ClickRateLimit.Rules {
+		if rule.Limit <= 0 {
+			return fmt.Errorf("anti_script.click_rate_limit.rules[%d].limit must be greater than 0", index)
+		}
+		if rule.Window <= 0 {
+			return fmt.Errorf("anti_script.click_rate_limit.rules[%d].window_ms must be greater than 0", index)
+		}
+	}
 	switch {
 	case config.Port <= 0:
 		return errors.New("port must be greater than 0")
@@ -439,18 +429,6 @@ func validate(config Config) error {
 		return errors.New("anti_script.points.stamina_turnstile_invalid must be greater than 0")
 	case config.AntiScript.Points.PostStaminaPurchaseClick <= 0:
 		return errors.New("anti_script.points.post_stamina_purchase_click must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Short.Limit <= 0:
-		return errors.New("anti_script.click_rate_limit.short.limit must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Short.Window <= 0:
-		return errors.New("anti_script.click_rate_limit.short.window_ms must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Medium.Limit <= 0:
-		return errors.New("anti_script.click_rate_limit.medium.limit must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Medium.Window <= 0:
-		return errors.New("anti_script.click_rate_limit.medium.window_ms must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Long.Limit <= 0:
-		return errors.New("anti_script.click_rate_limit.long.limit must be greater than 0")
-	case config.AntiScript.ClickRateLimit.Long.Window <= 0:
-		return errors.New("anti_script.click_rate_limit.long.window_ms must be greater than 0")
 	case strings.TrimSpace(config.Admin.Username) == "":
 		return errors.New("admin.username is required")
 	case strings.TrimSpace(config.Admin.Password) == "":
@@ -651,4 +629,18 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 		xlog.L().Info("consul config changed, exiting for restart")
 		exitProcess(0)
 	}
+}
+
+func normalizeRateLimitRules(rules []struct {
+	Limit    int `yaml:"limit"`
+	WindowMS int `yaml:"window_ms"`
+}) []RateLimitWindowConfig {
+	normalized := make([]RateLimitWindowConfig, 0, len(rules))
+	for _, rule := range rules {
+		normalized = append(normalized, RateLimitWindowConfig{
+			Limit:  rule.Limit,
+			Window: time.Duration(rule.WindowMS) * time.Millisecond,
+		})
+	}
+	return normalized
 }

@@ -293,16 +293,16 @@ func run() error {
 		return httpapi.AuthenticatedPlayerNickname(ctx, c, playerAuthenticator)
 	})
 	clickLimiter := ratelimit.NewLimiter(ratelimit.Config{
-		Limit:  cfg.AntiScript.ClickRateLimit.Short.Limit,
-		Window: cfg.AntiScript.ClickRateLimit.Short.Window,
-		Medium: ratelimit.WindowConfig{
-			Limit:  cfg.AntiScript.ClickRateLimit.Medium.Limit,
-			Window: cfg.AntiScript.ClickRateLimit.Medium.Window,
-		},
-		Long: ratelimit.WindowConfig{
-			Limit:  cfg.AntiScript.ClickRateLimit.Long.Limit,
-			Window: cfg.AntiScript.ClickRateLimit.Long.Window,
-		},
+		Rules: func() []ratelimit.WindowConfig {
+			rules := make([]ratelimit.WindowConfig, 0, len(cfg.AntiScript.ClickRateLimit.Rules))
+			for _, rule := range cfg.AntiScript.ClickRateLimit.Rules {
+				rules = append(rules, ratelimit.WindowConfig{
+					Limit:  rule.Limit,
+					Window: rule.Window,
+				})
+			}
+			return rules
+		}(),
 	})
 	afkService := httpapi.NewAfkService(store, changeBus, redisClient, cfg.RedisPrefix)
 	defer afkService.Close()
