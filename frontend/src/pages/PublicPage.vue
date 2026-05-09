@@ -85,11 +85,12 @@ function ensureLoginTurnstileScript() {
   return loginTurnstileScriptPromise
 }
 
-function clearLoginTurnstileState() {
-  loginCaptchaRequired.value = false
-  loginTurnstileSiteKey.value = ''
-  loginTurnstileToken.value = ''
-  loginTurnstileError.value = ''
+function resetLoginTurnstileScript() {
+  loginTurnstileScriptPromise = null
+  document.querySelectorAll('script[data-turnstile-script="true"]').forEach((script) => script.remove())
+}
+
+function removeLoginTurnstileWidget() {
   if (window.turnstile && loginTurnstileWidgetId.value !== null) {
     window.turnstile.remove?.(loginTurnstileWidgetId.value)
   }
@@ -97,6 +98,14 @@ function clearLoginTurnstileState() {
   if (loginTurnstileContainer.value) {
     loginTurnstileContainer.value.innerHTML = ''
   }
+}
+
+function clearLoginTurnstileState() {
+  loginCaptchaRequired.value = false
+  loginTurnstileSiteKey.value = ''
+  loginTurnstileToken.value = ''
+  loginTurnstileError.value = ''
+  removeLoginTurnstileWidget()
 }
 
 function resetLoginTurnstileWidget(message = '') {
@@ -132,6 +141,8 @@ async function renderLoginTurnstile() {
       'error-callback': handleLoginCaptchaError,
     })
   } catch {
+    resetLoginTurnstileScript()
+    removeLoginTurnstileWidget()
     loginTurnstileError.value = '验证服务暂时不可用，请稍后再试'
   }
 }
@@ -216,11 +227,20 @@ function handleLoginCaptchaExpired() {
 
 function handleLoginCaptchaError() {
   loginTurnstileToken.value = ''
-  loginTurnstileError.value = '验证组件加载失败，请关闭后重新打开登录窗口重试'
-  if (window.turnstile && loginTurnstileWidgetId.value !== null) {
-    window.turnstile.remove?.(loginTurnstileWidgetId.value)
+  loginTurnstileError.value = '验证组件加载失败，请点击重新加载验证'
+  resetLoginTurnstileScript()
+  removeLoginTurnstileWidget()
+}
+
+async function retryLoginTurnstile() {
+  if (!loginCaptchaRequired.value || !loginTurnstileSiteKey.value) {
+    return
   }
-  loginTurnstileWidgetId.value = null
+  loginTurnstileToken.value = ''
+  loginTurnstileError.value = ''
+  resetLoginTurnstileScript()
+  removeLoginTurnstileWidget()
+  await renderLoginTurnstile()
 }
 
 onBeforeUnmount(() => {
@@ -318,7 +338,7 @@ onBeforeUnmount(() => {
         </div>
         <p class="login-modal__note">输入昵称和密码，首次输入自动注册</p>
         <p class="login-modal__hint">昵称规则：最多 20 字，不得包含敏感词（不区分大小写）。</p>
-        <form class="nickname-form login-modal__form" @submit.prevent="handleLoginSubmit">
+         <form class="nickname-form login-modal__form" @submit.prevent="handleLoginSubmit">
           <input
               v-model="nicknameDraft"
               class="nickname-form__input"
@@ -336,14 +356,22 @@ onBeforeUnmount(() => {
             <p class="login-modal__hint login-modal__hint--captcha">登录前需要先完成人机验证</p>
             <div ref="loginTurnstileContainer" class="login-turnstile-panel__widget"></div>
           </div>
-          <button class="nickname-form__submit" type="submit" :disabled="loginSubmitting || (loginCaptchaRequired && !loginTurnstileToken)">
-            登录 / 首次认领
+           <button class="nickname-form__submit" type="submit" :disabled="loginSubmitting || (loginCaptchaRequired && !loginTurnstileToken)">
+             登录 / 首次认领
+           </button>
+          </form>
+          <p v-if="loginTurnstileError" class="feedback">{{ loginTurnstileError }}</p>
+          <button
+              v-if="loginCaptchaRequired && loginTurnstileError"
+              class="nickname-form__ghost"
+              type="button"
+              @click="retryLoginTurnstile"
+          >
+            重新加载验证
           </button>
-        </form>
-        <p v-if="loginTurnstileError" class="feedback">{{ loginTurnstileError }}</p>
-        <p v-if="errorMessage" class="feedback">{{ errorMessage }}</p>
-      </div>
-    </section>
+          <p v-if="errorMessage" class="feedback">{{ errorMessage }}</p>
+       </div>
+     </section>
 
     <BattlePage v-if="currentPublicPage === 'battle'"/>
     <ShopPage v-else-if="currentPublicPage === 'shop'"/>

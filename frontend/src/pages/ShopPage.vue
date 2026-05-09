@@ -86,11 +86,12 @@ function ensureTurnstileScript() {
   return turnstileScriptPromise
 }
 
-function clearStaminaTurnstileState() {
-  staminaCaptchaRequired.value = false
-  staminaTurnstileSiteKey.value = ''
-  staminaTurnstileToken.value = ''
-  staminaTurnstileError.value = ''
+function resetTurnstileScript() {
+  turnstileScriptPromise = null
+  document.querySelectorAll('script[data-turnstile-script="true"]').forEach((script) => script.remove())
+}
+
+function removeStaminaTurnstileWidget() {
   if (window.turnstile && staminaTurnstileWidgetId.value !== null) {
     window.turnstile.remove?.(staminaTurnstileWidgetId.value)
   }
@@ -98,6 +99,14 @@ function clearStaminaTurnstileState() {
   if (staminaTurnstileContainer.value) {
     staminaTurnstileContainer.value.innerHTML = ''
   }
+}
+
+function clearStaminaTurnstileState() {
+  staminaCaptchaRequired.value = false
+  staminaTurnstileSiteKey.value = ''
+  staminaTurnstileToken.value = ''
+  staminaTurnstileError.value = ''
+  removeStaminaTurnstileWidget()
 }
 
 function resetStaminaTurnstileWidget(message = '') {
@@ -133,6 +142,8 @@ async function renderStaminaTurnstile() {
       'error-callback': handlePurchaseStaminaCaptchaError,
     })
   } catch {
+    resetTurnstileScript()
+    removeStaminaTurnstileWidget()
     staminaTurnstileError.value = '验证服务暂时不可用，请稍后再试'
   }
 }
@@ -195,11 +206,20 @@ function handlePurchaseStaminaCaptchaExpired() {
 
 function handlePurchaseStaminaCaptchaError() {
   staminaTurnstileToken.value = ''
-  staminaTurnstileError.value = '验证组件加载失败，请关闭后重新打开购买窗口重试'
-  if (window.turnstile && staminaTurnstileWidgetId.value !== null) {
-    window.turnstile.remove?.(staminaTurnstileWidgetId.value)
+  staminaTurnstileError.value = '验证组件加载失败，请点击重新加载验证'
+  resetTurnstileScript()
+  removeStaminaTurnstileWidget()
+}
+
+async function retryStaminaTurnstile() {
+  if (!staminaCaptchaRequired.value || !staminaTurnstileSiteKey.value) {
+    return
   }
-  staminaTurnstileWidgetId.value = null
+  staminaTurnstileToken.value = ''
+  staminaTurnstileError.value = ''
+  resetTurnstileScript()
+  removeStaminaTurnstileWidget()
+  await renderStaminaTurnstile()
 }
 
 async function handleUpgradeStaminaCap() {
@@ -338,12 +358,20 @@ onBeforeUnmount(() => {
           </div>
           <p class="shop-stamina-modal__desc">购买后将体力直接补满，并按当日次数刷新下一次价格。</p>
           <p class="shop-stamina-modal__desc">当前体力：{{ stamina.current }} / {{ stamina.max }}，体力上限等级：{{ stamina.maxLevel }} / 50</p>
-          <div v-if="staminaCaptchaRequired" class="shop-turnstile-panel">
-            <p class="shop-stamina-modal__desc shop-stamina-modal__desc--captcha">本次购买需要完成人机验证</p>
-            <div ref="staminaTurnstileContainer" class="shop-turnstile-panel__widget"></div>
-          </div>
-          <p v-if="staminaTurnstileError" class="feedback-panel feedback-panel--compact">{{ staminaTurnstileError }}</p>
-        </section>
+           <div v-if="staminaCaptchaRequired" class="shop-turnstile-panel">
+             <p class="shop-stamina-modal__desc shop-stamina-modal__desc--captcha">本次购买需要完成人机验证</p>
+             <div ref="staminaTurnstileContainer" class="shop-turnstile-panel__widget"></div>
+           </div>
+           <p v-if="staminaTurnstileError" class="feedback-panel feedback-panel--compact">{{ staminaTurnstileError }}</p>
+           <button
+               v-if="staminaCaptchaRequired && staminaTurnstileError"
+               class="nickname-form__ghost"
+               type="button"
+               @click="retryStaminaTurnstile"
+           >
+             重新加载验证
+           </button>
+         </section>
         <div class="shop-stamina-modal__actions">
           <button class="nickname-form__ghost" type="button" @click="closeStaminaConfirm">
             取消购买

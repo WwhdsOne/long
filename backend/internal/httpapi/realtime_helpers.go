@@ -69,11 +69,12 @@ func resolveClickNickname(request clickRequestContext) (string, *apiResponseErro
 	return nickname, nil
 }
 
-func enforceClickRateLimitForClient(ctx context.Context, detector ClickRiskDetector, accountRisk AccountRiskManager, clientID string, nickname string) *apiResponseError {
+func enforceClickRateLimitForClient(ctx context.Context, detector ClickRiskDetector, accountRisk AccountRiskManager, clientID string, nickname string) (bool, *apiResponseError) {
 	if detector == nil || accountRisk == nil {
-		return nil
+		return false, nil
 	}
 
+	nicknameHit := false
 	keys := []string{
 		"ip:" + strings.TrimSpace(clientID),
 		"nickname:" + strings.TrimSpace(nickname),
@@ -85,8 +86,9 @@ func enforceClickRateLimitForClient(ctx context.Context, detector ClickRiskDetec
 		}
 		if err == nil && hit {
 			if strings.HasPrefix(key, "nickname:") {
+				nicknameHit = true
 				if _, recordErr := accountRisk.RecordAccountRiskEvent(ctx, nickname, core.AccountRiskEventClickRateLimitHit); recordErr != nil {
-					return &apiResponseError{
+					return false, &apiResponseError{
 						Status:  consts.StatusInternalServerError,
 						Code:    "ACCOUNT_RISK_FAILED",
 						Message: "风险积分记录失败，请稍后重试。",
@@ -95,14 +97,14 @@ func enforceClickRateLimitForClient(ctx context.Context, detector ClickRiskDetec
 			}
 			continue
 		}
-		return &apiResponseError{
+		return false, &apiResponseError{
 			Status:  consts.StatusInternalServerError,
 			Code:    "RATE_LIMIT_DETECT_FAILED",
 			Message: "点击异常检测失败，请稍后重试。",
 		}
 	}
 
-	return nil
+	return nicknameHit, nil
 }
 
 func shouldSkipClickRateLimit(authenticatorEnabled bool, nickname string, nicknameWhitelist []string) bool {
@@ -170,7 +172,8 @@ func executeButtonClick(ctx context.Context, options Options, request clickReque
 	}
 
 	if !shouldSkipClickRateLimit(request.AuthenticatorEnabled, nickname, options.RateLimitNicknameWhitelist) {
-		if apiErr := enforceClickRateLimitForClient(ctx, options.ClickRiskDetector, options.AccountRisk, request.ClientID, nickname); apiErr != nil {
+		_, apiErr := enforceClickRateLimitForClient(ctx, options.ClickRiskDetector, options.AccountRisk, request.ClientID, nickname)
+		if apiErr != nil {
 			return "", core.ClickResult{}, apiErr
 		}
 	}

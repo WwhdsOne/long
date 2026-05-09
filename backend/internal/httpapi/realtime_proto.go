@@ -39,17 +39,17 @@ type realtimeBossPartStaticPayload struct {
 }
 
 type realtimeBossStaticPayload struct {
-	ID                 string                         `json:"id,omitempty"`
-	TemplateID         string                         `json:"templateId,omitempty"`
-	RoomID             string                         `json:"roomId,omitempty"`
-	QueueID            string                         `json:"queueId,omitempty"`
-	Name               string                         `json:"name,omitempty"`
-	MaxHP              int64                          `json:"maxHp,omitempty"`
-	GoldOnKill         int64                          `json:"goldOnKill,omitempty"`
-	StoneOnKill        int64                          `json:"stoneOnKill,omitempty"`
-	TalentPointsOnKill int64                          `json:"talentPointsOnKill,omitempty"`
+	ID                 string                          `json:"id,omitempty"`
+	TemplateID         string                          `json:"templateId,omitempty"`
+	RoomID             string                          `json:"roomId,omitempty"`
+	QueueID            string                          `json:"queueId,omitempty"`
+	Name               string                          `json:"name,omitempty"`
+	MaxHP              int64                           `json:"maxHp,omitempty"`
+	GoldOnKill         int64                           `json:"goldOnKill,omitempty"`
+	StoneOnKill        int64                           `json:"stoneOnKill,omitempty"`
+	TalentPointsOnKill int64                           `json:"talentPointsOnKill,omitempty"`
 	Parts              []realtimeBossPartStaticPayload `json:"parts,omitempty"`
-	StartedAt          int64                          `json:"startedAt,omitempty"`
+	StartedAt          int64                           `json:"startedAt,omitempty"`
 }
 
 type realtimeBossPartRuntimePayload struct {
@@ -67,10 +67,10 @@ type realtimeBossRuntimePayload struct {
 }
 
 type realtimeBossDeltaPayload struct {
-	TotalVotes  int64                     `json:"totalVotes"`
-	RoomID      string                    `json:"roomId,omitempty"`
-	BossID      string                    `json:"bossId,omitempty"`
-	BossVersion int64                     `json:"bossVersion,omitempty"`
+	TotalVotes  int64                       `json:"totalVotes"`
+	RoomID      string                      `json:"roomId,omitempty"`
+	BossID      string                      `json:"bossId,omitempty"`
+	BossVersion int64                       `json:"bossVersion,omitempty"`
 	BossRuntime *realtimeBossRuntimePayload `json:"bossRuntime,omitempty"`
 }
 

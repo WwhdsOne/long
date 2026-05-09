@@ -219,6 +219,45 @@ describe('realtimeTransport', () => {
         ])
     })
 
+    it('sendClick 不再编码鼠标轨迹摘要', () => {
+        const sockets = []
+        const transport = createRealtimeTransport({
+            createWebSocket(url) {
+                const socket = new FakeWebSocket(url)
+                sockets.push(socket)
+                return socket
+            },
+            createEventSource() {
+                throw new Error('should not create event source')
+            },
+        })
+
+        transport.connect({nickname: '阿明'})
+        sockets[0].emitOpen()
+
+        const summary = {
+            sampleCount: 12,
+            windowMs: 600,
+            distanceTotal: 80,
+            distanceStraight: 78,
+            detourRatio: 1.025,
+            speedAvg: 0.133,
+            speedStdLike: 0.01,
+            directionChanges: 1,
+            pauseCount: 0,
+            hasEffectiveMove: true,
+        }
+        expect(transport.sendClick('feel', 0, summary)).toBe(true)
+
+        expect(decodeRealtimeBinaryMessage(sockets[0].sent.at(-1))).toEqual({
+            type: 'click_request',
+            payload: {
+                slug: 'feel',
+                comboCount: 0,
+            },
+        })
+    })
+
     it('click_ack 的 0 坐标部位增量不会在二进制解码时丢失 x/y', () => {
         const encodedAck = realtime.ClickAck.encode(realtime.ClickAck.create({
             button: {key: 'boss-part:0-2'},

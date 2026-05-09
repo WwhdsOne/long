@@ -44,21 +44,21 @@ type realtimeClientMessage struct {
 }
 
 type realtimeSnapshotMessage struct {
-	Type      string                     `json:"type"`
-	Public    realtimeSnapshotPublic     `json:"public"`
-	User      any                        `json:"user"`
-	RoomState core.RoomList              `json:"roomState"`
+	Type      string                 `json:"type"`
+	Public    realtimeSnapshotPublic `json:"public"`
+	User      any                    `json:"user"`
+	RoomState core.RoomList          `json:"roomState"`
 }
 
 type realtimeSnapshotPublic struct {
-	TotalVotes          int64                    `json:"totalVotes"`
-	Leaderboard         []core.LeaderboardEntry  `json:"leaderboard"`
-	RoomID              string                   `json:"roomId,omitempty"`
-	BossID              string                   `json:"bossId,omitempty"`
-	BossVersion         int64                    `json:"bossVersion,omitempty"`
-	BossStatic          *realtimeBossStaticPayload `json:"bossStatic,omitempty"`
+	TotalVotes          int64                       `json:"totalVotes"`
+	Leaderboard         []core.LeaderboardEntry     `json:"leaderboard"`
+	RoomID              string                      `json:"roomId,omitempty"`
+	BossID              string                      `json:"bossId,omitempty"`
+	BossVersion         int64                       `json:"bossVersion,omitempty"`
+	BossStatic          *realtimeBossStaticPayload  `json:"bossStatic,omitempty"`
 	BossRuntime         *realtimeBossRuntimePayload `json:"bossRuntime,omitempty"`
-	AnnouncementVersion string                   `json:"announcementVersion,omitempty"`
+	AnnouncementVersion string                      `json:"announcementVersion,omitempty"`
 }
 
 type realtimeDeltaMessage struct {

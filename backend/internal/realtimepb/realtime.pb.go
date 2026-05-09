@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v5.29.3
-// source: backend/internal/realtimepb/realtime.proto
+// source: internal/realtimepb/realtime.proto
 
 package realtimepb
 
@@ -31,7 +31,7 @@ type ClickRequest struct {
 
 func (x *ClickRequest) Reset() {
 	*x = ClickRequest{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[0]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +43,7 @@ func (x *ClickRequest) String() string {
 func (*ClickRequest) ProtoMessage() {}
 
 func (x *ClickRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[0]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +56,7 @@ func (x *ClickRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClickRequest.ProtoReflect.Descriptor instead.
 func (*ClickRequest) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{0}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ClickRequest) GetSlug() string {
@@ -92,7 +92,7 @@ type ClickAck struct {
 
 func (x *ClickAck) Reset() {
 	*x = ClickAck{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[1]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -104,7 +104,7 @@ func (x *ClickAck) String() string {
 func (*ClickAck) ProtoMessage() {}
 
 func (x *ClickAck) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[1]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -117,7 +117,7 @@ func (x *ClickAck) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClickAck.ProtoReflect.Descriptor instead.
 func (*ClickAck) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{1}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ClickAck) GetDelta() int64 {
@@ -212,7 +212,7 @@ type UserDeltaPatch struct {
 
 func (x *UserDeltaPatch) Reset() {
 	*x = UserDeltaPatch{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[2]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -224,7 +224,7 @@ func (x *UserDeltaPatch) String() string {
 func (*UserDeltaPatch) ProtoMessage() {}
 
 func (x *UserDeltaPatch) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[2]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -237,7 +237,7 @@ func (x *UserDeltaPatch) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserDeltaPatch.ProtoReflect.Descriptor instead.
 func (*UserDeltaPatch) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{2}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *UserDeltaPatch) GetGold() int64 {
@@ -298,7 +298,7 @@ type ButtonRef struct {
 
 func (x *ButtonRef) Reset() {
 	*x = ButtonRef{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[3]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -310,7 +310,7 @@ func (x *ButtonRef) String() string {
 func (*ButtonRef) ProtoMessage() {}
 
 func (x *ButtonRef) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[3]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -323,7 +323,7 @@ func (x *ButtonRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ButtonRef.ProtoReflect.Descriptor instead.
 func (*ButtonRef) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{3}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ButtonRef) GetKey() string {
@@ -347,7 +347,7 @@ type PublicDelta struct {
 
 func (x *PublicDelta) Reset() {
 	*x = PublicDelta{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[4]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +359,7 @@ func (x *PublicDelta) String() string {
 func (*PublicDelta) ProtoMessage() {}
 
 func (x *PublicDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[4]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +372,7 @@ func (x *PublicDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicDelta.ProtoReflect.Descriptor instead.
 func (*PublicDelta) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{4}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PublicDelta) GetTotalVotes() int64 {
@@ -428,7 +428,7 @@ type PublicMeta struct {
 
 func (x *PublicMeta) Reset() {
 	*x = PublicMeta{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[5]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -440,7 +440,7 @@ func (x *PublicMeta) String() string {
 func (*PublicMeta) ProtoMessage() {}
 
 func (x *PublicMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[5]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -453,7 +453,7 @@ func (x *PublicMeta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublicMeta.ProtoReflect.Descriptor instead.
 func (*PublicMeta) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{5}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PublicMeta) GetLeaderboard() []*LeaderboardEntry {
@@ -492,7 +492,7 @@ type BossPartStatic struct {
 
 func (x *BossPartStatic) Reset() {
 	*x = BossPartStatic{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[6]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +504,7 @@ func (x *BossPartStatic) String() string {
 func (*BossPartStatic) ProtoMessage() {}
 
 func (x *BossPartStatic) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[6]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +517,7 @@ func (x *BossPartStatic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossPartStatic.ProtoReflect.Descriptor instead.
 func (*BossPartStatic) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{6}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BossPartStatic) GetX() int32 {
@@ -588,7 +588,7 @@ type BossStatic struct {
 
 func (x *BossStatic) Reset() {
 	*x = BossStatic{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[7]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -600,7 +600,7 @@ func (x *BossStatic) String() string {
 func (*BossStatic) ProtoMessage() {}
 
 func (x *BossStatic) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[7]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -613,7 +613,7 @@ func (x *BossStatic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossStatic.ProtoReflect.Descriptor instead.
 func (*BossStatic) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{7}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BossStatic) GetId() string {
@@ -705,7 +705,7 @@ type BossPartRuntime struct {
 
 func (x *BossPartRuntime) Reset() {
 	*x = BossPartRuntime{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[8]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -717,7 +717,7 @@ func (x *BossPartRuntime) String() string {
 func (*BossPartRuntime) ProtoMessage() {}
 
 func (x *BossPartRuntime) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[8]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -730,7 +730,7 @@ func (x *BossPartRuntime) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossPartRuntime.ProtoReflect.Descriptor instead.
 func (*BossPartRuntime) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{8}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BossPartRuntime) GetX() int32 {
@@ -773,7 +773,7 @@ type BossRuntime struct {
 
 func (x *BossRuntime) Reset() {
 	*x = BossRuntime{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[9]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -785,7 +785,7 @@ func (x *BossRuntime) String() string {
 func (*BossRuntime) ProtoMessage() {}
 
 func (x *BossRuntime) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[9]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -798,7 +798,7 @@ func (x *BossRuntime) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossRuntime.ProtoReflect.Descriptor instead.
 func (*BossRuntime) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{9}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *BossRuntime) GetStatus() string {
@@ -842,7 +842,7 @@ type BossDelta struct {
 
 func (x *BossDelta) Reset() {
 	*x = BossDelta{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[10]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -854,7 +854,7 @@ func (x *BossDelta) String() string {
 func (*BossDelta) ProtoMessage() {}
 
 func (x *BossDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[10]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +867,7 @@ func (x *BossDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossDelta.ProtoReflect.Descriptor instead.
 func (*BossDelta) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{10}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BossDelta) GetTotalVotes() int64 {
@@ -927,7 +927,7 @@ type RoomInfo struct {
 
 func (x *RoomInfo) Reset() {
 	*x = RoomInfo{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[11]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -939,7 +939,7 @@ func (x *RoomInfo) String() string {
 func (*RoomInfo) ProtoMessage() {}
 
 func (x *RoomInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[11]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -952,7 +952,7 @@ func (x *RoomInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomInfo.ProtoReflect.Descriptor instead.
 func (*RoomInfo) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{11}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RoomInfo) GetId() string {
@@ -1064,7 +1064,7 @@ type RoomState struct {
 
 func (x *RoomState) Reset() {
 	*x = RoomState{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[12]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1076,7 +1076,7 @@ func (x *RoomState) String() string {
 func (*RoomState) ProtoMessage() {}
 
 func (x *RoomState) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[12]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1089,7 +1089,7 @@ func (x *RoomState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RoomState.ProtoReflect.Descriptor instead.
 func (*RoomState) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{12}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RoomState) GetCurrentRoomId() string {
@@ -1137,7 +1137,7 @@ type UserDelta struct {
 
 func (x *UserDelta) Reset() {
 	*x = UserDelta{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[13]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1149,7 +1149,7 @@ func (x *UserDelta) String() string {
 func (*UserDelta) ProtoMessage() {}
 
 func (x *UserDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[13]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1162,7 +1162,7 @@ func (x *UserDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserDelta.ProtoReflect.Descriptor instead.
 func (*UserDelta) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{13}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *UserDelta) GetUserStats() *UserStats {
@@ -1295,7 +1295,7 @@ type StaminaState struct {
 
 func (x *StaminaState) Reset() {
 	*x = StaminaState{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[14]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1307,7 +1307,7 @@ func (x *StaminaState) String() string {
 func (*StaminaState) ProtoMessage() {}
 
 func (x *StaminaState) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[14]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1320,7 +1320,7 @@ func (x *StaminaState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StaminaState.ProtoReflect.Descriptor instead.
 func (*StaminaState) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{14}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *StaminaState) GetCurrent() int64 {
@@ -1403,7 +1403,7 @@ type UserStats struct {
 
 func (x *UserStats) Reset() {
 	*x = UserStats{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[15]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1415,7 +1415,7 @@ func (x *UserStats) String() string {
 func (*UserStats) ProtoMessage() {}
 
 func (x *UserStats) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[15]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1428,7 +1428,7 @@ func (x *UserStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserStats.ProtoReflect.Descriptor instead.
 func (*UserStats) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{15}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *UserStats) GetNickname() string {
@@ -1456,7 +1456,7 @@ type LeaderboardEntry struct {
 
 func (x *LeaderboardEntry) Reset() {
 	*x = LeaderboardEntry{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[16]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1468,7 +1468,7 @@ func (x *LeaderboardEntry) String() string {
 func (*LeaderboardEntry) ProtoMessage() {}
 
 func (x *LeaderboardEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[16]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1481,7 +1481,7 @@ func (x *LeaderboardEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LeaderboardEntry.ProtoReflect.Descriptor instead.
 func (*LeaderboardEntry) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{16}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *LeaderboardEntry) GetRank() int32 {
@@ -1522,7 +1522,7 @@ type BossPart struct {
 
 func (x *BossPart) Reset() {
 	*x = BossPart{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[17]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1534,7 +1534,7 @@ func (x *BossPart) String() string {
 func (*BossPart) ProtoMessage() {}
 
 func (x *BossPart) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[17]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1547,7 +1547,7 @@ func (x *BossPart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossPart.ProtoReflect.Descriptor instead.
 func (*BossPart) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{17}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *BossPart) GetX() int32 {
@@ -1635,7 +1635,7 @@ type Boss struct {
 
 func (x *Boss) Reset() {
 	*x = Boss{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[18]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1647,7 +1647,7 @@ func (x *Boss) String() string {
 func (*Boss) ProtoMessage() {}
 
 func (x *Boss) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[18]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1660,7 +1660,7 @@ func (x *Boss) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Boss.ProtoReflect.Descriptor instead.
 func (*Boss) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{18}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Boss) GetId() string {
@@ -1772,7 +1772,7 @@ type BossLeaderboardEntry struct {
 
 func (x *BossLeaderboardEntry) Reset() {
 	*x = BossLeaderboardEntry{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[19]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1784,7 +1784,7 @@ func (x *BossLeaderboardEntry) String() string {
 func (*BossLeaderboardEntry) ProtoMessage() {}
 
 func (x *BossLeaderboardEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[19]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1797,7 +1797,7 @@ func (x *BossLeaderboardEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossLeaderboardEntry.ProtoReflect.Descriptor instead.
 func (*BossLeaderboardEntry) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{19}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *BossLeaderboardEntry) GetRank() int32 {
@@ -1832,7 +1832,7 @@ type BossUserStats struct {
 
 func (x *BossUserStats) Reset() {
 	*x = BossUserStats{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[20]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1844,7 +1844,7 @@ func (x *BossUserStats) String() string {
 func (*BossUserStats) ProtoMessage() {}
 
 func (x *BossUserStats) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[20]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1857,7 +1857,7 @@ func (x *BossUserStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossUserStats.ProtoReflect.Descriptor instead.
 func (*BossUserStats) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{20}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *BossUserStats) GetNickname() string {
@@ -1910,7 +1910,7 @@ type InventoryItem struct {
 
 func (x *InventoryItem) Reset() {
 	*x = InventoryItem{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[21]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1922,7 +1922,7 @@ func (x *InventoryItem) String() string {
 func (*InventoryItem) ProtoMessage() {}
 
 func (x *InventoryItem) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[21]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1935,7 +1935,7 @@ func (x *InventoryItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InventoryItem.ProtoReflect.Descriptor instead.
 func (*InventoryItem) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{21}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *InventoryItem) GetItemId() string {
@@ -2099,7 +2099,7 @@ type Loadout struct {
 
 func (x *Loadout) Reset() {
 	*x = Loadout{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[22]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2111,7 +2111,7 @@ func (x *Loadout) String() string {
 func (*Loadout) ProtoMessage() {}
 
 func (x *Loadout) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[22]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2124,7 +2124,7 @@ func (x *Loadout) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Loadout.ProtoReflect.Descriptor instead.
 func (*Loadout) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{22}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Loadout) GetWeapon() *InventoryItem {
@@ -2193,7 +2193,7 @@ type CombatStats struct {
 
 func (x *CombatStats) Reset() {
 	*x = CombatStats{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[23]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2205,7 +2205,7 @@ func (x *CombatStats) String() string {
 func (*CombatStats) ProtoMessage() {}
 
 func (x *CombatStats) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[23]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2218,7 +2218,7 @@ func (x *CombatStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CombatStats.ProtoReflect.Descriptor instead.
 func (*CombatStats) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{23}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *CombatStats) GetEffectiveIncrement() int64 {
@@ -2348,7 +2348,7 @@ type Reward struct {
 
 func (x *Reward) Reset() {
 	*x = Reward{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[24]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2360,7 +2360,7 @@ func (x *Reward) String() string {
 func (*Reward) ProtoMessage() {}
 
 func (x *Reward) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[24]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2373,7 +2373,7 @@ func (x *Reward) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reward.ProtoReflect.Descriptor instead.
 func (*Reward) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{24}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Reward) GetBossId() string {
@@ -2440,7 +2440,7 @@ type TalentTriggerEvent struct {
 
 func (x *TalentTriggerEvent) Reset() {
 	*x = TalentTriggerEvent{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[25]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2452,7 +2452,7 @@ func (x *TalentTriggerEvent) String() string {
 func (*TalentTriggerEvent) ProtoMessage() {}
 
 func (x *TalentTriggerEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[25]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2465,7 +2465,7 @@ func (x *TalentTriggerEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TalentTriggerEvent.ProtoReflect.Descriptor instead.
 func (*TalentTriggerEvent) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{25}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *TalentTriggerEvent) GetTalentId() string {
@@ -2531,7 +2531,7 @@ type BossPartStateDelta struct {
 
 func (x *BossPartStateDelta) Reset() {
 	*x = BossPartStateDelta{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[26]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2543,7 +2543,7 @@ func (x *BossPartStateDelta) String() string {
 func (*BossPartStateDelta) ProtoMessage() {}
 
 func (x *BossPartStateDelta) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[26]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2556,7 +2556,7 @@ func (x *BossPartStateDelta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BossPartStateDelta.ProtoReflect.Descriptor instead.
 func (*BossPartStateDelta) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{26}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *BossPartStateDelta) GetX() int32 {
@@ -2618,7 +2618,7 @@ type TalentBleedState struct {
 
 func (x *TalentBleedState) Reset() {
 	*x = TalentBleedState{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[27]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2630,7 +2630,7 @@ func (x *TalentBleedState) String() string {
 func (*TalentBleedState) ProtoMessage() {}
 
 func (x *TalentBleedState) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[27]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2643,7 +2643,7 @@ func (x *TalentBleedState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TalentBleedState.ProtoReflect.Descriptor instead.
 func (*TalentBleedState) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{27}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *TalentBleedState) GetStartedAtMs() int64 {
@@ -2758,7 +2758,7 @@ type TalentCombatState struct {
 
 func (x *TalentCombatState) Reset() {
 	*x = TalentCombatState{}
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[28]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2770,7 +2770,7 @@ func (x *TalentCombatState) String() string {
 func (*TalentCombatState) ProtoMessage() {}
 
 func (x *TalentCombatState) ProtoReflect() protoreflect.Message {
-	mi := &file_backend_internal_realtimepb_realtime_proto_msgTypes[28]
+	mi := &file_internal_realtimepb_realtime_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2783,7 +2783,7 @@ func (x *TalentCombatState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TalentCombatState.ProtoReflect.Descriptor instead.
 func (*TalentCombatState) Descriptor() ([]byte, []int) {
-	return file_backend_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{28}
+	return file_internal_realtimepb_realtime_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *TalentCombatState) GetOmenStacks() int32 {
@@ -3073,11 +3073,11 @@ func (x *TalentCombatState) GetPartMagicTriggerCount() map[string]int64 {
 	return nil
 }
 
-var File_backend_internal_realtimepb_realtime_proto protoreflect.FileDescriptor
+var File_internal_realtimepb_realtime_proto protoreflect.FileDescriptor
 
-const file_backend_internal_realtimepb_realtime_proto_rawDesc = "" +
+const file_internal_realtimepb_realtime_proto_rawDesc = "" +
 	"\n" +
-	"*backend/internal/realtimepb/realtime.proto\x12\brealtime\"C\n" +
+	"\"internal/realtimepb/realtime.proto\x12\brealtime\"C\n" +
 	"\fClickRequest\x12\x12\n" +
 	"\x04slug\x18\x01 \x01(\tR\x04slug\x12\x1f\n" +
 	"\vcombo_count\x18\x02 \x01(\x03R\n" +
@@ -3435,19 +3435,19 @@ const file_backend_internal_realtimepb_realtime_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01B\x1aZ\x18long/internal/realtimepbb\x06proto3"
 
 var (
-	file_backend_internal_realtimepb_realtime_proto_rawDescOnce sync.Once
-	file_backend_internal_realtimepb_realtime_proto_rawDescData []byte
+	file_internal_realtimepb_realtime_proto_rawDescOnce sync.Once
+	file_internal_realtimepb_realtime_proto_rawDescData []byte
 )
 
-func file_backend_internal_realtimepb_realtime_proto_rawDescGZIP() []byte {
-	file_backend_internal_realtimepb_realtime_proto_rawDescOnce.Do(func() {
-		file_backend_internal_realtimepb_realtime_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_backend_internal_realtimepb_realtime_proto_rawDesc), len(file_backend_internal_realtimepb_realtime_proto_rawDesc)))
+func file_internal_realtimepb_realtime_proto_rawDescGZIP() []byte {
+	file_internal_realtimepb_realtime_proto_rawDescOnce.Do(func() {
+		file_internal_realtimepb_realtime_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_realtimepb_realtime_proto_rawDesc), len(file_internal_realtimepb_realtime_proto_rawDesc)))
 	})
-	return file_backend_internal_realtimepb_realtime_proto_rawDescData
+	return file_internal_realtimepb_realtime_proto_rawDescData
 }
 
-var file_backend_internal_realtimepb_realtime_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
-var file_backend_internal_realtimepb_realtime_proto_goTypes = []any{
+var file_internal_realtimepb_realtime_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_internal_realtimepb_realtime_proto_goTypes = []any{
 	(*ClickRequest)(nil),         // 0: realtime.ClickRequest
 	(*ClickAck)(nil),             // 1: realtime.ClickAck
 	(*UserDeltaPatch)(nil),       // 2: realtime.UserDeltaPatch
@@ -3488,7 +3488,7 @@ var file_backend_internal_realtimepb_realtime_proto_goTypes = []any{
 	nil,                          // 37: realtime.TalentCombatState.SkinnerDurationByPartEntry
 	nil,                          // 38: realtime.TalentCombatState.PartMagicTriggerCountEntry
 }
-var file_backend_internal_realtimepb_realtime_proto_depIdxs = []int32{
+var file_internal_realtimepb_realtime_proto_depIdxs = []int32{
 	25, // 0: realtime.ClickAck.talent_events:type_name -> realtime.TalentTriggerEvent
 	26, // 1: realtime.ClickAck.part_state_deltas:type_name -> realtime.BossPartStateDelta
 	28, // 2: realtime.ClickAck.talent_combat_state:type_name -> realtime.TalentCombatState
@@ -3536,26 +3536,26 @@ var file_backend_internal_realtimepb_realtime_proto_depIdxs = []int32{
 	0,  // [0:40] is the sub-list for field type_name
 }
 
-func init() { file_backend_internal_realtimepb_realtime_proto_init() }
-func file_backend_internal_realtimepb_realtime_proto_init() {
-	if File_backend_internal_realtimepb_realtime_proto != nil {
+func init() { file_internal_realtimepb_realtime_proto_init() }
+func file_internal_realtimepb_realtime_proto_init() {
+	if File_internal_realtimepb_realtime_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_backend_internal_realtimepb_realtime_proto_rawDesc), len(file_backend_internal_realtimepb_realtime_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_realtimepb_realtime_proto_rawDesc), len(file_internal_realtimepb_realtime_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   39,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_backend_internal_realtimepb_realtime_proto_goTypes,
-		DependencyIndexes: file_backend_internal_realtimepb_realtime_proto_depIdxs,
-		MessageInfos:      file_backend_internal_realtimepb_realtime_proto_msgTypes,
+		GoTypes:           file_internal_realtimepb_realtime_proto_goTypes,
+		DependencyIndexes: file_internal_realtimepb_realtime_proto_depIdxs,
+		MessageInfos:      file_internal_realtimepb_realtime_proto_msgTypes,
 	}.Build()
-	File_backend_internal_realtimepb_realtime_proto = out.File
-	file_backend_internal_realtimepb_realtime_proto_goTypes = nil
-	file_backend_internal_realtimepb_realtime_proto_depIdxs = nil
+	File_internal_realtimepb_realtime_proto = out.File
+	file_internal_realtimepb_realtime_proto_goTypes = nil
+	file_internal_realtimepb_realtime_proto_depIdxs = nil
 }

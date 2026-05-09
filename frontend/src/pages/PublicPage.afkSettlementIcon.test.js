@@ -56,5 +56,8 @@ describe('挂机结算图标时序', () => {
         expect(pageSource).toContain('验证服务暂时不可用，请稍后再试')
         expect(pageSource).toContain('handleLoginCaptchaSuccess')
         expect(pageSource).toContain('clearLoginTurnstileState')
+        expect(pageSource).toContain('retryLoginTurnstile')
+        expect(pageSource).toContain('重新加载验证')
+        expect(pageSource).not.toContain('请关闭后重新打开登录窗口重试')
     })
 })

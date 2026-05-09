@@ -77,6 +77,7 @@
 ### 反滥用
 
 - [architecture/2026-05-05-实时点击官方客户端接入与挑战令牌方案.md](./architecture/2026-05-05-实时点击官方客户端接入与挑战令牌方案.md)
+- [architecture/2026-05-09-20Hz鼠标轨迹保守组合风控方案.md](./architecture/2026-05-09-20Hz鼠标轨迹保守组合风控方案.md)
 - [reports/2026-05-09-统一账号积分反脚本系统重构总结.md](./reports/2026-05-09-统一账号积分反脚本系统重构总结.md)
 - [superpowers/specs/2026-05-03-script-detection-design.md](./superpowers/specs/2026-05-03-script-detection-design.md)
 

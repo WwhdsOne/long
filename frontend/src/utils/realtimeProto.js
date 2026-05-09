@@ -94,6 +94,11 @@ export function decodeRealtimeBinaryMessage(frame) {
     const {messageType, body} = unpackFrame(frame)
 
     switch (messageType) {
+        case realtimeBinaryType.clickRequest:
+            return {
+                type: 'click_request',
+                payload: toPlain(realtime.ClickRequest, realtime.ClickRequest.decode(body)),
+            }
         case realtimeBinaryType.clickAck: {
             const message = realtime.ClickAck.decode(body)
             return {

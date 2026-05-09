@@ -73,7 +73,6 @@ func decodeRealtimeMessage[T any](t *testing.T, payload []byte) T {
 
 func encodeRealtimeBinaryClickRequestForTest(t *testing.T, slug string, comboCount int64) []byte {
 	t.Helper()
-
 	payload, err := packRealtimeBinaryMessage(realtimeBinaryTypeClickRequest, &realtimepb.ClickRequest{
 		Slug:       slug,
 		ComboCount: comboCount,
@@ -348,7 +347,7 @@ func TestRealtimeSessionHelloReturnsSlimPublicSnapshot(t *testing.T) {
 	}
 
 	response := decodeRealtimeMessage[struct {
-		Type string `json:"type"`
+		Type   string `json:"type"`
 		Public struct {
 			AnnouncementVersion string `json:"announcementVersion"`
 			RoomID              string `json:"roomId"`

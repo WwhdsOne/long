@@ -27,10 +27,9 @@ describe('BattlePage 光标与伤害说明', () => {
         expect(styleSource).toContain('color: #fee2e2;')
     })
 
-    it('改用局部原生事件，只在 Boss 5x5 网格内显示 PNG 光标', () => {
+    it('Boss 网格已移除鼠标轨迹采样，只保留光标显示所需事件', () => {
         expect(battleSource).toContain("ref=\"bossGridRef\"")
         expect(battleSource).toContain('@pointerenter="handleBossGridPointerEnter"')
-        expect(battleSource).toContain('@pointermove="handleBossGridPointerMove"')
         expect(battleSource).toContain('@pointerleave="handleBossGridPointerLeave"')
         expect(battleSource).toContain('https://hai-world2.oss-cn-beijing.aliyuncs.com/effects/click-sword_basic.png')
         expect(battleSource).toContain(':src="bossSwordCursorUrl"')
@@ -50,6 +49,9 @@ describe('BattlePage 光标与伤害说明', () => {
         expect(styleSource).toContain('will-change: transform, opacity;')
         expect(styleSource).toContain('transition: opacity 0.08s ease-out;')
         expect(styleSource).toContain('.boss-sword-cursor__image {')
+        expect(battleSource).toContain('@pointermove="handleBossGridPointerMove"')
+        expect(battleSource).not.toContain('createMousePathTracker')
+        expect(battleSource).not.toContain('mousePathTracker')
         expect(battleSource).not.toContain("document.addEventListener('pointermove'")
         expect(battleSource).not.toContain("document.addEventListener('pointerdown'")
         expect(battleSource).not.toContain("document.addEventListener('click'")
