@@ -51,6 +51,7 @@ const salvageRuleModalOpen = ref(false)
 
 const enhanceAttackGrowth = 1.12
 const enhancePercentGrowth = 1.08
+const enhanceFlatPercentStep = 0.001
 const enhanceMagicProcRateStep = 0.001
 
 function formatTrimmedNumber(value, digits = 2) {
@@ -390,6 +391,17 @@ function previewScaledStat(currentValue, currentLevel, targetLevel) {
   return baseValue * (enhancePercentGrowth ** safeTargetLevel)
 }
 
+function previewFlatStepStat(currentValue, currentLevel, targetLevel) {
+  const safeCurrentValue = Number(currentValue || 0)
+  const safeCurrentLevel = Math.max(0, Number(currentLevel || 0))
+  const safeTargetLevel = Math.max(safeCurrentLevel, Number(targetLevel || 0))
+  if (!Number.isFinite(safeCurrentValue) || safeCurrentValue === 0) return 0
+  if (safeTargetLevel === safeCurrentLevel) return safeCurrentValue
+
+  const baseValue = safeCurrentValue - safeCurrentLevel * enhanceFlatPercentStep
+  return baseValue > 0 ? baseValue + safeTargetLevel * enhanceFlatPercentStep : 0
+}
+
 function previewMagicProcRateBonus(currentValue, currentLevel, targetLevel) {
   const safeCurrentValue = Number(currentValue || 0)
   const safeCurrentLevel = Math.max(0, Number(currentLevel || 0))
@@ -426,8 +438,8 @@ function buildEnhancePreviewItem(item, levels) {
     const baseAttackPower = recoverBaseAttackPower(preview.attackPower, currentLevel)
     preview.attackPower = Math.round(baseAttackPower * (enhanceAttackGrowth ** targetLevel))
   }
-  preview.armorPenPercent = previewScaledStat(preview.armorPenPercent, currentLevel, targetLevel)
-  preview.critRate = previewScaledStat(preview.critRate, currentLevel, targetLevel)
+  preview.armorPenPercent = previewFlatStepStat(preview.armorPenPercent, currentLevel, targetLevel)
+  preview.critRate = previewFlatStepStat(preview.critRate, currentLevel, targetLevel)
   preview.critDamageMultiplier = previewScaledStat(preview.critDamageMultiplier, currentLevel, targetLevel)
   preview.partTypeDamageSoft = previewScaledStat(preview.partTypeDamageSoft, currentLevel, targetLevel)
   preview.partTypeDamageHeavy = previewScaledStat(preview.partTypeDamageHeavy, currentLevel, targetLevel)

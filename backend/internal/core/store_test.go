@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -3462,6 +3463,41 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 	}
 	if result.CriticalDamage != 200 {
 		t.Fatalf("expected critical damage 200, got %+v", result)
+	}
+}
+
+func TestBuildInventoryItemEnhanceCritRateAndArmorPenUseFlatStep(t *testing.T) {
+	item := buildInventoryItem(EquipmentDefinition{
+		ItemID:          "flat-scale-ring",
+		Name:            "平刻戒指",
+		Slot:            "accessory",
+		Rarity:          "史诗",
+		CritRate:        0.03,
+		ArmorPenPercent: 0.10,
+	}, 1, false, 20, "inst-1", false, false)
+
+	if diff := math.Abs(item.CritRate - 0.05); diff > 1e-9 {
+		t.Fatalf("expected crit rate 0.05 after +20 enhance, got %.12f", item.CritRate)
+	}
+	if diff := math.Abs(item.ArmorPenPercent - 0.12); diff > 1e-9 {
+		t.Fatalf("expected armor pen 0.12 after +20 enhance, got %.12f", item.ArmorPenPercent)
+	}
+}
+
+func TestBuildInventoryItemEnhanceDoesNotAddFlatStepWhenBaseIsZero(t *testing.T) {
+	item := buildInventoryItem(EquipmentDefinition{
+		ItemID:   "flat-scale-empty",
+		Name:     "空白戒指",
+		Slot:     "accessory",
+		Rarity:   "史诗",
+		CritRate: 0,
+	}, 1, false, 20, "inst-2", false, false)
+
+	if item.CritRate != 0 {
+		t.Fatalf("expected zero crit rate to stay zero, got %.12f", item.CritRate)
+	}
+	if item.ArmorPenPercent != 0 {
+		t.Fatalf("expected zero armor pen to stay zero, got %.12f", item.ArmorPenPercent)
 	}
 }
 

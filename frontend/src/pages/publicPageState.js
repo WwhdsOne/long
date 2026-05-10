@@ -996,7 +996,7 @@ function formatItemStats(item) {
 function normalizeDisplayPercent(value) {
     const normalized = Number(value ?? 0)
     if (!Number.isFinite(normalized)) return 0
-    return Math.abs(normalized) <= 1 ? normalized * 100 : normalized
+    return normalized * 100
 }
 
 function formatDisplayPercent(value) {

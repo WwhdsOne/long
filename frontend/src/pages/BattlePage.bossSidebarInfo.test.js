@@ -37,6 +37,7 @@ describe('BattlePage Boss 右侧整合信息', () => {
         expect(battleSource).toContain('v-for="line in formatItemStatLines(item)"')
         expect(battleSource).not.toContain('{{ formatItemStats(item) }}')
         expect(stateSource).toContain('function normalizeDisplayPercent(value) {')
+        expect(stateSource).toContain('return normalized * 100')
         expect(stateSource).toContain('if (item?.partTypeDamageSoft) lines.push(`软组织伤害 ${formatDisplayPercent(item.partTypeDamageSoft)}%`)')
         expect(stateSource).toContain('if (item?.partTypeDamageHeavy) lines.push(`重甲伤害 ${formatDisplayPercent(item.partTypeDamageHeavy)}%`)')
         expect(stateSource).toContain('if (item?.partTypeDamageWeak) lines.push(`弱点伤害 ${formatDisplayPercent(item.partTypeDamageWeak)}%`)')
