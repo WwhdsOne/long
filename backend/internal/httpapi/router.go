@@ -32,6 +32,7 @@ type ButtonStore interface {
 	UnequipItem(context.Context, string, string) (core.State, error)
 	EnhanceItem(context.Context, string, string) (core.State, error)
 	EnhanceItemBatch(context.Context, string, string, int) (core.State, error)
+	InscribeItem(context.Context, string, string) (core.State, error)
 	SalvageItem(context.Context, string, string) (core.SalvageResult, error)
 	BulkSalvageUnequipped(context.Context, string) (core.BulkSalvageResult, error)
 	LockItem(context.Context, string, string) (core.State, error)

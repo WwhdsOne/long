@@ -28,9 +28,10 @@ func (s *Store) GetBossResourcesForRoom(ctx context.Context, roomID string) (Bos
 	}
 	if boss == nil {
 		return BossResources{
-			BossLoot:   []BossLootEntry{},
-			GoldRange:  ResourceRange{},
-			StoneRange: ResourceRange{},
+			BossLoot:              []BossLootEntry{},
+			GoldRange:             ResourceRange{},
+			StoneRange:            ResourceRange{},
+			InscriptionStoneRange: ResourceRange{},
 		}, nil
 	}
 
@@ -52,6 +53,11 @@ func (s *Store) GetBossResourcesForRoom(ctx context.Context, roomID string) (Bos
 			Min: int64(math.Floor(float64(maxInt64(0, boss.StoneOnKill)) * 0.67)),
 			Max: int64(math.Floor(float64(maxInt64(0, boss.StoneOnKill)) * 1.33)),
 		},
+		InscriptionStoneRange: ResourceRange{
+			Min: maxInt64(0, boss.InscriptionStoneDropCountMin),
+			Max: maxInt64(maxInt64(0, boss.InscriptionStoneDropCountMin), boss.InscriptionStoneDropCountMax),
+		},
+		InscriptionStoneDropRatePercent: clampFloat(boss.InscriptionStoneDropRatePercent, 0, 100),
 		TalentPointsOnKill: maxInt64(0, boss.TalentPointsOnKill),
 		BossLoot:           loot,
 	}, nil

@@ -31,6 +31,8 @@ var ErrEquipmentEnhanceMaxLevel = errors.New("equipment enhance max level")
 var ErrEquipmentEnhanceInsufficientGold = errors.New("equipment enhance insufficient gold")
 var ErrEquipmentEnhanceInsufficientStones = errors.New("equipment enhance insufficient stones")
 var ErrEquipmentEnhanceInvalidLevels = errors.New("equipment enhance invalid levels")
+var ErrInscriptionStoneInsufficient = errors.New("inscription stone insufficient")
+var ErrEquipmentAffixLimitReached = errors.New("equipment affix limit reached")
 var ErrMessageEmpty = errors.New("message empty")
 var ErrMessageTooLong = errors.New("message too long")
 var ErrBossTemplateNotFound = errors.New("boss template not found")
@@ -132,6 +134,9 @@ type Boss struct {
 	CurrentHP          int64      `json:"currentHp"`
 	GoldOnKill         int64      `json:"goldOnKill"`
 	StoneOnKill        int64      `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
+	InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
+	InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
 	TalentPointsOnKill int64      `json:"talentPointsOnKill"`
 	Parts              []BossPart `json:"parts,omitempty"`
 	StartedAt          int64      `json:"startedAt,omitempty"`
@@ -171,6 +176,16 @@ type EquipmentDefinition struct {
 	MagicProcRateBonus   float64 `json:"magicProcRateBonus,omitempty"`  // 魔法触发率额外加成
 	MagicDamageBonus     float64 `json:"magicDamageBonus,omitempty"`    // 魔法伤害额外加成
 	TalentAffinity       string  `json:"talentAffinity,omitempty"`      // 天赋系绑定
+}
+
+// ItemAffix 装备铭刻词条。
+type ItemAffix struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Type      string  `json:"type"`
+	Value     float64 `json:"value"`
+	ValueText string  `json:"valueText"`
+	Tier      string  `json:"tier"`
 }
 
 // EquipmentDraftFailureLog 记录装备草稿生成失败上下文，便于回放和调参。
@@ -235,6 +250,10 @@ type InventoryItem struct {
 	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
 	MagicProcRateBonus   float64 `json:"magicProcRateBonus,omitempty"`
 	MagicDamageBonus     float64 `json:"magicDamageBonus,omitempty"`
+	AllDamageAmplifyBonus float64   `json:"allDamageAmplifyBonus,omitempty"`
+	Affixes              []ItemAffix `json:"affixes,omitempty"`
+	AffixCount           int         `json:"affixCount,omitempty"`
+	AffixLimit           int         `json:"affixLimit,omitempty"`
 }
 
 // ItemInstance 装备实例
@@ -246,6 +265,7 @@ type ItemInstance struct {
 	Bound        bool   `json:"bound"`
 	Locked       bool   `json:"locked"`
 	CreatedAt    int64  `json:"createdAt"`
+	Affixes      []ItemAffix `json:"affixes,omitempty"`
 }
 
 // Loadout 已穿戴装备
@@ -319,6 +339,8 @@ type BossResources struct {
 	Status             string          `json:"status,omitempty"`
 	GoldRange          ResourceRange   `json:"goldRange"`
 	StoneRange         ResourceRange   `json:"stoneRange"`
+	InscriptionStoneRange ResourceRange `json:"inscriptionStoneRange"`
+	InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
 	TalentPointsOnKill int64           `json:"talentPointsOnKill"`
 	BossLoot           []BossLootEntry `json:"bossLoot"`
 }
@@ -351,6 +373,7 @@ type UserState struct {
 	CombatStats                        CombatStats          `json:"combatStats"`
 	Gold                               int64                `json:"gold"`
 	Stones                             int64                `json:"stones"`
+	InscriptionStones                  int64                `json:"inscriptionStones"`
 	TalentPoints                       int64                `json:"talentPoints"`
 	RecentRewards                      []Reward             `json:"recentRewards,omitempty"`
 	Tasks                              []PlayerTask         `json:"tasks,omitempty"`
@@ -380,6 +403,7 @@ type State struct {
 	CombatStats                        CombatStats            `json:"combatStats"`
 	Gold                               int64                  `json:"gold"`
 	Stones                             int64                  `json:"stones"`
+	InscriptionStones                  int64                  `json:"inscriptionStones"`
 	TalentPoints                       int64                  `json:"talentPoints"`
 	RecentRewards                      []Reward               `json:"recentRewards,omitempty"`
 	TalentCombatState                  *TalentCombatState     `json:"talentCombatState,omitempty"`
@@ -991,6 +1015,7 @@ func (s *Store) getUserState(ctx context.Context, nickname string, includeProfil
 	}
 	userState.Gold = resources.Gold
 	userState.Stones = resources.Stones
+	userState.InscriptionStones = resources.InscriptionStones
 	userState.TalentPoints = resources.TalentPoints
 	userState.MyBossKills = resources.BossKills
 	if userState.MyBossKills <= 0 {
@@ -1105,6 +1130,7 @@ func (s *Store) GetPlayerResources(ctx context.Context, nickname string) (Player
 	return PlayerResources{
 		Gold:         resources.Gold,
 		Stones:       resources.Stones,
+		InscriptionStones: resources.InscriptionStones,
 		TalentPoints: resources.TalentPoints,
 		Stamina:      staminaState,
 	}, nil
@@ -1297,6 +1323,61 @@ func (s *Store) EnhanceItemBatch(ctx context.Context, nickname string, instanceI
 		return State{}, err
 	}
 
+	return s.GetState(ctx, normalizedNickname)
+}
+
+// InscribeItem 消耗刻印石，为装备实例新增一条铭刻词条。
+func (s *Store) InscribeItem(ctx context.Context, nickname string, instanceID string) (State, error) {
+	normalizedNickname, err := s.validatedNickname(nickname)
+	if err != nil {
+		return State{}, err
+	}
+
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return State{}, ErrEquipmentNotFound
+	}
+
+	instance, err := s.getOwnedInstance(ctx, normalizedNickname, instanceID)
+	if err != nil {
+		return State{}, err
+	}
+	definition, err := s.getEquipmentDefinition(ctx, instance.ItemID)
+	if err != nil {
+		return State{}, err
+	}
+
+	if len(instance.Affixes) >= maxAffixCount(definition.Rarity) {
+		return State{}, ErrEquipmentAffixLimitReached
+	}
+
+	resources, err := s.resourcesForNickname(ctx, normalizedNickname)
+	if err != nil {
+		return State{}, err
+	}
+	if resources.InscriptionStones < 1 {
+		return State{}, ErrInscriptionStoneInsufficient
+	}
+
+	affix := generateInscriptionAffix(instance)
+	nextAffixes := append(append([]ItemAffix(nil), instance.Affixes...), affix)
+	encoded, err := sonic.Marshal(nextAffixes)
+	if err != nil {
+		return State{}, err
+	}
+
+	now := time.Now().Unix()
+	pipe := s.client.TxPipeline()
+	pipe.HIncrBy(ctx, s.resourceKey(normalizedNickname), "inscription_stones", -1)
+	pipe.HSet(ctx, s.equipmentInstanceKey(instanceID), "affixes", string(encoded))
+	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
+		Score:  float64(now),
+		Member: normalizedNickname,
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
+		return State{}, err
+	}
+	s.invalidatePlayerCombatCaches(normalizedNickname)
 	return s.GetState(ctx, normalizedNickname)
 }
 
@@ -1746,6 +1827,7 @@ func ComposeState(snapshot Snapshot, userState UserState) State {
 		CombatStats:                        userState.CombatStats,
 		Gold:                               userState.Gold,
 		Stones:                             userState.Stones,
+		InscriptionStones:                  userState.InscriptionStones,
 		TalentPoints:                       userState.TalentPoints,
 		RecentRewards:                      userState.RecentRewards,
 		TalentCombatState:                  userState.TalentCombatState,
@@ -2774,6 +2856,9 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 	minDamage := (maxInt64(1, boss.MaxHP) + 99) / 100
 	goldBase := boss.GoldOnKill
 	stoneBase := boss.StoneOnKill
+	inscriptionStoneRate := clampFloat(boss.InscriptionStoneDropRatePercent, 0, 100)
+	inscriptionStoneMin := maxInt64(0, boss.InscriptionStoneDropCountMin)
+	inscriptionStoneMax := maxInt64(inscriptionStoneMin, boss.InscriptionStoneDropCountMax)
 	talentPointBase := maxInt64(0, boss.TalentPointsOnKill)
 	if afkMode {
 		goldBase = int64(math.Floor(float64(goldBase) * 0.5))
@@ -2796,6 +2881,10 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 		if stoneDelta > 0 {
 			pipe.HIncrBy(ctx, s.resourceKey(nickname), "stones", stoneDelta)
 		}
+		inscriptionStoneDelta := rollInscriptionStoneReward(s.roll, inscriptionStoneRate, inscriptionStoneMin, inscriptionStoneMax)
+		if inscriptionStoneDelta > 0 {
+			pipe.HIncrBy(ctx, s.resourceKey(nickname), "inscription_stones", inscriptionStoneDelta)
+		}
 		if talentPointBase > 0 {
 			pipe.HIncrBy(ctx, s.resourceKey(nickname), "talent_points", talentPointBase)
 		}
@@ -2817,6 +2906,7 @@ func (s *Store) finalizeBossKill(ctx context.Context, boss *Boss, afkMode bool, 
 				"bound":         "0",
 				"locked":        "0",
 				"created_at":    strconv.FormatInt(now, 10),
+				"affixes":       "[]",
 			})
 			pipe.SAdd(ctx, s.playerInstancesKey(nickname), instanceID)
 			rewards = append(rewards, Reward{
@@ -2889,6 +2979,35 @@ func rollResourceReward(roller func(int) int, base int64, minMultiplier float64,
 	return result
 }
 
+func rollInscriptionStoneReward(roller func(int) int, ratePercent float64, minCount int64, maxCount int64) int64 {
+	ratePercent = clampFloat(ratePercent, 0, 100)
+	minCount = maxInt64(0, minCount)
+	maxCount = maxInt64(minCount, maxCount)
+	if ratePercent <= 0 || maxCount <= 0 {
+		return 0
+	}
+	const rollSteps = 10000
+	roll := 0
+	if roller != nil {
+		roll = roller(rollSteps)
+	}
+	if float64(max(0, roll))*100/float64(rollSteps) >= ratePercent {
+		return 0
+	}
+	if maxCount <= minCount {
+		return minCount
+	}
+	span := int(maxCount - minCount + 1)
+	if span <= 1 {
+		return minCount
+	}
+	countRoll := 0
+	if roller != nil {
+		countRoll = roller(span)
+	}
+	return minCount + int64(max(0, countRoll))
+}
+
 func (s *Store) rollLootDrops(entries []BossLootEntry) []BossLootEntry {
 	if len(entries) == 0 {
 		return nil
@@ -2946,11 +3065,12 @@ func (s *Store) combatStatsForNickname(ctx context.Context, nickname string, loa
 
 	stats := s.baseCombatStats()
 
-	attackPower, armorPen, critRate, critDmgMult, partTypeSoft, partTypeHeavy, partTypeWeak, magicProcRate, magicDamageBonus := loadoutBonuses(loadout)
+	attackPower, armorPen, critRate, critDmgMult, allDamageAmplify, partTypeSoft, partTypeHeavy, partTypeWeak, magicProcRate, magicDamageBonus := loadoutBonuses(loadout)
 	stats.AttackPower += attackPower
 	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+armorPen, 0, 1.0)
 	stats.CriticalChancePercent += critRate * 100
 	stats.CritDamageMultiplier += critDmgMult
+	stats.AllDamageAmplify += allDamageAmplify
 	stats.PartTypeDamageSoft += partTypeSoft
 	stats.PartTypeDamageHeavy += partTypeHeavy
 	stats.PartTypeDamageWeak += partTypeWeak
@@ -3004,7 +3124,7 @@ func (s *Store) baseCombatStats() CombatStats {
 	})
 }
 
-func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64, partTypeSoft float64, partTypeHeavy float64, partTypeWeak float64, magicProcRate float64, magicDamageBonus float64) {
+func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critRate float64, critDmgMult float64, allDamageAmplify float64, partTypeSoft float64, partTypeHeavy float64, partTypeWeak float64, magicProcRate float64, magicDamageBonus float64) {
 	items := []*InventoryItem{
 		loadout.Weapon,
 		loadout.Helmet,
@@ -3021,6 +3141,7 @@ func loadoutBonuses(loadout Loadout) (attackPower int64, armorPen float64, critR
 		armorPen += item.ArmorPenPercent
 		critRate += item.CritRate
 		critDmgMult += item.CritDamageMultiplier
+		allDamageAmplify += item.AllDamageAmplifyBonus
 		partTypeSoft += item.PartTypeDamageSoft
 		partTypeHeavy += item.PartTypeDamageHeavy
 		partTypeWeak += item.PartTypeDamageWeak
@@ -3144,6 +3265,9 @@ func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable
 		"current_hp",
 		"gold_on_kill",
 		"stone_on_kill",
+		"inscription_stone_drop_rate_percent",
+		"inscription_stone_drop_count_min",
+		"inscription_stone_drop_count_max",
 		"talent_points_on_kill",
 		"parts",
 		"started_at",
@@ -3159,7 +3283,7 @@ func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable
 	}
 
 	var parts []BossPart
-	if partsRaw := stringValue(values, 11); partsRaw != "" {
+	if partsRaw := stringValue(values, 14); partsRaw != "" {
 		parts, _ = decodeBossParts([]byte(partsRaw))
 	}
 
@@ -3174,10 +3298,13 @@ func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable
 		CurrentHP:          int64Value(values, 7),
 		GoldOnKill:         int64Value(values, 8),
 		StoneOnKill:        int64Value(values, 9),
-		TalentPointsOnKill: int64Value(values, 10),
+		InscriptionStoneDropRatePercent: float64FromString(stringValue(values, 10)),
+		InscriptionStoneDropCountMin:    int64Value(values, 11),
+		InscriptionStoneDropCountMax:    int64Value(values, 12),
+		TalentPointsOnKill: int64Value(values, 13),
 		Parts:              parts,
-		StartedAt:          int64Value(values, 12),
-		DefeatedAt:         int64Value(values, 13),
+		StartedAt:          int64Value(values, 15),
+		DefeatedAt:         int64Value(values, 16),
 	}, nil
 }
 
@@ -3204,6 +3331,9 @@ func normalizeBoss(values map[string]string) *Boss {
 		CurrentHP:          int64FromString(values["current_hp"]),
 		GoldOnKill:         int64FromString(values["gold_on_kill"]),
 		StoneOnKill:        int64FromString(values["stone_on_kill"]),
+		InscriptionStoneDropRatePercent: float64FromString(values["inscription_stone_drop_rate_percent"]),
+		InscriptionStoneDropCountMin:    int64FromString(values["inscription_stone_drop_count_min"]),
+		InscriptionStoneDropCountMax:    int64FromString(values["inscription_stone_drop_count_max"]),
 		TalentPointsOnKill: int64FromString(values["talent_points_on_kill"]),
 		Parts:              parts,
 		StartedAt:          int64FromString(values["started_at"]),
@@ -3365,6 +3495,7 @@ func (s *Store) itemInstancesByIDForNickname(ctx context.Context, nickname strin
 			"bound",
 			"locked",
 			"created_at",
+			"affixes",
 		)
 	}
 	if len(filteredIDs) == 0 {
@@ -3399,6 +3530,7 @@ func (s *Store) itemInstancesByIDForNickname(ctx context.Context, nickname strin
 			Bound:        int64Value(values, 3) > 0,
 			Locked:       int64Value(values, 4) > 0,
 			CreatedAt:    int64Value(values, 5),
+			Affixes:      decodeItemAffixes(stringValue(values, 6)),
 		}
 		instances[instanceID] = instance
 	}
@@ -3430,6 +3562,7 @@ func (s *Store) getOwnedInstance(ctx context.Context, nickname string, ref strin
 		"bound",
 		"locked",
 		"created_at",
+		"affixes",
 	).Result()
 	if err != nil {
 		return nil, err
@@ -3450,6 +3583,7 @@ func (s *Store) getOwnedInstance(ctx context.Context, nickname string, ref strin
 		Bound:        int64Value(values, 3) > 0,
 		Locked:       int64Value(values, 4) > 0,
 		CreatedAt:    int64Value(values, 5),
+		Affixes:      decodeItemAffixes(stringValue(values, 6)),
 	}
 	return instance, nil
 }
@@ -3488,7 +3622,7 @@ func (s *Store) loadoutFromRefs(ctx context.Context, loadoutRefs map[string]stri
 		if defErr != nil {
 			continue
 		}
-		item := buildInventoryItem(definition, 1, true, instance.EnhanceLevel, instance.InstanceID, instance.Bound, instance.Locked)
+		item := buildInventoryItem(definition, instance, 1, true)
 		equipped[instance.InstanceID] = slot
 		switch slot {
 		case "weapon":
@@ -3536,10 +3670,13 @@ func (s *Store) inventoryFromInstances(ctx context.Context, instances map[string
 				EnhanceLevel: instance.EnhanceLevel,
 				Bound:        instance.Bound,
 				Locked:       instance.Locked,
+				Affixes:      append([]ItemAffix(nil), instance.Affixes...),
+				AffixCount:   len(instance.Affixes),
+				AffixLimit:   maxAffixCount(""),
 			})
 			continue
 		}
-		items = append(items, buildInventoryItem(definition, 1, equipped[instance.InstanceID] != "", instance.EnhanceLevel, instance.InstanceID, instance.Bound, instance.Locked))
+		items = append(items, buildInventoryItem(definition, instance, 1, equipped[instance.InstanceID] != ""))
 	}
 
 	if len(items) == 0 {
@@ -3899,6 +4036,7 @@ func (s *Store) resourceKey(nickname string) string {
 type playerResources struct {
 	Gold         int64
 	Stones       int64
+	InscriptionStones int64
 	TalentPoints int64
 	BossKills    int64
 }
@@ -3906,6 +4044,7 @@ type playerResources struct {
 type PlayerResources struct {
 	Gold         int64
 	Stones       int64
+	InscriptionStones int64
 	TalentPoints int64
 	Stamina      StaminaState
 }
@@ -3917,7 +4056,7 @@ type BossKillBackfillStats struct {
 
 func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (playerResources, error) {
 	resourceKey := s.resourceKey(nickname)
-	values, err := s.client.HMGet(ctx, resourceKey, "gold", "stones", "talent_points", "boss_kills").Result()
+	values, err := s.client.HMGet(ctx, resourceKey, "gold", "stones", "inscription_stones", "talent_points", "boss_kills").Result()
 	if err != nil {
 		return playerResources{}, err
 	}
@@ -3925,8 +4064,9 @@ func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (play
 	return playerResources{
 		Gold:         int64Value(values, 0),
 		Stones:       int64Value(values, 1),
-		TalentPoints: int64Value(values, 2),
-		BossKills:    int64Value(values, 3),
+		InscriptionStones: int64Value(values, 2),
+		TalentPoints: int64Value(values, 3),
+		BossKills:    int64Value(values, 4),
 	}, nil
 }
 
@@ -4150,8 +4290,8 @@ func int64FromString(raw string) int64 {
 	return value
 }
 
-func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped bool, enhanceLevel int, instanceID string, bound bool, locked bool) InventoryItem {
-	enhanceLevel = maxInt(0, enhanceLevel)
+func buildInventoryItem(definition EquipmentDefinition, instance ItemInstance, quantity int64, equipped bool) InventoryItem {
+	enhanceLevel := maxInt(0, instance.EnhanceLevel)
 	multValue := math.Pow(1.12, float64(enhanceLevel))
 	multPercent := math.Pow(1.08, float64(enhanceLevel))
 	flatPercentStep := 0.001
@@ -4174,9 +4314,9 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 	magicProcRateBonus := definition.MagicProcRateBonus + float64(enhanceLevel)*magicProcRateStep
 	magicDamageBonus := definition.MagicDamageBonus * multPercent
 
-	return InventoryItem{
+	item := InventoryItem{
 		ItemID:               definition.ItemID,
-		InstanceID:           strings.TrimSpace(instanceID),
+		InstanceID:           strings.TrimSpace(instance.InstanceID),
 		Name:                 name,
 		Slot:                 normalizeEquipmentSlot(definition.Slot),
 		Rarity:               normalizeEquipmentRarity(definition.Rarity),
@@ -4185,8 +4325,8 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 		Quantity:             quantity,
 		Equipped:             equipped,
 		EnhanceLevel:         enhanceLevel,
-		Bound:                bound,
-		Locked:               locked,
+		Bound:                instance.Bound,
+		Locked:               instance.Locked,
 		AttackPower:          attackPower,
 		ArmorPenPercent:      armorPenPercent,
 		CritRate:             critRate,
@@ -4196,6 +4336,206 @@ func buildInventoryItem(definition EquipmentDefinition, quantity int64, equipped
 		PartTypeDamageWeak:   partTypeDamageWeak,
 		MagicProcRateBonus:   magicProcRateBonus,
 		MagicDamageBonus:     magicDamageBonus,
+	}
+	applyAffixesToInventoryItem(&item, instance.Affixes)
+	item.AffixLimit = maxAffixCount(definition.Rarity)
+	return item
+}
+
+func applyAffixesToInventoryItem(item *InventoryItem, affixes []ItemAffix) {
+	if item == nil {
+		return
+	}
+	item.Affixes = append([]ItemAffix(nil), affixes...)
+	item.AffixCount = len(affixes)
+	for _, affix := range affixes {
+		switch affix.Type {
+		case "attack_power":
+			item.AttackPower += int64(math.Round(affix.Value))
+		case "crit_damage":
+			item.CritDamageMultiplier += affix.Value
+		case "all_damage_amplify":
+			item.AllDamageAmplifyBonus += affix.Value
+		case "part_type_damage_soft":
+			item.PartTypeDamageSoft += affix.Value
+		case "part_type_damage_heavy":
+			item.PartTypeDamageHeavy += affix.Value
+		case "part_type_damage_weak":
+			item.PartTypeDamageWeak += affix.Value
+		case "magic_damage_bonus":
+			item.MagicDamageBonus += affix.Value
+		case "crit_rate":
+			item.CritRate += affix.Value
+		case "armor_pen_percent":
+			item.ArmorPenPercent += affix.Value
+		case "magic_proc_rate_bonus":
+			item.MagicProcRateBonus += affix.Value
+		}
+	}
+}
+
+func decodeItemAffixes(raw string) []ItemAffix {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var affixes []ItemAffix
+	if err := sonic.Unmarshal([]byte(raw), &affixes); err != nil {
+		return nil
+	}
+	return affixes
+}
+
+func (s *Store) saveItemInstanceAffixes(ctx context.Context, instanceID string, affixes []ItemAffix) error {
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return ErrEquipmentNotFound
+	}
+	encoded, err := sonic.Marshal(affixes)
+	if err != nil {
+		return err
+	}
+	return s.client.HSet(ctx, s.equipmentInstanceKey(instanceID), "affixes", string(encoded)).Err()
+}
+
+func maxAffixCount(rarity string) int {
+	switch strings.TrimSpace(rarity) {
+	case "神话":
+		return 7
+	}
+	switch normalizeEquipmentRarity(rarity) {
+	case "至臻":
+		return 8
+	case "传说":
+		return 6
+	case "史诗":
+		return 5
+	case "稀有":
+		return 3
+	case "优秀", "普通":
+		fallthrough
+	default:
+		return 2
+	}
+}
+
+type inscriptionAffixRule struct {
+	Name         string
+	Type         string
+	Min          float64
+	Max          float64
+	Tier         string
+	BaseWeight   int
+	SensitiveCap float64
+}
+
+var inscriptionAffixRules = []inscriptionAffixRule{
+	{Name: "猛攻", Type: "attack_power", Min: 8, Max: 120, Tier: "normal", BaseWeight: 18},
+	{Name: "狂烈", Type: "crit_damage", Min: 0.08, Max: 0.90, Tier: "normal", BaseWeight: 14},
+	{Name: "破势", Type: "all_damage_amplify", Min: 0.02, Max: 0.18, Tier: "normal", BaseWeight: 12},
+	{Name: "屠软", Type: "part_type_damage_soft", Min: 0.04, Max: 0.30, Tier: "normal", BaseWeight: 12},
+	{Name: "碎甲", Type: "part_type_damage_heavy", Min: 0.04, Max: 0.30, Tier: "normal", BaseWeight: 12},
+	{Name: "猎弱", Type: "part_type_damage_weak", Min: 0.04, Max: 0.30, Tier: "normal", BaseWeight: 12},
+	{Name: "奥术增幅", Type: "magic_damage_bonus", Min: 0.04, Max: 0.45, Tier: "normal", BaseWeight: 10},
+	{Name: "精准", Type: "crit_rate", Min: 0.0015, Max: 0.012, Tier: "sensitive", BaseWeight: 5, SensitiveCap: 0.06},
+	{Name: "裂甲", Type: "armor_pen_percent", Min: 0.002, Max: 0.015, Tier: "sensitive", BaseWeight: 5, SensitiveCap: 0.08},
+	{Name: "感电", Type: "magic_proc_rate_bonus", Min: 0.001, Max: 0.008, Tier: "sensitive", BaseWeight: 4, SensitiveCap: 0.04},
+}
+
+func generateInscriptionAffix(instance *ItemInstance) ItemAffix {
+	type weightedRule struct {
+		rule    inscriptionAffixRule
+		weight  int
+		min     float64
+		max     float64
+	}
+	weighted := make([]weightedRule, 0, len(inscriptionAffixRules))
+	totalWeight := 0
+	for _, rule := range inscriptionAffixRules {
+		currentTotal := inscriptionAffixTypeTotal(instance, rule.Type)
+		if rule.SensitiveCap > 0 && currentTotal >= rule.SensitiveCap {
+			continue
+		}
+		duplicates := inscriptionAffixNameCount(instance, rule.Name)
+		weight := rule.BaseWeight
+		minValue := rule.Min
+		maxValue := rule.Max
+		if duplicates > 0 {
+			weight = max(1, rule.BaseWeight/(duplicates+2))
+		}
+		if rule.SensitiveCap > 0 && duplicates > 0 {
+			maxValue = rule.Min + (rule.Max-rule.Min)/2
+		}
+		weighted = append(weighted, weightedRule{rule: rule, weight: weight, min: minValue, max: maxValue})
+		totalWeight += weight
+	}
+	if totalWeight <= 0 {
+		return ItemAffix{ID: "fallback", Name: "猛攻", Type: "attack_power", Value: 8, ValueText: "+8", Tier: "normal"}
+	}
+
+	pick := globalRand.IntN(totalWeight)
+	for _, entry := range weighted {
+		pick -= entry.weight
+		if pick >= 0 {
+			continue
+		}
+		value := randomAffixValue(entry.min, entry.max, entry.rule.Type)
+		return ItemAffix{
+			ID:        "affix-" + strconv.FormatInt(time.Now().UnixNano(), 10),
+			Name:      entry.rule.Name,
+			Type:      entry.rule.Type,
+			Value:     value,
+			ValueText: formatAffixValueText(entry.rule.Type, value),
+			Tier:      entry.rule.Tier,
+		}
+	}
+	return ItemAffix{ID: "fallback", Name: "猛攻", Type: "attack_power", Value: 8, ValueText: "+8", Tier: "normal"}
+}
+
+func inscriptionAffixNameCount(instance *ItemInstance, name string) int {
+	if instance == nil {
+		return 0
+	}
+	count := 0
+	for _, affix := range instance.Affixes {
+		if affix.Name == name {
+			count++
+		}
+	}
+	return count
+}
+
+func inscriptionAffixTypeTotal(instance *ItemInstance, affixType string) float64 {
+	if instance == nil {
+		return 0
+	}
+	total := 0.0
+	for _, affix := range instance.Affixes {
+		if affix.Type == affixType {
+			total += affix.Value
+		}
+	}
+	return total
+}
+
+func randomAffixValue(minValue float64, maxValue float64, affixType string) float64 {
+	if maxValue <= minValue {
+		return minValue
+	}
+	ratio := globalRand.Float64()
+	value := minValue + ratio*(maxValue-minValue)
+	if affixType == "attack_power" {
+		return math.Round(value)
+	}
+	return math.Round(value*10000) / 10000
+}
+
+func formatAffixValueText(affixType string, value float64) string {
+	switch affixType {
+	case "attack_power":
+		return "+" + strconv.FormatInt(int64(math.Round(value)), 10)
+	default:
+		return "+" + strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.2f", value*100), "0"), ".") + "%"
 	}
 }
 

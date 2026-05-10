@@ -16,6 +16,8 @@ import (
 
 type flexibleInt64 int64
 
+type flexibleFloat64 float64
+
 func (v *flexibleInt64) UnmarshalJSON(data []byte) error {
 	raw := strings.TrimSpace(string(data))
 	if raw == "" || raw == "null" {
@@ -41,6 +43,31 @@ func (v *flexibleInt64) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*v = flexibleInt64(parsed)
+	return nil
+}
+
+func (v *flexibleFloat64) UnmarshalJSON(data []byte) error {
+	raw := strings.TrimSpace(string(data))
+	if raw == "" || raw == "null" {
+		*v = 0
+		return nil
+	}
+	if strings.HasPrefix(raw, `"`) {
+		unquoted, err := strconv.Unquote(raw)
+		if err != nil {
+			return err
+		}
+		raw = strings.TrimSpace(unquoted)
+	}
+	if raw == "" {
+		*v = 0
+		return nil
+	}
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return err
+	}
+	*v = flexibleFloat64(parsed)
 	return nil
 }
 
@@ -77,6 +104,7 @@ type bossUpsertPayload struct {
 	MaxHP              flexibleInt64     `json:"maxHp"`
 	GoldOnKill         flexibleInt64     `json:"goldOnKill"`
 	StoneOnKill        flexibleInt64     `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent flexibleFloat64 `json:"inscriptionStoneDropRatePercent"`
 	TalentPointsOnKill flexibleInt64     `json:"talentPointsOnKill"`
 	Parts              []bossPartPayload `json:"parts,omitempty"`
 }
@@ -93,6 +121,9 @@ func (p bossUpsertPayload) toCore() core.BossUpsert {
 		MaxHP:              int64(p.MaxHP),
 		GoldOnKill:         int64(p.GoldOnKill),
 		StoneOnKill:        int64(p.StoneOnKill),
+		InscriptionStoneDropRatePercent: float64(p.InscriptionStoneDropRatePercent),
+		InscriptionStoneDropCountMin:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
+		InscriptionStoneDropCountMax:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
 		TalentPointsOnKill: int64(p.TalentPointsOnKill),
 		Parts:              parts,
 	}
@@ -104,6 +135,7 @@ type bossTemplateUpsertPayload struct {
 	MaxHP              flexibleInt64     `json:"maxHp"`
 	GoldOnKill         flexibleInt64     `json:"goldOnKill"`
 	StoneOnKill        flexibleInt64     `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent flexibleFloat64 `json:"inscriptionStoneDropRatePercent"`
 	TalentPointsOnKill flexibleInt64     `json:"talentPointsOnKill"`
 	Layout             []bossPartPayload `json:"layout,omitempty"`
 }
@@ -119,9 +151,19 @@ func (p bossTemplateUpsertPayload) toCore() core.BossTemplateUpsert {
 		MaxHP:              int64(p.MaxHP),
 		GoldOnKill:         int64(p.GoldOnKill),
 		StoneOnKill:        int64(p.StoneOnKill),
+		InscriptionStoneDropRatePercent: float64(p.InscriptionStoneDropRatePercent),
+		InscriptionStoneDropCountMin:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
+		InscriptionStoneDropCountMax:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
 		TalentPointsOnKill: int64(p.TalentPointsOnKill),
 		Layout:             layout,
 	}
+}
+
+func singleDropCountForRate(rate float64) int64 {
+	if rate <= 0 {
+		return 0
+	}
+	return 1
 }
 
 func registerAdminBossRoutes(router route.IRouter, options Options) {

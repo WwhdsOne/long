@@ -38,6 +38,9 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
         expect(pageSource).toContain('class="loadout-slot__placeholder"')
         expect(pageSource).toContain('class="armory-item-tooltip"')
         expect(pageSource).toContain('item.imagePath')
+        expect(pageSource).toContain('词条：{{ loadout[slot.value].affixCount || 0 }} / {{ loadout[slot.value].affixLimit || 0 }}')
+        expect(pageSource).toContain('词条：{{ item.affixCount || 0 }} / {{ item.affixLimit || 0 }}')
+        expect(pageSource).toContain('尚未铭刻')
     })
 
     it('强化弹窗支持滑条预览与批量提交', () => {
@@ -75,5 +78,42 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
         expect(pageSource).toContain('按规则保留 {{ bulkSalvageConfirmData.excludedKeptHighest }} 件')
         expect(pageSource).toContain('一键分解会按 itemId 分组，每种装备保留 1 件最高强化。')
         expect(pageSource).toContain('若最高强化并列，则随机保留其中 1 件。')
+    })
+
+    it('右键菜单和确认弹窗支持铭刻，并明确不可撤销与刻印石消耗', () => {
+        expect(pageSource).toContain('handleContextInscribe')
+        expect(pageSource).toContain('铭刻')
+        expect(pageSource).toContain('确认铭刻')
+        expect(pageSource).toContain('将消耗 刻印石 x1')
+        expect(pageSource).toContain('铭刻会为该装备随机新增 1 条词条')
+        expect(pageSource).toContain('铭刻后词条将与该装备永久绑定，无法撤销')
+        expect(pageSource).toContain('当前词条：{{ inscribeConfirmItem.affixCount || 0 }} / {{ inscribeConfirmItem.affixLimit || 0 }}')
+        expect(pageSource).toContain('确认铭刻')
+        expect(stateSource).toContain('const inscriptionStones = ref(0)')
+        expect(stateSource).toContain("fetch(`/api/equipment/${encodeURIComponent(instanceId)}/inscribe`")
+        expect(stateSource).toContain("inscriptionStones.value = Number(payload.inscriptionStones ?? 0)")
+    })
+
+    it('铭刻词条展示会补齐效果类型说明而不是只显示数值', () => {
+        expect(stateSource).toContain("const affixEffectLabels = {")
+        expect(stateSource).toContain("magic_proc_rate_bonus: '魔法触发率'")
+        expect(stateSource).toContain("armor_pen_percent: '额外护甲穿透'")
+        expect(stateSource).toContain("function formatItemAffixLine(affix) {")
+        expect(pageSource).toContain('{{ formatItemAffixLine(affix) }}')
+        expect(pageSource).not.toContain('{{ affix.name }} {{ affix.valueText }}')
+    })
+
+    it('资源条把金币强化石刻印石和天赋点字样替换为图标', () => {
+        expect(pageSource).toContain('class="armory-backpack-resources__item"')
+        expect(pageSource).toContain('const resourceIcons = {')
+        expect(pageSource).toContain('https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E9%87%91%E5%B8%81.png')
+        expect(pageSource).toContain('https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%BC%BA%E5%8C%96%E7%9F%B3.png')
+        expect(pageSource).toContain('https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%88%BB%E5%8D%B0%E7%9F%B3.png')
+        expect(pageSource).toContain('https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%A4%A9%E8%B5%8B%E7%82%B9.png')
+        expect(pageSource).toContain('class="armory-backpack-resources__icon"')
+        expect(pageSource).not.toContain('金币 <span class="num-gold">{{ gold }}</span>')
+        expect(pageSource).not.toContain('强化石 <span class="num-stone">{{ stones }}</span>')
+        expect(pageSource).not.toContain('刻印石 <span class="num-stone">{{ inscriptionStones }}</span>')
+        expect(pageSource).not.toContain('天赋点 <span class="num-stone">{{ talentPoints }}</span>')
     })
 })

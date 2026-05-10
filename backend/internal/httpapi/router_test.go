@@ -65,6 +65,7 @@ type mockStore struct {
 	lastLockState             bool
 	lastEnhanceItemID         string
 	lastEnhanceLevels         int
+	lastInscribeItemID        string
 	lastClickNickname         string
 	lastAutoClickNickname     string
 	lastGetStateNickname      string
@@ -1043,6 +1044,17 @@ func (m *mockStore) EnhanceItemBatch(_ context.Context, _ string, itemID string,
 	return m.equipState, nil
 }
 
+func (m *mockStore) InscribeItem(_ context.Context, _ string, itemID string) (core.State, error) {
+	m.lastInscribeItemID = itemID
+	if m.enhanceErr != nil {
+		return core.State{}, m.enhanceErr
+	}
+	if m.equipState.Loadout.Weapon == nil {
+		return m.state, nil
+	}
+	return m.equipState, nil
+}
+
 func (m *mockStore) SalvageItem(_ context.Context, _ string, itemID string) (core.SalvageResult, error) {
 	m.lastSalvageItemID = itemID
 	if m.salvageErr != nil {
@@ -1808,6 +1820,27 @@ func TestEnhanceItemForwardsBatchLevels(t *testing.T) {
 	}
 }
 
+func TestInscribeItemForwardsInstanceID(t *testing.T) {
+	store := &mockStore{}
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+	})
+
+	request := httptest.NewRequest(http.MethodPost, "/api/equipment/instance-wood-sword/inscribe", strings.NewReader(`{"nickname":"阿明"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", response.Code)
+	}
+	if store.lastInscribeItemID != "instance-wood-sword" {
+		t.Fatalf("expected inscribe item forwarded, got item=%q", store.lastInscribeItemID)
+	}
+}
+
 func TestLockItemForwardsInstanceID(t *testing.T) {
 	store := &mockStore{}
 	handler := NewHandler(Options{
@@ -2159,6 +2192,46 @@ func TestAdminBossPoolRoutesAcceptStringInt64HP(t *testing.T) {
 	}
 	if len(store.lastBossTemplate.Layout) != 1 || store.lastBossTemplate.Layout[0].MaxHP != 9223372036854775800 {
 		t.Fatalf("expected layout maxHp preserved, got %+v", store.lastBossTemplate.Layout)
+	}
+}
+
+func TestAdminBossPoolRoutesForwardInscriptionStoneRateAsSingleDrop(t *testing.T) {
+	store := &mockStore{}
+
+	handler := NewHandler(Options{
+		Store:       store,
+		Broadcaster: &mockBroadcaster{},
+		AdminAuthenticator: admin.NewAuthenticator(admin.Config{
+			Username:      "admin",
+			Password:      "secret",
+			SessionSecret: "session-secret",
+		}),
+	})
+
+	loginRequest := httptest.NewRequest(http.MethodPost, "/api/admin/login", strings.NewReader(`{"username":"admin","password":"secret"}`))
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	handler.ServeHTTP(loginResponse, loginRequest)
+
+	cookies := loginResponse.Result().Cookies()
+	if len(cookies) == 0 {
+		t.Fatal("expected session cookie from login")
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":80,"inscriptionStoneDropRatePercent":16.5,"layout":[{"x":0,"y":0,"type":"soft","maxHp":80}]}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.AddCookie(cookies[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected 200 from boss template save with inscription stone rate, got %d body=%s", response.Code, response.Body.String())
+	}
+	if store.lastBossTemplate.InscriptionStoneDropRatePercent != 16.5 {
+		t.Fatalf("expected inscription stone rate forwarded, got %+v", store.lastBossTemplate)
+	}
+	if store.lastBossTemplate.InscriptionStoneDropCountMin != 1 || store.lastBossTemplate.InscriptionStoneDropCountMax != 1 {
+		t.Fatalf("expected inscription stone count forced to single drop, got %+v", store.lastBossTemplate)
 	}
 }
 

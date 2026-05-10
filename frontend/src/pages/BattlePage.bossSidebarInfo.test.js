@@ -31,6 +31,8 @@ describe('BattlePage Boss 右侧整合信息', () => {
         expect(styleSource).toContain('.boss-right-summary {')
         expect(styleSource).toContain('.boss-right-summary__stats {')
         expect(styleSource).toContain('.boss-right-summary__drop {')
+        expect(styleSource).toContain('.boss-right-summary__drop button {')
+        expect(styleSource).toContain('font-size: 1.28rem;')
     })
 
     it('Boss 掉落池复用背包多行属性格式，并补齐三种部位增伤', () => {

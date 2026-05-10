@@ -360,9 +360,10 @@ func TestGetUserStateReadsResourceKeyWithoutGems(t *testing.T) {
 	nickname := "阿明"
 	resourceKey := store.resourceKey(nickname)
 	if err := store.client.HSet(ctx, resourceKey, map[string]any{
-		"gold":          "345",
-		"stones":        "67",
-		"talent_points": "89",
+		"gold":               "345",
+		"stones":             "67",
+		"inscription_stones": "12",
+		"talent_points":      "89",
 	}).Err(); err != nil {
 		t.Fatalf("seed resource key: %v", err)
 	}
@@ -371,8 +372,8 @@ func TestGetUserStateReadsResourceKeyWithoutGems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get user state: %v", err)
 	}
-	if state.Gold != 345 || state.Stones != 67 || state.TalentPoints != 89 {
-		t.Fatalf("expected resources from resource key, got gold=%d stones=%d talentPoints=%d", state.Gold, state.Stones, state.TalentPoints)
+	if state.Gold != 345 || state.Stones != 67 || state.InscriptionStones != 12 || state.TalentPoints != 89 {
+		t.Fatalf("expected resources from resource key, got gold=%d stones=%d inscriptionStones=%d talentPoints=%d", state.Gold, state.Stones, state.InscriptionStones, state.TalentPoints)
 	}
 }
 
@@ -2395,6 +2396,41 @@ func TestBossResourcesLootContainsEquipmentIcon(t *testing.T) {
 	}
 }
 
+func TestBossResourcesIncludeInscriptionStoneRange(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	boss := &Boss{
+		ID:                               "inscription-boss",
+		Name:                             "铭刻 Boss",
+		Status:                           bossStatusActive,
+		MaxHP:                            100,
+		CurrentHP:                        100,
+		InscriptionStoneDropRatePercent:  28,
+		InscriptionStoneDropCountMin:     2,
+		InscriptionStoneDropCountMax:     3,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
+		},
+		StartedAt: store.now().Unix(),
+	}
+	if err := store.setCurrentBoss(ctx, boss, nil); err != nil {
+		t.Fatalf("set current boss: %v", err)
+	}
+
+	resources, err := store.GetBossResources(ctx)
+	if err != nil {
+		t.Fatalf("get boss resources: %v", err)
+	}
+	if resources.InscriptionStoneDropRatePercent != 28 {
+		t.Fatalf("expected inscription stone drop rate 28, got %+v", resources)
+	}
+	if resources.InscriptionStoneRange.Min != 2 || resources.InscriptionStoneRange.Max != 3 {
+		t.Fatalf("expected inscription stone range 2~3, got %+v", resources.InscriptionStoneRange)
+	}
+}
+
 func TestRollLootDropsCanReturnMultipleItems(t *testing.T) {
 	store, cleanup := newTestStore(t)
 	defer cleanup()
@@ -3474,7 +3510,7 @@ func TestBuildInventoryItemEnhanceCritRateAndArmorPenUseFlatStep(t *testing.T) {
 		Rarity:          "史诗",
 		CritRate:        0.03,
 		ArmorPenPercent: 0.10,
-	}, 1, false, 20, "inst-1", false, false)
+	}, ItemInstance{InstanceID: "inst-1", EnhanceLevel: 20}, 1, false)
 
 	if diff := math.Abs(item.CritRate - 0.05); diff > 1e-9 {
 		t.Fatalf("expected crit rate 0.05 after +20 enhance, got %.12f", item.CritRate)
@@ -3491,7 +3527,7 @@ func TestBuildInventoryItemEnhanceDoesNotAddFlatStepWhenBaseIsZero(t *testing.T)
 		Slot:     "accessory",
 		Rarity:   "史诗",
 		CritRate: 0,
-	}, 1, false, 20, "inst-2", false, false)
+	}, ItemInstance{InstanceID: "inst-2", EnhanceLevel: 20}, 1, false)
 
 	if item.CritRate != 0 {
 		t.Fatalf("expected zero crit rate to stay zero, got %.12f", item.CritRate)
@@ -3994,9 +4030,10 @@ func TestGetPlayerResourcesDoesNotConsumePendingTalentEvents(t *testing.T) {
 	nickname := "资源只读不消费测试"
 
 	if err := store.client.HSet(ctx, store.resourceKey(nickname), map[string]any{
-		"gold":          "12",
-		"stones":        "34",
-		"talent_points": "56",
+		"gold":               "12",
+		"stones":             "34",
+		"inscription_stones": "7",
+		"talent_points":      "56",
 	}).Err(); err != nil {
 		t.Fatalf("seed resources: %v", err)
 	}
@@ -4024,7 +4061,7 @@ func TestGetPlayerResourcesDoesNotConsumePendingTalentEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read resources: %v", err)
 	}
-	if resources.Gold != 12 || resources.Stones != 34 || resources.TalentPoints != 56 {
+	if resources.Gold != 12 || resources.Stones != 34 || resources.InscriptionStones != 7 || resources.TalentPoints != 56 {
 		t.Fatalf("unexpected resources: %+v", resources)
 	}
 

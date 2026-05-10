@@ -19,11 +19,13 @@ const {
   actioningItemId,
   gold,
   stones,
+  inscriptionStones,
   talentPoints,
   isLoggedIn,
   equippedItems,
   formatRarityLabel,
   formatNumber,
+  formatItemAffixLine,
   formatItemStatLines,
   equipmentNameParts,
   equipmentNameClass,
@@ -32,6 +34,7 @@ const {
   toggleItemLock,
   salvageUnequippedItems,
   enhanceItem,
+  inscribeItem,
 } = usePublicPageState()
 
 const contextMenu = ref({
@@ -42,7 +45,9 @@ const contextMenu = ref({
 })
 const salvageConfirmItem = ref(null)
 const enhanceConfirmItem = ref(null)
+const inscribeConfirmItem = ref(null)
 const enhanceFeedback = ref('')
+const inscribeFeedback = ref('')
 const enhanceSelectedLevels = ref(0)
 const bulkSalvageConfirmData = ref(null)
 const bulkSalvageFeedback = ref('')
@@ -53,6 +58,12 @@ const enhanceAttackGrowth = 1.12
 const enhancePercentGrowth = 1.08
 const enhanceFlatPercentStep = 0.001
 const enhanceMagicProcRateStep = 0.001
+const resourceIcons = {
+  gold: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E9%87%91%E5%B8%81.png',
+  stones: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%BC%BA%E5%8C%96%E7%9F%B3.png',
+  inscriptionStones: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%88%BB%E5%8D%B0%E7%9F%B3.png',
+  talentPoints: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%A4%A9%E8%B5%8B%E7%82%B9.png',
+}
 
 function formatTrimmedNumber(value, digits = 2) {
   const normalized = Number(value ?? 0)
@@ -170,6 +181,14 @@ function handleContextEnhance() {
   enhanceConfirmItem.value = item
   enhanceFeedback.value = ''
   enhanceSelectedLevels.value = Math.min(1, maxAffordableEnhanceLevelsByStone(item))
+  closeContextMenu()
+}
+
+function handleContextInscribe() {
+  const item = contextMenu.value.item
+  if (!item) return
+  inscribeConfirmItem.value = item
+  inscribeFeedback.value = ''
   closeContextMenu()
 }
 
@@ -522,6 +541,23 @@ function cancelEnhance() {
   enhanceSelectedLevels.value = 0
 }
 
+async function confirmInscribe() {
+  const item = inscribeConfirmItem.value
+  if (!item) return
+  const result = await inscribeItem(item.instanceId || item.itemId)
+  if (result?.ok === false) {
+    inscribeFeedback.value = result.message || '铭刻失败，请稍后重试。'
+    return
+  }
+  inscribeConfirmItem.value = null
+  inscribeFeedback.value = ''
+}
+
+function cancelInscribe() {
+  inscribeConfirmItem.value = null
+  inscribeFeedback.value = ''
+}
+
 
 const enhanceDisplayName = computed(() => {
   const name = enhanceConfirmItem.value?.name || enhanceConfirmItem.value?.itemId || ''
@@ -622,10 +658,14 @@ onBeforeUnmount(() => {
                   <strong>{{ loadout[slot.value].name || loadout[slot.value].itemId }}</strong>
                   <p>{{ formatRarityLabel(loadout[slot.value].rarity) }} · 强化
                     +{{ loadout[slot.value].enhanceLevel || 0 }}</p>
+                  <p>词条：{{ loadout[slot.value].affixCount || 0 }} / {{ loadout[slot.value].affixLimit || 0 }}</p>
                   <ul v-if="formatItemStatLines(loadout[slot.value]).length > 0" class="armory-item-tooltip__stats">
                     <li v-for="line in formatItemStatLines(loadout[slot.value])" :key="line">{{ line }}</li>
                   </ul>
-                  <p v-else>暂无词条</p>
+                  <p v-if="!loadout[slot.value].affixes || loadout[slot.value].affixes.length === 0">尚未铭刻</p>
+                  <ul v-else class="armory-item-tooltip__stats">
+                    <li v-for="affix in loadout[slot.value].affixes" :key="affix.id">{{ formatItemAffixLine(affix) }}</li>
+                  </ul>
                 </article>
               </article>
             </div>
@@ -656,12 +696,25 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
-        <p :id="sectionID('resources')" class="armory-backpack-resources">
-          资源：
-          金币 <span class="num-gold">{{ gold }}</span>
-          · 强化石 <span class="num-stone">{{ stones }}</span>
-          · 天赋点 <span class="num-stone">{{ talentPoints }}</span>
-        </p>
+        <div :id="sectionID('resources')" class="armory-backpack-resources">
+          <span class="armory-backpack-resources__label">资源：</span>
+          <span class="armory-backpack-resources__item">
+            <img :src="resourceIcons.gold" alt="金币" class="armory-backpack-resources__icon">
+            <span class="num-gold">{{ gold }}</span>
+          </span>
+          <span class="armory-backpack-resources__item">
+            <img :src="resourceIcons.stones" alt="强化石" class="armory-backpack-resources__icon">
+            <span class="num-stone">{{ stones }}</span>
+          </span>
+          <span class="armory-backpack-resources__item">
+            <img :src="resourceIcons.talentPoints" alt="天赋点" class="armory-backpack-resources__icon">
+            <span class="num-stone">{{ talentPoints }}</span>
+          </span>
+          <span class="armory-backpack-resources__item">
+            <img :src="resourceIcons.inscriptionStones" alt="刻印石" class="armory-backpack-resources__icon">
+            <span class="num-stone">{{ inscriptionStones }}</span>
+          </span>
+        </div>
         <div v-if="inventory.length === 0" class="leaderboard-list leaderboard-list--empty">
           <p>先去打 Boss，掉落会自动进背包。</p>
         </div>
@@ -692,10 +745,14 @@ onBeforeUnmount(() => {
               <p class="vote-stage__eyebrow">装备属性</p>
               <strong>{{ item.name || item.itemId }}</strong>
               <p>{{ formatRarityLabel(item.rarity) }} · 强化 +{{ item.enhanceLevel || 0 }}</p>
+              <p>词条：{{ item.affixCount || 0 }} / {{ item.affixLimit || 0 }}</p>
               <ul v-if="formatItemStatLines(item).length > 0" class="armory-item-tooltip__stats">
                 <li v-for="line in formatItemStatLines(item)" :key="line">{{ line }}</li>
               </ul>
-              <p v-else>暂无词条</p>
+              <p v-if="!item.affixes || item.affixes.length === 0">尚未铭刻</p>
+              <ul v-else class="armory-item-tooltip__stats">
+                <li v-for="affix in item.affixes" :key="affix.id">{{ formatItemAffixLine(affix) }}</li>
+              </ul>
             </article>
             <div class="armory-backpack-cell__meta">
               <strong>
@@ -708,6 +765,7 @@ onBeforeUnmount(() => {
               </strong>
               <span>{{ item.slot || '未分类' }}</span>
               <span>强化 +{{ item.enhanceLevel || 0 }} · {{ item.equipped ? '已装备' : '点击穿戴' }}</span>
+              <span>词条 {{ item.affixCount || 0 }} / {{ item.affixLimit || 0 }}</span>
               <span>{{ item.locked ? '已锁定（不参与一键分解）' : '未锁定' }}</span>
             </div>
           </article>
@@ -727,6 +785,9 @@ onBeforeUnmount(() => {
       </button>
       <button class="inventory-context-menu__item" type="button" @click="handleContextEnhance">
         强化
+      </button>
+      <button class="inventory-context-menu__item" type="button" @click="handleContextInscribe">
+        铭刻
       </button>
       <button class="inventory-context-menu__item" type="button" @click="handleContextToggleLock">
         {{ contextMenu.item.locked ? '解锁' : '锁定' }}
@@ -790,6 +851,32 @@ onBeforeUnmount(() => {
           <button class="nickname-form__ghost" type="button" @click="cancelEnhance">取消</button>
           <button class="nickname-form__submit" type="button" :disabled="!enhanceCanConfirm" @click="confirmEnhance">
             确认强化
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <section v-if="inscribeConfirmItem" class="boss-drop-modal" aria-label="铭刻确认">
+      <div class="boss-drop-modal__backdrop" @click="cancelInscribe"></div>
+      <article class="boss-drop-modal__card">
+        <div class="boss-drop-modal__head">
+          <div>
+            <p class="vote-stage__eyebrow">确认铭刻</p>
+            <strong>{{ inscribeConfirmItem.name || inscribeConfirmItem.itemId }}</strong>
+          </div>
+          <button class="nickname-form__ghost" type="button" @click="cancelInscribe">关闭</button>
+        </div>
+        <div class="leaderboard-list">
+          <p>将消耗 刻印石 x1</p>
+          <p>铭刻会为该装备随机新增 1 条词条</p>
+          <p>铭刻后词条将与该装备永久绑定，无法撤销</p>
+          <p>当前词条：{{ inscribeConfirmItem.affixCount || 0 }} / {{ inscribeConfirmItem.affixLimit || 0 }}</p>
+        </div>
+        <p v-if="inscribeFeedback" class="feedback feedback--error">{{ inscribeFeedback }}</p>
+        <div class="announcement-modal__actions">
+          <button class="nickname-form__ghost" type="button" @click="cancelInscribe">取消</button>
+          <button class="nickname-form__submit" type="button" @click="confirmInscribe">
+            确认铭刻
           </button>
         </div>
       </article>

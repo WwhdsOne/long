@@ -37,7 +37,7 @@ describe('admin state rarity normalization', () => {
         expect(entry.bossDamagePercent).toBe(0.5)
     })
 
-    it('boss 模板规范化会保留金币与强化石奖励字段', () => {
+    it('boss 模板规范化会保留金币强化石天赋点和刻印石掉率字段', () => {
         const template = normalizeBossTemplate({
             id: 'dragon',
             name: '火龙',
@@ -45,6 +45,7 @@ describe('admin state rarity normalization', () => {
             layout: [{x: 0, y: 0, maxHp: '9223372036854775800', currentHp: '9223372036854775800', armor: '12'}],
             goldOnKill: 5000,
             stoneOnKill: 120,
+            inscriptionStoneDropRatePercent: 16.5,
             talentPointsOnKill: 88,
         })
 
@@ -53,6 +54,7 @@ describe('admin state rarity normalization', () => {
         expect(template.layout[0].armor).toBe('12')
         expect(template.goldOnKill).toBe(5000)
         expect(template.stoneOnKill).toBe(120)
+        expect(template.inscriptionStoneDropRatePercent).toBe(16.5)
         expect(template.talentPointsOnKill).toBe(88)
     })
 

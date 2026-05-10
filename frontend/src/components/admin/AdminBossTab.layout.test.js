@@ -45,4 +45,13 @@ describe('AdminBossTab 部位血量口径', () => {
         expect(actionSource).toContain('async function saveLoot(lootRowsOverride = null)')
         expect(actionSource).toContain('const rowsToSave = Array.isArray(lootRowsOverride) ? lootRowsOverride : lootRows.value')
     })
+
+    it('模板基础奖励支持刻印石掉率，并固定为命中掉 1 个', () => {
+        expect(componentSource).toContain('刻印石掉率（%）')
+        expect(componentSource).not.toContain('刻印石最小掉落数')
+        expect(componentSource).not.toContain('刻印石最大掉落数')
+        expect(actionSource).toContain('inscriptionStoneDropRatePercent: Number(bossForm.value.inscriptionStoneDropRatePercent || 0)')
+        expect(actionSource).not.toContain('inscriptionStoneDropCountMin')
+        expect(actionSource).not.toContain('inscriptionStoneDropCountMax')
+    })
 })

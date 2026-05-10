@@ -193,6 +193,63 @@ func registerEquipmentRoutes(router route.IRouter, options Options) {
 		writeJSON(c, consts.StatusOK, state)
 	})
 
+	router.POST("/api/equipment/:instanceId/inscribe", func(ctx context.Context, c *app.RequestContext) {
+		var body struct {
+			Nickname string `json:"nickname"`
+		}
+		if !bindJSON(c, &body, map[string]string{
+			"error":   "INVALID_REQUEST",
+			"message": "昵称没有带上，先报个名再铭刻。",
+		}) {
+			return
+		}
+		nickname, ok := resolvedPlayerNickname(ctx, c, options.PlayerAuthenticator, body.Nickname)
+		if !ok {
+			return
+		}
+
+		state, err := options.Store.InscribeItem(ctx, nickname, c.Param("instanceId"))
+		if err != nil {
+			if writeNicknameError(c, err) {
+				return
+			}
+			if errors.Is(err, core.ErrEquipmentNotFound) {
+				writeJSON(c, consts.StatusNotFound, map[string]string{"error": "EQUIPMENT_NOT_FOUND"})
+				return
+			}
+			if errors.Is(err, core.ErrEquipmentNotOwned) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_NOT_OWNED",
+					"message": "这件装备还不在你的背包里。",
+				})
+				return
+			}
+			if errors.Is(err, core.ErrInscriptionStoneInsufficient) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "INSCRIPTION_STONE_NOT_ENOUGH",
+					"message": "刻印石不足，无法铭刻。",
+				})
+				return
+			}
+			if errors.Is(err, core.ErrEquipmentAffixLimitReached) {
+				writeJSON(c, consts.StatusBadRequest, map[string]string{
+					"error":   "EQUIPMENT_AFFIX_LIMIT_REACHED",
+					"message": "这件装备的铭刻词条已达上限。",
+				})
+				return
+			}
+			writeJSON(c, consts.StatusInternalServerError, map[string]string{"error": "INSCRIBE_FAILED"})
+			return
+		}
+		publishEquipmentChange(ctx, nickname, options.ChangePublisher)
+		writeDomainEvent(ctx, options.DomainEventWriter, core.DomainEvent{
+			EventType: "equipment.inscribed",
+			Nickname:  nickname,
+			ItemID:    c.Param("instanceId"),
+		})
+		writeJSON(c, consts.StatusOK, state)
+	})
+
 	router.POST("/api/equipment/:instanceId/lock", func(ctx context.Context, c *app.RequestContext) {
 		var body struct {
 			Nickname string `json:"nickname"`

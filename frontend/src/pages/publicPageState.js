@@ -151,6 +151,7 @@ const bossLeaderboard = ref([])
 const bossLoot = ref([])
 const bossGoldRange = ref({min: 0, max: 0})
 const bossStoneRange = ref({min: 0, max: 0})
+const bossInscriptionStoneRange = ref({min: 0, max: 0})
 const bossTalentPointsOnKill = ref(0)
 const announcementVersion = ref('')
 const latestAnnouncement = ref(null)
@@ -176,6 +177,7 @@ const syncing = ref(false)
 const errorMessage = ref('')
 const pendingKeys = ref(new Set())
 const actioningItemId = ref('')
+const inscriptionStones = ref(0)
 const lastUpdatedAt = ref('')
 const liveConnected = ref(false)
 
@@ -988,6 +990,7 @@ function formatItemStats(item) {
     if (item?.critRate) parts.push(`暴击率 ${(item.critRate * 100).toFixed(1)}%`)
     if (item?.critDamageMultiplier) parts.push(`暴伤 ${item.critDamageMultiplier}`)
     if (item?.bossDamagePercent) parts.push(`首领伤 ${item.bossDamagePercent}%`)
+    if (item?.allDamageAmplifyBonus) parts.push(`全伤害 ${formatDisplayPercent(item.allDamageAmplifyBonus)}%`)
     if (item?.magicProcRateBonus) parts.push(`魔法触发 ${(item.magicProcRateBonus * 100).toFixed(1)}%`)
     if (item?.magicDamageBonus) parts.push(`魔法增伤 ${formatDisplayPercent(item.magicDamageBonus)}%`)
     return parts.join(' ') || '无属性'
@@ -1003,6 +1006,25 @@ function formatDisplayPercent(value) {
     return formatNumber(normalizeDisplayPercent(value), 2)
 }
 
+const affixEffectLabels = {
+    attack_power: '攻击力',
+    crit_damage: '暴击伤害',
+    all_damage_amplify: '全伤害加成',
+    part_type_damage_soft: '软组织增伤',
+    part_type_damage_heavy: '重甲增伤',
+    part_type_damage_weak: '弱点增伤',
+    magic_damage_bonus: '魔法伤害加成',
+    crit_rate: '暴击率',
+    armor_pen_percent: '额外护甲穿透',
+    magic_proc_rate_bonus: '魔法触发率',
+}
+
+function formatItemAffixLine(affix) {
+    if (!affix) return ''
+    const effectLabel = affixEffectLabels[affix.type] || affix.type || '词条效果'
+    return affix.name ? `${affix.name}：${effectLabel} ${affix.valueText || ''}`.trim() : `${effectLabel} ${affix.valueText || ''}`.trim()
+}
+
 function formatItemStatLines(item) {
     const lines = []
     if (item?.attackPower) lines.push(`攻击力 ${formatNumber(item.attackPower)}`)
@@ -1012,6 +1034,7 @@ function formatItemStatLines(item) {
     if (item?.critRate) lines.push(`暴击率 ${formatDisplayPercent(item.critRate)}%`)
     if (item?.critDamageMultiplier) lines.push(`暴击倍率 +${formatDisplayPercent(item.critDamageMultiplier)}%`)
     if (item?.bossDamagePercent) lines.push(`首领伤害 ${formatDisplayPercent(item.bossDamagePercent)}%`)
+    if (item?.allDamageAmplifyBonus) lines.push(`全伤害加成 ${formatDisplayPercent(item.allDamageAmplifyBonus)}%`)
     if (item?.partTypeDamageSoft) lines.push(`软组织伤害 ${formatDisplayPercent(item.partTypeDamageSoft)}%`)
     if (item?.partTypeDamageHeavy) lines.push(`重甲伤害 ${formatDisplayPercent(item.partTypeDamageHeavy)}%`)
     if (item?.partTypeDamageWeak) lines.push(`弱点伤害 ${formatDisplayPercent(item.partTypeDamageWeak)}%`)
@@ -1385,6 +1408,7 @@ async function loadBossResources(force = false) {
         bossLoot.value = []
         bossGoldRange.value = {min: 0, max: 0}
         bossStoneRange.value = {min: 0, max: 0}
+        bossInscriptionStoneRange.value = {min: 0, max: 0}
         bossTalentPointsOnKill.value = 0
         lastBossResourceVersion = ''
         return
@@ -1407,6 +1431,7 @@ async function loadBossResources(force = false) {
         bossLoot.value = Array.isArray(payload?.bossLoot) ? payload.bossLoot : []
         bossGoldRange.value = payload?.goldRange ?? {min: 0, max: 0}
         bossStoneRange.value = payload?.stoneRange ?? {min: 0, max: 0}
+        bossInscriptionStoneRange.value = payload?.inscriptionStoneRange ?? {min: 0, max: 0}
         bossTalentPointsOnKill.value = Math.max(0, Number(payload?.talentPointsOnKill ?? 0))
         lastBossResourceVersion = currentVersion
     } catch {
@@ -1414,6 +1439,7 @@ async function loadBossResources(force = false) {
             bossLoot.value = []
             bossGoldRange.value = {min: 0, max: 0}
             bossStoneRange.value = {min: 0, max: 0}
+            bossInscriptionStoneRange.value = {min: 0, max: 0}
             bossTalentPointsOnKill.value = 0
         }
     } finally {
@@ -1608,6 +1634,9 @@ function applyPublicState(payload) {
     if ('bossStoneRange' in payload && payload.bossStoneRange) {
         bossStoneRange.value = payload.bossStoneRange
     }
+    if ('bossInscriptionStoneRange' in payload && payload.bossInscriptionStoneRange) {
+        bossInscriptionStoneRange.value = payload.bossInscriptionStoneRange
+    }
     if ('bossTalentPointsOnKill' in payload) {
         bossTalentPointsOnKill.value = Math.max(0, Number(payload.bossTalentPointsOnKill ?? 0))
     }
@@ -1746,6 +1775,9 @@ function applyPlayerProfileState(payload) {
     }
     if ('stones' in payload) {
         stones.value = Number(payload.stones ?? 0)
+    }
+    if ('inscriptionStones' in payload) {
+        inscriptionStones.value = Number(payload.inscriptionStones ?? 0)
     }
     if ('talentPoints' in payload) {
         talentPoints.value = Number(payload.talentPoints ?? 0)
@@ -2185,6 +2217,7 @@ function clearUserRealtimeState() {
     combatStats.value = defaultCombatStats()
     gold.value = 0
     stones.value = 0
+    inscriptionStones.value = 0
     talentPoints.value = 0
     stamina.value = defaultStaminaState()
     equippedBattleClickSkinId.value = ''
@@ -3076,6 +3109,42 @@ async function enhanceItem(instanceId, levels = 1) {
     }
 }
 
+async function inscribeItem(instanceId) {
+    if (!nickname.value || !instanceId) {
+        return {ok: false, message: '昵称或装备不存在'}
+    }
+
+    actioningItemId.value = instanceId
+    errorMessage.value = ''
+
+    try {
+        const response = await fetch(`/api/equipment/${encodeURIComponent(instanceId)}/inscribe`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({nickname: nickname.value}),
+        })
+
+        if (!response.ok) {
+            const message = await readErrorMessage(response, '铭刻失败，请稍后重试。')
+            errorMessage.value = message
+            return {ok: false, message}
+        }
+
+        await response.json()
+        await loadPlayerProfile()
+        playUiActionSound('equip')
+        return {ok: true, message: ''}
+    } catch (error) {
+        const message = error.message || '铭刻失败，请稍后重试。'
+        errorMessage.value = message
+        return {ok: false, message}
+    } finally {
+        actioningItemId.value = ''
+    }
+}
+
 async function submitNickname(turnstileToken = '') {
     const nextNickname = normalizeNickname(nicknameDraft.value)
     if (!nextNickname) {
@@ -3353,6 +3422,7 @@ export function usePublicPageState() {
         bossLoot,
         bossGoldRange,
         bossStoneRange,
+        bossInscriptionStoneRange,
         bossTalentPointsOnKill,
         announcementVersion,
         latestAnnouncement,
@@ -3416,10 +3486,12 @@ export function usePublicPageState() {
         messageError,
         autoClickEnabled,
         autoClickTargetKey,
+        formatItemAffixLine,
         shopItems,
         loadingShopItems,
         gold,
         stones,
+        inscriptionStones,
         talentPoints,
         stamina,
         equippedBattleClickSkinId,
@@ -3488,6 +3560,7 @@ export function usePublicPageState() {
         toggleItemLock,
         salvageUnequippedItems,
         enhanceItem,
+        inscribeItem,
         submitNickname,
         resetNickname,
         registerPublicPageLifecycle,

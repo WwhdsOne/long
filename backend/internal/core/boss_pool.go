@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -54,6 +55,9 @@ func (s *Store) ListBossTemplates(ctx context.Context) ([]BossTemplate, error) {
 			MaxHP:              maxInt64(1, int64FromString(values["max_hp"])),
 			GoldOnKill:         maxInt64(0, int64FromString(values["gold_on_kill"])),
 			StoneOnKill:        maxInt64(0, int64FromString(values["stone_on_kill"])),
+			InscriptionStoneDropRatePercent: clampFloat(float64FromString(values["inscription_stone_drop_rate_percent"]), 0, 100),
+			InscriptionStoneDropCountMin:    maxInt64(0, int64FromString(values["inscription_stone_drop_count_min"])),
+			InscriptionStoneDropCountMax:    maxInt64(0, int64FromString(values["inscription_stone_drop_count_max"])),
 			TalentPointsOnKill: maxInt64(0, int64FromString(values["talent_points_on_kill"])),
 			Loot:               loot,
 			Layout:             layout,
@@ -87,6 +91,9 @@ func (s *Store) SaveBossTemplate(ctx context.Context, template BossTemplateUpser
 		"max_hp":                strconv.FormatInt(maxHP, 10),
 		"gold_on_kill":          strconv.FormatInt(maxInt64(0, template.GoldOnKill), 10),
 		"stone_on_kill":         strconv.FormatInt(maxInt64(0, template.StoneOnKill), 10),
+		"inscription_stone_drop_rate_percent": fmt.Sprintf("%.4f", clampFloat(template.InscriptionStoneDropRatePercent, 0, 100)),
+		"inscription_stone_drop_count_min":    strconv.FormatInt(maxInt64(0, template.InscriptionStoneDropCountMin), 10),
+		"inscription_stone_drop_count_max":    strconv.FormatInt(maxInt64(0, template.InscriptionStoneDropCountMax), 10),
 		"talent_points_on_kill": strconv.FormatInt(maxInt64(0, template.TalentPointsOnKill), 10),
 	}
 	if len(layout) > 0 {
@@ -406,6 +413,9 @@ func (s *Store) activateBossTemplateInstanceForRoom(ctx context.Context, roomID 
 		CurrentHP:          maxHP,
 		GoldOnKill:         maxInt64(0, template.GoldOnKill),
 		StoneOnKill:        maxInt64(0, template.StoneOnKill),
+		InscriptionStoneDropRatePercent: clampFloat(template.InscriptionStoneDropRatePercent, 0, 100),
+		InscriptionStoneDropCountMin:    maxInt64(0, template.InscriptionStoneDropCountMin),
+		InscriptionStoneDropCountMax:    maxInt64(0, template.InscriptionStoneDropCountMax),
 		TalentPointsOnKill: maxInt64(0, template.TalentPointsOnKill),
 		Parts:              parts,
 		StartedAt:          time.Now().Unix(),
@@ -454,6 +464,9 @@ func (s *Store) setCurrentBoss(ctx context.Context, boss *Boss, loot []BossLootE
 		"current_hp":            strconv.FormatInt(boss.CurrentHP, 10),
 		"gold_on_kill":          strconv.FormatInt(maxInt64(0, boss.GoldOnKill), 10),
 		"stone_on_kill":         strconv.FormatInt(maxInt64(0, boss.StoneOnKill), 10),
+		"inscription_stone_drop_rate_percent": fmt.Sprintf("%.4f", clampFloat(boss.InscriptionStoneDropRatePercent, 0, 100)),
+		"inscription_stone_drop_count_min":    strconv.FormatInt(maxInt64(0, boss.InscriptionStoneDropCountMin), 10),
+		"inscription_stone_drop_count_max":    strconv.FormatInt(maxInt64(maxInt64(0, boss.InscriptionStoneDropCountMin), boss.InscriptionStoneDropCountMax), 10),
 		"talent_points_on_kill": strconv.FormatInt(maxInt64(0, boss.TalentPointsOnKill), 10),
 		"started_at":            strconv.FormatInt(boss.StartedAt, 10),
 	}

@@ -52,6 +52,7 @@ export function useAdminPage() {
         maxHp: '',
         goldOnKill: 0,
         stoneOnKill: 0,
+        inscriptionStoneDropRatePercent: 0,
         talentPointsOnKill: 0,
         layout: []
     })
@@ -526,7 +527,7 @@ export function useAdminPage() {
         announcements.value = []
         checkingSession.value = false
         successMessage.value = ''
-        bossForm.value = {id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, talentPointsOnKill: 0, layout: []}
+        bossForm.value = {id: '', name: '', maxHp: '', goldOnKill: 0, stoneOnKill: 0, inscriptionStoneDropRatePercent: 0, talentPointsOnKill: 0, layout: []}
     }
 
     async function resetPlayerPassword(nickname) {

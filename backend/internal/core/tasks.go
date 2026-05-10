@@ -160,6 +160,7 @@ func (s *Store) ClaimTaskReward(ctx context.Context, nickname string, taskID str
 				"bound":         "0",
 				"locked":        "0",
 				"created_at":    strconv.FormatInt(nowUnix, 10),
+				"affixes":       "[]",
 			})
 			pipe.SAdd(ctx, s.playerInstancesKey(normalizedNickname), instanceID)
 			rewardItems = append(rewardItems, Reward{

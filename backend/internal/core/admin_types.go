@@ -39,6 +39,9 @@ type BossUpsert struct {
 	MaxHP              int64      `json:"maxHp"`
 	GoldOnKill         int64      `json:"goldOnKill"`
 	StoneOnKill        int64      `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
+	InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
+	InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
 	TalentPointsOnKill int64      `json:"talentPointsOnKill"`
 	Parts              []BossPart `json:"parts,omitempty"`
 }
@@ -50,6 +53,9 @@ type BossTemplate struct {
 	MaxHP              int64           `json:"maxHp"`
 	GoldOnKill         int64           `json:"goldOnKill"`
 	StoneOnKill        int64           `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
+	InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
+	InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
 	TalentPointsOnKill int64           `json:"talentPointsOnKill"`
 	Loot               []BossLootEntry `json:"loot"`
 	Layout             []BossPart      `json:"layout,omitempty"` // 部位布局
@@ -62,6 +68,9 @@ type BossTemplateUpsert struct {
 	MaxHP              int64      `json:"maxHp"`
 	GoldOnKill         int64      `json:"goldOnKill"`
 	StoneOnKill        int64      `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
+	InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
+	InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
 	TalentPointsOnKill int64      `json:"talentPointsOnKill"`
 	Layout             []BossPart `json:"layout,omitempty"`
 }

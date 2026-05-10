@@ -770,6 +770,27 @@ select {
     color: var(--ink-soft);
     font-size: 0.8rem;
     line-height: 1.4;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.armory-backpack-resources__label {
+    font-weight: 600;
+}
+
+.armory-backpack-resources__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.armory-backpack-resources__icon {
+    width: 40px;
+    height: 40px;
+    display: block;
+    object-fit: contain;
 }
 
 /* 金币数字框 - 游戏经典金色 */
@@ -779,7 +800,6 @@ select {
     color: #ffd966;
     padding: 1px 6px;
     border-radius: 3px;
-    margin: 0 3px;
     font-weight: 500;
 }
 
@@ -790,7 +810,6 @@ select {
     color: #e0e0e0;
     padding: 1px 6px;
     border-radius: 3px;
-    margin: 0 3px;
     font-weight: 500;
 }
 
@@ -1327,7 +1346,7 @@ select {
     border: 0;
     background: transparent;
     color: #fbbf24;
-    font-size: 0.64rem;
+    font-size: 0.9rem;
     font-weight: 800;
     text-decoration: underline;
     text-underline-offset: 3px;
@@ -1827,6 +1846,20 @@ select {
     color: var(--primary-deep);
     font-size: 0.78rem;
     font-weight: 800;
+}
+
+.boss-drop-card__resource-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.boss-drop-card__resource-icon {
+    width: 28px;
+    height: 28px;
+    display: block;
+    object-fit: contain;
+    flex: 0 0 auto;
 }
 
 .boss-drop-card__avatar {

@@ -173,6 +173,7 @@ function openCreateTemplateDialog() {
   props.bossForm.maxHp = ''
   props.bossForm.goldOnKill = 0
   props.bossForm.stoneOnKill = 0
+  props.bossForm.inscriptionStoneDropRatePercent = 0
   props.bossForm.talentPointsOnKill = 0
   props.bossForm.layout = []
   resetLootRows()
@@ -294,7 +295,7 @@ function goNextPage() {
             <span>{{ entry.id }}</span>
           </div>
           <p>血量 {{ entry.maxHp }} · 部位 {{ entry.layout?.length || 0 }}</p>
-          <p>掉落 {{ entry.loot.length }} · 金币 {{ entry.goldOnKill || 0 }} · 强化石 {{ entry.stoneOnKill || 0 }} · 天赋点
+          <p>掉落 {{ entry.loot.length }} · 金币 {{ entry.goldOnKill || 0 }} · 强化石 {{ entry.stoneOnKill || 0 }} · 刻印石掉率 {{ entry.inscriptionStoneDropRatePercent || 0 }}% · 天赋点
             {{ entry.talentPointsOnKill || 0 }}</p>
           <button class="inventory-item__action" type="button" @click.stop="openEditTemplateDialog(entry)">编辑模板
           </button>
@@ -333,6 +334,9 @@ function goNextPage() {
 
               <label>击杀强化石</label>
               <input v-model.number="bossForm.stoneOnKill" class="nickname-form__input" type="number"/>
+
+              <label>刻印石掉率（%）</label>
+              <input v-model.number="bossForm.inscriptionStoneDropRatePercent" class="nickname-form__input" type="number" step="0.1" min="0" max="100"/>
 
               <label>击杀天赋点</label>
               <input v-model.number="bossForm.talentPointsOnKill" class="nickname-form__input" type="number"/>

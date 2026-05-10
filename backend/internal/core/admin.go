@@ -179,14 +179,15 @@ func (s *Store) GrantEquipmentToPlayer(ctx context.Context, nickname string, ite
 		if createErr != nil {
 			return UserState{}, createErr
 		}
-		pipe.HSet(ctx, s.equipmentInstanceKey(instanceID), map[string]any{
-			"item_id":       itemID,
-			"enhance_level": "0",
-			"spent_stones":  "0",
-			"bound":         "0",
-			"locked":        "0",
-			"created_at":    strconv.FormatInt(nowUnix, 10),
-		})
+			pipe.HSet(ctx, s.equipmentInstanceKey(instanceID), map[string]any{
+				"item_id":       itemID,
+				"enhance_level": "0",
+				"spent_stones":  "0",
+				"bound":         "0",
+				"locked":        "0",
+				"created_at":    strconv.FormatInt(nowUnix, 10),
+				"affixes":       "[]",
+			})
 		pipe.SAdd(ctx, s.playerInstancesKey(normalizedNickname), instanceID)
 	}
 	pipe.ZAdd(ctx, s.playerIndexKey, redis.Z{
@@ -233,6 +234,9 @@ func (s *Store) ActivateBossInRoom(ctx context.Context, roomID string, boss Boss
 		CurrentHP:          maxHP,
 		GoldOnKill:         maxInt64(0, boss.GoldOnKill),
 		StoneOnKill:        maxInt64(0, boss.StoneOnKill),
+		InscriptionStoneDropRatePercent: clampFloat(boss.InscriptionStoneDropRatePercent, 0, 100),
+		InscriptionStoneDropCountMin:    maxInt64(0, boss.InscriptionStoneDropCountMin),
+		InscriptionStoneDropCountMax:    maxInt64(maxInt64(0, boss.InscriptionStoneDropCountMin), boss.InscriptionStoneDropCountMax),
 		TalentPointsOnKill: maxInt64(0, boss.TalentPointsOnKill),
 		Parts:              parts,
 		StartedAt:          time.Now().Unix(),

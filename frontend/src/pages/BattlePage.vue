@@ -13,6 +13,7 @@ const {
   bossLoot,
   bossGoldRange,
   bossStoneRange,
+  bossInscriptionStoneRange,
   bossTalentPointsOnKill,
   currentRoomId,
   currentRoom,
@@ -72,6 +73,12 @@ const {
 } = usePublicPageState()
 
 const bossDropModalOpen = ref(false)
+const resourceIcons = {
+  gold: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E9%87%91%E5%B8%81.png',
+  stones: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%BC%BA%E5%8C%96%E7%9F%B3.png',
+  inscriptionStones: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%88%BB%E5%8D%B0%E7%9F%B3.png',
+  talentPoints: 'https://hai-world2.oss-cn-beijing.aliyuncs.com/resource/%E5%A4%A9%E8%B5%8B%E7%82%B9.png',
+}
 const bossGridRef = ref(null)
 const swordCursorRef = ref(null)
 const swordCursorImageRef = ref(null)
@@ -1491,21 +1498,40 @@ const silverStormActive = computed(() => {
             </div>
             <div class="boss-drop-pool__grid">
               <article class="boss-drop-card boss-drop-card--detail">
-                <span class="boss-drop-card__type">金币</span>
+                <div class="boss-drop-card__resource-head">
+                  <img :src="resourceIcons.gold" alt="金币" class="boss-drop-card__resource-icon">
+                  <span class="boss-drop-card__type">金币</span>
+                </div>
                 <strong>可获取金币量 : {{ bossGoldRange.min }} ~ {{ bossGoldRange.max }}</strong>
                 <ul class="boss-drop-card__details">
                   <li>按击杀结算</li>
                 </ul>
               </article>
               <article class="boss-drop-card boss-drop-card--detail">
-                <span class="boss-drop-card__type">强化石</span>
+                <div class="boss-drop-card__resource-head">
+                  <img :src="resourceIcons.stones" alt="强化石" class="boss-drop-card__resource-icon">
+                  <span class="boss-drop-card__type">强化石</span>
+                </div>
                 <strong>可获取强化石量 : {{ bossStoneRange.min }} ~ {{ bossStoneRange.max }}</strong>
                 <ul class="boss-drop-card__details">
                   <li>按击杀结算</li>
                 </ul>
               </article>
               <article class="boss-drop-card boss-drop-card--detail">
-                <span class="boss-drop-card__type">天赋点</span>
+                <div class="boss-drop-card__resource-head">
+                  <img :src="resourceIcons.inscriptionStones" alt="刻印石" class="boss-drop-card__resource-icon">
+                  <span class="boss-drop-card__type">刻印石</span>
+                </div>
+                <strong>可获取刻印石量 : {{ bossInscriptionStoneRange.min }} ~ {{ bossInscriptionStoneRange.max }}</strong>
+                <ul class="boss-drop-card__details">
+                  <li>按击杀结算</li>
+                </ul>
+              </article>
+              <article class="boss-drop-card boss-drop-card--detail">
+                <div class="boss-drop-card__resource-head">
+                  <img :src="resourceIcons.talentPoints" alt="天赋点" class="boss-drop-card__resource-icon">
+                  <span class="boss-drop-card__type">天赋点</span>
+                </div>
                 <strong>可获取天赋点 : {{ bossTalentPointsOnKill }}（固定）</strong>
                 <ul class="boss-drop-card__details">
                   <li>按击杀结算</li>

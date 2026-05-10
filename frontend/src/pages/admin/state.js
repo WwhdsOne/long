@@ -262,6 +262,7 @@ export function normalizeBossTemplate(entry) {
         maxHp: String(entry?.maxHp ?? 0),
         goldOnKill: Number(entry?.goldOnKill ?? 0),
         stoneOnKill: Number(entry?.stoneOnKill ?? 0),
+        inscriptionStoneDropRatePercent: Number(entry?.inscriptionStoneDropRatePercent ?? 0),
         talentPointsOnKill: Number(entry?.talentPointsOnKill ?? 0),
         layout: Array.isArray(entry?.layout) ? entry.layout.map((part) => ({
             ...part,

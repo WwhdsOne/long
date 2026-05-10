@@ -109,6 +109,9 @@ func (b Boss) MarshalJSON() ([]byte, error) {
 		CurrentHP          string     `json:"currentHp"`
 		GoldOnKill         int64      `json:"goldOnKill"`
 		StoneOnKill        int64      `json:"stoneOnKill"`
+		InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
+		InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
+		InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
 		TalentPointsOnKill int64      `json:"talentPointsOnKill"`
 		Parts              []BossPart `json:"parts,omitempty"`
 		StartedAt          int64      `json:"startedAt,omitempty"`
@@ -125,6 +128,9 @@ func (b Boss) MarshalJSON() ([]byte, error) {
 		CurrentHP:          formatInt64String(b.CurrentHP),
 		GoldOnKill:         b.GoldOnKill,
 		StoneOnKill:        b.StoneOnKill,
+		InscriptionStoneDropRatePercent: b.InscriptionStoneDropRatePercent,
+		InscriptionStoneDropCountMin:    b.InscriptionStoneDropCountMin,
+		InscriptionStoneDropCountMax:    b.InscriptionStoneDropCountMax,
 		TalentPointsOnKill: b.TalentPointsOnKill,
 		Parts:              b.Parts,
 		StartedAt:          b.StartedAt,
@@ -144,6 +150,9 @@ func (b *Boss) UnmarshalJSON(data []byte) error {
 		CurrentHP          json.RawMessage `json:"currentHp"`
 		GoldOnKill         int64           `json:"goldOnKill"`
 		StoneOnKill        int64           `json:"stoneOnKill"`
+		InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
+		InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
+		InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
 		TalentPointsOnKill int64           `json:"talentPointsOnKill"`
 		Parts              []BossPart      `json:"parts,omitempty"`
 		StartedAt          int64           `json:"startedAt,omitempty"`
@@ -172,6 +181,9 @@ func (b *Boss) UnmarshalJSON(data []byte) error {
 		CurrentHP:          currentHP,
 		GoldOnKill:         aux.GoldOnKill,
 		StoneOnKill:        aux.StoneOnKill,
+		InscriptionStoneDropRatePercent: aux.InscriptionStoneDropRatePercent,
+		InscriptionStoneDropCountMin:    aux.InscriptionStoneDropCountMin,
+		InscriptionStoneDropCountMax:    aux.InscriptionStoneDropCountMax,
 		TalentPointsOnKill: aux.TalentPointsOnKill,
 		Parts:              aux.Parts,
 		StartedAt:          aux.StartedAt,

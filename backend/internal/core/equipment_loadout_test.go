@@ -51,7 +51,7 @@ func TestLoadoutReadsFixedSixSlotsViaHMGet(t *testing.T) {
 		t.Fatalf("expected equipped chest marker, got %+v", equipped)
 	}
 
-	attackPower, _, _, _, _, _, _, _, _ := loadoutBonuses(loadout)
+	attackPower, _, _, _, _, _, _, _, _, _ := loadoutBonuses(loadout)
 	if attackPower != 210 {
 		t.Fatalf("expected all six slots to contribute attack power 210, got %d", attackPower)
 	}
@@ -77,6 +77,7 @@ func seedOwnedInstance(t *testing.T, store *Store, ctx context.Context, nickname
 		"bound":         "0",
 		"locked":        "0",
 		"created_at":    "0",
+		"affixes":       "[]",
 	}).Err(); err != nil {
 		t.Fatalf("seed instance %s: %v", instanceID, err)
 	}

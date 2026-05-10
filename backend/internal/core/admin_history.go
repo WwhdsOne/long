@@ -28,6 +28,9 @@ func (s *Store) SaveBossToHistory(ctx context.Context, boss *Boss) error {
 		"current_hp":            strconv.FormatInt(boss.CurrentHP, 10),
 		"gold_on_kill":          strconv.FormatInt(maxInt64(0, boss.GoldOnKill), 10),
 		"stone_on_kill":         strconv.FormatInt(maxInt64(0, boss.StoneOnKill), 10),
+		"inscription_stone_drop_rate_percent": strconv.FormatFloat(clampFloat(boss.InscriptionStoneDropRatePercent, 0, 100), 'f', -1, 64),
+		"inscription_stone_drop_count_min":    strconv.FormatInt(maxInt64(0, boss.InscriptionStoneDropCountMin), 10),
+		"inscription_stone_drop_count_max":    strconv.FormatInt(maxInt64(maxInt64(0, boss.InscriptionStoneDropCountMin), boss.InscriptionStoneDropCountMax), 10),
 		"talent_points_on_kill": strconv.FormatInt(maxInt64(0, boss.TalentPointsOnKill), 10),
 		"started_at":            strconv.FormatInt(boss.StartedAt, 10),
 	}
