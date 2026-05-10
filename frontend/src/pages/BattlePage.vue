@@ -237,23 +237,12 @@ watch(() => currentRoomId.value, async (next, prev) => {
 }, {immediate: true})
 
 const talentEffectOverlayRef = ref(null)
-const talentOverlayCanvasSize = ref({width: 1, height: 1})
-const swordSwingTick = ref(0)
-const swordRecoverTick = ref(0)
-const swordAnimationPhase = ref('idle')
-const zoneHitFlashTicks = ref({})
-const clickSparkFeed = ref([])
-const bossZoneElementMap = new Map()
 let bossGridResizeObserver = null
 let bossGridRect = null
 let bossCursorFrame = 0
 let pendingBossCursorPoint = null
 let appliedBossCursorPoint = null
-
-// 缓存 DOM 测量结果，仅供 computed 读取，由 ResizeObserver 统一更新
-let cachedOverlayRect = null
-let cachedGridRect = null
-const cachedZoneRects = new Map()
+let bossCursorRotationDeg = 0
 
 // 每秒 tick 驱动倒计时刷新
 const nowTick = ref(0)
@@ -262,7 +251,6 @@ let tickTimer = 0
 let recoverTimer = 0
 let lastAttackTime = 0
 let lastPointerDown = 0
-const CLICK_SPARK_WINDOW_MS = 420
 
 const roomJoinCooldownRemainingSeconds = computed(() => {
   void nowTick.value
@@ -333,50 +321,27 @@ function invalidateBossGridRect() {
   bossGridRect = null
 }
 
-// 统一刷新所有 DOM 测量缓存，仅在 onMounted / ResizeObserver 中调用，不在 computed 内调用
-function refreshCachedLayout() {
-  const overlay = talentEffectOverlayRef.value
-  const grid = bossGridRef.value
-
-  if (overlay instanceof HTMLElement) {
-    const or = overlay.getBoundingClientRect()
-    cachedOverlayRect = {left: or.left, top: or.top, width: or.width, height: or.height}
-    talentOverlayCanvasSize.value = {
-      width: Math.max(1, Math.round(or.width || 0)),
-      height: Math.max(1, Math.round(or.height || 0)),
-    }
-  }
-
-  if (grid instanceof HTMLElement) {
-    const gr = grid.getBoundingClientRect()
-    cachedGridRect = {left: gr.left, top: gr.top, width: gr.width, height: gr.height}
-    bossGridRect = gr
-    const cell = grid.querySelector('.boss-part-cell--center') || grid.querySelector('.boss-part-cell')
-    if (cell instanceof HTMLElement) {
-      const cr = cell.getBoundingClientRect()
-      if (cr.width > 0) {
-        bossCellSizePx.value = Math.round(cr.width)
-      }
-    }
-  }
-
-  cachedZoneRects.clear()
-  for (const [key, el] of bossZoneElementMap.entries()) {
-    if (el instanceof HTMLElement) {
-      const zr = el.getBoundingClientRect()
-      cachedZoneRects.set(key, {left: zr.left, top: zr.top, width: zr.width, height: zr.height})
-    }
-  }
-}
-
 function updateCursorPos(e) {
   const rect = measureBossGridRect()
   if (!rect) return
   queueBossCursorPosition(e.clientX - rect.left, e.clientY - rect.top)
 }
 
-function measureTalentOverlaySize() {
-  return talentOverlayCanvasSize.value
+function setBossCursorRotation(nextRotationDeg) {
+  bossCursorRotationDeg = nextRotationDeg
+  const swordCursorImage = swordCursorImageRef.value
+  if (!swordCursorImage) return
+  swordCursorImage.style.transform = `rotate(${bossCursorRotationDeg}deg)`
+}
+
+function measureBossCellSize() {
+  const grid = bossGridRef.value
+  const cell = grid?.querySelector?.('.boss-part-cell')
+  if (!(cell instanceof HTMLElement)) return
+  const rect = cell.getBoundingClientRect()
+  if (rect.width > 0) {
+    bossCellSizePx.value = Math.round(rect.width)
+  }
 }
 
 function effectCanvasSize(scale) {
@@ -388,10 +353,9 @@ function ultimateEffectCanvasSize() {
 }
 
 function bossGridEffectSize() {
-  const rect = cachedGridRect
-  if (!rect) return Math.max(1, Math.round(bossCellSizePx.value * 5))
-  const width = Math.round(rect.width || 0)
-  const height = Math.round(rect.height || 0)
+  const rect = bossGridRef.value?.getBoundingClientRect?.()
+  const width = Math.round(rect?.width || 0)
+  const height = Math.round(rect?.height || 0)
   return Math.max(1, Math.max(width, height, Math.round(bossCellSizePx.value * 5)))
 }
 
@@ -406,90 +370,6 @@ function effectFallback(scale, fallback = {}) {
     marginTop: `-${Math.round(size / 2)}px`,
     ...fallback,
   }
-}
-
-function parseFallbackCoord(value, totalSize) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  const raw = String(value || '').trim()
-  if (!raw) return totalSize / 2
-  if (raw.endsWith('%')) {
-    const percent = Number(raw.slice(0, -1))
-    if (Number.isFinite(percent)) {
-      return totalSize * percent / 100
-    }
-  }
-  const px = Number(raw.replace(/px$/, ''))
-  if (Number.isFinite(px)) return px
-  return totalSize / 2
-}
-
-function resolveFallbackAnchor(fallback = {}) {
-  const size = measureTalentOverlaySize()
-  return {
-    left: parseFallbackCoord(fallback.left, size.width),
-    top: parseFallbackCoord(fallback.top, size.height),
-  }
-}
-
-function effectEntryLayout(type, options = {}) {
-  const {
-    anchor = 'part',
-    scale = 1,
-    offsetXScale = 0,
-    offsetYScale = 0,
-    entryOverride = null,
-    fallback = {},
-  } = options
-  if (anchor === 'grid') {
-    const size = bossGridEffectSize()
-    const center = gridOverlayAnchor()
-    if (!center) return null
-    return {
-      left: Math.round(center.left - size / 2),
-      top: Math.round(center.top - size / 2),
-      width: size,
-      height: size,
-      size,
-      effect: type,
-      id: `${type}-${size}-${Math.round(center.left)}-${Math.round(center.top)}`,
-    }
-  }
-  const size = effectCanvasSize(scale)
-  const center = triggerAnchor(type, effectWindowMs(type), entryOverride) || resolveFallbackAnchor(fallback)
-  if (!center) return null
-  return {
-    left: Math.round(center.left + effectOffset(offsetXScale) - size / 2),
-    top: Math.round(center.top + effectOffset(offsetYScale) - size / 2),
-    width: size,
-    height: size,
-    size,
-    effect: type,
-    id: `${type}-${size}-${Math.round(center.left)}-${Math.round(center.top)}`,
-  }
-}
-
-function pushBattleEffect(entries, effect, config = {}) {
-  const {
-    id = '',
-    anchor = 'part',
-    size = 0,
-    width = size,
-    height = size,
-    left = 0,
-    top = 0,
-    ...extra
-  } = config
-  entries.push({
-    id: id || `${effect}-${entries.length}`,
-    effect,
-    size: Math.max(1, Math.round(size || width || height || 1)),
-    width: Math.max(1, Math.round(width || size || 1)),
-    height: Math.max(1, Math.round(height || size || 1)),
-    left: Math.round(left),
-    top: Math.round(top),
-    anchor,
-    ...extra,
-  })
 }
 
 function effectOverlayStyle(type, options = {}) {
@@ -526,9 +406,9 @@ function effectOverlayStyle(type, options = {}) {
 
 // 剑挥火花（按部位类型变色，参照 DAMAGE_VARIANTS）
 const sparkPresets = {
-  weak: {count: 12, size: 112},
-  heavy: {count: 5, size: 88},
-  soft: {count: 6, size: 92},
+  weak: {colors: ['#facc15', '#ef4444', '#f87171', '#fbbf24', '#f59e0b', '#dc2626'], count: 12, gravity: 0.04},
+  heavy: {colors: ['#9ca3af', '#787888', '#64748b', '#94a3b8'], count: 5, gravity: 0.18},
+  soft: {colors: ['#f8fafc', '#e2e8f0', '#cbd5e1', '#fafaff'], count: 6, gravity: 0.08},
 }
 
 function detectCellType(el) {
@@ -539,53 +419,61 @@ function detectCellType(el) {
   return 'soft'
 }
 
-function setBossZoneElement(key, el) {
-  const normalizedKey = String(key || '').trim()
-  if (!normalizedKey) return
-  if (el instanceof HTMLElement) {
-    bossZoneElementMap.set(normalizedKey, el)
-    return
-  }
-  bossZoneElementMap.delete(normalizedKey)
-}
+const sparks = []
+let sparksRunning = false
+let particleRaf = 0
 
-function queueClickSpark(e, cellType) {
-  const overlay = talentEffectOverlayRef.value
-  if (!(overlay instanceof HTMLElement)) return
-  const rect = overlay.getBoundingClientRect()
+function spawnSparks(cx, cy, cellType) {
   const preset = sparkPresets[cellType] || sparkPresets.soft
-  const spreadSize = Math.max(effectCanvasSize(3.05), 156)
-  const now = Date.now()
-  clickSparkFeed.value = [
-    {
-      id: `click-spark-${now}-${Math.floor(Math.random() * 100000)}`,
-      triggeredAt: now,
-      left: e.clientX - rect.left,
-      top: e.clientY - rect.top,
-      size: preset.size,
-      spreadSize,
-      cellType,
-      count: preset.count,
-    },
-    ...clickSparkFeed.value,
-  ].slice(0, 18)
-}
-
-function queueHitFlash(zone) {
-  const key = getBossZoneButtonKey(zone)
-  if (!key) return
-  zoneHitFlashTicks.value = {
-    ...zoneHitFlashTicks.value,
-    [key]: (Number(zoneHitFlashTicks.value[key] || 0) + 1),
+  for (let i = 0; i < preset.count; i++) {
+    const el = document.createElement('div')
+    el.className = 'sword-spark'
+    const angle = Math.PI * 0.1 + Math.random() * Math.PI * 0.5
+    const speed = 4 + Math.random() * 10
+    const sz = 4 + Math.floor(Math.random() * 8)
+    el.style.width = el.style.height = sz + 'px'
+    el.style.background = preset.colors[Math.floor(Math.random() * preset.colors.length)]
+    el.style.left = cx + 'px';
+    el.style.top = cy + 'px'
+    document.body.appendChild(el)
+    sparks.push({
+      el,
+      x: cx,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 1,
+      gravity: preset.gravity,
+      decay: 0.03 + Math.random() * 0.04
+    })
+  }
+  if (!sparksRunning) {
+    sparksRunning = true;
+    particleRaf = requestAnimationFrame(updateSparks)
   }
 }
 
-function hitFlashClass(zone) {
-  const key = getBossZoneButtonKey(zone)
-  if (!key) return ''
-  const tick = Number(zoneHitFlashTicks.value[key] || 0)
-  if (tick <= 0) return ''
-  return tick % 2 === 0 ? 'boss-part-cell--hit-flash-b' : 'boss-part-cell--hit-flash-a'
+function updateSparks() {
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i];
+    s.x += s.vx;
+    s.y += s.vy;
+    s.vy += s.gravity;
+    s.life -= s.decay
+    s.el.style.left = s.x + 'px';
+    s.el.style.top = s.y + 'px';
+    s.el.style.opacity = s.life
+    if (s.life <= 0) {
+      s.el.remove();
+      sparks.splice(i, 1)
+    }
+  }
+  if (sparks.length > 0) {
+    particleRaf = requestAnimationFrame(updateSparks)
+  } else {
+    sparksRunning = false;
+    particleRaf = 0
+  }
 }
 
 function doCursorAttack(e) {
@@ -598,16 +486,19 @@ function doCursorAttack(e) {
   if (!swordCursorImage) return
 
   clearTimeout(recoverTimer)
-  swordAnimationPhase.value = 'swinging'
-  swordSwingTick.value++
+  swordCursorImage.classList.remove('swinging', 'recovering')
+  void swordCursorImage.offsetWidth // 强制重排，连续点击动画重新触发
+  setBossCursorRotation(60)
+  swordCursorImage.classList.add('swinging')
 
   recoverTimer = setTimeout(() => {
     if (!swordCursorImage) return
-    swordAnimationPhase.value = 'recovering'
-    swordRecoverTick.value++
+    swordCursorImage.classList.remove('swinging')
+    swordCursorImage.classList.add('recovering')
+    setBossCursorRotation(0)
   }, 50)
 
-  queueClickSpark(e, detectCellType(e.target))
+  spawnSparks(e.clientX, e.clientY, detectCellType(e.target))
 }
 
 function handleBossGridPointerMove(e) {
@@ -636,18 +527,17 @@ function handleBossGridClick(e) {
 }
 
 onMounted(() => {
-  refreshCachedLayout()
+  measureBossGridRect()
+  measureBossCellSize()
   window.addEventListener('scroll', invalidateBossGridRect, {passive: true})
   window.addEventListener('resize', invalidateBossGridRect)
   if (typeof ResizeObserver !== 'undefined') {
     bossGridResizeObserver = new ResizeObserver(() => {
-      refreshCachedLayout()
+      measureBossGridRect()
+      measureBossCellSize()
     })
     if (bossGridRef.value instanceof HTMLElement) {
       bossGridResizeObserver.observe(bossGridRef.value)
-    }
-    if (talentEffectOverlayRef.value instanceof HTMLElement) {
-      bossGridResizeObserver.observe(talentEffectOverlayRef.value)
     }
   }
   tickTimer = setInterval(() => {
@@ -661,10 +551,12 @@ onBeforeUnmount(() => {
   bossGridResizeObserver?.disconnect?.()
   bossGridResizeObserver = null
   clearInterval(tickTimer)
+  cancelAnimationFrame(particleRaf)
   cancelAnimationFrame(bossCursorFrame)
   clearTimeout(recoverTimer)
   clearTimeout(comboMilestoneTimer)
-  bossZoneElementMap.clear()
+  sparks.forEach(s => s.el.remove())
+  sparks.length = 0
 })
 
 const bossZones = computed(() => {
@@ -725,7 +617,12 @@ function getBossZoneButtonKey(zone) {
 function clickBossZone(zone) {
   const key = getBossZoneButtonKey(zone)
   if (!key) return
-  queueHitFlash(zone)
+  const el = findBossZoneElement(zone.x, zone.y)
+  if (el) {
+    el.classList.remove('hit-flash')
+    void el.offsetWidth
+    el.classList.add('hit-flash')
+  }
   clickButton(key)
 }
 
@@ -808,208 +705,25 @@ function triggerKey(type, windowMs = null) {
   return `${type}-${entry.id}`
 }
 
-const clickSparkEntries = computed(() => {
-  void nowTick.value
-  return clickSparkFeed.value
-      .filter((entry) => isTriggerFresh(entry, CLICK_SPARK_WINDOW_MS))
-      .map((entry) => ({
-        id: entry.id,
-        effect: 'click_spark',
-        size: entry.size,
-        width: entry.spreadSize,
-        height: entry.spreadSize,
-        left: Math.round(entry.left - entry.spreadSize / 2),
-        top: Math.round(entry.top - entry.spreadSize / 2),
-        anchor: 'spark',
-        cellType: entry.cellType,
-      }))
-})
-
-const battleEffectEntries = computed(() => {
-  void nowTick.value
-  const entries = []
-
-  const stormComboLayout = hasRecentTrigger('storm_combo') ? effectEntryLayout('storm_combo', {scale: 1.65, fallback: { top: '50%', left: '50%' }}) : null
-  if (stormComboLayout) {
-    void effectOverlayStyle('storm_combo', { scale: 1.65, fallback: { top: '50%', left: '50%' } })
-    pushBattleEffect(entries, 'storm_combo', {
-      id: triggerKey('storm_combo'),
-      size: effectCanvasSize(1.65),
-      width: stormComboLayout.width,
-      height: stormComboLayout.height,
-      left: stormComboLayout.left,
-      top: stormComboLayout.top,
-    })
-  }
-
-  const autoStrikeLayout = hasRecentTrigger('auto_strike') ? effectEntryLayout('auto_strike', {scale: 2.05, fallback: { top: '50%', left: '50%' }}) : null
-  if (autoStrikeLayout) {
-    pushBattleEffect(entries, 'auto_strike', {
-      id: triggerKey('auto_strike'),
-      size: effectCanvasSize(2.05),
-      width: autoStrikeLayout.width,
-      height: autoStrikeLayout.height,
-      left: autoStrikeLayout.left,
-      top: autoStrikeLayout.top,
-    })
-  }
-
-  for (const entry of recentBleedTriggers(BLEED_EFFECT_WINDOW_MS)) {
-    const bleedLayout = effectEntryLayout('bleed', {scale: 2.6, entryOverride: entry, fallback: { top: '50%', left: '50%' }})
-    if (!bleedLayout) continue
-    pushBattleEffect(entries, 'bleed', {
-      id: entry.id,
-      size: effectCanvasSize(2.6),
-      width: bleedLayout.width,
-      height: bleedLayout.height,
-      left: bleedLayout.left,
-      top: bleedLayout.top,
-    })
-  }
-
-  const finalCutLayout = hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)
-      ? effectEntryLayout('final_cut', {anchor: 'grid', fallback: { top: '50%', left: '50%' }})
-      : null
-  if (finalCutLayout) {
-    void effectOverlayStyle('final_cut', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })
-    pushBattleEffect(entries, 'final_cut', {
-      id: triggerKey('final_cut', ULTIMATE_EFFECT_WINDOW_MS),
-      anchor: 'grid',
-      size: ultimateEffectCanvasSize(),
-      width: finalCutLayout.width,
-      height: finalCutLayout.height,
-      left: finalCutLayout.left,
-      top: finalCutLayout.top,
-    })
-  }
-
-  const collapseLayout = hasRecentTrigger('collapse_trigger')
-      ? effectEntryLayout('collapse_trigger', {scale: 2, fallback: { top: '50%', left: '50%' }})
-      : null
-  if (collapseLayout) {
-    const collapseStyle = effectOverlayStyle('collapse_trigger', { scale: 2, fallback: { top: '50%', left: '50%' } })
-    void collapseStyle
-    pushBattleEffect(entries, 'collapse_trigger', {
-      id: triggerKey('collapse_trigger'),
-      size: effectCanvasSize(5),
-      width: collapseLayout.width,
-      height: collapseLayout.height,
-      left: collapseLayout.left,
-      top: collapseLayout.top,
-    })
-  }
-
-  const judgmentDayLayout = hasRecentTrigger('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)
-      ? effectEntryLayout('judgment_day', {anchor: 'grid', fallback: { top: '50%', left: '50%' }})
-      : null
-  if (judgmentDayLayout) {
-    const judgmentDayStyle = effectOverlayStyle('judgment_day', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })
-    void judgmentDayStyle
-    pushBattleEffect(entries, 'judgment_day', {
-      id: triggerKey('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS),
-      anchor: 'grid',
-      size: bossGridEffectSize(),
-      width: judgmentDayLayout.width,
-      height: judgmentDayLayout.height,
-      left: judgmentDayLayout.left,
-      top: judgmentDayLayout.top,
-    })
-  }
-
-  const magicBurstLayout = hasRecentTrigger('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS)
-      ? effectEntryLayout('magic_burst', {scale: 2.45, fallback: { top: '50%', left: '50%' }})
-      : null
-  if (magicBurstLayout) {
-    const magicBurstStyle = effectOverlayStyle('magic_burst', { scale: 2.45, fallback: { top: '50%', left: '50%' } })
-    void magicBurstStyle
-    pushBattleEffect(entries, 'magic_burst', {
-      id: triggerKey('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS),
-      size: effectCanvasSize(2.45),
-      width: magicBurstLayout.width,
-      height: magicBurstLayout.height,
-      left: magicBurstLayout.left,
-      top: magicBurstLayout.top,
-    })
-  }
-
-  const magicRuptureLayout = hasRecentTrigger('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS)
-      ? effectEntryLayout('magic_rupture', {scale: 2.65, fallback: { top: '50%', left: '50%' }})
-      : null
-  if (magicRuptureLayout) {
-    const magicRuptureStyle = effectOverlayStyle('magic_rupture', { scale: 2.65, fallback: { top: '50%', left: '50%' } })
-    void magicRuptureStyle
-    pushBattleEffect(entries, 'magic_rupture', {
-      id: triggerKey('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS),
-      size: effectCanvasSize(2.65),
-      width: magicRuptureLayout.width,
-      height: magicRuptureLayout.height,
-      left: magicRuptureLayout.left,
-      top: magicRuptureLayout.top,
-    })
-  }
-
-  const magicStarfallLayout = hasRecentTrigger('magic_starfall', STARFALL_EFFECT_WINDOW_MS)
-      ? effectEntryLayout('magic_starfall', {anchor: 'grid', fallback: { top: '50%', left: '50%' }})
-      : null
-  if (magicStarfallLayout) {
-    const magicStarfallStyle = effectOverlayStyle('magic_starfall', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })
-    void magicStarfallStyle
-    pushBattleEffect(entries, 'magic_starfall', {
-      id: triggerKey('magic_starfall', STARFALL_EFFECT_WINDOW_MS),
-      anchor: 'grid',
-      size: ultimateEffectCanvasSize(),
-      width: magicStarfallLayout.width,
-      height: magicStarfallLayout.height,
-      left: magicStarfallLayout.left,
-      top: magicStarfallLayout.top,
-    })
-  }
-
-  const doomMarkStyle = effectOverlayStyle('doom_mark', { scale: 1.25, fallback: { top: '50%', left: '50%' } })
-  const doomMarkLayout = hasRecentTrigger('doom_mark') ? effectEntryLayout('doom_mark', {scale: 1.25, fallback: { top: '50%', left: '50%' }}) : null
-  if (doomMarkLayout) {
-    pushBattleEffect(entries, 'doom_mark', {
-      id: triggerKey('doom_mark'),
-      size: effectCanvasSize(1.25),
-      width: doomMarkLayout.width,
-      height: doomMarkLayout.height,
-      left: doomMarkLayout.left,
-      top: doomMarkLayout.top,
-    })
-  }
-
-  void doomMarkStyle
-  const silverStormLayout = hasRecentTrigger('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)
-      ? effectEntryLayout('silver_storm', {anchor: 'grid', fallback: { top: '50%', left: '50%' }})
-      : null
-  if (silverStormLayout) {
-    const silverStormStyle = effectOverlayStyle('silver_storm', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })
-    void silverStormStyle
-    pushBattleEffect(entries, 'silver_storm', {
-      id: triggerKey('silver_storm', ULTIMATE_EFFECT_WINDOW_MS),
-      anchor: 'grid',
-      size: ultimateEffectCanvasSize(),
-      width: silverStormLayout.width,
-      height: silverStormLayout.height,
-      left: silverStormLayout.left,
-      top: silverStormLayout.top,
-    })
-  }
-
-  for (const entry of clickSparkEntries.value) {
-    pushBattleEffect(entries, 'click_spark', entry)
-  }
-
-  return entries
-})
+function findBossZoneElement(partX, partY) {
+  if (typeof window === 'undefined') return null
+  const x = Number(partX)
+  const y = Number(partY)
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  const key = `${Math.floor(x)}-${Math.floor(y)}`
+  return document.querySelector(`.boss-part-cell[data-zone-key="${key}"]`)
+}
 
 function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS, entryOverride = null) {
   const entry = entryOverride || latestTrigger(type)
   if (!isTriggerFresh(entry, windowMs)) return null
-  const key = `${Number(entry.partX)}-${Number(entry.partY)}`
-  const overlayRect = cachedOverlayRect
-  const zoneRect = cachedZoneRects.get(key)
-  if (!overlayRect || !zoneRect) return null
+  const overlayEl = talentEffectOverlayRef.value
+  const zoneEl = findBossZoneElement(entry.partX, entry.partY)
+  if (!(overlayEl instanceof HTMLElement) || !(zoneEl instanceof HTMLElement)) {
+    return null
+  }
+  const overlayRect = overlayEl.getBoundingClientRect()
+  const zoneRect = zoneEl.getBoundingClientRect()
   return {
     left: zoneRect.left - overlayRect.left + zoneRect.width / 2,
     top: zoneRect.top - overlayRect.top + zoneRect.height / 2,
@@ -1017,9 +731,13 @@ function triggerAnchor(type, windowMs = TALENT_EFFECT_WINDOW_MS, entryOverride =
 }
 
 function gridOverlayAnchor() {
-  const overlayRect = cachedOverlayRect
-  const gridRect = cachedGridRect
-  if (!overlayRect || !gridRect) return null
+  const overlayEl = talentEffectOverlayRef.value
+  const gridEl = bossGridRef.value
+  if (!(overlayEl instanceof HTMLElement) || !(gridEl instanceof HTMLElement)) {
+    return null
+  }
+  const overlayRect = overlayEl.getBoundingClientRect()
+  const gridRect = gridEl.getBoundingClientRect()
   return {
     left: gridRect.left - overlayRect.left + gridRect.width / 2,
     top: gridRect.top - overlayRect.top + gridRect.height / 2,
@@ -1355,7 +1073,6 @@ const silverStormActive = computed(() => {
                   <button
                       v-for="(zone, xi) in row"
                       :key="yi + '-' + xi"
-                      :ref="(el) => setBossZoneElement(zone ? `${zone.x}-${zone.y}` : '', el)"
                       class="boss-part-cell boss-zone-button"
                       :data-zone-key="zone ? `${zone.x}-${zone.y}` : ''"
                       :class="{
@@ -1371,7 +1088,6 @@ const silverStormActive = computed(() => {
             'boss-part-cell--fracture': zone && isPartFractured(zone),
             'boss-part-cell--center': xi === 2 && yi === 2,
             'talent-hammer-strike': zone && isPartCollapsed(zone),
-            [hitFlashClass(zone)]: zone && hitFlashClass(zone) !== '',
           }"
                       :style="zone ? { '--part-color': partTypeColors[zone.type] || '#64748b' } : {}"
                       type="button"
@@ -1467,15 +1183,6 @@ const silverStormActive = computed(() => {
                     <span v-else class="boss-part-cell__empty"></span>
                   </button>
                 </div>
-                <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
-                  <PixelEffectCanvas
-                      class="talent-effect-overlay__canvas"
-                      :entries="battleEffectEntries"
-                      :canvas-width="talentOverlayCanvasSize.width"
-                      :canvas-height="talentOverlayCanvasSize.height"
-                      :loop="false"
-                  />
-                </div>
                 <div
                     id="boss-sword-cursor"
                     ref="swordCursorRef"
@@ -1486,12 +1193,6 @@ const silverStormActive = computed(() => {
                   <img
                       ref="swordCursorImageRef"
                       class="boss-sword-cursor__image"
-                      :class="{
-                      'boss-sword-cursor__image--swing-a': swordAnimationPhase === 'swinging' && swordSwingTick % 2 === 1,
-                      'boss-sword-cursor__image--swing-b': swordAnimationPhase === 'swinging' && swordSwingTick % 2 === 0 && swordSwingTick > 0,
-                      'boss-sword-cursor__image--recover-a': swordAnimationPhase === 'recovering' && swordRecoverTick % 2 === 1,
-                      'boss-sword-cursor__image--recover-b': swordAnimationPhase === 'recovering' && swordRecoverTick % 2 === 0 && swordRecoverTick > 0,
-                    }"
                       :src="bossSwordCursorUrl"
                       alt=""
                       aria-hidden="true"
@@ -1554,6 +1255,80 @@ const silverStormActive = computed(() => {
               </div>
             </div>
 
+          </div>
+          <!-- 天赋瞬发特效覆盖层（Canvas 像素粒子） -->
+          <div ref="talentEffectOverlayRef" class="talent-effect-overlay" aria-hidden="true">
+            <div v-if="hasRecentTrigger('storm_combo')"
+                 :key="triggerKey('storm_combo')"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('storm_combo', { scale: 1.65, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="storm_combo" :size="effectCanvasSize(1.65)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('auto_strike')"
+                 :key="triggerKey('auto_strike')"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('auto_strike', { scale: 2.05, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="auto_strike" :size="effectCanvasSize(2.05)" :loop="false"/>
+            </div>
+            <div v-for="entry in recentBleedTriggers(BLEED_EFFECT_WINDOW_MS)"
+                 :key="entry.id"
+                 class="talent-canvas-fx"
+                 :style="triggerOverlayStyle('bleed', {
+                 width: effectCanvasSize(2.6),
+                 height: effectCanvasSize(2.6),
+                 anchor: triggerAnchor('bleed', BLEED_EFFECT_WINDOW_MS, entry),
+                 fallback: effectFallback(2.6, { top: '50%', left: '50%' }),
+               })">
+              <PixelEffectCanvas effect="bleed" :size="effectCanvasSize(2.6)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('final_cut', ULTIMATE_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('final_cut', ULTIMATE_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('final_cut', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="final_cut" :size="ultimateEffectCanvasSize()" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('collapse_trigger')"
+                 :key="triggerKey('collapse_trigger')"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('collapse_trigger', { scale: 2, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="collapse_trigger" :size="effectCanvasSize(5)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('judgment_day', JUDGMENT_DAY_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('judgment_day', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="judgment_day" :size="bossGridEffectSize()" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('magic_burst', MAGIC_BURST_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('magic_burst', { scale: 2.45, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="magic_burst" :size="effectCanvasSize(2.45)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('magic_rupture', MAGIC_RUPTURE_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('magic_rupture', { scale: 2.65, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="magic_rupture" :size="effectCanvasSize(2.65)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('magic_starfall', STARFALL_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('magic_starfall', STARFALL_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('magic_starfall', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="magic_starfall" :size="ultimateEffectCanvasSize()" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('doom_mark')"
+                 :key="triggerKey('doom_mark')"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('doom_mark', { scale: 1.25, fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="doom_mark" :size="effectCanvasSize(1.25)" :loop="false"/>
+            </div>
+            <div v-if="hasRecentTrigger('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)"
+                 :key="triggerKey('silver_storm', ULTIMATE_EFFECT_WINDOW_MS)"
+                 class="talent-canvas-fx"
+                 :style="effectOverlayStyle('silver_storm', { anchor: 'grid', fallback: { top: '50%', left: '50%' } })">
+              <PixelEffectCanvas effect="silver_storm" :size="ultimateEffectCanvasSize()" :loop="false"/>
+            </div>
           </div>
           <div class="vote-stage__boss-note vote-stage__boss-note--rules">
             <strong>挂机规则</strong>

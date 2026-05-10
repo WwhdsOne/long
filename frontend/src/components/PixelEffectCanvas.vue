@@ -2,30 +2,24 @@
   <canvas
       ref="canvasRef"
       class="pixel-canvas"
-      :width="canvasWidthValue"
-      :height="canvasHeightValue"
+      :width="size"
+      :height="size"
   />
 </template>
 
 <script setup>
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue'
+import {onBeforeUnmount, onMounted, ref, watch} from 'vue'
 
 const props = defineProps({
-  effect: {type: String, default: ''},
+  effect: {type: String, required: true},
   size: {type: Number, default: 90},
   loop: {type: Boolean, default: true},
-  entries: {type: Array, default: null},
-  canvasWidth: {type: Number, default: 0},
-  canvasHeight: {type: Number, default: 0},
 })
 
 const canvasRef = ref(null)
 let raf = 0
 let state = null
 let renderer = null
-const managerMode = computed(() => Array.isArray(props.entries))
-const canvasWidthValue = computed(() => managerMode.value ? Math.max(1, Math.round(props.canvasWidth || props.size || 1)) : props.size)
-const canvasHeightValue = computed(() => managerMode.value ? Math.max(1, Math.round(props.canvasHeight || props.size || 1)) : props.size)
 
 // ======= 盾牌图案 (collapse_trigger 用) =======
 const SHIELD = [
@@ -98,7 +92,7 @@ function rnd(n) {
 
 // ---- 1. storm_combo: 绿色像素斩击（加粗像素群） ----
 const stormComboRenderer = {
-  init(_size) {
+  init(size) {
     return {phase: 'idle', timer: 0, parts: [], trails: [], sparks: []}
   },
   update(s, size) {
@@ -148,10 +142,10 @@ const stormComboRenderer = {
         s.timer = 0
       }
     }
-    if (s.phase === 'done') return s
+    if (s.phase === 'done' && s.timer > 900) return this.init(size)
     return s
   },
-  draw(ctx, s, _size) {
+  draw(ctx, s, size) {
     for (const t of s.trails) {
       ctx.globalAlpha = t.life;
       ctx.fillStyle = t.color;
@@ -172,13 +166,13 @@ const stormComboRenderer = {
     ctx.globalAlpha = 1
   },
   isDone(s) {
-    return s.phase === 'done' && s.timer > 900
+    return false
   },
 }
 
 // ---- 2. auto_strike: T形锤，锤柄底端在格子左侧边缘为圆心，绕90度砸向中心 ----
 const autoStrikeRenderer = {
-  init(_size) {
+  init(size) {
     return {
       phase: 'idle',
       timer: 0,
@@ -271,7 +265,9 @@ const autoStrikeRenderer = {
       }
     }
 
-    if (s.phase === 'done') return s
+    if (s.phase === 'done' && s.timer > 800) {
+      return this.init(size)
+    }
 
     return s
   },
@@ -359,7 +355,7 @@ const autoStrikeRenderer = {
   },
 
   isDone(s) {
-    return s.phase === 'done' && s.timer > 800
+    return false
   },
 }
 
@@ -374,7 +370,7 @@ const bleedRenderer = {
     }
     return {phase: 'spread', timer: 0, parts}
   },
-  update(s, _size) {
+  update(s, size) {
     s.timer += 16
     for (const p of s.parts) {
       p.x += p.vx;
@@ -383,10 +379,10 @@ const bleedRenderer = {
       p.vy *= 0.94;
       p.life -= 0.006
     }
-    if (s.timer > 2200) s.phase = 'done'
+    if (s.timer > 2200) return this.init(size)
     return s
   },
-  draw(ctx, s, _size) {
+  draw(ctx, s, size) {
     for (const p of s.parts) {
       if (p.life <= 0) continue;
       ctx.globalAlpha = Math.min(1, p.life);
@@ -396,13 +392,13 @@ const bleedRenderer = {
     ctx.globalAlpha = 1
   },
   isDone(s) {
-    return s.phase === 'done' && s.timer > 2200
+    return false
   },
 }
 
 // ---- 5. final_cut: 贯穿全战斗区的超长对角终结斩 ----
 const finalCutRenderer = {
-  init(_size) {
+  init(size) {
     return {phase: 'idle', timer: 0, slashPixels: [], shockwave: [], sparks: [], screenFlash: 0}
   },
   update(s, size) {
@@ -494,7 +490,7 @@ const finalCutRenderer = {
         s.timer = 0
       }
     }
-    if (s.phase === 'done') return s
+    if (s.phase === 'done' && s.timer > 1400) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
@@ -526,7 +522,7 @@ const finalCutRenderer = {
     ctx.globalAlpha = 1
   },
   isDone(s) {
-    return s.phase === 'done' && s.timer > 1400
+    return false
   },
 }
 
@@ -573,10 +569,10 @@ const collapseTriggerRenderer = {
         s.timer = 0
       }
     }
-    if (s.phase === 'done') return s
+    if (s.phase === 'done' && s.timer > 1000) return this.init(size)
     return s
   },
-  draw(ctx, s, _size) {
+  draw(ctx, s, size) {
     for (const p of s.parts) {
       if (p.life <= 0) continue;
       ctx.globalAlpha = p.life;
@@ -586,7 +582,7 @@ const collapseTriggerRenderer = {
     ctx.globalAlpha = 1
   },
   isDone(s) {
-    return s.phase === 'done' && s.timer > 1000
+    return false
   },
 }
 
@@ -597,6 +593,7 @@ const judgmentDayRenderer = {
     const cell = size / 5
     const barHw = Math.round(cell * 0.5)   // 臂宽 = 一整格
     const spacing = cell * 0.055            // 采样间距（密度翻 4 倍）
+    const half = size * 0.5
 
     // 预生成十字所有像素块
     const px = []
@@ -797,9 +794,9 @@ const doomJudgmentRenderer = {
   init(size) {
     return {phase: 'build', timer: 0, ringPixels: [], cx: size / 2, cy: size / 2, r: size * 0.44}
   },
-  update(s, _size) {
+  update(s, size) {
     s.timer += 16
-    const totalSegments = 28
+    const totalSegments = 28, gapCount = 5
     const gapIndices = new Set([3, 9, 16, 22, 26]) // 断裂位置
     if (s.phase === 'build') {
       const built = Math.floor(s.timer / 40)
@@ -827,20 +824,18 @@ const doomJudgmentRenderer = {
         p.x -= (dx / dist) * shrink * 0.06;
         p.y -= (dy / dist) * shrink * 0.06
       }
-      if (s.timer > 3500) {
-        s.phase = 'done'
-      }
+      if (s.timer > 3500) return this.init(size)
     }
     return s
   },
-  draw(ctx, s, _size) {
+  draw(ctx, s, size) {
     for (const p of s.ringPixels) {
       ctx.fillStyle = p.color;
       ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
     }
   },
   isDone(s) {
-    return s.phase === 'done' && s.timer > 3500
+    return false
   },
 }
 
@@ -1316,14 +1311,14 @@ const magicStarfallRenderer = {
         ...p,
         life: p.life - 0.04,
       }))
-      if (s.timer > 420) {
+      if (s.timer > 280) {
         s.phase = 'expand'
         s.timer = 0
         s.waveRadius = size * 0.08
       }
     }
     if (s.phase === 'expand') {
-      const progress = Math.min(1, s.timer / 2600)
+      const progress = Math.min(1, s.timer / 1720)
       s.waveRadius = size * 0.08 + (maxRadius - size * 0.08) * progress
       s.flash = 0.05 + (1 - progress) * 0.08
       s.wavePixels = []
@@ -1373,7 +1368,7 @@ const magicStarfallRenderer = {
         p.y += p.vy
         p.vx *= 0.96
         p.vy *= 0.96
-        p.life -= 0.009
+        p.life -= 0.012
       }
       s.dustPixels = s.dustPixels.filter((p) => p.life > 0)
       if (progress >= 1) {
@@ -1403,14 +1398,14 @@ const magicStarfallRenderer = {
         p.y += p.vy
         p.vx *= 0.96
         p.vy *= 0.96
-        p.life -= 0.009
+        p.life -= 0.012
       }
       for (const p of s.emberPixels) {
         p.x += p.vx
         p.y += p.vy
         p.vx *= 0.95
         p.vy *= 0.95
-        p.life -= 0.01
+        p.life -= 0.014
       }
       s.dustPixels = s.dustPixels.filter((p) => p.life > 0)
       if (s.emberPixels.every((p) => p.life <= 0) && s.dustPixels.length === 0) {
@@ -1503,7 +1498,7 @@ const magicStarfallRenderer = {
     ctx.globalAlpha = 1
   },
   isDone(s) {
-    return s.phase === 'done' && s.timer > 300
+    return s.phase === 'done' && s.timer > 2200
   },
 }
 
@@ -1662,7 +1657,7 @@ const silverStormRenderer = {
       }
     }
 
-    if (s.phase === 'done') return s
+    if (s.phase === 'done' && s.timer > 900) return this.init(size)
     return s
   },
   draw(ctx, s, size) {
@@ -1693,68 +1688,7 @@ const silverStormRenderer = {
     ctx.globalAlpha = 1
   },
   isDone(s) {
-    return s.phase === 'done' && s.timer > 900
-  },
-}
-
-const clickSparkRenderer = {
-  init(size, entry = {}) {
-    const cx = size / 2
-    const cy = size / 2
-    const variant = String(entry.cellType || 'soft')
-    const paletteByType = {
-      weak: ['#facc15', '#ef4444', '#f87171', '#fbbf24', '#f59e0b', '#dc2626'],
-      heavy: ['#9ca3af', '#787888', '#64748b', '#94a3b8'],
-      soft: ['#f8fafc', '#e2e8f0', '#cbd5e1', '#fafaff'],
-    }
-    const gravityByType = {
-      weak: 0.04,
-      heavy: 0.18,
-      soft: 0.08,
-    }
-    const palette = paletteByType[variant] || paletteByType.soft
-    const gravity = gravityByType[variant] || gravityByType.soft
-    const count = Math.max(4, Number(entry.count || 6))
-    const particles = []
-    for (let i = 0; i < count; i++) {
-      const angle = Math.PI * 0.1 + Math.random() * Math.PI * 0.5
-      const speed = 4 + Math.random() * 10
-      const sz = 4 + Math.floor(Math.random() * 8)
-      particles.push({
-        x: cx,
-        y: cy,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        gravity,
-        decay: 0.03 + Math.random() * 0.04,
-        life: 1,
-        size: sz,
-        color: palette[Math.floor(Math.random() * palette.length)],
-      })
-    }
-    return {timer: 0, particles}
-  },
-  update(s) {
-    s.timer += 16
-    for (const p of s.particles) {
-      p.x += p.vx
-      p.y += p.vy
-      p.vy += p.gravity
-      p.life -= p.decay
-    }
-    return s
-  },
-  draw(ctx, s) {
-    for (const p of s.particles) {
-      if (p.life <= 0) continue
-      ctx.globalAlpha = Math.max(0, p.life)
-      ctx.fillStyle = p.color
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size)
-    }
-    ctx.globalAlpha = 1
-  },
-  isDone(s) {
-    return s.particles.every((p) => p.life <= 0)
+    return false
   },
 }
 
@@ -1771,113 +1705,18 @@ const renderers = {
   magic_burst: magicBurstRenderer,
   magic_rupture: magicRuptureRenderer,
   magic_starfall: magicStarfallRenderer,
-  click_spark: clickSparkRenderer,
 }
 
 // ======= 组件生命周期 =======
-const pooledEffects = new Map()
-const activeManagedEffects = new Map()
-const retiredManagedEffectIds = new Set()
-
-function acquireManagedEffect(effect) {
-  const effectPool = pooledEffects.get(effect)
-  if (Array.isArray(effectPool) && effectPool.length > 0) {
-    return effectPool.pop()
-  }
-  return {
-    id: '',
-    effect,
-    renderer: null,
-    state: null,
-    size: 0,
-    width: 0,
-    height: 0,
-    left: 0,
-    top: 0,
-  }
-}
-
-function releaseManagedEffect(instance) {
-  if (!instance?.effect) return
-  const effectPool = pooledEffects.get(instance.effect) || []
-  instance.id = ''
-  instance.state = null
-  effectPool.push(instance)
-  pooledEffects.set(instance.effect, effectPool)
-}
-
-function syncManagedEffects() {
-  const nextEntries = Array.isArray(props.entries) ? props.entries : []
-  const seen = new Set()
-  for (const entry of nextEntries) {
-    const effect = String(entry?.effect || '')
-    const id = String(entry?.id || '')
-    const currentRenderer = renderers[effect]
-    if (!currentRenderer || !id) continue
-    seen.add(id)
-    if (retiredManagedEffectIds.has(id)) continue
-    let instance = activeManagedEffects.get(id)
-    if (!instance) {
-      instance = acquireManagedEffect(effect)
-      instance.id = id
-      instance.effect = effect
-      instance.renderer = currentRenderer
-      instance.state = currentRenderer.init(Math.max(1, Number(entry?.size || 1)), entry)
-      activeManagedEffects.set(id, instance)
-    }
-    instance.size = Math.max(1, Number(entry?.size || 1))
-    instance.width = Math.max(1, Number(entry?.width || instance.size))
-    instance.height = Math.max(1, Number(entry?.height || instance.size))
-    instance.left = Math.round(Number(entry?.left || 0))
-    instance.top = Math.round(Number(entry?.top || 0))
-    instance.entry = entry
-  }
-  for (const id of retiredManagedEffectIds) {
-    if (seen.has(id)) continue
-    retiredManagedEffectIds.delete(id)
-  }
-}
-
-function drawManagedFrame(ctx) {
-  syncManagedEffects()
-  ctx.clearRect(0, 0, canvasWidthValue.value, canvasHeightValue.value)
-  for (const [id, instance] of activeManagedEffects.entries()) {
-    instance.state = instance.renderer.update(instance.state, instance.size, instance.entry)
-    ctx.save()
-    ctx.translate(instance.left, instance.top)
-    ctx.scale(instance.width / instance.size, instance.height / instance.size)
-    instance.renderer.draw(ctx, instance.state, instance.size, instance.entry)
-    ctx.restore()
-    if (instance.renderer.isDone(instance.state)) {
-      activeManagedEffects.delete(id)
-      retiredManagedEffectIds.add(id)
-      releaseManagedEffect(instance)
-    }
-  }
-}
-
 function start() {
-  stop()
-  const canvas = canvasRef.value
-  const ctx = canvas?.getContext('2d')
-  if (!ctx) return
-  ctx.imageSmoothingEnabled = false
-
-  if (managerMode.value) {
-    function frame() {
-      if (!canvasRef.value || !managerMode.value) return
-      drawManagedFrame(ctx)
-      raf = requestAnimationFrame(frame)
-    }
-    drawManagedFrame(ctx)
-    raf = requestAnimationFrame(frame)
-    return
-  }
-
   const r = renderers[props.effect]
   if (!r) return
   renderer = r
   state = r.init(props.size)
+  const canvas = canvasRef.value
+  const ctx = canvas?.getContext('2d')
+  if (!ctx) return
+  ctx.imageSmoothingEnabled = false
 
   function frame() {
     if (!canvasRef.value || renderer !== r) return
@@ -1908,30 +1747,14 @@ function start() {
 function stop() {
   cancelAnimationFrame(raf)
   raf = 0
-  renderer = null
-  state = null
-  retiredManagedEffectIds.clear()
-  for (const instance of activeManagedEffects.values()) {
-    releaseManagedEffect(instance)
-  }
-  activeManagedEffects.clear()
 }
 
 onMounted(start)
 onBeforeUnmount(stop)
-watch(
-    () => managerMode.value,
-    () => {
-      start()
-    },
-)
-watch(
-    () => [props.effect, props.size, props.loop],
-    () => {
-      if (managerMode.value) return
-      start()
-    },
-)
+watch(() => props.effect, () => {
+  stop();
+  start()
+})
 </script>
 
 <style scoped>

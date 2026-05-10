@@ -3,6 +3,7 @@ import {computed, onBeforeUnmount, onMounted, ref} from 'vue'
 import {applyBossDeltaMessage, applyBossPartStateDeltas, buildBossStateFromSnapshot, mergeBossState} from '../utils/bossState'
 import {ratioPercent} from '../utils/formatNumber'
 import {formatDropRate} from '../utils/buttonBoard'
+import {mergeClickFallbackState} from '../utils/clickResponse'
 import {formatRarityLabel, getRarityClassName, splitEquipmentName} from '../utils/rarity'
 import {EQUIPMENT_SLOTS, normalizeLoadout} from '../utils/equipmentSlots'
 import {createRealtimeTransport} from '../utils/realtimeTransport'
@@ -15,14 +16,6 @@ const EQUIPMENT_ENHANCE_COST = 10
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
 const AFK_HEARTBEAT_INTERVAL_MS = 15000
 const TASK_POLL_INTERVAL_MS = 10000
-const TALENT_TRIGGER_FEED_LIMIT = 10
-const BLEED_TRIGGER_FEED_LIMIT = 12
-const DAMAGE_BURST_LIMIT = 6
-const BLEED_BURST_LIMIT = 6
-const TALENT_EFFECT_WINDOW_MS = 1350
-const ULTIMATE_EFFECT_WINDOW_MS = 3200
-const JUDGMENT_DAY_EFFECT_WINDOW_MS = 5000
-const STARFALL_EFFECT_WINDOW_MS = 9200
 const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'magic', 'pursuit', 'heavy', 'normal']
 const PERSISTENT_TALENT_EFFECT_TYPES = new Set(['magic_starfall', 'judgment_day', 'final_cut', 'silver_storm'])
 const DAMAGE_VARIANTS = {
@@ -670,6 +663,12 @@ const globalStatusList = computed(() => {
         })
     }
 
+    const finalCutLastTriggerAt = Math.max(0, Number(talentCombatState.value?.lastFinalCutAt) || 0)
+    const finalCutRecentWindowSec = 3
+    const finalCutRecentlyTriggered = finalCutLastTriggerAt > 0
+        ? Math.max(0, Math.ceil(finalCutLastTriggerAt + finalCutRecentWindowSec - Date.now() / 1000))
+        : 0
+
     const silverStormEndsAt = Number(talentVisualState.value?.silverStormEndsAt) || 0
     const silverStormRemaining = silverStormEndsAt
         ? Math.max(0, Math.ceil(silverStormEndsAt - Date.now() / 1000))
@@ -1181,6 +1180,7 @@ function handlePublicRouteChange() {
     }
     void activatePublicPage(currentPublicPage.value)
 }
+
 
 function formatTime(timestamp) {
     if (!timestamp) {
@@ -1954,32 +1954,33 @@ function applyClickResult(payload) {
             riskBanUntil: payload.userDelta.staminaRiskBanUntil !== undefined ? Number(payload.userDelta.staminaRiskBanUntil) : stamina.value.riskBanUntil,
         }
     }
-    if ('userStats' in payload) {
-        userStats.value = payload.userStats ?? null
-    }
-    let nextBoss = boss.value
-    if ('boss' in payload) {
-        nextBoss = mergeBossState(nextBoss, payload.boss)
-    }
-    if (Array.isArray(payload.partStateDeltas) && payload.partStateDeltas.length > 0) {
-        nextBoss = applyBossPartStateDeltas(nextBoss, payload.partStateDeltas)
-    }
-    boss.value = nextBoss
-    if ('myBossStats' in payload) {
-        myBossStats.value = payload.myBossStats ?? null
-        if (myBossStats.value?.damage !== undefined) {
-            myBossDamageValue.value = myBossStats.value.damage ?? myBossDamageValue.value
-        }
-    }
-    if ('myBossDamage' in payload) {
-        myBossDamageValue.value = Math.max(0, Number(payload.myBossDamage ?? 0))
-    }
+    const nextClickState = mergeClickFallbackState(
+        {
+            userStats: userStats.value,
+            boss: boss.value,
+            bossLeaderboard: bossLeaderboard.value,
+            bossLeaderboardCount: bossLeaderboardCountValue.value,
+            myBossStats: myBossStats.value,
+            myBossDamage: myBossDamageValue.value,
+            recentRewards: recentRewards.value,
+        },
+        payload,
+    )
+    nextClickState.boss = applyBossPartStateDeltas(nextClickState.boss, payload.partStateDeltas)
+    userStats.value = nextClickState.userStats
+    boss.value = nextClickState.boss
+    bossLeaderboard.value = nextClickState.bossLeaderboard
+    bossLeaderboardCountValue.value = nextClickState.bossLeaderboardCount
+    myBossStats.value = nextClickState.myBossStats
+    myBossDamageValue.value = nextClickState.myBossDamage
+    recentRewards.value = nextClickState.recentRewards
     triggerTalentEventDamageBursts(payload.talentEvents)
     appendTalentTriggerEvents(payload.talentEvents)
     if (payload.talentCombatState) {
         applyTalentCombatState(payload.talentCombatState)
     }
     syncing.value = false
+    markUpdated()
 }
 
 function indexToPartKey(index) {
@@ -2071,8 +2072,40 @@ function applyTalentVisualState(events) {
     }
 }
 
-function buildTriggerEntry(event, index, now) {
-    return {
+function appendBleedTriggerEvents(events) {
+    if (!Array.isArray(events) || events.length === 0) {
+        return
+    }
+    const now = Date.now()
+    const nextEntries = events
+        .filter((event) => event?.effectType === 'bleed')
+        .map((event, index) => ({
+            id: `${now}-${index}-${event.talentId || 'talent'}`,
+            name: event.name || event.talentId || '天赋',
+            message: event.message || '天赋触发',
+            extraDamage: Number(event.extraDamage || 0),
+            triggeredAt: Number(event.triggeredAt || now),
+            effectType: event.effectType || '',
+            partX: event.partX,
+            partY: event.partY,
+        }))
+    if (nextEntries.length === 0) {
+        return
+    }
+    bleedTriggerFeed.value = [
+        ...nextEntries,
+        ...bleedTriggerFeed.value,
+    ]
+        .sort((left, right) => Number(right.triggeredAt || 0) - Number(left.triggeredAt || 0))
+        .slice(0, 12)
+}
+
+function appendTalentTriggerEvents(events) {
+    if (!Array.isArray(events) || events.length === 0) {
+        return
+    }
+    const now = Date.now()
+    const nextEntries = events.map((event, index) => ({
         id: `${now}-${index}-${event.talentId || 'talent'}`,
         name: event.name || event.talentId || '天赋',
         message: event.message || '天赋触发',
@@ -2081,142 +2114,31 @@ function buildTriggerEntry(event, index, now) {
         effectType: event.effectType || '',
         partX: event.partX,
         partY: event.partY,
-    }
-}
-
-function insertBurstByPriority(currentBursts, burst, limit) {
-    const nextBursts = []
-    let inserted = false
-    for (const entry of currentBursts) {
-        if (!inserted && burst.priority < entry.priority) {
-            nextBursts.push(burst)
-            inserted = true
-        }
-        if (nextBursts.length < limit) {
-            nextBursts.push(entry)
-        }
-    }
-    if (!inserted && nextBursts.length < limit) {
-        nextBursts.push(burst)
-    }
-    return nextBursts
-}
-
-function pushBurstQueue(currentBursts, burst, limit, sortByPriority = false) {
-    const queue = Array.isArray(currentBursts) ? currentBursts : []
-    if (sortByPriority) {
-        return insertBurstByPriority(queue, burst, limit)
-    }
-    if (queue.length >= limit) {
-        return [...queue.slice(1), burst]
-    }
-    return [...queue, burst]
-}
-
-function insertTriggerEntry(currentEntries, entry, limit, options = {}) {
-    const {
-        filterEffectType = '',
-        persistentTypes = null,
-    } = options
-    const nextEntries = []
-    const pinnedTypes = persistentTypes ? new Set() : null
-    let inserted = false
-    for (const currentEntry of currentEntries) {
-        if (filterEffectType && currentEntry.effectType === filterEffectType) {
-            continue
-        }
-        if (pinnedTypes && persistentTypes.has(currentEntry.effectType)) {
-            if (currentEntry.effectType === entry.effectType) {
-                continue
-            }
-            if (pinnedTypes.has(currentEntry.effectType)) {
-                continue
-            }
-            pinnedTypes.add(currentEntry.effectType)
-        }
-        if (!inserted && Number(entry.triggeredAt || 0) >= Number(currentEntry.triggeredAt || 0)) {
-            nextEntries.push(entry)
-            inserted = true
-        }
-        if (nextEntries.length < limit) {
-            nextEntries.push(currentEntry)
-        }
-    }
-    if (!inserted && nextEntries.length < limit) {
-        nextEntries.push(entry)
-    }
-    return nextEntries.slice(0, limit)
-}
-
-function persistentTalentEffectWindowMs(effectType) {
-    if (effectType === 'magic_starfall') return STARFALL_EFFECT_WINDOW_MS
-    if (effectType === 'judgment_day') return JUDGMENT_DAY_EFFECT_WINDOW_MS
-    if (effectType === 'final_cut' || effectType === 'silver_storm') return ULTIMATE_EFFECT_WINDOW_MS
-    return TALENT_EFFECT_WINDOW_MS
-}
-
-function hasFreshPersistentTriggerEntry(currentEntries, entry, persistentTypes = null) {
-    if (!persistentTypes || !persistentTypes.has(entry.effectType)) return false
-    const now = Date.now()
-    return currentEntries.some((currentEntry) => (
-        currentEntry.effectType === entry.effectType
-        && Number(currentEntry.triggeredAt || 0) + persistentTalentEffectWindowMs(entry.effectType) > now
-    ))
-}
-
-function appendTriggerEntries(currentEntries, nextEntries, limit, options = {}) {
-    let mergedEntries = Array.isArray(currentEntries) ? currentEntries : []
-    for (const entry of nextEntries) {
-        mergedEntries = insertTriggerEntry(mergedEntries, entry, limit, options)
-    }
-    return mergedEntries
-}
-
-function appendBleedTriggerEvents(events) {
-    if (!Array.isArray(events) || events.length === 0) {
-        return
-    }
-    const now = Date.now()
-    const nextEntries = events
-        .filter((event) => event?.effectType === 'bleed')
-        .map((event, index) => buildTriggerEntry(event, index, now))
-    if (nextEntries.length === 0) {
-        return
-    }
-    bleedTriggerFeed.value = appendTriggerEntries(
-        bleedTriggerFeed.value,
-        nextEntries,
-        BLEED_TRIGGER_FEED_LIMIT,
-    )
-}
-
-function appendTalentTriggerEvents(events) {
-    if (!Array.isArray(events) || events.length === 0) {
-        return
-    }
-    const now = Date.now()
-    let mergedEntries = Array.isArray(talentTriggerFeed.value) ? talentTriggerFeed.value : []
-    const acceptedEntries = []
-    for (const [index, event] of events.entries()) {
-        const entry = buildTriggerEntry(event, index, now)
-        if (hasFreshPersistentTriggerEntry(mergedEntries, entry, PERSISTENT_TALENT_EFFECT_TYPES)) {
-            continue
-        }
+    }))
+    for (const event of events) {
         playBattleTriggerSound(event?.effectType || event?.name || '')
-        mergedEntries = insertTriggerEntry(
-            mergedEntries,
-            entry,
-            TALENT_TRIGGER_FEED_LIMIT,
-            {
-                filterEffectType: 'bleed',
-                persistentTypes: PERSISTENT_TALENT_EFFECT_TYPES,
-            },
-        )
-        acceptedEntries.push(entry)
     }
-    if (acceptedEntries.length > 0) {
-        talentTriggerFeed.value = mergedEntries
+    const mergedFeed = [
+        ...nextEntries,
+        ...talentTriggerFeed.value,
+    ]
+    const otherEvents = mergedFeed
+        .filter((entry) => entry.effectType !== 'bleed')
+        .sort((left, right) => Number(right.triggeredAt || 0) - Number(left.triggeredAt || 0))
+    const pinnedEffects = []
+    const pinnedTypes = new Set()
+    const regularEffects = []
+    for (const entry of otherEvents) {
+        if (PERSISTENT_TALENT_EFFECT_TYPES.has(entry.effectType) && !pinnedTypes.has(entry.effectType)) {
+            pinnedEffects.push(entry)
+            pinnedTypes.add(entry.effectType)
+            continue
+        }
+        regularEffects.push(entry)
     }
+    talentTriggerFeed.value = [...pinnedEffects, ...regularEffects]
+        .sort((left, right) => Number(right.triggeredAt || 0) - Number(left.triggeredAt || 0))
+        .slice(0, 10)
     appendBleedTriggerEvents(events)
     applyTalentVisualState(events)
 }
@@ -2625,9 +2547,14 @@ function rankDamageVariant(variant) {
 }
 
 function resolveDamageVariant(payload, part, damageValue, source) {
-    const explicit = normalizeDamageVariant(payload?.damageType || payload?.hitType || payload?.effectType)
+    const explicit = normalizeDamageVariant(payload?.damageType || payload?.hitType)
+    const hasTalentEvents = Array.isArray(payload?.talentEvents) && payload.talentEvents.length > 0
     if (explicit) {
-        return explicit
+        if (hasTalentEvents && (explicit === 'doomsday' || explicit === 'judgement')) {
+            // 天赋事件已经单独渲染，这里只保留普通主伤害的视觉态
+        } else {
+            return explicit
+        }
     }
 
     const critical = Boolean(payload?.critical)
@@ -2754,7 +2681,9 @@ function triggerDamageBurst(key, payload = {}) {
         })
     }
     const currentBursts = damageBursts.value[normalizedKey] || []
-    const nextBursts = pushBurstQueue(currentBursts, burst, DAMAGE_BURST_LIMIT, true)
+    const nextBursts = [...currentBursts, burst]
+        .sort((left, right) => left.priority - right.priority)
+        .slice(0, 6)
     damageBursts.value = {
         ...damageBursts.value,
         [normalizedKey]: nextBursts,
@@ -2790,7 +2719,7 @@ function triggerBleedBurst(partKey, payload = {}) {
         effectType: 'bleed',
     }, part, 'bleed')
     const currentBursts = bleedBursts.value[normalizedKey] || []
-    const nextBursts = pushBurstQueue(currentBursts, burst, BLEED_BURST_LIMIT)
+    const nextBursts = [...currentBursts, burst].slice(-6)
     bleedBursts.value = {
         ...bleedBursts.value,
         [normalizedKey]: nextBursts,

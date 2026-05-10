@@ -69,8 +69,6 @@ describe('BattleFxGalleryPage 魔法特效入口', () => {
     })
 
     it('星陨潮爆结束判定比原先更晚，避免刚出流星就被提前收掉', () => {
-        expect(canvasSource).toContain("if (s.timer > 420) {")
-        expect(canvasSource).toContain('const progress = Math.min(1, s.timer / 2600)')
-        expect(canvasSource).toContain("return s.phase === 'done' && s.timer > 300")
+        expect(canvasSource).toContain("return s.phase === 'done' && s.timer > 2200")
     })
 })

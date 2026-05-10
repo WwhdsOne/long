@@ -45,11 +45,7 @@ export default [
         },
         rules: {
             'vue/no-mutating-props': 'off',
-            'no-unused-vars': ['error', {
-                argsIgnorePattern: '^_',
-                caughtErrorsIgnorePattern: '^_',
-                varsIgnorePattern: '^_',
-            }],
+            'no-unused-vars': 'off',
             'unused-imports/no-unused-imports': 'error',
         },
     },

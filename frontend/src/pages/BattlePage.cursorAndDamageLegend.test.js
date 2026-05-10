@@ -10,6 +10,7 @@ const stateSource = readFileSync(path.resolve(currentDir, './publicPageState.js'
 const styleSource = readFileSync(path.resolve(currentDir, '../style.css'), 'utf8')
 const docsPath = path.resolve(currentDir, '../../../docs/implementation/2026-04-29-伤害动画解析优先级.md')
 const compactBattleSource = battleSource.replace(/\s+/g, ' ')
+const compactStyleSource = styleSource.replace(/\s+/g, ' ')
 
 describe('BattlePage 光标与伤害说明', () => {
     it('死兆改到左侧统一全局状态面板，并按 150 层显示进度', () => {
@@ -40,8 +41,6 @@ describe('BattlePage 光标与伤害说明', () => {
         expect(battleSource).toContain('swordCursor.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`')
         expect(battleSource).toContain('function measureBossGridRect() {')
         expect(battleSource).toContain('bossGridRect = grid.getBoundingClientRect()')
-        expect(battleSource).toContain('const swordSwingTick = ref(0)')
-        expect(battleSource).toContain('const swordRecoverTick = ref(0)')
         expect(battleSource).not.toContain('const bossCursorX = ref(0)')
         expect(battleSource).not.toContain('const bossCursorY = ref(0)')
         expect(styleSource).toContain('.boss-part-grid-with-combo * {')
@@ -57,6 +56,16 @@ describe('BattlePage 光标与伤害说明', () => {
         expect(battleSource).not.toContain("document.addEventListener('pointermove'")
         expect(battleSource).not.toContain("document.addEventListener('pointerdown'")
         expect(battleSource).not.toContain("document.addEventListener('click'")
+    })
+
+    it('点击火花改为 body 粒子后，仍保持方块像素粒子而不是圆点发光', () => {
+        expect(battleSource).toContain("el.className = 'sword-spark'")
+        expect(battleSource).toContain('document.body.appendChild(el)')
+        expect(styleSource).toContain('.sword-spark {')
+        expect(styleSource).toContain('position: fixed;')
+        expect(styleSource).toContain('pointer-events: none;')
+        expect(styleSource).toContain('z-index: 45;')
+        expect(compactStyleSource).toContain('.sword-spark { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 45; border-radius: 0; transform: translate(-50%, -50%); }')
     })
 
     it('右侧伤害类型说明把重甲替换为真实伤害', () => {
@@ -93,42 +102,22 @@ describe('BattlePage 光标与伤害说明', () => {
         expect(stateSource).toContain("if (effectType === 'bleed') {")
         expect(stateSource).toContain("if (effectType === 'magic_burst' || effectType === 'magic_starfall') {")
         expect(stateSource).toContain('function triggerBleedBurst(partKey, payload = {}) {')
-        expect(stateSource).toContain('const nextBursts = pushBurstQueue(')
+        expect(stateSource).toContain('const currentBursts = bleedBursts.value[normalizedKey] || []')
         expect(stateSource).toContain('bleedBursts,')
         expect(stateSource).toContain('bleedTriggerFeed,')
         expect(stateSource).toContain('ttl: 280,')
         expect(stateSource).toContain("if (variant === 'bleed') {")
         expect(stateSource).toContain('function appendBleedTriggerEvents(events) {')
-        expect(stateSource).toContain('appendTriggerEntries(')
+        expect(stateSource).toContain('bleedTriggerFeed.value = [')
+        expect(stateSource).toContain('function appendBleedTriggerEvents(events) {')
+        expect(stateSource).toContain('bleedTriggerFeed.value = [')
         expect(stateSource).toContain("const PERSISTENT_TALENT_EFFECT_TYPES = new Set(['magic_starfall', 'judgment_day', 'final_cut', 'silver_storm'])")
-        expect(stateSource).toContain('function persistentTalentEffectWindowMs(effectType) {')
-        expect(stateSource).toContain("if (!persistentTypes || !persistentTypes.has(entry.effectType)) return false")
-        expect(stateSource).toContain('Number(currentEntry.triggeredAt || 0) + persistentTalentEffectWindowMs(entry.effectType) > now')
-        expect(stateSource).toContain('const TALENT_TRIGGER_FEED_LIMIT = 10')
-        expect(stateSource).toContain('const BLEED_TRIGGER_FEED_LIMIT = 12')
-        expect(stateSource).toContain('const DAMAGE_BURST_LIMIT = 6')
-        expect(stateSource).toContain('const BLEED_BURST_LIMIT = 6')
+        expect(stateSource).toContain(".filter((entry) => entry.effectType !== 'bleed')")
+        expect(stateSource).toContain('.slice(0, 10)')
         expect(stateSource).toContain("triggerDamageBurst(`boss-part:${event.partX}-${event.partY}`, {")
         expect(stateSource).toContain("damageType: 'magic'")
         expect(stateSource).toContain('triggerTalentEventDamageBursts(payload.talentEvents)')
         expect(battleSource).toContain('zoneBleedBursts(zone)')
-    })
-
-    it('click_ack 热链路只推进必要战斗态，不再在本地同步排行榜奖励和时间格式化', () => {
-        const applyClickResultSegment = stateSource.slice(
-            stateSource.indexOf('function applyClickResult(payload) {'),
-            stateSource.indexOf('function indexToPartKey(index) {'),
-        )
-
-        expect(applyClickResultSegment).not.toContain('mergeClickFallbackState(')
-        expect(applyClickResultSegment).not.toContain('recentRewards.value = nextClickState.recentRewards')
-        expect(applyClickResultSegment).not.toContain('bossLeaderboard.value = nextClickState.bossLeaderboard')
-        expect(applyClickResultSegment).not.toContain('bossLeaderboardCountValue.value = nextClickState.bossLeaderboardCount')
-        expect(applyClickResultSegment).not.toContain('markUpdated()')
-        expect(applyClickResultSegment).toContain("if ('myBossDamage' in payload) {")
-        expect(applyClickResultSegment).toContain("if ('myBossStats' in payload) {")
-        expect(applyClickResultSegment).toContain("if ('userStats' in payload) {")
-        expect(applyClickResultSegment).toContain('nextBoss = applyBossPartStateDeltas(nextBoss, payload.partStateDeltas)')
     })
 
     it('重甲格子有金属质感和低频扫光，只作用在 5x5 战斗格子', () => {

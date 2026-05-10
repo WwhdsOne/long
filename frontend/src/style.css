@@ -4873,6 +4873,16 @@ select {
     animation: talent-blood-fall 1.8s ease-in forwards;
 }
 
+.sword-spark {
+    position: fixed;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    z-index: 45;
+    border-radius: 0;
+    transform: translate(-50%, -50%);
+}
+
 /* 末日标记：纯 CSS 像素十字 */
 .boss-part-cell__doom-mark {
     position: absolute;
