@@ -16,7 +16,7 @@ const EQUIPMENT_ENHANCE_COST = 10
 const GROWTH_FORMULA_TEXT = '点击 / 暴击单次成长 = ceil((当前点击 + 当前暴击 + 当前暴击率) / 4)，至少 +1'
 const AFK_HEARTBEAT_INTERVAL_MS = 15000
 const TASK_POLL_INTERVAL_MS = 10000
-const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'magic', 'pursuit', 'heavy', 'normal']
+const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'magic', 'pursuit', 'heavy', 'physicalInvalid', 'normal']
 const PERSISTENT_TALENT_EFFECT_TYPES = new Set(['magic_starfall', 'judgment_day', 'final_cut', 'silver_storm'])
 const DAMAGE_VARIANTS = {
     normal: {
@@ -45,6 +45,15 @@ const DAMAGE_VARIANTS = {
         particles: 5,
         colors: ['#b0b0c0', '#9ca3af', '#787888', '#64748b'],
         label: '',
+    },
+    physicalInvalid: {
+        scale: 0.92,
+        ttl: 1200,
+        shake: 0,
+        stageFx: [],
+        particles: 0,
+        colors: [],
+        label: '物理无效化',
     },
     trueDamage: {
         scale: 1.05,
@@ -789,7 +798,7 @@ const globalStatusList = computed(() => {
 })
 
 function partTypeLabel(type) {
-    const labels = {soft: '软组织', heavy: '重甲', weak: '弱点'}
+    const labels = {soft: '软组织', heavy: '重甲', weak: '弱点', arcane: '奥核'}
     return labels[type] || type || '未知'
 }
 
@@ -2567,6 +2576,8 @@ function normalizeDamageVariant(rawType) {
         magic_starfall: 'magic',
         magic_damage: 'magic',
         arcane: 'magic',
+        physicalinvalid: 'physicalInvalid',
+        physical_invalid: 'physicalInvalid',
         pursuit: 'pursuit',
         followup: 'pursuit',
         normal: 'normal',
@@ -2588,6 +2599,10 @@ function resolveDamageVariant(payload, part, damageValue, source) {
         } else {
             return explicit
         }
+    }
+    const rawBossDamage = Number(payload?.bossDamage)
+    if (part?.damageAffinity === 'magic_only' && Number.isFinite(rawBossDamage) && rawBossDamage <= 0) {
+        return 'physicalInvalid'
     }
 
     const critical = Boolean(payload?.critical)
@@ -2679,7 +2694,7 @@ function buildDamageBurst(key, payload, part, source) {
         id: `${key}-${variant}-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
         type: variant,
         priority: rankDamageVariant(variant),
-        value: formatNumber(damageValue),
+        value: variant === 'physicalInvalid' ? '' : formatNumber(damageValue),
         label: config.label || '',
         scale: config.scale,
         ttl: config.ttl,

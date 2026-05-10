@@ -25,6 +25,7 @@
   .legend .lg-soft { background:#334155; color:#e2e8f0; }
   .legend .lg-heavy { background:#334155; color:#9ca3af; }
   .legend .lg-weak { background:#422006; color:#fcd34d; }
+  .legend .lg-arcane { background:#2e1065; color:#c4b5fd; }
 
   /* Boss 战斗区域 */
   .boss-grid-wrapper {
@@ -102,6 +103,32 @@
     opacity: 1;
     filter: brightness(1.2);
   }
+  .boss-cell.arcane-cell {
+    border-color: rgba(139,92,246,0.82);
+    background:
+      radial-gradient(circle at 30% 24%, rgba(34,211,238,0.18) 0, rgba(34,211,238,0) 44%),
+      linear-gradient(180deg, rgba(88,28,135,0.34) 0%, rgba(45,12,87,0.44) 58%, rgba(15,23,42,0.82) 100%);
+    box-shadow:
+      inset 0 0 18px rgba(192,132,252,0.08),
+      0 0 16px rgba(139,92,246,0.18);
+    filter: brightness(0.92) saturate(1.12);
+    opacity: 0.92;
+  }
+  .boss-cell.arcane-cell:hover {
+    border-color: rgba(196,181,253,0.95);
+    box-shadow:
+      0 0 18px rgba(139,92,246,0.36),
+      0 0 30px rgba(34,211,238,0.18),
+      inset 0 0 24px rgba(196,181,253,0.09);
+    filter: brightness(1.12) saturate(1.22);
+  }
+  .boss-cell.arcane-cell .cell-type {
+    color: #c4b5fd;
+    text-shadow: 0 0 8px rgba(139,92,246,0.45);
+  }
+  .boss-cell.arcane-cell .cell-hp {
+    color: #a78bfa;
+  }
   .boss-cell:active {
     background: rgba(20,30,44,0.95);
     transform: scale(0.96);
@@ -117,6 +144,13 @@
   @keyframes hit-flash {
     0%   { background: rgba(255,255,255,0.25); box-shadow: 0 0 20px rgba(255,255,255,0.3); }
     100% { background: rgba(30,41,59,0.7); }
+  }
+  .boss-cell.arcane-cell.hit-flash {
+    animation: arcane-hit-flash 0.28s ease-out;
+  }
+  @keyframes arcane-hit-flash {
+    0%   { background: rgba(167,139,250,0.45); box-shadow: 0 0 24px rgba(34,211,238,0.45), 0 0 40px rgba(139,92,246,0.35); }
+    100% { background: linear-gradient(180deg, rgba(88,28,135,0.34) 0%, rgba(45,12,87,0.44) 58%, rgba(15,23,42,0.82) 100%); }
   }
 
   /* 连击计数器 */
@@ -197,6 +231,7 @@
   .dmg-number.dmg--crit    { color: #fbbf24; font-size: 1.5rem; text-shadow: 0 0 8px rgba(251,191,36,0.5); }
   .dmg-number.dmg--pursuit { color: #60a5fa; font-size: 1rem; }
   .dmg-number.dmg--true    { color: #a78bfa; font-size: 1.1rem; text-shadow: 0 0 4px rgba(139,92,246,0.4); }
+  .dmg-number.dmg--arcane  { color: #ddd6fe; font-size: 1.35rem; text-shadow: 0 0 10px rgba(34,211,238,0.4), 0 0 22px rgba(139,92,246,0.45); }
   .dmg-number.dmg--maxhp   { color: #7c3aed; font-size: 2.6rem; text-shadow: 0 0 14px #7c3aed, 0 0 28px rgba(124,58,237,0.5); }
   .dmg-number.dmg--ultra   { color: #fef3c7; font-size: 3.5rem; text-shadow: 0 0 16px #f59e0b, 0 0 36px #fbbf24, 0 0 60px rgba(251,191,36,0.4); }
   .dmg-number .dmg-label { display:block; font-size:0.55em; letter-spacing:0.15em; }
@@ -224,6 +259,11 @@
   .screen-flash--purple { animation-name:flash-purple; }
   @keyframes flash-purple {
     0% { background:rgba(124,58,237,0.35); }
+    100% { background:transparent; }
+  }
+  .screen-flash--arcane { animation-name:flash-arcane; }
+  @keyframes flash-arcane {
+    0% { background:radial-gradient(circle at center, rgba(196,181,253,0.38), rgba(34,211,238,0.2) 42%, transparent 72%); }
     100% { background:transparent; }
   }
 
@@ -265,6 +305,10 @@
     image-rendering: pixelated;
     transition: none;
   }
+  .sword-particle.particle--arcane {
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(34,211,238,0.35), 0 0 14px rgba(139,92,246,0.42);
+  }
 </style>
 </head>
 <body>
@@ -273,6 +317,7 @@
 
 <div class="legend">
   <span class="lg-soft">软组织</span><span class="lg-heavy">重甲</span><span class="lg-weak">弱点暴击</span>
+  <span class="lg-arcane">奥核·魔法专吃</span>
   <span style="padding:2px 8px;border-radius:4px;background:#422006;color:#fbbf24;">暴击CRIT!</span>
   <span style="padding:2px 8px;border-radius:4px;background:#1e293b;color:#60a5fa;">追击</span>
   <span style="padding:2px 8px;border-radius:4px;background:#1e293b;color:#a78bfa;">⚡真伤</span>
@@ -293,12 +338,12 @@
 <script>
 // 生成 5×5 Boss 格子 — 8 种伤害类型
 const grid = document.getElementById('boss-grid');
-const allTypes = ['soft','heavy','weak','crit','pursuit','trueDmg','maxHpCut','ultraCrit'];
+const allTypes = ['soft','heavy','weak','arcane','crit','pursuit','trueDmg','maxHpCut','ultraCrit'];
 const typeNames = {
   soft:'软组织', heavy:'重甲', weak:'弱点', crit:'暴击',
-  pursuit:'追击', trueDmg:'真伤', maxHpCut:'削血', ultraCrit:'K.O.'
+  arcane:'奥核', pursuit:'追击', trueDmg:'真伤', maxHpCut:'削血', ultraCrit:'K.O.'
 };
-const priorityTypes = new Set(['weak','crit','ultraCrit']);
+const priorityTypes = new Set(['weak','arcane','crit','ultraCrit']);
 let comboCount = 0;
 const bossArea = document.getElementById('boss-area');
 
@@ -368,6 +413,12 @@ const PARTICLE_PRESETS = {
     count: 18, size: [4, 9], speed: [6, 12],
     angle: [Math.PI*0.02, Math.PI*0.65],
     gravity: 0.04, name: '弱点暴击'
+  },
+  arcane: {
+    colors: ['#c4b5fd','#a78bfa','#22d3ee','#8b5cf6','#ddd6fe'],
+    count: 16, size: [4, 10], speed: [6, 13],
+    angle: [Math.PI*0.04, Math.PI*0.72],
+    gravity: 0.03, name: '奥核'
   },
   crit: {
     colors: ['#fcd34d','#fbbf24','#f59e0b','#fef3c7','#fde68a'],
@@ -456,6 +507,7 @@ const DMG_PRESETS = {
   crit:     { cls:'dmg--crit',     label:'CRIT!',   dmg:()=> 80 + Math.floor(Math.random()*150), shake:true },
   pursuit:  { cls:'dmg--pursuit',  label:'',        dmg:()=> 20 + Math.floor(Math.random()*40) },
   trueDmg:  { cls:'dmg--true',     label:'⚡',  dmg:()=> 60 + Math.floor(Math.random()*80) },
+  arcane:   { cls:'dmg--arcane',   label:'🔮',  dmg:()=> 90 + Math.floor(Math.random()*120), shake:'hard' },
   maxHpCut: { cls:'dmg--maxhp',    label:'💀', dmg:()=> 500 + Math.floor(Math.random()*500), shake:'hard' },
   ultraCrit:{ cls:'dmg--ultra',    label:'K.O.',    dmg:()=> 800 + Math.floor(Math.random()*400), shake:'hard' },
 };
@@ -481,7 +533,9 @@ function spawnDmgNumber(cx, cy, cellType) {
 // 闪光效果
 function triggerFlash(color) {
   const el = document.createElement('div');
-  el.className = 'screen-flash' + (color === 'purple' ? ' screen-flash--purple' : '');
+  el.className = 'screen-flash'
+    + (color === 'purple' ? ' screen-flash--purple' : '')
+    + (color === 'arcane' ? ' screen-flash--arcane' : '');
   document.body.appendChild(el);
   el.addEventListener('animationend', () => el.remove());
 }
@@ -547,7 +601,11 @@ function doAttack(e) {
   updateParticles();
   const result = spawnDmgNumber(e.clientX, e.clientY, cellType);
   if (result.shake) triggerShake(result.shake);
-  if (result.flash) triggerFlash(result.flash);
+  if (cellType === 'arcane') {
+    triggerFlash('arcane');
+  } else if (result.flash) {
+    triggerFlash(result.flash);
+  }
   if (cellType === 'ultraCrit') {
     const v = document.createElement('div');
     v.className = 'vignette';

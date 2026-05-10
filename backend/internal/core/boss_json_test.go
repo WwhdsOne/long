@@ -15,13 +15,14 @@ func TestBossJSONMarshalsHPFieldsAsStrings(t *testing.T) {
 		CurrentHP: 9223372036854775799,
 		Parts: []BossPart{
 			{
-				X:         0,
-				Y:         0,
-				Type:      PartTypeSoft,
-				MaxHP:     9223372036854775800,
-				CurrentHP: 9223372036854775799,
-				Armor:     12,
-				Alive:     true,
+				X:              0,
+				Y:              0,
+				Type:           PartTypeArcane,
+				DamageAffinity: PartDamageAffinityMagicOnly,
+				MaxHP:          9223372036854775800,
+				CurrentHP:      9223372036854775799,
+				Armor:          12,
+				Alive:          true,
 			},
 		},
 	})
@@ -38,6 +39,9 @@ func TestBossJSONMarshalsHPFieldsAsStrings(t *testing.T) {
 	}
 	if !strings.Contains(text, `"armor":"12"`) {
 		t.Fatalf("expected boss part armor string, got %s", text)
+	}
+	if !strings.Contains(text, `"damageAffinity":"magic_only"`) {
+		t.Fatalf("expected boss part damageAffinity string, got %s", text)
 	}
 }
 

@@ -59,13 +59,27 @@ describe('BattlePage 光标与伤害说明', () => {
     })
 
     it('点击火花改为 body 粒子后，仍保持方块像素粒子而不是圆点发光', () => {
+        expect(battleSource).toContain("arcane: {colors: ['#c4b5fd', '#7c3aed', '#22d3ee', '#a78bfa', '#38bdf8'], count: 10, gravity: 0.05}")
+        expect(battleSource).toContain("if (cell.classList.contains('boss-part-cell--arcane')) return 'arcane'")
+        expect(battleSource).toContain("boss-part-cell--arcane': zone?.type === 'arcane'")
         expect(battleSource).toContain("el.className = 'sword-spark'")
         expect(battleSource).toContain('document.body.appendChild(el)')
         expect(styleSource).toContain('.sword-spark {')
         expect(styleSource).toContain('position: fixed;')
         expect(styleSource).toContain('pointer-events: none;')
         expect(styleSource).toContain('z-index: 45;')
+        expect(styleSource).toContain('.boss-part-cell--arcane {')
+        expect(styleSource).toContain('.boss-part-info__item--arcane .boss-part-info__value {')
         expect(compactStyleSource).toContain('.sword-spark { position: fixed; left: 0; top: 0; pointer-events: none; z-index: 45; border-radius: 0; transform: translate(-50%, -50%); }')
+    })
+
+    it('奥核普通点击不再显示基础 -5，而是显示物理无效化', () => {
+        expect(stateSource).toContain("part?.damageAffinity === 'magic_only'")
+        expect(stateSource).toContain("return 'physicalInvalid'")
+        expect(stateSource).toContain("physicalInvalid: {")
+        expect(stateSource).toContain("label: '物理无效化'")
+        expect(battleSource).toContain("v-if=\"burst.type === 'physicalInvalid'\"")
+        expect(battleSource).not.toContain('基础 -5')
     })
 
     it('右侧伤害类型说明把重甲替换为真实伤害', () => {
@@ -141,9 +155,10 @@ describe('伤害动画解析优先级文档', () => {
     it('补充说明文档并记录当前前端优先级', () => {
         expect(existsSync(docsPath)).toBe(true)
         const docsSource = readFileSync(docsPath, 'utf8')
-        expect(stateSource).toContain("const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'magic', 'pursuit', 'heavy', 'normal']")
-        expect(docsSource).toContain('doomsday -> judgement -> weakCritical -> critical -> trueDamage -> pursuit -> heavy -> normal')
+        expect(stateSource).toContain("const DAMAGE_PRIORITY = ['doomsday', 'judgement', 'weakCritical', 'critical', 'trueDamage', 'magic', 'pursuit', 'heavy', 'physicalInvalid', 'normal']")
+        expect(docsSource).toContain('doomsday -> judgement -> weakCritical -> critical -> trueDamage -> magic -> pursuit -> heavy -> physicalInvalid -> normal')
         expect(docsSource).toContain('普通命中重甲')
+        expect(docsSource).toContain('物理无效化提示')
         expect(docsSource).toContain('10%')
         expect(docsSource).toContain('崩塌')
         expect(docsSource).toContain('resolveDamageVariant')

@@ -266,6 +266,7 @@ export function normalizeBossTemplate(entry) {
         talentPointsOnKill: Number(entry?.talentPointsOnKill ?? 0),
         layout: Array.isArray(entry?.layout) ? entry.layout.map((part) => ({
             ...part,
+            damageAffinity: String(part?.damageAffinity || '').trim() || (String(part?.type || '').trim() === 'arcane' ? 'magic_only' : 'normal'),
             maxHp: String(part?.maxHp ?? 0),
             currentHp: String(part?.currentHp ?? part?.maxHp ?? 0),
             armor: String(part?.armor ?? 0),

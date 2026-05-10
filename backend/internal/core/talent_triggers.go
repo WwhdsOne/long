@@ -422,6 +422,7 @@ func applyMagicCoreTrigger(tc *talentTriggerContext) {
 			if tc.now >= tc.combatState.MagicUltimateCooldownAt {
 				tc.combatState.PartMagicTriggerCount[partKey]++
 			}
+			tc.damageTypeOverride = "magic"
 		}
 	}
 
@@ -445,6 +446,7 @@ func applyMagicCoreTrigger(tc *talentTriggerContext) {
 			ExtraDamage: actualDamage, Message: "邻近部位受击",
 			PartX: target.X, PartY: target.Y,
 		})
+		tc.damageTypeOverride = "magic"
 	}
 
 	if tc.compiledTalents.Magic.UltimateTriggerCount > 0 && tc.compiledTalents.Magic.UltimateMainRatio > 0 {
@@ -539,6 +541,7 @@ func (tc *talentTriggerContext) tryTriggerMagicUltimate(partKey string) {
 		Message: "星陨潮爆席卷全场",
 		PartX:   tc.part.X, PartY: tc.part.Y,
 	})
+	tc.damageTypeOverride = "magic"
 }
 
 func absInt(value int) int {

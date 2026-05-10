@@ -2079,7 +2079,7 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 		t.Fatal("expected session cookie from login")
 	}
 
-	saveTemplateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":80,"layout":[{"x":0,"y":0,"type":"soft","maxHp":80}]}`))
+	saveTemplateRequest := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":80,"layout":[{"x":0,"y":0,"type":"arcane","damageAffinity":"magic_only","maxHp":80}]}`))
 	saveTemplateRequest.Header.Set("Content-Type", "application/json")
 	saveTemplateRequest.AddCookie(cookies[0])
 	saveTemplateResponse := httptest.NewRecorder()
@@ -2090,6 +2090,9 @@ func TestAdminBossPoolRoutesForwardTemplateAndCyclePayloads(t *testing.T) {
 	}
 	if store.lastBossTemplate.ID != "dragon" || store.lastBossTemplate.MaxHP != 80 {
 		t.Fatalf("expected template payload to be forwarded, got %+v", store.lastBossTemplate)
+	}
+	if len(store.lastBossTemplate.Layout) != 1 || store.lastBossTemplate.Layout[0].Type != core.PartTypeArcane || store.lastBossTemplate.Layout[0].DamageAffinity != core.PartDamageAffinityMagicOnly {
+		t.Fatalf("expected arcane layout to be forwarded, got %+v", store.lastBossTemplate.Layout)
 	}
 
 	saveLootRequest := httptest.NewRequest(http.MethodPut, "/api/admin/boss/pool/dragon/loot", strings.NewReader(`{"loot":[{"itemId":"fire-ring","dropRatePercent":35}]}`))
@@ -2178,7 +2181,7 @@ func TestAdminBossPoolRoutesAcceptStringInt64HP(t *testing.T) {
 		t.Fatal("expected session cookie from login")
 	}
 
-	request := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":"9223372036854775800","layout":[{"x":0,"y":0,"type":"soft","maxHp":"9223372036854775800","currentHp":"9223372036854775800","armor":"0"}]}`))
+	request := httptest.NewRequest(http.MethodPost, "/api/admin/boss/pool", strings.NewReader(`{"id":"dragon","name":"火龙","maxHp":"9223372036854775800","layout":[{"x":0,"y":0,"type":"arcane","damageAffinity":"magic_only","maxHp":"9223372036854775800","currentHp":"9223372036854775800","armor":"0"}]}`))
 	request.Header.Set("Content-Type", "application/json")
 	request.AddCookie(cookies[0])
 	response := httptest.NewRecorder()
@@ -2192,6 +2195,9 @@ func TestAdminBossPoolRoutesAcceptStringInt64HP(t *testing.T) {
 	}
 	if len(store.lastBossTemplate.Layout) != 1 || store.lastBossTemplate.Layout[0].MaxHP != 9223372036854775800 {
 		t.Fatalf("expected layout maxHp preserved, got %+v", store.lastBossTemplate.Layout)
+	}
+	if store.lastBossTemplate.Layout[0].DamageAffinity != core.PartDamageAffinityMagicOnly {
+		t.Fatalf("expected layout damage affinity preserved, got %+v", store.lastBossTemplate.Layout)
 	}
 }
 

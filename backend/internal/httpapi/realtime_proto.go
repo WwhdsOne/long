@@ -29,13 +29,14 @@ type realtimePublicMetaPayload struct {
 }
 
 type realtimeBossPartStaticPayload struct {
-	X           int    `json:"x"`
-	Y           int    `json:"y"`
-	Type        string `json:"type,omitempty"`
-	DisplayName string `json:"displayName,omitempty"`
-	ImagePath   string `json:"imagePath,omitempty"`
-	MaxHP       int64  `json:"maxHp,omitempty"`
-	Armor       int64  `json:"armor,omitempty"`
+	X              int    `json:"x"`
+	Y              int    `json:"y"`
+	Type           string `json:"type,omitempty"`
+	DamageAffinity string `json:"damageAffinity,omitempty"`
+	DisplayName    string `json:"displayName,omitempty"`
+	ImagePath      string `json:"imagePath,omitempty"`
+	MaxHP          int64  `json:"maxHp,omitempty"`
+	Armor          int64  `json:"armor,omitempty"`
 }
 
 type realtimeBossStaticPayload struct {
@@ -392,15 +393,16 @@ func toProtoLeaderboardEntries(entries *[]core.LeaderboardEntry) []*realtimepb.L
 
 func toProtoBossPart(part core.BossPart) *realtimepb.BossPart {
 	return &realtimepb.BossPart{
-		X:           int32(part.X),
-		Y:           int32(part.Y),
-		Type:        string(part.Type),
-		DisplayName: part.DisplayName,
-		ImagePath:   part.ImagePath,
-		MaxHp:       part.MaxHP,
-		CurrentHp:   part.CurrentHP,
-		Armor:       part.Armor,
-		Alive:       part.Alive,
+		X:              int32(part.X),
+		Y:              int32(part.Y),
+		Type:           string(part.Type),
+		DamageAffinity: string(part.DamageAffinity),
+		DisplayName:    part.DisplayName,
+		ImagePath:      part.ImagePath,
+		MaxHp:          part.MaxHP,
+		CurrentHp:      part.CurrentHP,
+		Armor:          part.Armor,
+		Alive:          part.Alive,
 	}
 }
 
@@ -432,13 +434,14 @@ func toProtoBoss(boss *core.Boss) *realtimepb.Boss {
 
 func toProtoBossPartStatic(part realtimeBossPartStaticPayload) *realtimepb.BossPartStatic {
 	return &realtimepb.BossPartStatic{
-		X:           int32(part.X),
-		Y:           int32(part.Y),
-		Type:        part.Type,
-		DisplayName: part.DisplayName,
-		ImagePath:   part.ImagePath,
-		MaxHp:       part.MaxHP,
-		Armor:       part.Armor,
+		X:              int32(part.X),
+		Y:              int32(part.Y),
+		Type:           part.Type,
+		DamageAffinity: part.DamageAffinity,
+		DisplayName:    part.DisplayName,
+		ImagePath:      part.ImagePath,
+		MaxHp:          part.MaxHP,
+		Armor:          part.Armor,
 	}
 }
 
@@ -497,13 +500,14 @@ func buildRealtimeBossStaticPayload(boss *core.Boss) *realtimeBossStaticPayload 
 	parts := make([]realtimeBossPartStaticPayload, 0, len(boss.Parts))
 	for _, part := range boss.Parts {
 		parts = append(parts, realtimeBossPartStaticPayload{
-			X:           part.X,
-			Y:           part.Y,
-			Type:        string(part.Type),
-			DisplayName: part.DisplayName,
-			ImagePath:   part.ImagePath,
-			MaxHP:       part.MaxHP,
-			Armor:       part.Armor,
+			X:              part.X,
+			Y:              part.Y,
+			Type:           string(part.Type),
+			DamageAffinity: string(part.DamageAffinity),
+			DisplayName:    part.DisplayName,
+			ImagePath:      part.ImagePath,
+			MaxHP:          part.MaxHP,
+			Armor:          part.Armor,
 		})
 	}
 	return &realtimeBossStaticPayload{

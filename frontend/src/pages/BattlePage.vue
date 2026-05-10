@@ -413,6 +413,7 @@ function effectOverlayStyle(type, options = {}) {
 
 // 剑挥火花（按部位类型变色，参照 DAMAGE_VARIANTS）
 const sparkPresets = {
+  arcane: {colors: ['#c4b5fd', '#7c3aed', '#22d3ee', '#a78bfa', '#38bdf8'], count: 10, gravity: 0.05},
   weak: {colors: ['#facc15', '#ef4444', '#f87171', '#fbbf24', '#f59e0b', '#dc2626'], count: 12, gravity: 0.04},
   heavy: {colors: ['#9ca3af', '#787888', '#64748b', '#94a3b8'], count: 5, gravity: 0.18},
   soft: {colors: ['#f8fafc', '#e2e8f0', '#cbd5e1', '#fafaff'], count: 6, gravity: 0.08},
@@ -421,6 +422,7 @@ const sparkPresets = {
 function detectCellType(el) {
   const cell = el?.closest?.('.boss-part-cell')
   if (!cell) return 'soft'
+  if (cell.classList.contains('boss-part-cell--arcane')) return 'arcane'
   if (cell.classList.contains('boss-part-cell--weak')) return 'weak'
   if (cell.classList.contains('boss-part-cell--heavy')) return 'heavy'
   return 'soft'
@@ -585,12 +587,14 @@ const partTypeLabels = {
   soft: '软组织',
   heavy: '重甲',
   weak: '弱点',
+  arcane: '奥核',
 }
 
 const partTypeColors = {
   soft: '#4ade80',
   heavy: '#9ca3af',
   weak: '#ef4444',
+  arcane: '#8b5cf6',
 }
 
 const bossDropPool = computed(() =>
@@ -1088,6 +1092,7 @@ const silverStormActive = computed(() => {
             'boss-part-cell--soft': zone?.type === 'soft',
             'boss-part-cell--heavy': zone?.type === 'heavy',
             'boss-part-cell--weak': zone?.type === 'weak',
+            'boss-part-cell--arcane': zone?.type === 'arcane',
             'boss-part-cell--low': zone?.alive && zone.healthPercent < 25,
             'boss-zone-button--empty': !zone,
             'boss-zone-button--pending': pendingKeys.has(getBossZoneButtonKey(zone)),
@@ -1126,9 +1131,14 @@ const silverStormActive = computed(() => {
                   '--damage-ttl': `${burst.ttl}ms`,
                 }"
               >
-                <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{
-                  burst.value
-                }}
+                <template v-if="burst.type === 'physicalInvalid'">
+                  <span class="boss-zone-button__damage-label">{{ burst.label }}</span>
+                </template>
+                <template v-else>
+                  <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{
+                    burst.value
+                  }}
+                </template>
               </span>
                           <span
                               v-for="p in (burst.particles || [])"
@@ -1159,9 +1169,14 @@ const silverStormActive = computed(() => {
                   '--damage-ttl': `${burst.ttl}ms`,
                 }"
               >
-                <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{
-                  burst.value
-                }}
+                <template v-if="burst.type === 'physicalInvalid'">
+                  <span class="boss-zone-button__damage-label">{{ burst.label }}</span>
+                </template>
+                <template v-else>
+                  <span v-if="burst.label" class="boss-zone-button__damage-label">{{ burst.label }}</span>- {{
+                    burst.value
+                  }}
+                </template>
               </span>
                         </template>
                       </div>
@@ -1226,6 +1241,11 @@ const silverStormActive = computed(() => {
                   <span class="boss-part-info__dot"></span>
                   <span class="boss-part-info__label">弱点</span>
                   <span class="boss-part-info__value">x2.5</span>
+                </div>
+                <div class="boss-part-info__item boss-part-info__item--arcane">
+                  <span class="boss-part-info__dot"></span>
+                  <span class="boss-part-info__label">奥核</span>
+                  <span class="boss-part-info__value">仅吃魔法</span>
                 </div>
                 <div class="boss-part-info__divider"></div>
                 <div class="boss-part-info__item boss-part-info__item--armor">
@@ -1666,7 +1686,7 @@ const silverStormActive = computed(() => {
       </div>
       <div class="stamina-float__rule-card" aria-label="体力规则说明">
         <strong>体力规则</strong>
-        <span>1 点体力 = 50 次点击</span>
+        <span>1 点体力 = 20 次点击</span>
         <span>每 5 分钟恢复 1 点</span>
         <span>体力耗尽后，点击伤害锁定为1</span>
       </div>

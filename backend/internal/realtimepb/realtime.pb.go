@@ -478,16 +478,17 @@ func (x *PublicMeta) GetAnnouncementVersion() string {
 }
 
 type BossPartStatic struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	ImagePath     string                 `protobuf:"bytes,5,opt,name=image_path,json=imagePath,proto3" json:"image_path,omitempty"`
-	MaxHp         int64                  `protobuf:"varint,6,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
-	Armor         int64                  `protobuf:"varint,7,opt,name=armor,proto3" json:"armor,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	X              int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y              int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
+	Type           string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	DamageAffinity string                 `protobuf:"bytes,4,opt,name=damage_affinity,json=damageAffinity,proto3" json:"damage_affinity,omitempty"`
+	DisplayName    string                 `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	ImagePath      string                 `protobuf:"bytes,6,opt,name=image_path,json=imagePath,proto3" json:"image_path,omitempty"`
+	MaxHp          int64                  `protobuf:"varint,7,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
+	Armor          int64                  `protobuf:"varint,8,opt,name=armor,proto3" json:"armor,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BossPartStatic) Reset() {
@@ -537,6 +538,13 @@ func (x *BossPartStatic) GetY() int32 {
 func (x *BossPartStatic) GetType() string {
 	if x != nil {
 		return x.Type
+	}
+	return ""
+}
+
+func (x *BossPartStatic) GetDamageAffinity() string {
+	if x != nil {
+		return x.DamageAffinity
 	}
 	return ""
 }
@@ -1506,18 +1514,19 @@ func (x *LeaderboardEntry) GetClickCount() int64 {
 }
 
 type BossPart struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	DisplayName   string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	ImagePath     string                 `protobuf:"bytes,5,opt,name=image_path,json=imagePath,proto3" json:"image_path,omitempty"`
-	MaxHp         int64                  `protobuf:"varint,6,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
-	CurrentHp     int64                  `protobuf:"varint,7,opt,name=current_hp,json=currentHp,proto3" json:"current_hp,omitempty"`
-	Armor         int64                  `protobuf:"varint,8,opt,name=armor,proto3" json:"armor,omitempty"`
-	Alive         bool                   `protobuf:"varint,9,opt,name=alive,proto3" json:"alive,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	X              int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y              int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
+	Type           string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	DamageAffinity string                 `protobuf:"bytes,4,opt,name=damage_affinity,json=damageAffinity,proto3" json:"damage_affinity,omitempty"`
+	DisplayName    string                 `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	ImagePath      string                 `protobuf:"bytes,6,opt,name=image_path,json=imagePath,proto3" json:"image_path,omitempty"`
+	MaxHp          int64                  `protobuf:"varint,7,opt,name=max_hp,json=maxHp,proto3" json:"max_hp,omitempty"`
+	CurrentHp      int64                  `protobuf:"varint,8,opt,name=current_hp,json=currentHp,proto3" json:"current_hp,omitempty"`
+	Armor          int64                  `protobuf:"varint,9,opt,name=armor,proto3" json:"armor,omitempty"`
+	Alive          bool                   `protobuf:"varint,10,opt,name=alive,proto3" json:"alive,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *BossPart) Reset() {
@@ -1567,6 +1576,13 @@ func (x *BossPart) GetY() int32 {
 func (x *BossPart) GetType() string {
 	if x != nil {
 		return x.Type
+	}
+	return ""
+}
+
+func (x *BossPart) GetDamageAffinity() string {
+	if x != nil {
+		return x.DamageAffinity
 	}
 	return ""
 }
@@ -3121,16 +3137,17 @@ const file_internal_realtimepb_realtime_proto_rawDesc = "" +
 	"PublicMeta\x12<\n" +
 	"\vleaderboard\x18\x01 \x03(\v2\x1a.realtime.LeaderboardEntryR\vleaderboard\x12I\n" +
 	"\x10boss_leaderboard\x18\x02 \x03(\v2\x1e.realtime.BossLeaderboardEntryR\x0fbossLeaderboard\x121\n" +
-	"\x14announcement_version\x18\x03 \x01(\tR\x13announcementVersion\"\xaf\x01\n" +
+	"\x14announcement_version\x18\x03 \x01(\tR\x13announcementVersion\"\xd8\x01\n" +
 	"\x0eBossPartStatic\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x05R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x05R\x01y\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\x12!\n" +
-	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12\x1d\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12'\n" +
+	"\x0fdamage_affinity\x18\x04 \x01(\tR\x0edamageAffinity\x12!\n" +
+	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
-	"image_path\x18\x05 \x01(\tR\timagePath\x12\x15\n" +
-	"\x06max_hp\x18\x06 \x01(\x03R\x05maxHp\x12\x14\n" +
-	"\x05armor\x18\a \x01(\x03R\x05armor\"\xe4\x02\n" +
+	"image_path\x18\x06 \x01(\tR\timagePath\x12\x15\n" +
+	"\x06max_hp\x18\a \x01(\x03R\x05maxHp\x12\x14\n" +
+	"\x05armor\x18\b \x01(\x03R\x05armor\"\xe4\x02\n" +
 	"\n" +
 	"BossStatic\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
@@ -3227,19 +3244,21 @@ const file_internal_realtimepb_realtime_proto_rawDesc = "" +
 	"\x04rank\x18\x01 \x01(\x05R\x04rank\x12\x1a\n" +
 	"\bnickname\x18\x02 \x01(\tR\bnickname\x12\x1f\n" +
 	"\vclick_count\x18\x03 \x01(\x03R\n" +
-	"clickCount\"\xde\x01\n" +
+	"clickCount\"\x87\x02\n" +
 	"\bBossPart\x12\f\n" +
 	"\x01x\x18\x01 \x01(\x05R\x01x\x12\f\n" +
 	"\x01y\x18\x02 \x01(\x05R\x01y\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\x12!\n" +
-	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12\x1d\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12'\n" +
+	"\x0fdamage_affinity\x18\x04 \x01(\tR\x0edamageAffinity\x12!\n" +
+	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
-	"image_path\x18\x05 \x01(\tR\timagePath\x12\x15\n" +
-	"\x06max_hp\x18\x06 \x01(\x03R\x05maxHp\x12\x1d\n" +
+	"image_path\x18\x06 \x01(\tR\timagePath\x12\x15\n" +
+	"\x06max_hp\x18\a \x01(\x03R\x05maxHp\x12\x1d\n" +
 	"\n" +
-	"current_hp\x18\a \x01(\x03R\tcurrentHp\x12\x14\n" +
-	"\x05armor\x18\b \x01(\x03R\x05armor\x12\x14\n" +
-	"\x05alive\x18\t \x01(\bR\x05alive\"\xb0\x03\n" +
+	"current_hp\x18\b \x01(\x03R\tcurrentHp\x12\x14\n" +
+	"\x05armor\x18\t \x01(\x03R\x05armor\x12\x14\n" +
+	"\x05alive\x18\n" +
+	" \x01(\bR\x05alive\"\xb0\x03\n" +
 	"\x04Boss\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vtemplate_id\x18\x02 \x01(\tR\n" +

@@ -30,6 +30,12 @@ describe('AdminBossTab 部位血量口径', () => {
         expect(componentSource).not.toContain('v-model="selectedCell.maxHp" class="nickname-form__input" type="number"')
     })
 
+    it('Boss 部位编辑器新增奥核类型，并自动标注只吃魔法伤害', () => {
+        expect(componentSource).toContain('<option value="arcane">奥核</option>')
+        expect(componentSource).toContain("selectedCell.type === 'arcane' ? '仅吃魔法伤害（自动）' : '普通点击伤害（自动）'")
+        expect(componentSource).toContain("damageAffinity: inferPartDamageAffinity(type, cell.damageAffinity)")
+    })
+
     it('模板掉落池直接填写掉落几率，不再填写权重', () => {
         expect(componentSource).toContain('entry.dropRatePercent')
         expect(componentSource).toContain('placeholder="掉落几率 %"')

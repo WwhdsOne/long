@@ -72,41 +72,43 @@ func (v *flexibleFloat64) UnmarshalJSON(data []byte) error {
 }
 
 type bossPartPayload struct {
-	X           int           `json:"x"`
-	Y           int           `json:"y"`
-	Type        core.PartType `json:"type"`
-	DisplayName string        `json:"displayName,omitempty"`
-	ImagePath   string        `json:"imagePath,omitempty"`
-	MaxHP       flexibleInt64 `json:"maxHp"`
-	CurrentHP   flexibleInt64 `json:"currentHp"`
-	Armor       flexibleInt64 `json:"armor"`
-	Alive       bool          `json:"alive"`
+	X              int           `json:"x"`
+	Y              int           `json:"y"`
+	Type           core.PartType `json:"type"`
+	DamageAffinity string        `json:"damageAffinity,omitempty"`
+	DisplayName    string        `json:"displayName,omitempty"`
+	ImagePath      string        `json:"imagePath,omitempty"`
+	MaxHP          flexibleInt64 `json:"maxHp"`
+	CurrentHP      flexibleInt64 `json:"currentHp"`
+	Armor          flexibleInt64 `json:"armor"`
+	Alive          bool          `json:"alive"`
 }
 
 func (p bossPartPayload) toCore() core.BossPart {
 	return core.BossPart{
-		X:           p.X,
-		Y:           p.Y,
-		Type:        p.Type,
-		DisplayName: p.DisplayName,
-		ImagePath:   p.ImagePath,
-		MaxHP:       int64(p.MaxHP),
-		CurrentHP:   int64(p.CurrentHP),
-		Armor:       int64(p.Armor),
-		Alive:       p.Alive,
+		X:              p.X,
+		Y:              p.Y,
+		Type:           p.Type,
+		DamageAffinity: core.PartDamageAffinity(strings.TrimSpace(p.DamageAffinity)),
+		DisplayName:    p.DisplayName,
+		ImagePath:      p.ImagePath,
+		MaxHP:          int64(p.MaxHP),
+		CurrentHP:      int64(p.CurrentHP),
+		Armor:          int64(p.Armor),
+		Alive:          p.Alive,
 	}
 }
 
 type bossUpsertPayload struct {
-	ID                 string            `json:"id"`
-	RoomID             string            `json:"roomId,omitempty"`
-	Name               string            `json:"name"`
-	MaxHP              flexibleInt64     `json:"maxHp"`
-	GoldOnKill         flexibleInt64     `json:"goldOnKill"`
-	StoneOnKill        flexibleInt64     `json:"stoneOnKill"`
-	InscriptionStoneDropRatePercent flexibleFloat64 `json:"inscriptionStoneDropRatePercent"`
-	TalentPointsOnKill flexibleInt64     `json:"talentPointsOnKill"`
-	Parts              []bossPartPayload `json:"parts,omitempty"`
+	ID                              string            `json:"id"`
+	RoomID                          string            `json:"roomId,omitempty"`
+	Name                            string            `json:"name"`
+	MaxHP                           flexibleInt64     `json:"maxHp"`
+	GoldOnKill                      flexibleInt64     `json:"goldOnKill"`
+	StoneOnKill                     flexibleInt64     `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent flexibleFloat64   `json:"inscriptionStoneDropRatePercent"`
+	TalentPointsOnKill              flexibleInt64     `json:"talentPointsOnKill"`
+	Parts                           []bossPartPayload `json:"parts,omitempty"`
 }
 
 func (p bossUpsertPayload) toCore() core.BossUpsert {
@@ -115,29 +117,29 @@ func (p bossUpsertPayload) toCore() core.BossUpsert {
 		parts = append(parts, part.toCore())
 	}
 	return core.BossUpsert{
-		ID:                 p.ID,
-		RoomID:             p.RoomID,
-		Name:               p.Name,
-		MaxHP:              int64(p.MaxHP),
-		GoldOnKill:         int64(p.GoldOnKill),
-		StoneOnKill:        int64(p.StoneOnKill),
+		ID:                              p.ID,
+		RoomID:                          p.RoomID,
+		Name:                            p.Name,
+		MaxHP:                           int64(p.MaxHP),
+		GoldOnKill:                      int64(p.GoldOnKill),
+		StoneOnKill:                     int64(p.StoneOnKill),
 		InscriptionStoneDropRatePercent: float64(p.InscriptionStoneDropRatePercent),
 		InscriptionStoneDropCountMin:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
 		InscriptionStoneDropCountMax:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
-		TalentPointsOnKill: int64(p.TalentPointsOnKill),
-		Parts:              parts,
+		TalentPointsOnKill:              int64(p.TalentPointsOnKill),
+		Parts:                           parts,
 	}
 }
 
 type bossTemplateUpsertPayload struct {
-	ID                 string            `json:"id"`
-	Name               string            `json:"name"`
-	MaxHP              flexibleInt64     `json:"maxHp"`
-	GoldOnKill         flexibleInt64     `json:"goldOnKill"`
-	StoneOnKill        flexibleInt64     `json:"stoneOnKill"`
-	InscriptionStoneDropRatePercent flexibleFloat64 `json:"inscriptionStoneDropRatePercent"`
-	TalentPointsOnKill flexibleInt64     `json:"talentPointsOnKill"`
-	Layout             []bossPartPayload `json:"layout,omitempty"`
+	ID                              string            `json:"id"`
+	Name                            string            `json:"name"`
+	MaxHP                           flexibleInt64     `json:"maxHp"`
+	GoldOnKill                      flexibleInt64     `json:"goldOnKill"`
+	StoneOnKill                     flexibleInt64     `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent flexibleFloat64   `json:"inscriptionStoneDropRatePercent"`
+	TalentPointsOnKill              flexibleInt64     `json:"talentPointsOnKill"`
+	Layout                          []bossPartPayload `json:"layout,omitempty"`
 }
 
 func (p bossTemplateUpsertPayload) toCore() core.BossTemplateUpsert {
@@ -146,16 +148,16 @@ func (p bossTemplateUpsertPayload) toCore() core.BossTemplateUpsert {
 		layout = append(layout, part.toCore())
 	}
 	return core.BossTemplateUpsert{
-		ID:                 p.ID,
-		Name:               p.Name,
-		MaxHP:              int64(p.MaxHP),
-		GoldOnKill:         int64(p.GoldOnKill),
-		StoneOnKill:        int64(p.StoneOnKill),
+		ID:                              p.ID,
+		Name:                            p.Name,
+		MaxHP:                           int64(p.MaxHP),
+		GoldOnKill:                      int64(p.GoldOnKill),
+		StoneOnKill:                     int64(p.StoneOnKill),
 		InscriptionStoneDropRatePercent: float64(p.InscriptionStoneDropRatePercent),
 		InscriptionStoneDropCountMin:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
 		InscriptionStoneDropCountMax:    singleDropCountForRate(float64(p.InscriptionStoneDropRatePercent)),
-		TalentPointsOnKill: int64(p.TalentPointsOnKill),
-		Layout:             layout,
+		TalentPointsOnKill:              int64(p.TalentPointsOnKill),
+		Layout:                          layout,
 	}
 }
 

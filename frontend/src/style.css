@@ -3930,6 +3930,15 @@ select {
     color: #ef4444;
 }
 
+.boss-part-info__item--arcane .boss-part-info__dot {
+    background: #8b5cf6;
+    box-shadow: 0 0 6px rgba(139, 92, 246, 0.42);
+}
+
+.boss-part-info__item--arcane .boss-part-info__value {
+    color: #8b5cf6;
+}
+
 .boss-part-info__divider {
     height: 1px;
     background: rgba(15, 23, 42, 0.08);
@@ -4072,6 +4081,22 @@ select {
     border-color: rgba(239, 68, 68, 0.6);
     box-shadow: 0 0 14px rgba(239, 68, 68, 0.2);
     animation: boss-weak-pulse 0.8s ease-in-out infinite;
+}
+
+.boss-part-cell--arcane {
+    border-color: rgba(139, 92, 246, 0.74);
+    background: linear-gradient(180deg, rgba(88, 28, 135, 0.34) 0%, rgba(45, 12, 87, 0.34) 56%, rgba(15, 23, 42, 0.54) 100%);
+    box-shadow: 0 0 14px rgba(139, 92, 246, 0.22), inset 0 0 12px rgba(34, 211, 238, 0.08);
+    animation: boss-arcane-pulse 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes boss-arcane-pulse {
+    0% {
+        box-shadow: 0 0 10px rgba(139, 92, 246, 0.18), inset 0 0 10px rgba(34, 211, 238, 0.08);
+    }
+    100% {
+        box-shadow: 0 0 18px rgba(139, 92, 246, 0.38), 0 0 28px rgba(34, 211, 238, 0.12), inset 0 0 14px rgba(167, 139, 250, 0.1);
+    }
 }
 
 .boss-part-cell--center {

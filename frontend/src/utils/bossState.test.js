@@ -273,8 +273,8 @@ describe('Boss Delta 状态机', () => {
                 name: '木桩王',
                 maxHp: 100,
                 parts: [
-                    {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: 50, armor: 3},
-                    {x: 1, y: 0, type: 'heavy', displayName: '甲壳', maxHp: 50, armor: 8},
+                    {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: 50, armor: 3, damageAffinity: 'normal'},
+                    {x: 1, y: 0, type: 'arcane', displayName: '甲壳', maxHp: 50, armor: 8, damageAffinity: 'magic_only'},
                 ],
             },
             bossRuntime: {
@@ -292,8 +292,8 @@ describe('Boss Delta 状态机', () => {
             maxHp: '100',
             currentHp: '91',
             parts: [
-                {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: '50', currentHp: '41', armor: '3', alive: true},
-                {x: 1, y: 0, type: 'heavy', displayName: '甲壳', maxHp: '50', currentHp: '50', armor: '8', alive: true},
+                {x: 0, y: 0, type: 'soft', displayName: '头部', maxHp: '50', currentHp: '41', armor: '3', alive: true, damageAffinity: 'normal'},
+                {x: 1, y: 0, type: 'arcane', displayName: '甲壳', maxHp: '50', currentHp: '50', armor: '8', alive: true, damageAffinity: 'magic_only'},
             ],
         })
     })

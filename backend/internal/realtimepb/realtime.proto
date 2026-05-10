@@ -56,10 +56,11 @@ message BossPartStatic {
   int32 x = 1;
   int32 y = 2;
   string type = 3;
-  string display_name = 4;
-  string image_path = 5;
-  int64 max_hp = 6;
-  int64 armor = 7;
+  string damage_affinity = 4;
+  string display_name = 5;
+  string image_path = 6;
+  int64 max_hp = 7;
+  int64 armor = 8;
 }
 
 message BossStatic {
@@ -168,12 +169,13 @@ message BossPart {
   int32 x = 1;
   int32 y = 2;
   string type = 3;
-  string display_name = 4;
-  string image_path = 5;
-  int64 max_hp = 6;
-  int64 current_hp = 7;
-  int64 armor = 8;
-  bool alive = 9;
+  string damage_affinity = 4;
+  string display_name = 5;
+  string image_path = 6;
+  int64 max_hp = 7;
+  int64 current_hp = 8;
+  int64 armor = 9;
+  bool alive = 10;
 }
 
 message Boss {

@@ -35,6 +35,13 @@ describe('BattlePage Boss 右侧整合信息', () => {
         expect(styleSource).toContain('font-size: 1.28rem;')
     })
 
+    it('部位说明补充奥核，并明确该部位只吃魔法伤害', () => {
+        expect(battleSource).toContain('boss-part-info__item--arcane')
+        expect(battleSource).toContain('奥核')
+        expect(battleSource).toContain('仅吃魔法')
+        expect(styleSource).toContain('.boss-part-info__item--arcane .boss-part-info__dot {')
+    })
+
     it('Boss 掉落池复用背包多行属性格式，并补齐三种部位增伤', () => {
         expect(battleSource).toContain('v-for="line in formatItemStatLines(item)"')
         expect(battleSource).not.toContain('{{ formatItemStats(item) }}')

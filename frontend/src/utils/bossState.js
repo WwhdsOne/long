@@ -5,8 +5,10 @@ function normalizeIntegerString(value, fallback = '0') {
 
 function normalizeBossPart(part) {
     if (!part || typeof part !== 'object') return part
+    const damageAffinity = String(part.damageAffinity || '').trim()
     return {
         ...part,
+        ...(damageAffinity ? {damageAffinity} : {}),
         maxHp: normalizeIntegerString(part.maxHp),
         currentHp: normalizeIntegerString(part.currentHp),
         armor: normalizeIntegerString(part.armor),
@@ -15,8 +17,10 @@ function normalizeBossPart(part) {
 
 function normalizeBossStaticPart(part) {
     if (!part || typeof part !== 'object') return part
+    const damageAffinity = String(part.damageAffinity || '').trim()
     return {
         ...part,
+        ...(damageAffinity ? {damageAffinity} : {}),
         maxHp: normalizeIntegerString(part.maxHp),
         armor: normalizeIntegerString(part.armor),
     }

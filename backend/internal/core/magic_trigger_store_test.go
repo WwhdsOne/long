@@ -32,7 +32,7 @@ func TestMagicCoreHitsMainTargetAndAdjacentPart(t *testing.T) {
 		Name:  "魔法核心Boss",
 		MaxHP: 400,
 		Parts: []BossPart{
-			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 200, CurrentHP: 200, Alive: true, Armor: 0},
+			{X: 0, Y: 0, Type: PartTypeArcane, DamageAffinity: PartDamageAffinityMagicOnly, MaxHP: 200, CurrentHP: 200, Alive: true, Armor: 0},
 			{X: 1, Y: 0, Type: PartTypeHeavy, MaxHP: 200, CurrentHP: 200, Alive: true, Armor: 0},
 		},
 	}); err != nil {
@@ -61,8 +61,44 @@ func TestMagicCoreHitsMainTargetAndAdjacentPart(t *testing.T) {
 		t.Fatalf("expected magic burst on main and adjacent parts, got %+v", result.TalentEvents)
 	}
 
-	if len(result.PartStateDeltas) < 3 {
-		t.Fatalf("expected base hit + magic deltas, got %+v", result.PartStateDeltas)
+	if len(result.PartStateDeltas) < 2 {
+		t.Fatalf("expected magic deltas on main and adjacent parts, got %+v", result.PartStateDeltas)
+	}
+}
+
+func TestMagicOnlyPartDoesNotTakeNormalClickDamage(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	store.critical.CriticalChancePercent = 0
+	store.roll = func(limit int) int { return 0 }
+
+	ctx := context.Background()
+	nickname := "奥核普通点击免疫测试"
+
+	if _, err := store.ActivateBoss(ctx, BossUpsert{
+		ID:    "magic-only-test",
+		Name:  "奥核Boss",
+		MaxHP: 200,
+		Parts: []BossPart{
+			{X: 0, Y: 0, Type: PartTypeArcane, DamageAffinity: PartDamageAffinityMagicOnly, MaxHP: 200, CurrentHP: 200, Alive: true, Armor: 0},
+		},
+	}); err != nil {
+		t.Fatalf("activate boss: %v", err)
+	}
+
+	result, err := store.ClickBossPart(ctx, "boss-part:0-0", nickname)
+	if err != nil {
+		t.Fatalf("click boss part: %v", err)
+	}
+	if result.BossDamage != 0 {
+		t.Fatalf("expected zero normal damage, got %+v", result)
+	}
+	if result.DamageType != "physicalInvalid" {
+		t.Fatalf("expected physicalInvalid damage type, got %+v", result)
+	}
+	if len(result.PartStateDeltas) != 1 || result.PartStateDeltas[0].Damage != 0 {
+		t.Fatalf("expected zero-damage delta only, got %+v", result.PartStateDeltas)
 	}
 }
 

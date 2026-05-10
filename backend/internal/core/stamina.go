@@ -12,7 +12,7 @@ import (
 
 const (
 	staminaBaseMax             int64         = 50
-	staminaClicksPerPoint      int64         = 50
+	staminaClicksPerPoint      int64         = 20
 	staminaMaxUpgradeLevels    int64         = 50
 	staminaRecoverInterval     time.Duration = 5 * time.Minute
 	staminaFullRecoverDuration time.Duration = staminaRecoverInterval * time.Duration(staminaBaseMax)

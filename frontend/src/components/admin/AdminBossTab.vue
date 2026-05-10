@@ -28,8 +28,8 @@ const props = defineProps({
   selectBossTemplate: {type: Function, required: true},
 })
 
-const partTypeLabels = {soft: '软组织', heavy: '重甲', weak: '弱点'}
-const partTypeColors = {soft: '#4ade80', heavy: '#fbbf24', weak: '#f472b6'}
+const partTypeLabels = {soft: '软组织', heavy: '重甲', weak: '弱点', arcane: '奥核'}
+const partTypeColors = {soft: '#4ade80', heavy: '#fbbf24', weak: '#f472b6', arcane: '#8b5cf6'}
 
 const selectedCell = ref(null)
 const queueDialogOpen = ref(false)
@@ -105,16 +105,31 @@ function findPart(x, y) {
   return props.bossForm.layout.find((p) => p.x === x && p.y === y)
 }
 
+function inferPartDamageAffinity(type, currentAffinity = '') {
+  if (type === 'arcane') {
+    return 'magic_only'
+  }
+  const normalizedCurrent = String(currentAffinity || '').trim()
+  if (normalizedCurrent === 'magic_only') {
+    return 'normal'
+  }
+  return normalizedCurrent || 'normal'
+}
+
 function selectCell(x, y) {
   const existing = findPart(x, y)
   if (existing) {
-    selectedCell.value = {...existing}
+    selectedCell.value = {
+      ...existing,
+      damageAffinity: inferPartDamageAffinity(existing.type, existing.damageAffinity),
+    }
     return
   }
   selectedCell.value = {
     x,
     y,
     type: 'soft',
+    damageAffinity: 'normal',
     displayName: '',
     imagePath: '',
     maxHp: '1000',
@@ -126,9 +141,11 @@ function selectCell(x, y) {
 
 function normalizeBossPartCell(cell) {
   const maxHp = normalizeBossIntegerString(cell.maxHp, 1n)
+  const type = cell.type || 'soft'
   return {
     ...cell,
-    type: cell.type || 'soft',
+    type,
+    damageAffinity: inferPartDamageAffinity(type, cell.damageAffinity),
     displayName: String(cell.displayName || '').trim(),
     imagePath: String(cell.imagePath || '').trim(),
     maxHp,
@@ -381,7 +398,16 @@ function goNextPage() {
                       <option value="soft">软组织</option>
                       <option value="heavy">重甲</option>
                       <option value="weak">弱点</option>
+                      <option value="arcane">奥核</option>
                     </select>
+                  </label>
+                  <label class="boss-editor-inspector__field">
+                    <span>伤害规则</span>
+                    <input
+                        :value="selectedCell.type === 'arcane' ? '仅吃魔法伤害（自动）' : '普通点击伤害（自动）'"
+                        class="nickname-form__input"
+                        readonly
+                    />
                   </label>
                   <label class="boss-editor-inspector__field">
                     <span>名称</span>

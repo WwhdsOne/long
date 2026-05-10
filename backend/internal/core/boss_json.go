@@ -32,40 +32,43 @@ func formatInt64String(value int64) string {
 
 func (p BossPart) MarshalJSON() ([]byte, error) {
 	type bossPartJSON struct {
-		X           int      `json:"x"`
-		Y           int      `json:"y"`
-		Type        PartType `json:"type"`
-		DisplayName string   `json:"displayName,omitempty"`
-		ImagePath   string   `json:"imagePath,omitempty"`
-		MaxHP       string   `json:"maxHp"`
-		CurrentHP   string   `json:"currentHp"`
-		Armor       string   `json:"armor"`
-		Alive       bool     `json:"alive"`
+		X              int                `json:"x"`
+		Y              int                `json:"y"`
+		Type           PartType           `json:"type"`
+		DamageAffinity PartDamageAffinity `json:"damageAffinity,omitempty"`
+		DisplayName    string             `json:"displayName,omitempty"`
+		ImagePath      string             `json:"imagePath,omitempty"`
+		MaxHP          string             `json:"maxHp"`
+		CurrentHP      string             `json:"currentHp"`
+		Armor          string             `json:"armor"`
+		Alive          bool               `json:"alive"`
 	}
 	return sonic.Marshal(bossPartJSON{
-		X:           p.X,
-		Y:           p.Y,
-		Type:        p.Type,
-		DisplayName: p.DisplayName,
-		ImagePath:   p.ImagePath,
-		MaxHP:       formatInt64String(p.MaxHP),
-		CurrentHP:   formatInt64String(p.CurrentHP),
-		Armor:       formatInt64String(p.Armor),
-		Alive:       p.Alive,
+		X:              p.X,
+		Y:              p.Y,
+		Type:           p.Type,
+		DamageAffinity: normalizeBossPartDamageAffinity(p.DamageAffinity),
+		DisplayName:    p.DisplayName,
+		ImagePath:      p.ImagePath,
+		MaxHP:          formatInt64String(p.MaxHP),
+		CurrentHP:      formatInt64String(p.CurrentHP),
+		Armor:          formatInt64String(p.Armor),
+		Alive:          p.Alive,
 	})
 }
 
 func (p *BossPart) UnmarshalJSON(data []byte) error {
 	type bossPartJSON struct {
-		X           int             `json:"x"`
-		Y           int             `json:"y"`
-		Type        PartType        `json:"type"`
-		DisplayName string          `json:"displayName,omitempty"`
-		ImagePath   string          `json:"imagePath,omitempty"`
-		MaxHP       json.RawMessage `json:"maxHp"`
-		CurrentHP   json.RawMessage `json:"currentHp"`
-		Armor       json.RawMessage `json:"armor"`
-		Alive       bool            `json:"alive"`
+		X              int                `json:"x"`
+		Y              int                `json:"y"`
+		Type           PartType           `json:"type"`
+		DamageAffinity PartDamageAffinity `json:"damageAffinity,omitempty"`
+		DisplayName    string             `json:"displayName,omitempty"`
+		ImagePath      string             `json:"imagePath,omitempty"`
+		MaxHP          json.RawMessage    `json:"maxHp"`
+		CurrentHP      json.RawMessage    `json:"currentHp"`
+		Armor          json.RawMessage    `json:"armor"`
+		Alive          bool               `json:"alive"`
 	}
 	var aux bossPartJSON
 	if err := sonic.Unmarshal(data, &aux); err != nil {
@@ -84,79 +87,80 @@ func (p *BossPart) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*p = BossPart{
-		X:           aux.X,
-		Y:           aux.Y,
-		Type:        aux.Type,
-		DisplayName: aux.DisplayName,
-		ImagePath:   aux.ImagePath,
-		MaxHP:       maxHP,
-		CurrentHP:   currentHP,
-		Armor:       armor,
-		Alive:       aux.Alive,
+		X:              aux.X,
+		Y:              aux.Y,
+		Type:           aux.Type,
+		DamageAffinity: normalizeBossPartDamageAffinity(aux.DamageAffinity),
+		DisplayName:    aux.DisplayName,
+		ImagePath:      aux.ImagePath,
+		MaxHP:          maxHP,
+		CurrentHP:      currentHP,
+		Armor:          armor,
+		Alive:          aux.Alive,
 	}
 	return nil
 }
 
 func (b Boss) MarshalJSON() ([]byte, error) {
 	type bossJSON struct {
-		ID                 string     `json:"id"`
-		TemplateID         string     `json:"templateId,omitempty"`
-		RoomID             string     `json:"roomId,omitempty"`
-		QueueID            string     `json:"queueId,omitempty"`
-		Name               string     `json:"name"`
-		Status             string     `json:"status"`
-		MaxHP              string     `json:"maxHp"`
-		CurrentHP          string     `json:"currentHp"`
-		GoldOnKill         int64      `json:"goldOnKill"`
-		StoneOnKill        int64      `json:"stoneOnKill"`
-		InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
-		InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
-		InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
-		TalentPointsOnKill int64      `json:"talentPointsOnKill"`
-		Parts              []BossPart `json:"parts,omitempty"`
-		StartedAt          int64      `json:"startedAt,omitempty"`
-		DefeatedAt         int64      `json:"defeatedAt,omitempty"`
+		ID                              string     `json:"id"`
+		TemplateID                      string     `json:"templateId,omitempty"`
+		RoomID                          string     `json:"roomId,omitempty"`
+		QueueID                         string     `json:"queueId,omitempty"`
+		Name                            string     `json:"name"`
+		Status                          string     `json:"status"`
+		MaxHP                           string     `json:"maxHp"`
+		CurrentHP                       string     `json:"currentHp"`
+		GoldOnKill                      int64      `json:"goldOnKill"`
+		StoneOnKill                     int64      `json:"stoneOnKill"`
+		InscriptionStoneDropRatePercent float64    `json:"inscriptionStoneDropRatePercent"`
+		InscriptionStoneDropCountMin    int64      `json:"inscriptionStoneDropCountMin"`
+		InscriptionStoneDropCountMax    int64      `json:"inscriptionStoneDropCountMax"`
+		TalentPointsOnKill              int64      `json:"talentPointsOnKill"`
+		Parts                           []BossPart `json:"parts,omitempty"`
+		StartedAt                       int64      `json:"startedAt,omitempty"`
+		DefeatedAt                      int64      `json:"defeatedAt,omitempty"`
 	}
 	return sonic.Marshal(bossJSON{
-		ID:                 b.ID,
-		TemplateID:         b.TemplateID,
-		RoomID:             b.RoomID,
-		QueueID:            b.QueueID,
-		Name:               b.Name,
-		Status:             b.Status,
-		MaxHP:              formatInt64String(b.MaxHP),
-		CurrentHP:          formatInt64String(b.CurrentHP),
-		GoldOnKill:         b.GoldOnKill,
-		StoneOnKill:        b.StoneOnKill,
+		ID:                              b.ID,
+		TemplateID:                      b.TemplateID,
+		RoomID:                          b.RoomID,
+		QueueID:                         b.QueueID,
+		Name:                            b.Name,
+		Status:                          b.Status,
+		MaxHP:                           formatInt64String(b.MaxHP),
+		CurrentHP:                       formatInt64String(b.CurrentHP),
+		GoldOnKill:                      b.GoldOnKill,
+		StoneOnKill:                     b.StoneOnKill,
 		InscriptionStoneDropRatePercent: b.InscriptionStoneDropRatePercent,
 		InscriptionStoneDropCountMin:    b.InscriptionStoneDropCountMin,
 		InscriptionStoneDropCountMax:    b.InscriptionStoneDropCountMax,
-		TalentPointsOnKill: b.TalentPointsOnKill,
-		Parts:              b.Parts,
-		StartedAt:          b.StartedAt,
-		DefeatedAt:         b.DefeatedAt,
+		TalentPointsOnKill:              b.TalentPointsOnKill,
+		Parts:                           b.Parts,
+		StartedAt:                       b.StartedAt,
+		DefeatedAt:                      b.DefeatedAt,
 	})
 }
 
 func (b *Boss) UnmarshalJSON(data []byte) error {
 	type bossJSON struct {
-		ID                 string          `json:"id"`
-		TemplateID         string          `json:"templateId,omitempty"`
-		RoomID             string          `json:"roomId,omitempty"`
-		QueueID            string          `json:"queueId,omitempty"`
-		Name               string          `json:"name"`
-		Status             string          `json:"status"`
-		MaxHP              json.RawMessage `json:"maxHp"`
-		CurrentHP          json.RawMessage `json:"currentHp"`
-		GoldOnKill         int64           `json:"goldOnKill"`
-		StoneOnKill        int64           `json:"stoneOnKill"`
-		InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
-		InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
-		InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
-		TalentPointsOnKill int64           `json:"talentPointsOnKill"`
-		Parts              []BossPart      `json:"parts,omitempty"`
-		StartedAt          int64           `json:"startedAt,omitempty"`
-		DefeatedAt         int64           `json:"defeatedAt,omitempty"`
+		ID                              string          `json:"id"`
+		TemplateID                      string          `json:"templateId,omitempty"`
+		RoomID                          string          `json:"roomId,omitempty"`
+		QueueID                         string          `json:"queueId,omitempty"`
+		Name                            string          `json:"name"`
+		Status                          string          `json:"status"`
+		MaxHP                           json.RawMessage `json:"maxHp"`
+		CurrentHP                       json.RawMessage `json:"currentHp"`
+		GoldOnKill                      int64           `json:"goldOnKill"`
+		StoneOnKill                     int64           `json:"stoneOnKill"`
+		InscriptionStoneDropRatePercent float64         `json:"inscriptionStoneDropRatePercent"`
+		InscriptionStoneDropCountMin    int64           `json:"inscriptionStoneDropCountMin"`
+		InscriptionStoneDropCountMax    int64           `json:"inscriptionStoneDropCountMax"`
+		TalentPointsOnKill              int64           `json:"talentPointsOnKill"`
+		Parts                           []BossPart      `json:"parts,omitempty"`
+		StartedAt                       int64           `json:"startedAt,omitempty"`
+		DefeatedAt                      int64           `json:"defeatedAt,omitempty"`
 	}
 	var aux bossJSON
 	if err := sonic.Unmarshal(data, &aux); err != nil {
@@ -171,23 +175,23 @@ func (b *Boss) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*b = Boss{
-		ID:                 aux.ID,
-		TemplateID:         aux.TemplateID,
-		RoomID:             aux.RoomID,
-		QueueID:            aux.QueueID,
-		Name:               aux.Name,
-		Status:             aux.Status,
-		MaxHP:              maxHP,
-		CurrentHP:          currentHP,
-		GoldOnKill:         aux.GoldOnKill,
-		StoneOnKill:        aux.StoneOnKill,
+		ID:                              aux.ID,
+		TemplateID:                      aux.TemplateID,
+		RoomID:                          aux.RoomID,
+		QueueID:                         aux.QueueID,
+		Name:                            aux.Name,
+		Status:                          aux.Status,
+		MaxHP:                           maxHP,
+		CurrentHP:                       currentHP,
+		GoldOnKill:                      aux.GoldOnKill,
+		StoneOnKill:                     aux.StoneOnKill,
 		InscriptionStoneDropRatePercent: aux.InscriptionStoneDropRatePercent,
 		InscriptionStoneDropCountMin:    aux.InscriptionStoneDropCountMin,
 		InscriptionStoneDropCountMax:    aux.InscriptionStoneDropCountMax,
-		TalentPointsOnKill: aux.TalentPointsOnKill,
-		Parts:              aux.Parts,
-		StartedAt:          aux.StartedAt,
-		DefeatedAt:         aux.DefeatedAt,
+		TalentPointsOnKill:              aux.TalentPointsOnKill,
+		Parts:                           aux.Parts,
+		StartedAt:                       aux.StartedAt,
+		DefeatedAt:                      aux.DefeatedAt,
 	}
 	return nil
 }

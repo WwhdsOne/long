@@ -90,9 +90,10 @@ type LeaderboardEntry struct {
 type PartType string
 
 const (
-	PartTypeSoft  PartType = "soft"  // 软组织
-	PartTypeHeavy PartType = "heavy" // 重甲
-	PartTypeWeak  PartType = "weak"  // 弱点
+	PartTypeSoft   PartType = "soft"   // 软组织
+	PartTypeHeavy  PartType = "heavy"  // 重甲
+	PartTypeWeak   PartType = "weak"   // 弱点
+	PartTypeArcane PartType = "arcane" // 奥核
 )
 
 // PartDamageCoefficient 返回部位类型的伤害系数
@@ -109,38 +110,47 @@ func (p PartType) DamageCoefficient() float64 {
 	}
 }
 
+// PartDamageAffinity 部位伤害亲和。
+type PartDamageAffinity string
+
+const (
+	PartDamageAffinityNormal    PartDamageAffinity = "normal"
+	PartDamageAffinityMagicOnly PartDamageAffinity = "magic_only"
+)
+
 // BossPart Boss 的战斗部位
 type BossPart struct {
-	X           int      `msgpack:"x" json:"x"`
-	Y           int      `msgpack:"y" json:"y"`
-	Type        PartType `msgpack:"type" json:"type"`
-	DisplayName string   `msgpack:"displayName,omitempty" json:"displayName,omitempty"`
-	ImagePath   string   `msgpack:"imagePath,omitempty" json:"imagePath,omitempty"`
-	MaxHP       int64    `msgpack:"maxHp" json:"maxHp"`
-	CurrentHP   int64    `msgpack:"currentHp" json:"currentHp"`
-	Armor       int64    `msgpack:"armor" json:"armor"`
-	Alive       bool     `msgpack:"alive" json:"alive"`
+	X              int                `msgpack:"x" json:"x"`
+	Y              int                `msgpack:"y" json:"y"`
+	Type           PartType           `msgpack:"type" json:"type"`
+	DamageAffinity PartDamageAffinity `msgpack:"damageAffinity,omitempty" json:"damageAffinity,omitempty"`
+	DisplayName    string             `msgpack:"displayName,omitempty" json:"displayName,omitempty"`
+	ImagePath      string             `msgpack:"imagePath,omitempty" json:"imagePath,omitempty"`
+	MaxHP          int64              `msgpack:"maxHp" json:"maxHp"`
+	CurrentHP      int64              `msgpack:"currentHp" json:"currentHp"`
+	Armor          int64              `msgpack:"armor" json:"armor"`
+	Alive          bool               `msgpack:"alive" json:"alive"`
 }
 
 // Boss 世界 Boss 状态
 type Boss struct {
-	ID                 string     `json:"id"`
-	TemplateID         string     `json:"templateId,omitempty"`
-	RoomID             string     `json:"roomId,omitempty"`
-	QueueID            string     `json:"queueId,omitempty"`
-	Name               string     `json:"name"`
-	Status             string     `json:"status"`
-	MaxHP              int64      `json:"maxHp"`
-	CurrentHP          int64      `json:"currentHp"`
-	GoldOnKill         int64      `json:"goldOnKill"`
-	StoneOnKill        int64      `json:"stoneOnKill"`
-	InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
-	InscriptionStoneDropCountMin    int64   `json:"inscriptionStoneDropCountMin"`
-	InscriptionStoneDropCountMax    int64   `json:"inscriptionStoneDropCountMax"`
-	TalentPointsOnKill int64      `json:"talentPointsOnKill"`
-	Parts              []BossPart `json:"parts,omitempty"`
-	StartedAt          int64      `json:"startedAt,omitempty"`
-	DefeatedAt         int64      `json:"defeatedAt,omitempty"`
+	ID                              string     `json:"id"`
+	TemplateID                      string     `json:"templateId,omitempty"`
+	RoomID                          string     `json:"roomId,omitempty"`
+	QueueID                         string     `json:"queueId,omitempty"`
+	Name                            string     `json:"name"`
+	Status                          string     `json:"status"`
+	MaxHP                           int64      `json:"maxHp"`
+	CurrentHP                       int64      `json:"currentHp"`
+	GoldOnKill                      int64      `json:"goldOnKill"`
+	StoneOnKill                     int64      `json:"stoneOnKill"`
+	InscriptionStoneDropRatePercent float64    `json:"inscriptionStoneDropRatePercent"`
+	InscriptionStoneDropCountMin    int64      `json:"inscriptionStoneDropCountMin"`
+	InscriptionStoneDropCountMax    int64      `json:"inscriptionStoneDropCountMax"`
+	TalentPointsOnKill              int64      `json:"talentPointsOnKill"`
+	Parts                           []BossPart `json:"parts,omitempty"`
+	StartedAt                       int64      `json:"startedAt,omitempty"`
+	DefeatedAt                      int64      `json:"defeatedAt,omitempty"`
 }
 
 // BossLeaderboardEntry Boss 伤害榜
@@ -229,42 +239,42 @@ type MessagePage struct {
 
 // InventoryItem 背包道具
 type InventoryItem struct {
-	ItemID               string  `json:"itemId"`
-	InstanceID           string  `json:"instanceId,omitempty"`
-	Name                 string  `json:"name"`
-	Slot                 string  `json:"slot"`
-	Rarity               string  `json:"rarity"`
-	ImagePath            string  `json:"imagePath,omitempty"`
-	ImageAlt             string  `json:"imageAlt,omitempty"`
-	Quantity             int64   `json:"quantity"`
-	Equipped             bool    `json:"equipped"`
-	EnhanceLevel         int     `json:"enhanceLevel,omitempty"`
-	Bound                bool    `json:"bound,omitempty"`
-	Locked               bool    `json:"locked,omitempty"`
-	AttackPower          int64   `json:"attackPower,omitempty"`
-	ArmorPenPercent      float64 `json:"armorPenPercent,omitempty"`
-	CritRate             float64 `json:"critRate,omitempty"`
-	CritDamageMultiplier float64 `json:"critDamageMultiplier,omitempty"`
-	PartTypeDamageSoft   float64 `json:"partTypeDamageSoft,omitempty"`
-	PartTypeDamageHeavy  float64 `json:"partTypeDamageHeavy,omitempty"`
-	PartTypeDamageWeak   float64 `json:"partTypeDamageWeak,omitempty"`
-	MagicProcRateBonus   float64 `json:"magicProcRateBonus,omitempty"`
-	MagicDamageBonus     float64 `json:"magicDamageBonus,omitempty"`
-	AllDamageAmplifyBonus float64   `json:"allDamageAmplifyBonus,omitempty"`
-	Affixes              []ItemAffix `json:"affixes,omitempty"`
-	AffixCount           int         `json:"affixCount,omitempty"`
-	AffixLimit           int         `json:"affixLimit,omitempty"`
+	ItemID                string      `json:"itemId"`
+	InstanceID            string      `json:"instanceId,omitempty"`
+	Name                  string      `json:"name"`
+	Slot                  string      `json:"slot"`
+	Rarity                string      `json:"rarity"`
+	ImagePath             string      `json:"imagePath,omitempty"`
+	ImageAlt              string      `json:"imageAlt,omitempty"`
+	Quantity              int64       `json:"quantity"`
+	Equipped              bool        `json:"equipped"`
+	EnhanceLevel          int         `json:"enhanceLevel,omitempty"`
+	Bound                 bool        `json:"bound,omitempty"`
+	Locked                bool        `json:"locked,omitempty"`
+	AttackPower           int64       `json:"attackPower,omitempty"`
+	ArmorPenPercent       float64     `json:"armorPenPercent,omitempty"`
+	CritRate              float64     `json:"critRate,omitempty"`
+	CritDamageMultiplier  float64     `json:"critDamageMultiplier,omitempty"`
+	PartTypeDamageSoft    float64     `json:"partTypeDamageSoft,omitempty"`
+	PartTypeDamageHeavy   float64     `json:"partTypeDamageHeavy,omitempty"`
+	PartTypeDamageWeak    float64     `json:"partTypeDamageWeak,omitempty"`
+	MagicProcRateBonus    float64     `json:"magicProcRateBonus,omitempty"`
+	MagicDamageBonus      float64     `json:"magicDamageBonus,omitempty"`
+	AllDamageAmplifyBonus float64     `json:"allDamageAmplifyBonus,omitempty"`
+	Affixes               []ItemAffix `json:"affixes,omitempty"`
+	AffixCount            int         `json:"affixCount,omitempty"`
+	AffixLimit            int         `json:"affixLimit,omitempty"`
 }
 
 // ItemInstance 装备实例
 type ItemInstance struct {
-	InstanceID   string `json:"instanceId"`
-	ItemID       string `json:"itemId"`
-	EnhanceLevel int    `json:"enhanceLevel"`
-	SpentStones  int64  `json:"spentStones"`
-	Bound        bool   `json:"bound"`
-	Locked       bool   `json:"locked"`
-	CreatedAt    int64  `json:"createdAt"`
+	InstanceID   string      `json:"instanceId"`
+	ItemID       string      `json:"itemId"`
+	EnhanceLevel int         `json:"enhanceLevel"`
+	SpentStones  int64       `json:"spentStones"`
+	Bound        bool        `json:"bound"`
+	Locked       bool        `json:"locked"`
+	CreatedAt    int64       `json:"createdAt"`
 	Affixes      []ItemAffix `json:"affixes,omitempty"`
 }
 
@@ -333,16 +343,16 @@ type BossLootEntry struct {
 
 // BossResources 描述当前 Boss 的低频公共资源。
 type BossResources struct {
-	BossID             string          `json:"bossId,omitempty"`
-	TemplateID         string          `json:"templateId,omitempty"`
-	RoomID             string          `json:"roomId,omitempty"`
-	Status             string          `json:"status,omitempty"`
-	GoldRange          ResourceRange   `json:"goldRange"`
-	StoneRange         ResourceRange   `json:"stoneRange"`
-	InscriptionStoneRange ResourceRange `json:"inscriptionStoneRange"`
-	InscriptionStoneDropRatePercent float64 `json:"inscriptionStoneDropRatePercent"`
-	TalentPointsOnKill int64           `json:"talentPointsOnKill"`
-	BossLoot           []BossLootEntry `json:"bossLoot"`
+	BossID                          string          `json:"bossId,omitempty"`
+	TemplateID                      string          `json:"templateId,omitempty"`
+	RoomID                          string          `json:"roomId,omitempty"`
+	Status                          string          `json:"status,omitempty"`
+	GoldRange                       ResourceRange   `json:"goldRange"`
+	StoneRange                      ResourceRange   `json:"stoneRange"`
+	InscriptionStoneRange           ResourceRange   `json:"inscriptionStoneRange"`
+	InscriptionStoneDropRatePercent float64         `json:"inscriptionStoneDropRatePercent"`
+	TalentPointsOnKill              int64           `json:"talentPointsOnKill"`
+	BossLoot                        []BossLootEntry `json:"bossLoot"`
 }
 
 // ResourceRange 掉落资源显示区间。
@@ -1128,11 +1138,11 @@ func (s *Store) GetPlayerResources(ctx context.Context, nickname string) (Player
 		return PlayerResources{}, err
 	}
 	return PlayerResources{
-		Gold:         resources.Gold,
-		Stones:       resources.Stones,
+		Gold:              resources.Gold,
+		Stones:            resources.Stones,
 		InscriptionStones: resources.InscriptionStones,
-		TalentPoints: resources.TalentPoints,
-		Stamina:      staminaState,
+		TalentPoints:      resources.TalentPoints,
+		Stamina:           staminaState,
 	}, nil
 }
 
@@ -1921,6 +1931,9 @@ func (s *Store) AttackBossPartAFKInRoom(ctx context.Context, nickname string, ro
 	}
 
 	damage := max(int64(math.Floor(float64(maxInt64(0, combatStats.AttackPower))*0.5)), 0)
+	if part.DamageAffinity == PartDamageAffinityMagicOnly {
+		damage = 0
+	}
 	_, actualDamage, _ := applyBossPartDamageDelta(boss, part, damage)
 	allDead := true
 	for _, p := range boss.Parts {
@@ -2025,6 +2038,7 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	if !part.Alive || part.CurrentHP <= 0 {
 		return ClickResult{}, ErrBossPartAlreadyDead
 	}
+	magicOnly := part.DamageAffinity == PartDamageAffinityMagicOnly
 
 	staminaState, hasStamina, err := s.consumeManualStamina(ctx, nickname)
 	if err != nil {
@@ -2038,6 +2052,9 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 			return ClickResult{}, err
 		}
 	}
+	if magicOnly {
+		critical = false
+	}
 	result, err := s.applyClickCountOnly(ctx, nickname, 1, critical)
 	if err != nil {
 		return ClickResult{}, err
@@ -2045,7 +2062,7 @@ func (s *Store) clickBossPart(ctx context.Context, target string, nickname strin
 	result.RoomID = roomID
 	result.Stamina = staminaState
 	fixedDamage := int64(0)
-	if !hasStamina {
+	if !hasStamina && !magicOnly {
 		fixedDamage = 1
 	}
 	result, err = s.applyBossPartDamage(ctx, boss, nickname, critical, result, targetIdx, comboCount, fixedDamage)
@@ -2083,6 +2100,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	if !part.Alive || part.CurrentHP <= 0 {
 		return result, ErrBossPartAlreadyDead
 	}
+	magicOnly := part.DamageAffinity == PartDamageAffinityMagicOnly
 
 	nowTime := s.now()
 	now := nowTime.Unix()
@@ -2129,30 +2147,35 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	damageStats := CalcBossPartDamage(combatStats, effectivePartType, effectiveArmor, aliveCount, boss.CurrentHP, boss.MaxHP)
 	partDamage := damageStats.NormalDamage
-	partDamage = applyComboDamageAmplify(partDamage, comboCount)
-	if critical {
-		partDamage = damageStats.CriticalDamage
-	}
-	if inCollapse && compiledTalents.Armor.CollapseAmp > 1 {
-		partDamage = int64(float64(partDamage) * compiledTalents.Armor.CollapseAmp)
+	if magicOnly {
+		partDamage = 0
+		critical = false
+	} else {
+		partDamage = applyComboDamageAmplify(partDamage, comboCount)
+		if critical {
+			partDamage = damageStats.CriticalDamage
+		}
+		if inCollapse && compiledTalents.Armor.CollapseAmp > 1 {
+			partDamage = int64(float64(partDamage) * compiledTalents.Armor.CollapseAmp)
+		}
 	}
 
 	hpRatio := float64(part.CurrentHP) / float64(maxInt64(1, boss.MaxHP))
-	if compiledTalents.Has("crit_omen_kill") && combatState.OmenStacks > 0 {
+	if !magicOnly && compiledTalents.Has("crit_omen_kill") && combatState.OmenStacks > 0 {
 		if hpRatio < compiledTalents.Crit.OmenKillThreshold {
 			partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*compiledTalents.Crit.OmenKillDmgPerOmen))
 		}
 	}
 
-	if critical && compiledTalents.Has("crit_core") && combatState.OmenStacks > 0 {
+	if !magicOnly && critical && compiledTalents.Has("crit_core") && combatState.OmenStacks > 0 {
 		partDamage = int64(float64(partDamage) * (1.0 + float64(combatState.OmenStacks)*compiledTalents.Crit.OmenResonatePerOmen))
 	}
-	if critical && effectivePartType == PartTypeWeak && compiledTalents.Crit.WeakspotInsightMult > 1 {
+	if !magicOnly && critical && effectivePartType == PartTypeWeak && compiledTalents.Crit.WeakspotInsightMult > 1 {
 		partDamage = int64(float64(partDamage) * compiledTalents.Crit.WeakspotInsightMult)
 	}
 
 	// 死兆收割被动：根据死兆层数档位提供增伤（不消耗层数）
-	if compiledTalents.Has("crit_omen_reap") && len(compiledTalents.Crit.OmenReapThresholds) > 0 {
+	if !magicOnly && compiledTalents.Has("crit_omen_reap") && len(compiledTalents.Crit.OmenReapThresholds) > 0 {
 		reapMult := 1.0
 		for i := len(compiledTalents.Crit.OmenReapThresholds) - 1; i >= 0; i-- {
 			if combatState.OmenStacks >= compiledTalents.Crit.OmenReapThresholds[i] {
@@ -2167,7 +2190,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 
 	partWasAlive := part.CurrentHP > 0
 	omenGain := 0
-	if compiledTalents.Has("crit_core") {
+	if !magicOnly && compiledTalents.Has("crit_core") {
 		if critical && effectivePartType == PartTypeWeak && partWasAlive {
 			omenGain = compiledTalents.Crit.OmenPerWeakCrit
 		}
@@ -2175,11 +2198,11 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	beforeHP, actualDamage, _ := applyBossPartDamageDelta(boss, part, partDamage)
 
 	// 死兆层数获取：弱点暴击 +2，普通暴击 +1，击碎部位 +5
-	if compiledTalents.Has("crit_core") && omenGain > 0 {
+	if !magicOnly && compiledTalents.Has("crit_core") && omenGain > 0 {
 		combatState.OmenStacks, _ = applyOmenStackDelta(combatState.OmenStacks, omenGain)
 	}
 
-	if critical && compiledTalents.Has("crit_skinner") && now >= combatState.SkinnerCooldownEndsAt {
+	if !magicOnly && critical && compiledTalents.Has("crit_skinner") && now >= combatState.SkinnerCooldownEndsAt {
 		var candidates []BossPart
 		for _, candidate := range boss.Parts {
 			if !candidate.Alive || candidate.Type == PartTypeWeak {
@@ -2214,7 +2237,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		PartType: string(part.Type),
 	})
 
-	extraDamage, talentEvents, extraDeltas, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, combatStats, effectivePartType, compiledTalents, combatState, now, nowMs)
+	extraDamage, talentEvents, extraDeltas, damageTypeOverride := s.applyTriggeredTalentDamage(ctx, boss, part, nickname, result.UserStats.ClickCount, actualDamage, critical, targetIdx, combatStats, effectivePartType, compiledTalents, combatState, now, nowMs, magicOnly)
 	if extraDamage > 0 {
 		totalDamage += extraDamage
 		result.PartStateDeltas = append(result.PartStateDeltas, extraDeltas...)
@@ -2223,7 +2246,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		result.TalentEvents = append(result.TalentEvents, talentEvents...)
 	}
 
-	if combatState.SilverStormActive && compiledTalents.Normal.SilverStormDamageRatio > 0 && part.Alive {
+	if combatState.SilverStormActive && compiledTalents.Normal.SilverStormDamageRatio > 0 && part.Alive && !magicOnly {
 		silverStormDamage := int64(float64(maxInt64(1, totalDamage)) * compiledTalents.Normal.SilverStormDamageRatio)
 		if silverStormDamage > 0 {
 			silverBeforeHP, silverActualDamage, _ := applyBossPartDamageDelta(boss, part, silverStormDamage)
@@ -2250,7 +2273,7 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	}
 
 	partDiedThisClick := partWasAlive && !part.Alive
-	if partDiedThisClick && compiledTalents.Has("normal_ultimate") {
+	if partDiedThisClick && compiledTalents.Has("normal_ultimate") && !magicOnly {
 		combatState.SilverStormActive = true
 		duration := int(compiledTalents.Normal.SilverStormDuration)
 		combatState.SilverStormRemaining = duration
@@ -2274,6 +2297,9 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 		IsCollapsed: isCollapsed,
 		IsAfkAttack: false,
 	})
+	if magicOnly && totalDamage <= 0 {
+		result.DamageType = "physicalInvalid"
+	}
 	if damageTypeOverride != "" {
 		result.DamageType = damageTypeOverride
 	}
@@ -2489,6 +2515,11 @@ func applyTalentBleedTicks(boss *Boss, combatState *TalentCombatState, nowMs int
 			changed = true
 			continue
 		}
+		if part.DamageAffinity == PartDamageAffinityMagicOnly {
+			delete(combatState.Bleeds, partKey)
+			changed = true
+			continue
+		}
 
 		if nowMs < bleed.NextTickAtMs {
 			continue
@@ -2687,7 +2718,7 @@ func applyBossPartDamageDelta(boss *Boss, part *BossPart, damage int64) (beforeH
 	return beforeHP, actualDamage, partWasAlive && !part.Alive
 }
 
-func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, combatStats CombatStats, effectivePartType PartType, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now, nowMs int64) (int64, []TalentTriggerEvent, []BossPartStateDelta, string) {
+func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part *BossPart, nickname string, clickCount int64, baseDamage int64, isCritical bool, partIndex int, combatStats CombatStats, effectivePartType PartType, compiledTalents *CompiledTalentSet, combatState *TalentCombatState, now, nowMs int64, magicOnly bool) (int64, []TalentTriggerEvent, []BossPartStateDelta, string) {
 	if boss == nil || part == nil || strings.TrimSpace(nickname) == "" || clickCount <= 0 {
 		return 0, nil, nil, ""
 	}
@@ -2711,8 +2742,12 @@ func (s *Store) applyTriggeredTalentDamage(ctx context.Context, boss *Boss, part
 		nowMs:             nowMs,
 		roll:              s.roll,
 	}
-	for _, trigger := range compiledTalents.triggers {
-		trigger(triggerCtx)
+	if magicOnly {
+		applyMagicCoreTrigger(triggerCtx)
+	} else {
+		for _, trigger := range compiledTalents.triggers {
+			trigger(triggerCtx)
+		}
 	}
 
 	if combatState.CollapseEndsAt > 0 && now >= combatState.CollapseEndsAt {
@@ -2781,6 +2816,8 @@ func bossPartDisplayLabel(part BossPart) string {
 		return "重甲"
 	case PartTypeWeak:
 		return "弱点"
+	case PartTypeArcane:
+		return "奥核"
 	default:
 		return string(part.Type)
 	}
@@ -3288,23 +3325,23 @@ func (s *Store) currentBossFromCmdable(ctx context.Context, client redis.Cmdable
 	}
 
 	return &Boss{
-		ID:                 id,
-		TemplateID:         strings.TrimSpace(stringValue(values, 1)),
-		RoomID:             firstNonEmpty(strings.TrimSpace(stringValue(values, 2)), roomID),
-		QueueID:            firstNonEmpty(strings.TrimSpace(stringValue(values, 3)), s.queueIDForRoom(roomID)),
-		Name:               name,
-		Status:             strings.TrimSpace(stringValue(values, 5)),
-		MaxHP:              int64Value(values, 6),
-		CurrentHP:          int64Value(values, 7),
-		GoldOnKill:         int64Value(values, 8),
-		StoneOnKill:        int64Value(values, 9),
+		ID:                              id,
+		TemplateID:                      strings.TrimSpace(stringValue(values, 1)),
+		RoomID:                          firstNonEmpty(strings.TrimSpace(stringValue(values, 2)), roomID),
+		QueueID:                         firstNonEmpty(strings.TrimSpace(stringValue(values, 3)), s.queueIDForRoom(roomID)),
+		Name:                            name,
+		Status:                          strings.TrimSpace(stringValue(values, 5)),
+		MaxHP:                           int64Value(values, 6),
+		CurrentHP:                       int64Value(values, 7),
+		GoldOnKill:                      int64Value(values, 8),
+		StoneOnKill:                     int64Value(values, 9),
 		InscriptionStoneDropRatePercent: float64FromString(stringValue(values, 10)),
 		InscriptionStoneDropCountMin:    int64Value(values, 11),
 		InscriptionStoneDropCountMax:    int64Value(values, 12),
-		TalentPointsOnKill: int64Value(values, 13),
-		Parts:              parts,
-		StartedAt:          int64Value(values, 15),
-		DefeatedAt:         int64Value(values, 16),
+		TalentPointsOnKill:              int64Value(values, 13),
+		Parts:                           parts,
+		StartedAt:                       int64Value(values, 15),
+		DefeatedAt:                      int64Value(values, 16),
 	}, nil
 }
 
@@ -3321,23 +3358,23 @@ func normalizeBoss(values map[string]string) *Boss {
 	}
 
 	return &Boss{
-		ID:                 id,
-		TemplateID:         strings.TrimSpace(values["template_id"]),
-		RoomID:             strings.TrimSpace(values["room_id"]),
-		QueueID:            strings.TrimSpace(values["queue_id"]),
-		Name:               name,
-		Status:             strings.TrimSpace(values["status"]),
-		MaxHP:              int64FromString(values["max_hp"]),
-		CurrentHP:          int64FromString(values["current_hp"]),
-		GoldOnKill:         int64FromString(values["gold_on_kill"]),
-		StoneOnKill:        int64FromString(values["stone_on_kill"]),
+		ID:                              id,
+		TemplateID:                      strings.TrimSpace(values["template_id"]),
+		RoomID:                          strings.TrimSpace(values["room_id"]),
+		QueueID:                         strings.TrimSpace(values["queue_id"]),
+		Name:                            name,
+		Status:                          strings.TrimSpace(values["status"]),
+		MaxHP:                           int64FromString(values["max_hp"]),
+		CurrentHP:                       int64FromString(values["current_hp"]),
+		GoldOnKill:                      int64FromString(values["gold_on_kill"]),
+		StoneOnKill:                     int64FromString(values["stone_on_kill"]),
 		InscriptionStoneDropRatePercent: float64FromString(values["inscription_stone_drop_rate_percent"]),
 		InscriptionStoneDropCountMin:    int64FromString(values["inscription_stone_drop_count_min"]),
 		InscriptionStoneDropCountMax:    int64FromString(values["inscription_stone_drop_count_max"]),
-		TalentPointsOnKill: int64FromString(values["talent_points_on_kill"]),
-		Parts:              parts,
-		StartedAt:          int64FromString(values["started_at"]),
-		DefeatedAt:         int64FromString(values["defeated_at"]),
+		TalentPointsOnKill:              int64FromString(values["talent_points_on_kill"]),
+		Parts:                           parts,
+		StartedAt:                       int64FromString(values["started_at"]),
+		DefeatedAt:                      int64FromString(values["defeated_at"]),
 	}
 }
 
@@ -4034,19 +4071,19 @@ func (s *Store) resourceKey(nickname string) string {
 }
 
 type playerResources struct {
-	Gold         int64
-	Stones       int64
+	Gold              int64
+	Stones            int64
 	InscriptionStones int64
-	TalentPoints int64
-	BossKills    int64
+	TalentPoints      int64
+	BossKills         int64
 }
 
 type PlayerResources struct {
-	Gold         int64
-	Stones       int64
+	Gold              int64
+	Stones            int64
 	InscriptionStones int64
-	TalentPoints int64
-	Stamina      StaminaState
+	TalentPoints      int64
+	Stamina           StaminaState
 }
 
 type BossKillBackfillStats struct {
@@ -4062,11 +4099,11 @@ func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (play
 	}
 
 	return playerResources{
-		Gold:         int64Value(values, 0),
-		Stones:       int64Value(values, 1),
+		Gold:              int64Value(values, 0),
+		Stones:            int64Value(values, 1),
 		InscriptionStones: int64Value(values, 2),
-		TalentPoints: int64Value(values, 3),
-		BossKills:    int64Value(values, 4),
+		TalentPoints:      int64Value(values, 3),
+		BossKills:         int64Value(values, 4),
 	}, nil
 }
 
@@ -4444,10 +4481,10 @@ var inscriptionAffixRules = []inscriptionAffixRule{
 
 func generateInscriptionAffix(instance *ItemInstance) ItemAffix {
 	type weightedRule struct {
-		rule    inscriptionAffixRule
-		weight  int
-		min     float64
-		max     float64
+		rule   inscriptionAffixRule
+		weight int
+		min    float64
+		max    float64
 	}
 	weighted := make([]weightedRule, 0, len(inscriptionAffixRules))
 	totalWeight := 0

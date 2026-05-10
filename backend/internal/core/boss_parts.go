@@ -11,12 +11,22 @@ func normalizeBossPartLayout(parts []BossPart) []BossPart {
 	for _, part := range parts {
 		part.DisplayName = strings.TrimSpace(part.DisplayName)
 		part.ImagePath = strings.TrimSpace(part.ImagePath)
+		part.DamageAffinity = normalizeBossPartDamageAffinity(part.DamageAffinity)
 		part.MaxHP = maxInt64(1, part.MaxHP)
 		part.CurrentHP = part.MaxHP
 		part.Alive = true
 		normalized = append(normalized, part)
 	}
 	return normalized
+}
+
+func normalizeBossPartDamageAffinity(affinity PartDamageAffinity) PartDamageAffinity {
+	switch affinity {
+	case PartDamageAffinityMagicOnly:
+		return PartDamageAffinityMagicOnly
+	default:
+		return PartDamageAffinityNormal
+	}
 }
 
 func sumBossPartMaxHP(parts []BossPart) int64 {
