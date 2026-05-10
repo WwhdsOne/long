@@ -29,7 +29,35 @@ type Limiter struct {
 	clients   map[string]*clientState
 }
 
-func maxDuration(values ...time.Duration) time.Duration {
+func normalizeWindowConfig(cfg WindowConfig, defaultLimit int, defaultWindow time.Duration) WindowConfig {
+	limit := cfg.Limit
+	window := cfg.Window
+	if limit <= 0 {
+		limit = defaultLimit
+	}
+	if window <= 0 {
+		window = defaultWindow
+	}
+	return WindowConfig{
+		Limit:  limit,
+		Window: window,
+	}
+}
+
+func normalizeRules(rules []WindowConfig) []WindowConfig {
+	if len(rules) == 0 {
+		return []WindowConfig{
+			normalizeWindowConfig(WindowConfig{}, 42, 2*time.Second),
+		}
+	}
+	normalized := make([]WindowConfig, 0, len(rules))
+	for _, rule := range rules {
+		normalized = append(normalized, normalizeWindowConfig(rule, 42, 2*time.Second))
+	}
+	return normalized
+}
+
+func maxDuration(values []time.Duration) time.Duration {
 	var max time.Duration
 	for _, value := range values {
 		if value > max {
@@ -40,19 +68,18 @@ func maxDuration(values ...time.Duration) time.Duration {
 }
 
 func NewLimiter(config Config) *Limiter {
-	var maxWindow time.Duration
-	for _, r := range config.Rules {
-		if r.Window > maxWindow {
-			maxWindow = r.Window
-		}
+	rules := normalizeRules(config.Rules)
+	windows := make([]time.Duration, 0, len(rules))
+	for _, rule := range rules {
+		windows = append(windows, rule.Window)
 	}
 	now := config.Now
 	if now == nil {
 		now = time.Now
 	}
 	return &Limiter{
-		rules:     config.Rules,
-		maxWindow: maxWindow,
+		rules:     rules,
+		maxWindow: maxDuration(windows),
 		now:       now,
 		clients:   make(map[string]*clientState),
 	}
@@ -76,8 +103,8 @@ func exceedsWindowLimit(hits []time.Time, now time.Time, window WindowConfig) bo
 }
 
 func exceedsAnyWindowLimit(hits []time.Time, now time.Time, rules []WindowConfig) bool {
-	for _, r := range rules {
-		if exceedsWindowLimit(hits, now, r) {
+	for _, rule := range rules {
+		if exceedsWindowLimit(hits, now, rule) {
 			return true
 		}
 	}

@@ -125,16 +125,16 @@ func TestLoadTestReadsConfigFromConsul(t *testing.T) {
 		t.Fatalf("expected purchase click cooldown 3s, got %s", cfg.AntiScript.PurchaseClickCooldown)
 	}
 	if len(cfg.AntiScript.ClickRateLimit.Rules) != 3 {
-		t.Fatalf("expected 3 rate limit rules, got %d", len(cfg.AntiScript.ClickRateLimit.Rules))
+		t.Fatalf("expected 3 click rate limit rules, got %+v", cfg.AntiScript.ClickRateLimit.Rules)
 	}
 	if cfg.AntiScript.ClickRateLimit.Rules[0].Limit != 30 || cfg.AntiScript.ClickRateLimit.Rules[0].Window != 2*time.Second {
-		t.Fatalf("expected rule[0] 30/2s, got %+v", cfg.AntiScript.ClickRateLimit.Rules[0])
+		t.Fatalf("expected first rule 30/2s, got %+v", cfg.AntiScript.ClickRateLimit.Rules[0])
 	}
 	if cfg.AntiScript.ClickRateLimit.Rules[1].Limit != 1000 || cfg.AntiScript.ClickRateLimit.Rules[1].Window != 10*time.Minute {
-		t.Fatalf("expected rule[1] 1000/10m, got %+v", cfg.AntiScript.ClickRateLimit.Rules[1])
+		t.Fatalf("expected second rule 1000/10m, got %+v", cfg.AntiScript.ClickRateLimit.Rules[1])
 	}
 	if cfg.AntiScript.ClickRateLimit.Rules[2].Limit != 2500 || cfg.AntiScript.ClickRateLimit.Rules[2].Window != time.Hour {
-		t.Fatalf("expected rule[2] 2500/1h, got %+v", cfg.AntiScript.ClickRateLimit.Rules[2])
+		t.Fatalf("expected third rule 2500/1h, got %+v", cfg.AntiScript.ClickRateLimit.Rules[2])
 	}
 	if len(cfg.AntiScript.ClickRateLimit.NicknameWhitelist) != 1 || cfg.AntiScript.ClickRateLimit.NicknameWhitelist[0] != "压测账号" {
 		t.Fatalf("expected click risk nickname whitelist to contain 压测账号, got %v", cfg.AntiScript.ClickRateLimit.NicknameWhitelist)

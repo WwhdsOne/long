@@ -176,10 +176,10 @@ type fileConfig struct {
 		} `yaml:"points"`
 		ClickRateLimit struct {
 			NicknameWhitelist []string `yaml:"nickname_whitelist"`
-				Rules             []struct {
-					Limit    int `yaml:"limit"`
-					WindowMS int `yaml:"window_ms"`
-				} `yaml:"rules"`
+			Rules             []struct {
+				Limit    int `yaml:"limit"`
+				WindowMS int `yaml:"window_ms"`
+			} `yaml:"rules"`
 		} `yaml:"click_rate_limit"`
 	} `yaml:"anti_script"`
 	Admin struct {
@@ -311,7 +311,7 @@ func loadFromConsul() (Config, consulSource, error) {
 			},
 			ClickRateLimit: AntiScriptClickRateLimitConfig{
 				NicknameWhitelist: normalizeStringList(parsed.AntiScript.ClickRateLimit.NicknameWhitelist),
-				Rules:             convertRateLimitRules(parsed.AntiScript.ClickRateLimit.Rules),
+				Rules:             normalizeRateLimitRules(parsed.AntiScript.ClickRateLimit.Rules),
 			},
 		},
 		Admin: AdminConfig{
@@ -391,6 +391,17 @@ func loadFromConsul() (Config, consulSource, error) {
 }
 
 func validate(config Config) error {
+	if len(config.AntiScript.ClickRateLimit.Rules) == 0 {
+		return errors.New("anti_script.click_rate_limit.rules must contain at least one rule")
+	}
+	for index, rule := range config.AntiScript.ClickRateLimit.Rules {
+		if rule.Limit <= 0 {
+			return fmt.Errorf("anti_script.click_rate_limit.rules[%d].limit must be greater than 0", index)
+		}
+		if rule.Window <= 0 {
+			return fmt.Errorf("anti_script.click_rate_limit.rules[%d].window_ms must be greater than 0", index)
+		}
+	}
 	switch {
 	case config.Port <= 0:
 		return errors.New("port must be greater than 0")
@@ -418,10 +429,6 @@ func validate(config Config) error {
 		return errors.New("anti_script.points.stamina_turnstile_invalid must be greater than 0")
 	case config.AntiScript.Points.PostStaminaPurchaseClick <= 0:
 		return errors.New("anti_script.points.post_stamina_purchase_click must be greater than 0")
-	case len(config.AntiScript.ClickRateLimit.Rules) == 0:
-		return errors.New("anti_script.click_rate_limit.rules must not be empty")
-	case !validateClickRateLimitRules(config.AntiScript.ClickRateLimit.Rules):
-		return errors.New("anti_script.click_rate_limit.rules[].limit must be greater than 0 and window_ms must be greater than 0")
 	case strings.TrimSpace(config.Admin.Username) == "":
 		return errors.New("admin.username is required")
 	case strings.TrimSpace(config.Admin.Password) == "":
@@ -505,33 +512,6 @@ func normalizeStringList(items []string) []string {
 	}
 	return normalized
 }
-
-func convertRateLimitRules(rules []struct {
-	Limit    int `yaml:"limit"`
-	WindowMS int `yaml:"window_ms"`
-}) []RateLimitWindowConfig {
-	if len(rules) == 0 {
-		return nil
-	}
-	result := make([]RateLimitWindowConfig, 0, len(rules))
-	for _, r := range rules {
-		result = append(result, RateLimitWindowConfig{
-			Limit:  r.Limit,
-			Window: time.Duration(r.WindowMS) * time.Millisecond,
-		})
-	}
-	return result
-}
-
-func validateClickRateLimitRules(rules []RateLimitWindowConfig) bool {
-	for _, r := range rules {
-		if r.Limit <= 0 || r.Window <= 0 {
-			return false
-		}
-	}
-	return true
-}
-
 
 func normalizeLLMBaseURL(baseURL string) string {
 	trimmed := strings.TrimSpace(baseURL)
@@ -649,4 +629,18 @@ func watchConsulConfig(consulAddr, configKey, lastIndex string) {
 		xlog.L().Info("consul config changed, exiting for restart")
 		exitProcess(0)
 	}
+}
+
+func normalizeRateLimitRules(rules []struct {
+	Limit    int `yaml:"limit"`
+	WindowMS int `yaml:"window_ms"`
+}) []RateLimitWindowConfig {
+	normalized := make([]RateLimitWindowConfig, 0, len(rules))
+	for _, rule := range rules {
+		normalized = append(normalized, RateLimitWindowConfig{
+			Limit:  rule.Limit,
+			Window: time.Duration(rule.WindowMS) * time.Millisecond,
+		})
+	}
+	return normalized
 }

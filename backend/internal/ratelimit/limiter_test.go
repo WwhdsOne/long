@@ -8,7 +8,9 @@ import (
 func TestLimiterDetectsBurstOverflow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Rules: []WindowConfig{{Limit: 3, Window: 2 * time.Second}},
+		Rules: []WindowConfig{
+			{Limit: 3, Window: 2 * time.Second},
+		},
 		Now: func() time.Time {
 			return now
 		},
@@ -43,7 +45,9 @@ func TestLimiterDetectsBurstOverflow(t *testing.T) {
 
 func TestLimiterKeepsDifferentKeysIndependent(t *testing.T) {
 	limiter := NewLimiter(Config{
-		Rules: []WindowConfig{{Limit: 1, Window: time.Second}},
+		Rules: []WindowConfig{
+			{Limit: 1, Window: time.Second},
+		},
 	})
 
 	if hit, err := limiter.Detect("198.51.100.10"); err != nil || hit {
@@ -57,43 +61,38 @@ func TestLimiterKeepsDifferentKeysIndependent(t *testing.T) {
 	}
 }
 
-func TestLimiterUsesMultipleRules(t *testing.T) {
-	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+func TestLimiterUsesWindowDefaults(t *testing.T) {
 	limiter := NewLimiter(Config{
 		Rules: []WindowConfig{
-			{Limit: 3, Window: time.Second},
-			{Limit: 5, Window: 10 * time.Second},
-		},
-		Now: func() time.Time {
-			return now
+			{Window: 2 * time.Second},
 		},
 	})
 
-	// Stay below both limits (limit=3 for short)
-	for i := range 3 {
-		hit, err := limiter.Detect("multi")
+	for i := range 42 {
+		hit, err := limiter.Detect("203.0.113.20")
 		if err != nil {
-			t.Fatalf("multi detect %d: %v", i+1, err)
+			t.Fatalf("detect %d: %v", i+1, err)
 		}
 		if hit {
-			t.Fatalf("expected multi detect %d below both thresholds", i+1)
+			t.Fatalf("expected request %d to stay below default threshold", i+1)
 		}
 	}
 
-	// Exceed short limit on 4th call
-	hit, err := limiter.Detect("multi")
+	hit, err := limiter.Detect("203.0.113.20")
 	if err != nil {
-		t.Fatalf("multi overflow detect: %v", err)
+		t.Fatalf("detect 43: %v", err)
 	}
 	if !hit {
-		t.Fatal("expected short window overflow")
+		t.Fatal("expected request 43 to overflow default threshold")
 	}
 }
 
 func TestLimiterSuppressesRepeatedOverflowSignalsUntilWindowResets(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
-		Rules: []WindowConfig{{Limit: 2, Window: 2 * time.Second}},
+		Rules: []WindowConfig{
+			{Limit: 2, Window: 2 * time.Second},
+		},
 		Now: func() time.Time {
 			return now
 		},
@@ -135,7 +134,7 @@ func TestLimiterSuppressesRepeatedOverflowSignalsUntilWindowResets(t *testing.T)
 	}
 }
 
-func TestLimiterDetectsMultiTierWindow(t *testing.T) {
+func TestLimiterDetectsSecondRuleWindow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
 		Rules: []WindowConfig{
@@ -147,31 +146,31 @@ func TestLimiterDetectsMultiTierWindow(t *testing.T) {
 		},
 	})
 
-	// Stay below short limit but trigger medium
 	for i := range 5 {
-		hit, err := limiter.Detect("tier")
+		hit, err := limiter.Detect("medium")
 		if err != nil {
-			t.Fatalf("tier detect %d: %v", i+1, err)
+			t.Fatalf("medium detect %d: %v", i+1, err)
 		}
 		if hit {
-			t.Fatalf("expected tier detect %d below thresholds", i+1)
+			t.Fatalf("expected second-rule detect %d below threshold", i+1)
 		}
 		now = now.Add(2 * time.Second)
 	}
-	hit, err := limiter.Detect("tier")
+	hit, err := limiter.Detect("medium")
 	if err != nil {
-		t.Fatalf("tier overflow detect: %v", err)
+		t.Fatalf("second-rule overflow detect: %v", err)
 	}
 	if !hit {
-		t.Fatal("expected multi-tier window overflow")
+		t.Fatal("expected second rule window overflow")
 	}
 }
 
-func TestLimiterDetectsLongWindowInMultiTier(t *testing.T) {
+func TestLimiterDetectsThirdRuleWindow(t *testing.T) {
 	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
 	limiter := NewLimiter(Config{
 		Rules: []WindowConfig{
 			{Limit: 10, Window: time.Second},
+			{Limit: 20, Window: 10 * time.Second},
 			{Limit: 3, Window: time.Hour},
 		},
 		Now: func() time.Time {
@@ -179,8 +178,11 @@ func TestLimiterDetectsLongWindowInMultiTier(t *testing.T) {
 		},
 	})
 
+	now = time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	var hit bool
+	var err error
 	for i := range 3 {
-		hit, err := limiter.Detect("long")
+		hit, err = limiter.Detect("long")
 		if err != nil {
 			t.Fatalf("long detect %d: %v", i+1, err)
 		}
@@ -189,7 +191,7 @@ func TestLimiterDetectsLongWindowInMultiTier(t *testing.T) {
 		}
 		now = now.Add(20 * time.Minute)
 	}
-	hit, err := limiter.Detect("long")
+	hit, err = limiter.Detect("long")
 	if err != nil {
 		t.Fatalf("long overflow detect: %v", err)
 	}
