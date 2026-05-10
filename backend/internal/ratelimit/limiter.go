@@ -111,7 +111,20 @@ func exceedsAnyWindowLimit(hits []time.Time, now time.Time, rules []WindowConfig
 	return false
 }
 
-func (l *Limiter) Detect(clientID string) (bool, error) {
+func countNewlyExceededWindows(prevHits []time.Time, currentHits []time.Time, now time.Time, rules []WindowConfig) int {
+	count := 0
+	for _, rule := range rules {
+		if exceedsWindowLimit(prevHits, now, rule) {
+			continue
+		}
+		if exceedsWindowLimit(currentHits, now, rule) {
+			count++
+		}
+	}
+	return count
+}
+
+func (l *Limiter) DetectCount(clientID string) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -130,8 +143,16 @@ func (l *Limiter) Detect(clientID string) (bool, error) {
 		}
 	}
 	state.hits = filtered
-	prevOverflow := exceedsAnyWindowLimit(state.hits, now, l.rules)
+	prevHits := append([]time.Time(nil), state.hits...)
 	state.hits = append(state.hits, now)
 
-	return !prevOverflow && exceedsAnyWindowLimit(state.hits, now, l.rules), nil
+	return countNewlyExceededWindows(prevHits, state.hits, now, l.rules), nil
+}
+
+func (l *Limiter) Detect(clientID string) (bool, error) {
+	hitCount, err := l.DetectCount(clientID)
+	if err != nil {
+		return false, err
+	}
+	return hitCount > 0, nil
 }

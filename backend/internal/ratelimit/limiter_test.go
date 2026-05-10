@@ -199,3 +199,82 @@ func TestLimiterDetectsThirdRuleWindow(t *testing.T) {
 		t.Fatal("expected long window overflow")
 	}
 }
+
+func TestLimiterDetectCountReportsEveryNewlyTriggeredWindow(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Rules: []WindowConfig{
+			{Limit: 2, Window: time.Second},
+			{Limit: 2, Window: 2 * time.Second},
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	for i := range 2 {
+		hitCount, err := limiter.DetectCount("multi")
+		if err != nil {
+			t.Fatalf("detect warmup %d: %v", i+1, err)
+		}
+		if hitCount != 0 {
+			t.Fatalf("expected warmup request %d not to trigger, got %d", i+1, hitCount)
+		}
+	}
+
+	hitCount, err := limiter.DetectCount("multi")
+	if err != nil {
+		t.Fatalf("detect first overflow: %v", err)
+	}
+	if hitCount != 2 {
+		t.Fatalf("expected two windows to trigger together, got %d", hitCount)
+	}
+
+	hitCount, err = limiter.DetectCount("multi")
+	if err != nil {
+		t.Fatalf("detect repeated overflow: %v", err)
+	}
+	if hitCount != 0 {
+		t.Fatalf("expected repeated overflow to stay suppressed, got %d", hitCount)
+	}
+}
+
+func TestLimiterDetectCountCanReportLaterWindowAfterEarlierWindowAlreadyOverflowed(t *testing.T) {
+	now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+	limiter := NewLimiter(Config{
+		Rules: []WindowConfig{
+			{Limit: 2, Window: time.Second},
+			{Limit: 3, Window: 10 * time.Second},
+		},
+		Now: func() time.Time {
+			return now
+		},
+	})
+
+	for i := range 2 {
+		hitCount, err := limiter.DetectCount("staggered")
+		if err != nil {
+			t.Fatalf("detect warmup %d: %v", i+1, err)
+		}
+		if hitCount != 0 {
+			t.Fatalf("expected warmup request %d not to trigger, got %d", i+1, hitCount)
+		}
+	}
+
+	hitCount, err := limiter.DetectCount("staggered")
+	if err != nil {
+		t.Fatalf("detect short-window overflow: %v", err)
+	}
+	if hitCount != 1 {
+		t.Fatalf("expected only short window to trigger first, got %d", hitCount)
+	}
+
+	now = now.Add(2 * time.Second)
+	hitCount, err = limiter.DetectCount("staggered")
+	if err != nil {
+		t.Fatalf("detect long-window overflow: %v", err)
+	}
+	if hitCount != 1 {
+		t.Fatalf("expected later long window to trigger independently, got %d", hitCount)
+	}
+}

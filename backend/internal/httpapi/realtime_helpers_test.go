@@ -69,6 +69,37 @@ func TestExecuteButtonClickStillEnforcesRateLimitForNonWhitelistedNickname(t *te
 	}
 }
 
+func TestExecuteButtonClickAccumulatesRiskForEveryTriggeredRateLimitWindow(t *testing.T) {
+	store := &mockStore{}
+	detector := &mockClickRiskDetector{hitCount: 2}
+	accountRisk := &mockAccountRiskManager{}
+
+	nickname, _, apiErr := executeButtonClick(context.Background(), Options{
+		Store:             store,
+		ClickRiskDetector: detector,
+		AccountRisk:       accountRisk,
+	}, clickRequestContext{
+		Slug:                  "feel",
+		AuthenticatedNickname: "普通账号",
+		AuthenticatorEnabled:  true,
+		ClientID:              "127.0.0.1",
+	})
+	if apiErr != nil {
+		t.Fatalf("expected click to continue after risk detect, got %+v", apiErr)
+	}
+	if nickname != "普通账号" {
+		t.Fatalf("expected nickname 普通账号, got %q", nickname)
+	}
+	if len(accountRisk.recorded) != 2 {
+		t.Fatalf("expected two risk records for two triggered windows, got %+v", accountRisk.recorded)
+	}
+	for _, entry := range accountRisk.recorded {
+		if entry.event != core.AccountRiskEventClickRateLimitHit {
+			t.Fatalf("expected click rate limit event, got %+v", entry)
+		}
+	}
+}
+
 func TestExecuteButtonClickReturnsReadableRiskBanError(t *testing.T) {
 	store := &mockStore{clickErr: core.ErrAccountRiskBanned}
 

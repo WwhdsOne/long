@@ -8,14 +8,29 @@ import (
 )
 
 type mockClickRiskDetector struct {
-	hit   bool
-	err   error
-	calls []string
+	hit      bool
+	hitCount int
+	err      error
+	calls    []string
 }
 
 func (m *mockClickRiskDetector) Detect(key string) (bool, error) {
 	m.calls = append(m.calls, key)
 	return m.hit, m.err
+}
+
+func (m *mockClickRiskDetector) DetectCount(key string) (int, error) {
+	m.calls = append(m.calls, key)
+	if m.err != nil {
+		return 0, m.err
+	}
+	if m.hitCount > 0 {
+		return m.hitCount, nil
+	}
+	if m.hit {
+		return 1, nil
+	}
+	return 0, nil
 }
 
 type mockAccountRiskManager struct {

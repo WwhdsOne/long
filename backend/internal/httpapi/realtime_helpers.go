@@ -74,24 +74,40 @@ func enforceClickRateLimitForClient(ctx context.Context, detector ClickRiskDetec
 		return false, nil
 	}
 
+	type clickRiskCountDetector interface {
+		DetectCount(string) (int, error)
+	}
+
 	nicknameHit := false
 	keys := []string{
 		"ip:" + strings.TrimSpace(clientID),
 		"nickname:" + strings.TrimSpace(nickname),
 	}
 	for _, key := range keys {
-		hit, err := detector.Detect(key)
-		if err == nil && !hit {
+		hitCount := 0
+		var err error
+		if countDetector, ok := detector.(clickRiskCountDetector); ok {
+			hitCount, err = countDetector.DetectCount(key)
+		} else {
+			var hit bool
+			hit, err = detector.Detect(key)
+			if hit {
+				hitCount = 1
+			}
+		}
+		if err == nil && hitCount <= 0 {
 			continue
 		}
-		if err == nil && hit {
+		if err == nil && hitCount > 0 {
 			if strings.HasPrefix(key, "nickname:") {
 				nicknameHit = true
-				if _, recordErr := accountRisk.RecordAccountRiskEvent(ctx, nickname, core.AccountRiskEventClickRateLimitHit); recordErr != nil {
-					return false, &apiResponseError{
-						Status:  consts.StatusInternalServerError,
-						Code:    "ACCOUNT_RISK_FAILED",
-						Message: "风险积分记录失败，请稍后重试。",
+				for range hitCount {
+					if _, recordErr := accountRisk.RecordAccountRiskEvent(ctx, nickname, core.AccountRiskEventClickRateLimitHit); recordErr != nil {
+						return false, &apiResponseError{
+							Status:  consts.StatusInternalServerError,
+							Code:    "ACCOUNT_RISK_FAILED",
+							Message: "风险积分记录失败，请稍后重试。",
+						}
 					}
 				}
 			}
