@@ -74,8 +74,8 @@ func TestResolveServerTLSConfigBuildsConfig(t *testing.T) {
 	if tlsConfig.MinVersion != tls.VersionTLS12 {
 		t.Fatalf("expected min tls 1.2, got %v", tlsConfig.MinVersion)
 	}
-	if len(tlsConfig.NextProtos) < 2 || tlsConfig.NextProtos[0] != "h2" || tlsConfig.NextProtos[1] != "http/1.1" {
-		t.Fatalf("expected alpn h2/http1.1, got %+v", tlsConfig.NextProtos)
+	if len(tlsConfig.NextProtos) != 1 || tlsConfig.NextProtos[0] != "http/1.1" {
+		t.Fatalf("expected alpn http/1.1 only, got %+v", tlsConfig.NextProtos)
 	}
 	if tlsConfig.GetCertificate == nil {
 		t.Fatal("expected dynamic certificate loader")

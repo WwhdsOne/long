@@ -499,7 +499,9 @@ func resolveServerTLSConfig() (*tls.Config, error) {
 
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,
-		NextProtos: []string{"h2", "http/1.1"},
+		// 当前 Hertz TLS 入口未实际提供 HTTP/2，显式限制为 HTTP/1.1，
+		// 避免浏览器协商到 h2 后触发 ERR_HTTP2_PROTOCOL_ERROR。
+		NextProtos: []string{"http/1.1"},
 		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 			certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
 			if err != nil {
