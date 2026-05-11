@@ -1,8 +1,12 @@
 package main
 
 import (
+	"crypto/tls"
+	"errors"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/hertz/pkg/common/ut"
 
@@ -11,7 +15,7 @@ import (
 )
 
 func TestHertzServerRegistersPprofAndAPI(t *testing.T) {
-	server := httpapi.NewHertzServer(":2333", httpapi.Options{})
+	server := httpapi.NewHertzServer(":2333", httpapi.Options{}, nil)
 
 	pprofResponse := ut.PerformRequest(server.Engine, "GET", "/debug/pprof/", nil).Result()
 	if pprofResponse.StatusCode() != 200 {
@@ -37,6 +41,73 @@ func TestServerAddressUsesOverrideEnv(t *testing.T) {
 	}
 }
 
+func TestResolveServerTLSConfigDisabledByDefault(t *testing.T) {
+	tlsConfig, err := resolveServerTLSConfig()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if tlsConfig != nil {
+		t.Fatalf("expected nil tls config, got %+v", tlsConfig)
+	}
+}
+
+func TestResolveServerTLSConfigRequiresCertAndKeyTogether(t *testing.T) {
+	t.Setenv("LONG_TLS_CERT_FILE", "/tmp/server.crt")
+
+	_, err := resolveServerTLSConfig()
+	if !errors.Is(err, errIncompleteTLSFiles) {
+		t.Fatalf("expected errIncompleteTLSFiles, got %v", err)
+	}
+}
+
+func TestResolveServerTLSConfigBuildsConfig(t *testing.T) {
+	t.Setenv("LONG_TLS_CERT_FILE", "/tmp/server.crt")
+	t.Setenv("LONG_TLS_KEY_FILE", "/tmp/server.key")
+
+	tlsConfig, err := resolveServerTLSConfig()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if tlsConfig == nil {
+		t.Fatal("expected tls config")
+	}
+	if tlsConfig.MinVersion != tls.VersionTLS12 {
+		t.Fatalf("expected min tls 1.2, got %v", tlsConfig.MinVersion)
+	}
+	if len(tlsConfig.NextProtos) < 2 || tlsConfig.NextProtos[0] != "h2" || tlsConfig.NextProtos[1] != "http/1.1" {
+		t.Fatalf("expected alpn h2/http1.1, got %+v", tlsConfig.NextProtos)
+	}
+	if tlsConfig.GetCertificate == nil {
+		t.Fatal("expected dynamic certificate loader")
+	}
+}
+
+func TestConfigureLocalTimezoneSetsAsiaShanghai(t *testing.T) {
+	originalLocal := time.Local
+	originalTZ, hadTZ := os.LookupEnv("TZ")
+	defer func() {
+		time.Local = originalLocal
+		if hadTZ {
+			_ = os.Setenv("TZ", originalTZ)
+			return
+		}
+		_ = os.Unsetenv("TZ")
+	}()
+
+	if err := configureLocalTimezone(); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if time.Local == nil {
+		t.Fatal("expected time.Local to be set")
+	}
+	if time.Local.String() != "Asia/Shanghai" {
+		t.Fatalf("expected Asia/Shanghai, got %q", time.Local.String())
+	}
+	if got := os.Getenv("TZ"); got != "Asia/Shanghai" {
+		t.Fatalf("expected TZ=Asia/Shanghai, got %q", got)
+	}
+}
+
 func TestRenderStartupInfoIncludesBannerAndSummary(t *testing.T) {
 	cfg := config.Config{
 		Port:        2333,
@@ -46,10 +117,11 @@ func TestRenderStartupInfoIncludesBannerAndSummary(t *testing.T) {
 		RedisPrefix: "hai-world:",
 	}
 
-	info := renderStartupInfo(cfg, "127.0.0.1:2333")
+	info := renderStartupInfo(cfg, "127.0.0.1:2333", true)
 	assertContains(t, godAnimalArt(), "神兽保佑")
 	assertContains(t, godAnimalArt(), "代码无BUG")
 	assertContains(t, info, "监听地址: 127.0.0.1:2333")
+	assertContains(t, info, "HTTPS: true")
 	assertContains(t, info, "Redis: 127.0.0.1:6379/2")
 	assertContains(t, info, "Redis TLS: true")
 	assertContains(t, info, "Mongo: true (vote_wall)")

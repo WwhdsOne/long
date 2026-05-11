@@ -14,9 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: long
-      BASE_IMAGE: go-app-runtime:latest
       CONTAINER_NAME: long
-      NETWORK_NAME: docker-compose_app-net
       DEPLOY_PATH: /home/docker-images/long
       CONSUL_ADDR: ${{ secrets.CONSUL_ADDR }}
       CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
@@ -69,10 +67,18 @@ jobs:
                 dockerfile: Dockerfile
               container_name: ${CONTAINER_NAME}
               restart: unless-stopped
+              ports:
+                - "443:16002"
               environment:
                 CONSUL_ADDR: ${CONSUL_ADDR}
                 CONSUL_CONFIG_KEY: ${CONSUL_CONFIG_KEY}
-              network_mode: ${NETWORK_NAME}
+                LONG_LISTEN_HOST: 0.0.0.0
+                LONG_LISTEN_PORT: 16002
+                LONG_TLS_CERT_FILE: /certs/fullchain.pem
+                LONG_TLS_KEY_FILE: /certs/privkey.pem
+              volumes:
+                - /etc/letsencrypt/live/x1sv.wclick.top/fullchain.pem:/certs/fullchain.pem:ro
+                - /etc/letsencrypt/live/x1sv.wclick.top/privkey.pem:/certs/privkey.pem:ro
           EOF
 
           tar -C release -czf release.tar.gz .

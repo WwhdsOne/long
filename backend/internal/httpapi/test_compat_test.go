@@ -19,7 +19,7 @@ type testHandler struct {
 }
 
 func newTestEngine(options Options) *route.Engine {
-	return NewHertzServer(":0", options).Engine
+	return NewHertzServer(":0", options, nil).Engine
 }
 
 func (h *testHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

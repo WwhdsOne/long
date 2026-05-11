@@ -11,7 +11,7 @@ import (
 )
 
 func newNativeTestHandler(options Options) *nativeTestHandler {
-	return &nativeTestHandler{engine: NewHertzServer(":0", options).Engine}
+	return &nativeTestHandler{engine: NewHertzServer(":0", options, nil).Engine}
 }
 
 type nativeTestHandler struct {

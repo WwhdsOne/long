@@ -6,16 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
-
-	_ "golang.org/x/crypto/x509roots/fallback" // Mozilla 根证书（嵌入 Go 二进制）
-	_ "time/tzdata"                            // 时区数据库（嵌入 Go 二进制）
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/redis/go-redis/v9"
@@ -38,16 +34,9 @@ import (
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
-		port := os.Getenv("LONG_LISTEN_PORT")
-		if port == "" {
-			port = "16002"
-		}
-		resp, err := http.Get("http://localhost:" + port + "/api/health")
-		if err != nil || resp.StatusCode != 200 {
-			os.Exit(1)
-		}
-		os.Exit(0)
+	if err := configureLocalTimezone(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -62,7 +51,11 @@ func run() error {
 		return err
 	}
 	listenAddr := serverAddress(cfg.Port)
-	printStartupInfo(cfg, listenAddr)
+	serverTLSConfig, err := resolveServerTLSConfig()
+	if err != nil {
+		return err
+	}
+	printStartupInfo(cfg, listenAddr, serverTLSConfig != nil)
 	if !cfg.Mongo.Enabled {
 		return errors.New("mongo.enabled 必须为 true，冷数据已固定切换到 MongoDB")
 	}
@@ -365,7 +358,7 @@ func run() error {
 		DomainEventWriter:      domainEventWriter,
 		AccessLogQueue:         accessLogQueue,
 		AdminBossHistoryReader: bossHistoryStore,
-	})
+	}, serverTLSConfig)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -446,23 +439,25 @@ func run() error {
 	return nil
 }
 
-func printStartupInfo(cfg config.Config, listenAddr string) {
+func printStartupInfo(cfg config.Config, listenAddr string, httpsEnabled bool) {
 	displayGodAnimal()
-	fmt.Println(renderStartupInfo(cfg, listenAddr))
+	fmt.Println(renderStartupInfo(cfg, listenAddr, httpsEnabled))
 }
 
-func renderStartupInfo(cfg config.Config, listenAddr string) string {
+func renderStartupInfo(cfg config.Config, listenAddr string, httpsEnabled bool) string {
 	return fmt.Sprintf(
 		"启动信息\n"+
 			"  监听地址: %s\n"+
+			"  HTTPS: %t\n"+
 			"  Redis: %s:%d/%d\n"+
 			"  Redis TLS: %t\n"+
 			"  Redis 前缀: %s\n"+
 			"  Mongo: %t (%s)\n"+
 			"  日志: level=%s format=%s\n"+
 			"  OSS: %t\n"+
-			"  LLM: %t",
+		"  LLM: %t",
 		listenAddr,
+		httpsEnabled,
 		cfg.Redis.Host,
 		cfg.Redis.Port,
 		cfg.Redis.DB,
@@ -475,6 +470,44 @@ func renderStartupInfo(cfg config.Config, listenAddr string) string {
 		cfg.OSS.Enabled(),
 		cfg.LLM.Enabled,
 	)
+}
+
+var errIncompleteTLSFiles = errors.New("LONG_TLS_CERT_FILE 和 LONG_TLS_KEY_FILE 必须同时提供")
+
+func configureLocalTimezone() error {
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		return fmt.Errorf("load asia/shanghai timezone: %w", err)
+	}
+	time.Local = location
+	if err := os.Setenv("TZ", "Asia/Shanghai"); err != nil {
+		return fmt.Errorf("set TZ env: %w", err)
+	}
+	return nil
+}
+
+func resolveServerTLSConfig() (*tls.Config, error) {
+	certFile := strings.TrimSpace(os.Getenv("LONG_TLS_CERT_FILE"))
+	keyFile := strings.TrimSpace(os.Getenv("LONG_TLS_KEY_FILE"))
+
+	if certFile == "" && keyFile == "" {
+		return nil, nil
+	}
+	if certFile == "" || keyFile == "" {
+		return nil, errIncompleteTLSFiles
+	}
+
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		NextProtos: []string{"h2", "http/1.1"},
+		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+			certificate, err := tls.LoadX509KeyPair(certFile, keyFile)
+			if err != nil {
+				return nil, fmt.Errorf("load tls certificate: %w", err)
+			}
+			return &certificate, nil
+		},
+	}, nil
 }
 
 func displayGodAnimal() {

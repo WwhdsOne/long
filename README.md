@@ -288,7 +288,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 
 ### 服务器部署约束
 
-- 基础镜像要求服务器本地已存在 `go-app-runtime:latest`。
+- 发布镜像当前基于 `gcr.io/distroless/static:latest`。
 - workflow 当前在服务器端执行：
 
 ```bash
