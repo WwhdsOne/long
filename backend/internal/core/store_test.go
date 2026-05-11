@@ -3502,7 +3502,7 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 	}
 }
 
-func TestBuildInventoryItemEnhanceCritRateUsesFlatStepButArmorPenStaysFixed(t *testing.T) {
+func TestBuildInventoryItemEnhanceKeepsCritRateAndArmorPenFixed(t *testing.T) {
 	item := buildInventoryItem(EquipmentDefinition{
 		ItemID:          "flat-scale-ring",
 		Name:            "平刻戒指",
@@ -3512,8 +3512,8 @@ func TestBuildInventoryItemEnhanceCritRateUsesFlatStepButArmorPenStaysFixed(t *t
 		ArmorPenPercent: 0.10,
 	}, ItemInstance{InstanceID: "inst-1", EnhanceLevel: 20}, 1, false)
 
-	if diff := math.Abs(item.CritRate - 0.05); diff > 1e-9 {
-		t.Fatalf("expected crit rate 0.05 after +20 enhance, got %.12f", item.CritRate)
+	if diff := math.Abs(item.CritRate - 0.03); diff > 1e-9 {
+		t.Fatalf("expected crit rate stay 0.03 after +20 enhance, got %.12f", item.CritRate)
 	}
 	if diff := math.Abs(item.ArmorPenPercent - 0.10); diff > 1e-9 {
 		t.Fatalf("expected armor pen stay 0.10 after +20 enhance, got %.12f", item.ArmorPenPercent)

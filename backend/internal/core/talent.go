@@ -208,8 +208,8 @@ var talentDefs = map[string]TalentDef{
 	"normal_ultimate":  {ID: "normal_ultimate", Tree: TalentTreeNormal, Tier: 4, MaxLevel: 5, Name: "白银风暴", EffectType: "silver_storm", EffectValue: map[string]any{"triggerHits": 15, "damageRatio": 2.50}},
 
 	// ===== 破甲：碎盾攻坚 =====
-	"armor_core":         {ID: "armor_core", Tree: TalentTreeArmor, Tier: 0, MaxLevel: 5, Name: "灭绝穿甲", EffectType: "permanent_armor_pen", EffectValue: map[string]any{"penPercent": 0.30, "collapseTrigger": 120, "collapseDuration": 6}},
-	"armor_pen_up":       {ID: "armor_pen_up", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "穿甲强化", EffectType: "armor_pen_extra", EffectValue: map[string]any{"extraPen": 0.20}},
+	"armor_core":         {ID: "armor_core", Tree: TalentTreeArmor, Tier: 0, MaxLevel: 5, Name: "灭绝穿甲", EffectType: "permanent_armor_pen", EffectValue: map[string]any{"penPercent": 0.20, "collapseTrigger": 120, "collapseDuration": 6}},
+	"armor_pen_up":       {ID: "armor_pen_up", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "穿甲强化", EffectType: "armor_pen_extra", EffectValue: map[string]any{"extraPen": 0.12}},
 	"armor_boss_hunter":  {ID: "armor_boss_hunter", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "首领猎杀", EffectType: "all_damage_amplify", EffectValue: map[string]any{"percent": 0.30}},
 	"armor_heavy_scale":  {ID: "armor_heavy_scale", Tree: TalentTreeArmor, Tier: 1, MaxLevel: 5, Name: "以强制强", EffectType: "armor_scaling", EffectValue: map[string]any{"damagePer150Armor": 0.03}},
 	"armor_heavy_atk":    {ID: "armor_heavy_atk", Tree: TalentTreeArmor, Tier: 2, MaxLevel: 5, Name: "重甲特攻", EffectType: "part_type_damage", EffectValue: map[string]any{"partType": "heavy", "percent": 0.50}},
@@ -306,7 +306,7 @@ var tierCompletionBonusLabels = map[TalentTree]map[int]string{
 	TalentTreeArmor: {
 		0: "全伤害 +10%",
 		1: "全伤害 +10%",
-		2: "护甲穿透 +15%",
+		2: "护甲穿透 +3%",
 		3: "崩塌易伤 +15%",
 		4: "审判日倍率 +1.0",
 	},
@@ -673,7 +673,7 @@ func normalFillerT3bAtkPercentForLevel(level int) float64 {
 }
 
 func armorCorePenPercentForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.30, 0.46)
+	return lerpTalentValue(level, 0.12, 0.20)
 }
 
 func armorCoreCollapseTriggerForLevel(level int) int {
@@ -681,7 +681,7 @@ func armorCoreCollapseTriggerForLevel(level int) int {
 }
 
 func armorPenUpExtraForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.20, 0.60)
+	return lerpTalentValue(level, 0.04, 0.12)
 }
 
 func armorBossHunterPercentForLevel(level int) float64 {
@@ -713,7 +713,7 @@ func armorRuinAmpForLevel(level int) float64 {
 }
 
 func armorPenConvertRatioForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.30, 0.70)
+	return lerpTalentValue(level, 0.10, 0.30)
 }
 
 func armorUltimateTriggerCountForLevel(level int) int {
@@ -733,7 +733,7 @@ func armorFillerT1aAtkPercentForLevel(level int) float64 {
 	return lerpTalentValue(level, 0.10, 0.30)
 }
 func armorFillerT1bPenForLevel(level int) float64 {
-	return lerpTalentValue(level, 0.05, 0.17)
+	return lerpTalentValue(level, 0.01, 0.05)
 }
 func armorFillerT2aDmgAmpForLevel(level int) float64 {
 	return lerpTalentValue(level, 0.08, 0.24)
@@ -1567,7 +1567,7 @@ func applyTierCompletionBonus(mods *TalentModifiers, treeStr string, tier int) {
 	case treeStr == "armor" && tier == 1:
 		mods.AllDamageAmplify += 0.10
 	case treeStr == "armor" && tier == 2:
-		mods.ArmorPenExtra += 0.15
+		mods.ArmorPenExtra += 0.03
 	case treeStr == "armor" && tier == 3:
 		mods.CollapseVulnerability += 0.15
 	case treeStr == "armor" && tier == 4:
@@ -1621,7 +1621,7 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 	// Boss 增伤
 
 	// 破甲率额外
-	stats.ArmorPenPercent = min(0.80, stats.ArmorPenPercent+mods.ArmorPenExtra)
+	stats.ArmorPenPercent = clampFloat(stats.ArmorPenPercent+mods.ArmorPenExtra, 0, 1.0)
 
 	// 暴击伤害百分比加成
 	if mods.CritDamagePercentBonus > 0 {
@@ -1639,9 +1639,9 @@ func (mods *TalentModifiers) ApplyTalentEffectsToCombatStats(stats *CombatStats,
 		stats.AllDamageAmplify += mods.PerPartDamagePercent * float64(alivePartCount)
 	}
 
-	// 破甲转化：破甲率的50%转为全伤害增幅
-	if hasTalent != nil && hasTalent("armor_pen_convert") {
-		stats.AllDamageAmplify += stats.ArmorPenPercent * 0.60
+	// 破甲转化：按当前转化率把破甲折算为全伤害增幅
+	if mods.PenToAmplifyRatio > 0 && (hasTalent == nil || hasTalent("armor_pen_convert")) {
+		stats.AllDamageAmplify += stats.ArmorPenPercent * mods.PenToAmplifyRatio
 	}
 }
 
