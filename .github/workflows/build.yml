@@ -69,7 +69,7 @@ jobs:
               restart: unless-stopped
               network_mode: docker-compose_app-net
               ports:
-                - "443:16002"
+                - "16002:16002"
               environment:
                 CONSUL_ADDR: ${CONSUL_ADDR}
                 CONSUL_CONFIG_KEY: ${CONSUL_CONFIG_KEY}
