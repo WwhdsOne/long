@@ -64,7 +64,7 @@ describe('ArmoryPage 战斗属性与装备栏', () => {
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '软组织伤害', item.partTypeDamageSoft, preview.partTypeDamageSoft, formatRatioPercentValue)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '重甲伤害', item.partTypeDamageHeavy, preview.partTypeDamageHeavy, formatRatioPercentValue)")
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '弱点伤害', item.partTypeDamageWeak, preview.partTypeDamageWeak, formatRatioPercentValue)")
-        expect(pageSource).toContain('preview.armorPenPercent = previewFlatStepStat(preview.armorPenPercent, currentLevel, targetLevel)')
+        expect(pageSource).not.toContain('preview.armorPenPercent = previewFlatStepStat(preview.armorPenPercent, currentLevel, targetLevel)')
         expect(pageSource).toContain('preview.critRate = previewFlatStepStat(preview.critRate, currentLevel, targetLevel)')
         expect(pageSource).toContain('preview.magicProcRateBonus = previewMagicProcRateBonus(preview.magicProcRateBonus, currentLevel, targetLevel)')
         expect(pageSource).toContain("pushEnhancePreviewRow(rows, '魔法触发率', item.magicProcRateBonus, preview.magicProcRateBonus, formatMagicProcRateValue)")
