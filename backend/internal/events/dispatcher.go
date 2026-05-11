@@ -217,7 +217,7 @@ func shouldBroadcastUserProfile(changeType core.StateChangeType) bool {
 
 func shouldBroadcastPublicMeta(changeType core.StateChangeType) bool {
 	switch changeType {
-	case core.StateChangeBossChanged, core.StateChangeAnnouncementChanged:
+	case core.StateChangeButtonClicked, core.StateChangeBossChanged, core.StateChangeAnnouncementChanged:
 		return true
 	default:
 		return false
