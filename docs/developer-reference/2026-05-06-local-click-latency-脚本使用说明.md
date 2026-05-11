@@ -108,8 +108,12 @@ go -C backend run ./cmd/local_click_latency \
   - 压测账号昵称
 - `-password`
   - 压测账号密码
+- `-session-cookie`
+  - 已登录网页里的 `long_player_session`，传入后脚本跳过登录接口
 - `-slug`
   - 目标 Boss 部位，必须是 `boss-part:x-y`
+- `-turnstile-token`
+  - 登录命中 Cloudflare Turnstile 时使用的人机验证 token
 - `-count`
   - 每条连接发送点击次数
 - `-pause`
@@ -163,8 +167,19 @@ curl -c /tmp/long.cookies -b /tmp/long.cookies \
 go -C backend run ./cmd/local_click_latency \
   -base https://www.wclick.top \
   -connections 1 \
+  -session-cookie '这里替换成 long_player_session' \
+  -slug boss-part:0-0 \
+  -count 500
+```
+
+如果你仍然想走脚本登录，也可以继续传：
+
+```bash
+go -C backend run ./cmd/local_click_latency \
+  -base https://www.wclick.top \
   -nickname Wwhds \
   -password '123456' \
+  -turnstile-token '从网页拿到的 token' \
   -slug boss-part:0-0 \
   -count 500
 ```
@@ -228,6 +243,17 @@ go -C backend run ./cmd/local_click_latency \
   - 目标部位坐标不存在
   - 目标部位已经被打死
   - 压测账号没进对房间
+- `登录失败: 登录前需要先完成人机验证 (CAPTCHA_REQUIRED)...`
+  - 说明当前站点开启了登录验证码
+  - 先在网页登录弹窗里完成一次 Turnstile
+  - 再从浏览器开发者工具的登录请求里复制 `turnstileToken`
+  - 然后把它传给 `-turnstile-token`
+- `登录失败: 验证失败，请重试 (CAPTCHA_INVALID)`
+  - 这通常不是“没带 token”，而是 token 已被网页那次请求消费，或复制后重放无效
+  - 优先改用 `-session-cookie`，直接复用网页登录态
+- `session 已失效: ...`
+  - 说明你复制的 `long_player_session` 已过期或不完整
+  - 回网页重新登录后再复制一遍
 - `建立 WebSocket 失败`
   - 常见是网关、证书、来源校验或站点不可达
 

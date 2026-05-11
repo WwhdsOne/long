@@ -36,6 +36,8 @@ type config struct {
 	baseURL        string
 	nickname       string
 	password       string
+	turnstileToken string
+	sessionCookie  string
 	slug           string
 	count          int
 	connections    int
@@ -50,6 +52,7 @@ type loginResponse struct {
 	Nickname      string `json:"nickname"`
 	Error         string `json:"error"`
 	Message       string `json:"message"`
+	SiteKey       string `json:"siteKey"`
 }
 
 type realtimeTextEnvelope struct {
@@ -94,6 +97,8 @@ func parseFlags() config {
 	flag.StringVar(&cfg.baseURL, "base", "", "站点地址，例如 https://example.com")
 	flag.StringVar(&cfg.nickname, "nickname", "", "压测账号昵称")
 	flag.StringVar(&cfg.password, "password", "", "压测账号密码")
+	flag.StringVar(&cfg.turnstileToken, "turnstile-token", "", "登录命中人机验证时携带的 Cloudflare Turnstile token")
+	flag.StringVar(&cfg.sessionCookie, "session-cookie", "", "已登录网页中的 long_player_session，传入后跳过脚本登录")
 	flag.StringVar(&cfg.slug, "slug", "", "Boss 部位 slug，例如 boss-part:1-0")
 	flag.IntVar(&cfg.count, "count", 200, "每条连接发送点击次数")
 	flag.IntVar(&cfg.connections, "connections", 1, "WebSocket 连接数")
@@ -111,7 +116,7 @@ func run(cfg config) error {
 		return err
 	}
 
-	cookie, nickname, err := login(cfg)
+	cookie, nickname, err := authenticate(cfg)
 	if err != nil {
 		return err
 	}
@@ -173,9 +178,9 @@ func validateConfig(cfg config) error {
 	switch {
 	case strings.TrimSpace(cfg.baseURL) == "":
 		return errors.New("缺少 -base")
-	case strings.TrimSpace(cfg.nickname) == "":
+	case strings.TrimSpace(cfg.sessionCookie) == "" && strings.TrimSpace(cfg.nickname) == "":
 		return errors.New("缺少 -nickname")
-	case strings.TrimSpace(cfg.password) == "":
+	case strings.TrimSpace(cfg.sessionCookie) == "" && strings.TrimSpace(cfg.password) == "":
 		return errors.New("缺少 -password")
 	case strings.TrimSpace(cfg.slug) == "":
 		return errors.New("缺少 -slug")
@@ -191,11 +196,19 @@ func validateConfig(cfg config) error {
 	return nil
 }
 
+func authenticate(cfg config) (*http.Cookie, string, error) {
+	if strings.TrimSpace(cfg.sessionCookie) != "" {
+		return sessionLogin(cfg)
+	}
+	return login(cfg)
+}
+
 func login(cfg config) (*http.Cookie, string, error) {
 	loginURL := strings.TrimRight(cfg.baseURL, "/") + "/api/player/auth/login"
 	body, err := json.Marshal(map[string]string{
-		"nickname": cfg.nickname,
-		"password": cfg.password,
+		"nickname":       cfg.nickname,
+		"password":       cfg.password,
+		"turnstileToken": strings.TrimSpace(cfg.turnstileToken),
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("编码登录请求失败: %w", err)
@@ -219,6 +232,9 @@ func login(cfg config) (*http.Cookie, string, error) {
 	_ = json.Unmarshal(rawBody, &parsed)
 
 	if resp.StatusCode != http.StatusOK {
+		if parsed.Error == "CAPTCHA_REQUIRED" {
+			return nil, "", fmt.Errorf("登录失败: %s (%s)，请先从网页拿到 turnstile token，并通过 -turnstile-token 传给脚本。siteKey=%s", fallbackMessage(parsed.Message, "登录前需要先完成人机验证"), parsed.Error, strings.TrimSpace(parsed.SiteKey))
+		}
 		if parsed.Message != "" {
 			return nil, "", fmt.Errorf("登录失败: %s (%s)", parsed.Message, parsed.Error)
 		}
@@ -231,6 +247,52 @@ func login(cfg config) (*http.Cookie, string, error) {
 		}
 	}
 	return nil, "", errors.New("登录成功但未拿到 long_player_session cookie")
+}
+
+func sessionLogin(cfg config) (*http.Cookie, string, error) {
+	cookieValue := strings.TrimSpace(cfg.sessionCookie)
+	sessionURL := strings.TrimRight(cfg.baseURL, "/") + "/api/player/auth/session"
+	req, err := http.NewRequest(http.MethodGet, sessionURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("创建 session 校验请求失败: %w", err)
+	}
+	req.AddCookie(&http.Cookie{
+		Name:  playerSessionCookieName,
+		Value: cookieValue,
+		Path:  "/",
+	})
+
+	client := &http.Client{Timeout: cfg.timeout}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("session 校验请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	rawBody, _ := io.ReadAll(resp.Body)
+	var parsed loginResponse
+	_ = json.Unmarshal(rawBody, &parsed)
+
+	if resp.StatusCode != http.StatusOK || !parsed.Authenticated {
+		if parsed.Message != "" {
+			return nil, "", fmt.Errorf("session 已失效: %s (%s)", parsed.Message, parsed.Error)
+		}
+		return nil, "", fmt.Errorf("session 已失效: HTTP %d", resp.StatusCode)
+	}
+
+	return &http.Cookie{
+		Name:  playerSessionCookieName,
+		Value: cookieValue,
+		Path:  "/",
+	}, parsed.Nickname, nil
+}
+
+func fallbackMessage(value string, fallback string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed != "" {
+		return trimmed
+	}
+	return fallback
 }
 
 func connectWebSocket(cfg config, cookie *http.Cookie) (*websocket.Conn, error) {

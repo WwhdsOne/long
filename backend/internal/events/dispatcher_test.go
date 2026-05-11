@@ -91,7 +91,15 @@ func TestDispatcherHandleChangeBroadcastsSlimPublicDelta(t *testing.T) {
 	if strings.Contains(payload, `"bossLeaderboard"`) {
 		t.Fatalf("expected slim public delta to move bossLeaderboard out of public_state, got %s", payload)
 	}
-	assertNoEventWithin(t, client, 50*time.Millisecond, "expected click change to skip public_meta broadcast")
+
+	metaEvent := readEventByName(t, client, PublicMetaEventName)
+	metaPayload := string(metaEvent.Payload)
+	if !strings.Contains(metaPayload, `"bossLeaderboard":[{"rank":1,"nickname":"阿明","damage":88}]`) {
+		t.Fatalf("expected click change to carry boss leaderboard in public_meta, got %s", metaPayload)
+	}
+	if strings.Contains(metaPayload, `"leaderboard"`) {
+		t.Fatalf("expected click change public_meta to skip click leaderboard, got %s", metaPayload)
+	}
 	assertNoEventWithin(t, client, 50*time.Millisecond, "expected click change to skip room_state broadcast")
 }
 
@@ -314,6 +322,7 @@ func TestDispatcherThrottlePublicBroadcastWithinWindow(t *testing.T) {
 		t.Fatalf("first click change: %v", err)
 	}
 	_ = readEventByName(t, client, PublicStateEventName)
+	_ = readEventByName(t, client, PublicMetaEventName)
 
 	if err := dispatcher.HandleChange(context.Background(), core.StateChange{Type: core.StateChangeButtonClicked}); err != nil {
 		t.Fatalf("second click change: %v", err)
@@ -322,9 +331,10 @@ func TestDispatcherThrottlePublicBroadcastWithinWindow(t *testing.T) {
 		t.Fatalf("third click change: %v", err)
 	}
 
-	assertNoEventWithin(t, client, 10*time.Millisecond, "expected throttle window to suppress immediate extra public_state")
+	assertNoEventWithin(t, client, 10*time.Millisecond, "expected throttle window to suppress immediate extra public events")
 	_ = readEventByName(t, client, PublicStateEventName)
-	assertNoEventWithin(t, client, 30*time.Millisecond, "expected only one deferred public_state within throttle window")
+	_ = readEventByName(t, client, PublicMetaEventName)
+	assertNoEventWithin(t, client, 30*time.Millisecond, "expected only one deferred public flush within throttle window")
 }
 
 func TestDispatcherBroadcastPublicReusesSameRoomBossSnapshotAndVersionWithinOneFlush(t *testing.T) {

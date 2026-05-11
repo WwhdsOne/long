@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -93,5 +96,96 @@ func TestBuildRunSummaryAggregatesAllConnections(t *testing.T) {
 	}
 	if summary.overall.QPS != 3 {
 		t.Fatalf("expected overall qps 3, got %.2f", summary.overall.QPS)
+	}
+}
+
+func TestLoginCarriesTurnstileTokenWhenProvided(t *testing.T) {
+	var received map[string]string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/player/auth/login" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		http.SetCookie(w, &http.Cookie{Name: playerSessionCookieName, Value: "token"})
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"authenticated":true,"nickname":"阿明"}`))
+	}))
+	defer server.Close()
+
+	cookie, nickname, err := login(config{
+		baseURL:        server.URL,
+		nickname:       "阿明",
+		password:       "hunter2",
+		turnstileToken: "cf-turnstile-token",
+		timeout:        5 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("login returned error: %v", err)
+	}
+	if cookie == nil || cookie.Value != "token" {
+		t.Fatalf("expected session cookie token, got %+v", cookie)
+	}
+	if nickname != "阿明" {
+		t.Fatalf("expected nickname 阿明, got %s", nickname)
+	}
+	if received["turnstileToken"] != "cf-turnstile-token" {
+		t.Fatalf("expected turnstile token in request, got %+v", received)
+	}
+}
+
+func TestLoginReturnsHelpfulCaptchaRequiredError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":"CAPTCHA_REQUIRED","message":"登录前需要先完成人机验证","siteKey":"site-key"}`))
+	}))
+	defer server.Close()
+
+	_, _, err := login(config{
+		baseURL:  server.URL,
+		nickname: "阿明",
+		password: "hunter2",
+		timeout:  5 * time.Second,
+	})
+	if err == nil {
+		t.Fatal("expected login to return captcha required error")
+	}
+	if got := err.Error(); got != "登录失败: 登录前需要先完成人机验证 (CAPTCHA_REQUIRED)，请先从网页拿到 turnstile token，并通过 -turnstile-token 传给脚本。siteKey=site-key" {
+		t.Fatalf("unexpected error: %s", got)
+	}
+}
+
+func TestAuthenticateUsesExistingSessionCookie(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/player/auth/session" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		cookie, err := r.Cookie(playerSessionCookieName)
+		if err != nil {
+			t.Fatalf("expected session cookie: %v", err)
+		}
+		if cookie.Value != "existing-session" {
+			t.Fatalf("unexpected session cookie value %s", cookie.Value)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"authenticated":true,"nickname":"阿明"}`))
+	}))
+	defer server.Close()
+
+	cookie, nickname, err := authenticate(config{
+		baseURL:       server.URL,
+		sessionCookie: "existing-session",
+		timeout:       5 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("authenticate returned error: %v", err)
+	}
+	if cookie == nil || cookie.Value != "existing-session" {
+		t.Fatalf("expected existing session cookie, got %+v", cookie)
+	}
+	if nickname != "阿明" {
+		t.Fatalf("expected nickname 阿明, got %s", nickname)
 	}
 }
