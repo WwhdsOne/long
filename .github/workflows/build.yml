@@ -97,6 +97,6 @@ jobs:
           script: |
             cd ${{ env.DEPLOY_PATH }}
             tar -xzf release.tar.gz
-            docker-compose down
-            docker-compose up -d --build --force-recreate
+            docker compose down
+            docker compose up -d --build --force-recreate
             docker image prune -f
