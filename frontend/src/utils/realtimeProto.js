@@ -82,6 +82,16 @@ function normalizeBossRuntimePartsFromMessage(payload, message) {
     return payload
 }
 
+function normalizeRoomStateRoomsFromMessage(payload, message) {
+    if (!payload?.rooms || !message?.rooms) {
+        return payload
+    }
+    payload.rooms = message.rooms.map((room) => (
+        realtime.RoomInfo.toObject(room, nestedDecodeOptions)
+    ))
+    return payload
+}
+
 export function encodeRealtimeClickRequest({slug, comboCount = 0}) {
     const encoded = realtime.ClickRequest.encode(realtime.ClickRequest.create({
         slug,
@@ -124,11 +134,16 @@ export function decodeRealtimeBinaryMessage(frame) {
                 type: 'user_delta',
                 payload: toPlain(realtime.UserDelta, realtime.UserDelta.decode(body)),
             }
-        case realtimeBinaryType.roomState:
+        case realtimeBinaryType.roomState: {
+            const message = realtime.RoomState.decode(body)
             return {
                 type: 'room_state',
-                payload: toPlain(realtime.RoomState, realtime.RoomState.decode(body)),
+                payload: normalizeRoomStateRoomsFromMessage(
+                    toPlain(realtime.RoomState, message),
+                    message,
+                ),
             }
+        }
         case realtimeBinaryType.publicMeta:
             return {
                 type: 'public_meta',
