@@ -465,7 +465,7 @@ describe('realtimeTransport', () => {
             {
                 currentRoomId: '2',
                 switchCooldownRemainingSeconds: 6,
-                rooms: [{id: '2', displayName: '二线', current: true, onlineCount: 4}],
+                rooms: [expect.objectContaining({id: '2', displayName: '二线', current: true, onlineCount: 4, joinable: false})],
             },
             {
                 currentRoomId: 'hall',
@@ -530,15 +530,48 @@ describe('realtimeTransport', () => {
             payload: {
                 currentRoomId: '2',
                 switchCooldownRemainingSeconds: 0,
-                rooms: [{
+                rooms: [expect.objectContaining({
                     id: '2',
                     displayName: '二线',
                     current: true,
+                    joinable: false,
                     onlineCount: 0,
+                    cycleEnabled: false,
                     currentBossHp: 0,
                     currentBossMaxHp: 0,
                     currentBossAvgHp: 0,
-                }],
+                })],
+            },
+        })
+    })
+
+    it('room_state 的 false 布尔值不会在二进制解码时丢字段', () => {
+        const encoded = realtime.RoomState.encode(realtime.RoomState.create({
+            currentRoomId: '2',
+            switchCooldownRemainingSeconds: 0,
+            rooms: [{
+                id: '3',
+                displayName: '三线',
+                onlineCount: 0,
+            }],
+        })).finish()
+        const frame = new Uint8Array(1 + encoded.length)
+        frame[0] = realtimeBinaryType.roomState
+        frame.set(encoded, 1)
+
+        expect(decodeRealtimeBinaryMessage(frame)).toEqual({
+            type: 'room_state',
+            payload: {
+                currentRoomId: '2',
+                switchCooldownRemainingSeconds: 0,
+                rooms: [expect.objectContaining({
+                    id: '3',
+                    displayName: '三线',
+                    current: false,
+                    joinable: false,
+                    onlineCount: 0,
+                    cycleEnabled: false,
+                })],
             },
         })
     })

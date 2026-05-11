@@ -91,7 +91,7 @@ function roomAvgHpText(room) {
 function roomStatusLabel(room) {
   if (!room) return '未知'
   if (isCurrentRoom(room)) return '当前房间'
-  if (room.joinable === false) return '冷却中'
+  if (room?.joinable !== true) return '冷却中'
   return room.cycleEnabled ? '可切换' : '待开放'
 }
 
@@ -100,7 +100,7 @@ function roomActionLabel(room) {
   if (props.switching) return '切换中'
   if (isCurrentRoom(room)) return '当前所在'
   if (props.cooldownRemainingSeconds > 0) return '冷却未结束'
-  if (room?.joinable === false) return '暂不可切'
+  if (room?.joinable !== true) return '暂不可切'
   return '进入战线'
 }
 
@@ -109,7 +109,7 @@ function isCurrentRoom(room) {
 }
 
 function canJoin(room) {
-  return props.loggedIn && !props.switching && props.cooldownRemainingSeconds <= 0 && room?.joinable !== false && !isCurrentRoom(room)
+  return props.loggedIn && !props.switching && props.cooldownRemainingSeconds <= 0 && room?.joinable === true && !isCurrentRoom(room)
 }
 </script>
 
@@ -237,7 +237,7 @@ function canJoin(room) {
 .room-selector__button {
   display: grid;
   gap: 6px;
-  min-height: 74px;
+  min-height: 94px;
   padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
