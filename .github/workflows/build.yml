@@ -67,6 +67,7 @@ jobs:
                 dockerfile: Dockerfile
               container_name: ${CONTAINER_NAME}
               restart: unless-stopped
+              network_mode: docker-compose_app-net
               ports:
                 - "443:16002"
               environment:
