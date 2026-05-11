@@ -13,8 +13,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: long
-      CONTAINER_NAME: long
+      IMAGE_REF: 82.157.208.173:5000/long:latest
       DEPLOY_PATH: /home/docker-images/long
       CONSUL_ADDR: ${{ secrets.CONSUL_ADDR }}
       CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
@@ -50,60 +49,48 @@ jobs:
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go -C backend build -trimpath -buildvcs=false -ldflags "-w -s -buildid=" -o long ./cmd/server
 
-      - name: Prepare release bundle
+      - name: Install deploy tools
         run: |
-          rm -rf release release.tar.gz
-          mkdir -p release/backend
+          sudo apt-get update
+          sudo apt-get install -y sshpass
 
-          cp Dockerfile .dockerignore release/
-          cp backend/long release/backend/long
+      - name: Configure SSH alias
+        run: |
+          mkdir -p ~/.ssh
+          cat > ~/.ssh/config <<EOF
+          Host x1sv
+            HostName ${SERVER_IP}
+            User ${SSH_USER}
+            Port ${SERVER_PORT}
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+          chmod 600 ~/.ssh/config
 
-          cat > release/docker-compose.yml <<EOF
-          services:
-            ${IMAGE_NAME}:
-              image: ${IMAGE_NAME}:latest
-              build:
-                context: .
-                dockerfile: Dockerfile
-              container_name: ${CONTAINER_NAME}
-              restart: unless-stopped
-              network_mode: docker-compose_app-net
-              ports:
-                - "16002:16002"
-              environment:
-                CONSUL_ADDR: ${CONSUL_ADDR}
-                CONSUL_CONFIG_KEY: ${CONSUL_CONFIG_KEY}
-                LONG_LISTEN_HOST: 0.0.0.0
-                LONG_LISTEN_PORT: 16002
-                LONG_TLS_CERT_FILE: /certs/fullchain.pem
-                LONG_TLS_KEY_FILE: /certs/privkey.pem
-              volumes:
-                - /etc/letsencrypt/live/x1sv.wclick.top/fullchain.pem:/certs/fullchain.pem:ro
-                - /etc/letsencrypt/live/x1sv.wclick.top/privkey.pem:/certs/privkey.pem:ro
+      - name: Build image
+        run: docker build -t ${IMAGE_REF} .
+
+      - name: Push image
+        run: docker push ${IMAGE_REF}
+
+      - name: Prepare deploy env file
+        run: |
+          cat > .deploy.env <<EOF
+          CONSUL_ADDR=${CONSUL_ADDR}
+          CONSUL_CONFIG_KEY=${CONSUL_CONFIG_KEY}
           EOF
 
-          tar -C release -czf release.tar.gz .
-
-      - name: Upload to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: ${{ secrets.SERVER_PORT }}
-          source: "release.tar.gz"
-          target: ${{ env.DEPLOY_PATH }}
+      - name: Sync compose files to server
+        run: |
+          export SSHPASS="${SSH_PASSWORD}"
+          sshpass -e ssh x1sv "mkdir -p ${DEPLOY_PATH}"
+          sshpass -e scp docker-compose.yml x1sv:${DEPLOY_PATH}/docker-compose.yml
+          sshpass -e scp .deploy.env x1sv:${DEPLOY_PATH}/.env
 
       - name: Deploy on server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: ${{ secrets.SERVER_PORT }}
-          script: |
-            cd ${{ env.DEPLOY_PATH }}
-            tar -xzf release.tar.gz
-            docker compose down
-            docker compose up -d --build --force-recreate
-            docker image prune -f
+        run: |
+          export SSHPASS="${SSH_PASSWORD}"
+          sshpass -e ssh x1sv "
+            docker pull ${IMAGE_REF} &&
+            docker compose --env-file ${DEPLOY_PATH}/.env -f ${DEPLOY_PATH}/docker-compose.yml up -d
+          "

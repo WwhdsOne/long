@@ -276,25 +276,20 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 1. 安装前端依赖
 2. 构建前端产物
 3. 构建 Linux `amd64` 后端二进制
-4. 生成 `release.tar.gz`
-5. 上传服务器并执行部署
-
-当前 release 包包含：
-
-- `Dockerfile`
-- `.dockerignore`
-- `docker-compose.yml`
-- `backend/long`
+4. 执行 `docker build -t 82.157.208.173:5000/long:latest .`
+5. 执行 `docker push 82.157.208.173:5000/long:latest`
+6. 同步根目录 `docker-compose.yml` 与服务器端 `.env`
+7. 通过 SSH 到 `x1sv` 执行远端部署
 
 ### 服务器部署约束
 
 - 发布镜像当前基于 `cgr.dev/chainguard/static:latest`。
+- 根目录 `docker-compose.yml` 是服务器端 `/home/docker-images/long/docker-compose.yml` 的权威来源。
 - workflow 当前在服务器端执行：
 
 ```bash
-docker-compose down
-docker-compose up -d --build --force-recreate
-docker image prune -f
+docker pull 82.157.208.173:5000/long:latest
+docker compose --env-file /home/docker-images/long/.env -f /home/docker-images/long/docker-compose.yml up -d
 ```
 
 ## 测试特性

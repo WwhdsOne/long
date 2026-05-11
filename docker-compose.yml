@@ -1,0 +1,18 @@
+services:
+  long:
+    image: 82.157.208.173:5000/long:latest
+    container_name: long
+    restart: unless-stopped
+    network_mode: docker-compose_app-net
+    ports:
+      - "16002:16002"
+    environment:
+      CONSUL_ADDR: ${CONSUL_ADDR}
+      CONSUL_CONFIG_KEY: ${CONSUL_CONFIG_KEY}
+      LONG_LISTEN_HOST: 0.0.0.0
+      LONG_LISTEN_PORT: 16002
+      LONG_TLS_CERT_FILE: /certs/fullchain.pem
+      LONG_TLS_KEY_FILE: /certs/privkey.pem
+    volumes:
+      - /etc/letsencrypt/live/x1sv.wclick.top/fullchain.pem:/certs/fullchain.pem:ro
+      - /etc/letsencrypt/live/x1sv.wclick.top/privkey.pem:/certs/privkey.pem:ro
