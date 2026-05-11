@@ -2,9 +2,12 @@ package core
 
 import (
 	"context"
+	"math"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/bytedance/sonic"
 )
 
 func TestCombatStatsRefreshAfterEquipItem(t *testing.T) {
@@ -246,6 +249,97 @@ func TestArmorCoreCollapseTriggerCurveAndTierBonus(t *testing.T) {
 	}
 	if compiled.Armor.CollapseTrigger != 100 {
 		t.Fatalf("expected tier-full armor collapse trigger remain 100, got %d", compiled.Armor.CollapseTrigger)
+	}
+}
+
+func TestArmorTreePureTalentPenCapsAtFortyPercent(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	nickname := "纯天赋破甲测试"
+
+	talentsJSON, err := sonic.Marshal(map[string]int{
+		"armor_core":         5,
+		"armor_pen_up":       5,
+		"armor_boss_hunter":  1,
+		"armor_heavy_scale":  1,
+		"armor_filler_t1a":   1,
+		"armor_filler_t1b":   5,
+		"armor_heavy_atk":    1,
+		"armor_collapse_ext": 1,
+		"armor_auto_strike":  1,
+		"armor_filler_t2a":   1,
+		"armor_filler_t2b":   1,
+	})
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(nickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed talents: %v", err)
+	}
+
+	stats, err := store.combatStatsForNickname(ctx, nickname, Loadout{})
+	if err != nil {
+		t.Fatalf("combat stats: %v", err)
+	}
+	if diff := math.Abs(stats.ArmorPenPercent - 0.40); diff > 1e-9 {
+		t.Fatalf("expected pure armor talents to provide 0.40 armor pen, got %.12f", stats.ArmorPenPercent)
+	}
+}
+
+func TestArmorPenConvertUsesFortyPercentTalentBase(t *testing.T) {
+	store, cleanup := newTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	baselineNickname := "破甲转伤基线测试"
+	convertNickname := "破甲转伤测试"
+
+	baselineTalents := map[string]int{
+		"armor_core":         5,
+		"armor_pen_up":       5,
+		"armor_boss_hunter":  1,
+		"armor_heavy_scale":  1,
+		"armor_filler_t1a":   1,
+		"armor_filler_t1b":   5,
+		"armor_heavy_atk":    1,
+		"armor_collapse_ext": 1,
+		"armor_auto_strike":  1,
+		"armor_filler_t2a":   1,
+		"armor_filler_t2b":   1,
+	}
+	talentsJSON, err := sonic.Marshal(baselineTalents)
+	if err != nil {
+		t.Fatalf("marshal talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(baselineNickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed baseline talents: %v", err)
+	}
+
+	baselineStats, err := store.combatStatsForNickname(ctx, baselineNickname, Loadout{})
+	if err != nil {
+		t.Fatalf("baseline combat stats: %v", err)
+	}
+
+	baselineTalents["armor_pen_convert"] = 5
+	talentsJSON, err = sonic.Marshal(baselineTalents)
+	if err != nil {
+		t.Fatalf("marshal convert talents: %v", err)
+	}
+	if err := store.client.HSet(ctx, store.talentKey(convertNickname), "talents", string(talentsJSON)).Err(); err != nil {
+		t.Fatalf("seed convert talents: %v", err)
+	}
+
+	stats, err := store.combatStatsForNickname(ctx, convertNickname, Loadout{})
+	if err != nil {
+		t.Fatalf("convert combat stats: %v", err)
+	}
+	if diff := math.Abs(stats.ArmorPenPercent - 0.40); diff > 1e-9 {
+		t.Fatalf("expected pure armor talents with convert to keep 0.40 armor pen, got %.12f", stats.ArmorPenPercent)
+	}
+	if diff := math.Abs((stats.AllDamageAmplify - baselineStats.AllDamageAmplify) - 0.12); diff > 1e-9 {
+		t.Fatalf("expected armor pen convert to add 0.12 all damage amplify, baseline=%.12f got=%.12f", baselineStats.AllDamageAmplify, stats.AllDamageAmplify)
 	}
 }
 

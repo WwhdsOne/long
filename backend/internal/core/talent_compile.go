@@ -222,6 +222,12 @@ func buildTalentModifiersFromCompiled(compiled *CompiledTalentSet) *TalentModifi
 					mods.ArmorPenExtra += armorFillerT1bPenForLevel(level)
 				}
 			}
+		case "permanent_armor_pen":
+			if _, ok := val["penPercent"].(float64); ok {
+				if id == "armor_core" {
+					mods.ArmorPenExtra += armorCorePenPercentForLevel(level)
+				}
+			}
 		case "crit_damage_bonus":
 			if _, ok := val["percent"].(float64); ok {
 				switch id {
