@@ -4337,9 +4337,6 @@ func buildInventoryItem(definition EquipmentDefinition, instance ItemInstance, q
 	name := displayItemName(definition.Name, enhanceLevel)
 	attackPower := int64(math.Round(float64(definition.AttackPower) * multValue))
 	armorPenPercent := definition.ArmorPenPercent
-	if armorPenPercent > 0 {
-		armorPenPercent += float64(enhanceLevel) * flatPercentStep
-	}
 	critRate := definition.CritRate
 	if critRate > 0 {
 		critRate += float64(enhanceLevel) * flatPercentStep

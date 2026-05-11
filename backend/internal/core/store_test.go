@@ -2402,14 +2402,14 @@ func TestBossResourcesIncludeInscriptionStoneRange(t *testing.T) {
 
 	ctx := context.Background()
 	boss := &Boss{
-		ID:                               "inscription-boss",
-		Name:                             "铭刻 Boss",
-		Status:                           bossStatusActive,
-		MaxHP:                            100,
-		CurrentHP:                        100,
-		InscriptionStoneDropRatePercent:  28,
-		InscriptionStoneDropCountMin:     2,
-		InscriptionStoneDropCountMax:     3,
+		ID:                              "inscription-boss",
+		Name:                            "铭刻 Boss",
+		Status:                          bossStatusActive,
+		MaxHP:                           100,
+		CurrentHP:                       100,
+		InscriptionStoneDropRatePercent: 28,
+		InscriptionStoneDropCountMin:    2,
+		InscriptionStoneDropCountMax:    3,
 		Parts: []BossPart{
 			{X: 0, Y: 0, Type: PartTypeSoft, MaxHP: 100, CurrentHP: 100, Alive: true},
 		},
@@ -3502,7 +3502,7 @@ func TestCalcBossPartDamageCriticalDamageUsesMultiplier(t *testing.T) {
 	}
 }
 
-func TestBuildInventoryItemEnhanceCritRateAndArmorPenUseFlatStep(t *testing.T) {
+func TestBuildInventoryItemEnhanceCritRateUsesFlatStepButArmorPenStaysFixed(t *testing.T) {
 	item := buildInventoryItem(EquipmentDefinition{
 		ItemID:          "flat-scale-ring",
 		Name:            "平刻戒指",
@@ -3515,8 +3515,8 @@ func TestBuildInventoryItemEnhanceCritRateAndArmorPenUseFlatStep(t *testing.T) {
 	if diff := math.Abs(item.CritRate - 0.05); diff > 1e-9 {
 		t.Fatalf("expected crit rate 0.05 after +20 enhance, got %.12f", item.CritRate)
 	}
-	if diff := math.Abs(item.ArmorPenPercent - 0.12); diff > 1e-9 {
-		t.Fatalf("expected armor pen 0.12 after +20 enhance, got %.12f", item.ArmorPenPercent)
+	if diff := math.Abs(item.ArmorPenPercent - 0.10); diff > 1e-9 {
+		t.Fatalf("expected armor pen stay 0.10 after +20 enhance, got %.12f", item.ArmorPenPercent)
 	}
 }
 

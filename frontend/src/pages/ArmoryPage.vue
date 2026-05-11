@@ -457,7 +457,6 @@ function buildEnhancePreviewItem(item, levels) {
     const baseAttackPower = recoverBaseAttackPower(preview.attackPower, currentLevel)
     preview.attackPower = Math.round(baseAttackPower * (enhanceAttackGrowth ** targetLevel))
   }
-  preview.armorPenPercent = previewFlatStepStat(preview.armorPenPercent, currentLevel, targetLevel)
   preview.critRate = previewFlatStepStat(preview.critRate, currentLevel, targetLevel)
   preview.critDamageMultiplier = previewScaledStat(preview.critDamageMultiplier, currentLevel, targetLevel)
   preview.partTypeDamageSoft = previewScaledStat(preview.partTypeDamageSoft, currentLevel, targetLevel)
