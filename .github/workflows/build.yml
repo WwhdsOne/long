@@ -26,6 +26,14 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
+      - name: Set up Docker daemon for HTTP registry
+        uses: docker/setup-docker-action@v4
+        with:
+          daemon-config: |
+            {
+              "insecure-registries": ["82.157.208.173:5000"]
+            }
+
       - name: Set up Go 1.26
         uses: actions/setup-go@v5
         with:
