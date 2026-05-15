@@ -13,7 +13,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      IMAGE_REF: 82.157.208.173:5000/long:latest
+      IMAGE_NAME: long
+      CONTAINER_NAME: long
+      DOCKER_NETWORK: docker-compose_app-net
       DEPLOY_PATH: /home/docker-images/long
       CONSUL_ADDR: ${{ secrets.CONSUL_ADDR }}
       CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
@@ -49,13 +51,18 @@ jobs:
       - name: Install dependencies
         run: bun --cwd=frontend install --frozen-lockfile
 
-      - name: Build frontend release assets
+      - name: Build frontend
         run: bun --cwd=frontend run build
 
-      - name: Build backend release binary
+      - name: Build Go binary (linux/amd64)
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go -C backend build -trimpath -buildvcs=false -ldflags "-w -s -buildid=" -o long ./cmd/server
+            go -C backend build \
+              -trimpath \
+              -buildvcs=false \
+              -ldflags "-w -s -buildid=" \
+              -o long \
+              ./cmd/server
 
       - name: Install deploy tools
         run: |
@@ -75,30 +82,54 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      - name: Build image
-        run: docker build -t ${IMAGE_REF} .
-
-      - name: Push image
-        run: docker push ${IMAGE_REF}
-
-      - name: Prepare deploy env file
+      - name: Prepare deploy artifacts
         run: |
-          cat > .deploy.env <<EOF
-          CONSUL_ADDR=${CONSUL_ADDR}
-          CONSUL_CONFIG_KEY=${CONSUL_CONFIG_KEY}
-          EOF
+          mkdir -p deploy-artifacts
+          cp Dockerfile deploy-artifacts/
+          cp backend/long deploy-artifacts/
+          cp -r backend/public deploy-artifacts/
 
-      - name: Sync compose files to server
+      - name: Prepare remote deploy directory and clean old container/image
         run: |
           export SSHPASS="${SSH_PASSWORD}"
           sshpass -e ssh x1sv "mkdir -p ${DEPLOY_PATH}"
-          sshpass -e scp docker-compose.yml x1sv:${DEPLOY_PATH}/docker-compose.yml
-          sshpass -e scp .deploy.env x1sv:${DEPLOY_PATH}/.env
+          sshpass -e ssh x1sv "
+            set -e
+            rm -rf ${DEPLOY_PATH}/*
 
-      - name: Deploy on server
+            CONTAINER_ID=\$(docker ps -a -q --filter \"name=^/${CONTAINER_NAME}$\")
+            if [ -n \"\$CONTAINER_ID\" ]; then
+              docker rm -f \"\$CONTAINER_ID\" || true
+            fi
+
+            IMAGE_ID=\$(docker images -q ${IMAGE_NAME}:latest)
+            if [ -n \"\$IMAGE_ID\" ]; then
+              docker rmi -f \"\$IMAGE_ID\" || true
+            fi
+          "
+
+      - name: Upload build artifacts to server
+        run: |
+          export SSHPASS="${SSH_PASSWORD}"
+          sshpass -e scp -r deploy-artifacts x1sv:${DEPLOY_PATH}/
+
+      - name: Build image and start container
         run: |
           export SSHPASS="${SSH_PASSWORD}"
           sshpass -e ssh x1sv "
-            docker pull ${IMAGE_REF} &&
-            docker compose --env-file ${DEPLOY_PATH}/.env -f ${DEPLOY_PATH}/docker-compose.yml up -d
+            set -e
+            cd ${DEPLOY_PATH}/deploy-artifacts
+
+            docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1 || \
+              docker network create ${DOCKER_NETWORK}
+
+            docker build -t ${IMAGE_NAME}:latest .
+
+            docker run -d \
+              --name ${CONTAINER_NAME} \
+              --network ${DOCKER_NETWORK} \
+              --restart unless-stopped \
+              -e CONSUL_ADDR=\"${CONSUL_ADDR}\" \
+              -e CONSUL_CONFIG_KEY=\"${CONSUL_CONFIG_KEY}\" \
+              ${IMAGE_NAME}:latest
           "

@@ -274,22 +274,31 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 当前 workflow 位于 `.github/workflows/build.yml`，在 `main` 分支 push 后执行：
 
 1. 安装前端依赖
-2. 构建前端产物
-3. 构建 Linux `amd64` 后端二进制
-4. 执行 `docker build -t 82.157.208.173:5000/long:latest .`
-5. 执行 `docker push 82.157.208.173:5000/long:latest`
-6. 同步根目录 `docker-compose.yml` 与服务器端 `.env`
-7. 通过 SSH 到 `x1sv` 执行远端部署
+2. 运行后端测试与 `vet`
+3. 构建前端产物
+4. 构建 Linux `amd64` 后端二进制
+5. 通过 SSH 清理服务器上的旧容器和旧镜像
+6. 同步 `Dockerfile`、后端二进制和前端静态产物到服务器
+7. 通过 SSH 到 `x1sv` 在服务器端执行 `docker build` 和 `docker run`
 
 ### 服务器部署约束
 
-- 发布镜像当前基于 `cgr.dev/chainguard/static:latest`。
-- 根目录 `docker-compose.yml` 是服务器端 `/home/docker-images/long/docker-compose.yml` 的权威来源。
+- 发布镜像当前在服务器端基于仓库内 `Dockerfile` 构建。
+- 服务器端部署目录为 `/home/docker-images/long/deploy-artifacts`。
 - workflow 当前在服务器端执行：
 
 ```bash
-docker pull 82.157.208.173:5000/long:latest
-docker compose --env-file /home/docker-images/long/.env -f /home/docker-images/long/docker-compose.yml up -d
+cd /home/docker-images/long/deploy-artifacts
+docker network inspect docker-compose_app-net >/dev/null 2>&1 || \
+  docker network create docker-compose_app-net
+docker build -t long:latest .
+docker run -d \
+  --name long \
+  --network docker-compose_app-net \
+  --restart unless-stopped \
+  -e CONSUL_ADDR=... \
+  -e CONSUL_CONFIG_KEY=... \
+  long:latest
 ```
 
 ## 测试特性
