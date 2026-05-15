@@ -15,14 +15,9 @@ jobs:
     env:
       IMAGE_NAME: long
       CONTAINER_NAME: long
-      DOCKER_NETWORK: docker-compose_app-net
       DEPLOY_PATH: /home/docker-images/long
       CONSUL_ADDR: ${{ secrets.CONSUL_ADDR }}
       CONSUL_CONFIG_KEY: ${{ secrets.CONSUL_CONFIG_KEY }}
-      SERVER_IP: ${{ secrets.SERVER_IP }}
-      SSH_USER: ${{ secrets.SSH_USER }}
-      SERVER_PORT: ${{ secrets.SERVER_PORT }}
-      SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
 
     steps:
       - name: Check out repository code
@@ -31,7 +26,7 @@ jobs:
       - name: Set up Go 1.26
         uses: actions/setup-go@v5
         with:
-          go-version: '1.26.2'
+          go-version: "1.26.2"
           cache: true
           cache-dependency-path: backend/go.sum
 
@@ -43,10 +38,10 @@ jobs:
       - name: Install dependencies
         run: bun --cwd=frontend install --frozen-lockfile
 
-      - name: Build frontend
+      - name: Build frontend release assets
         run: bun --cwd=frontend run build
 
-      - name: Build Go binary (linux/amd64)
+      - name: Build backend release binary
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go -C backend build \
@@ -56,67 +51,68 @@ jobs:
               -o long \
               ./cmd/server
 
-      - name: Install deploy tools
+      - name: Prepare release bundle
         run: |
-          sudo apt-get update
-          sudo apt-get install -y sshpass
+          rm -rf release release.tar.gz
+          mkdir -p release
 
-      - name: Configure SSH alias
-        run: |
-          mkdir -p ~/.ssh
-          cat > ~/.ssh/config <<EOF
-          Host x1sv
-            HostName ${SERVER_IP}
-            User ${SSH_USER}
-            Port ${SERVER_PORT}
-            StrictHostKeyChecking no
-            UserKnownHostsFile /dev/null
+          cp Dockerfile .dockerignore release/
+          cp backend/long release/long
+
+          cat > release/docker-compose.yml <<EOF
+          services:
+            ${IMAGE_NAME}:
+              image: ${IMAGE_NAME}:latest
+              build:
+                context: .
+                dockerfile: Dockerfile
+              container_name: ${CONTAINER_NAME}
+              restart: unless-stopped
+              networks:
+                - docker-compose_app-net
+              ports:
+                - "16002:16002"
+              environment:
+                CONSUL_ADDR: \${CONSUL_ADDR}
+                CONSUL_CONFIG_KEY: \${CONSUL_CONFIG_KEY}
+                LONG_LISTEN_HOST: 0.0.0.0
+                LONG_LISTEN_PORT: 16002
+                LONG_TLS_CERT_FILE: /certs/fullchain.pem
+                LONG_TLS_KEY_FILE: /certs/privkey.pem
+              volumes:
+                - /etc/letsencrypt/live/x1sv.wclick.top/fullchain.pem:/certs/fullchain.pem:ro
+                - /etc/letsencrypt/live/x1sv.wclick.top/privkey.pem:/certs/privkey.pem:ro
+
+          networks:
+            docker-compose_app-net:
+              external: true
           EOF
-          chmod 600 ~/.ssh/config
 
-      - name: Prepare deploy artifacts
-        run: |
-          mkdir -p deploy-artifacts
-          cp Dockerfile deploy-artifacts/
-          cp docker-compose.yml deploy-artifacts/
-          cp backend/long deploy-artifacts/
-          cp -r backend/public deploy-artifacts/
+          tar -C release -czf release.tar.gz .
 
-      - name: Prepare remote deploy directory and clean old container/image
-        run: |
-          export SSHPASS="${SSH_PASSWORD}"
-          sshpass -e ssh x1sv "mkdir -p ${DEPLOY_PATH}"
-          sshpass -e ssh x1sv "
-            set -e
-            rm -rf ${DEPLOY_PATH}/*
+      - name: Upload to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          source: "release.tar.gz"
+          target: ${{ env.DEPLOY_PATH }}
 
-            CONTAINER_ID=\$(docker ps -a -q --filter \"name=^/${CONTAINER_NAME}$\")
-            if [ -n \"\$CONTAINER_ID\" ]; then
-              docker rm -f \"\$CONTAINER_ID\" || true
-            fi
-
-            IMAGE_ID=\$(docker images -q ${IMAGE_NAME}:latest)
-            if [ -n \"\$IMAGE_ID\" ]; then
-              docker rmi -f \"\$IMAGE_ID\" || true
-            fi
-          "
-
-      - name: Upload build artifacts to server
-        run: |
-          export SSHPASS="${SSH_PASSWORD}"
-          sshpass -e scp -r deploy-artifacts x1sv:${DEPLOY_PATH}/
-
-      - name: Build image and start container
-        run: |
-          export SSHPASS="${SSH_PASSWORD}"
-          sshpass -e ssh x1sv "
-            set -e
-            cd ${DEPLOY_PATH}/deploy-artifacts
-
-            docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1 || \
-              docker network create ${DOCKER_NETWORK}
-
-            CONSUL_ADDR=\"${CONSUL_ADDR}\" \
-            CONSUL_CONFIG_KEY=\"${CONSUL_CONFIG_KEY}\" \
-              docker compose up -d --build
-          "
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            cd ${{ env.DEPLOY_PATH }}
+            tar -xzf release.tar.gz
+            docker network inspect docker-compose_app-net >/dev/null 2>&1 || \
+              docker network create docker-compose_app-net
+            CONSUL_ADDR='${{ secrets.CONSUL_ADDR }}' \
+            CONSUL_CONFIG_KEY='${{ secrets.CONSUL_CONFIG_KEY }}' \
+              docker compose up -d --build --force-recreate
+            docker image prune -f
