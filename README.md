@@ -278,12 +278,12 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 3. 构建前端产物
 4. 构建 Linux `amd64` 后端二进制
 5. 通过 SSH 清理服务器上的旧容器和旧镜像
-6. 同步 `Dockerfile`、后端二进制和前端静态产物到服务器
-7. 通过 SSH 到 `x1sv` 在服务器端执行 `docker build` 和 `docker run`
+6. 同步 `Dockerfile`、`docker-compose.yml`、后端二进制和前端静态产物到服务器
+7. 通过 SSH 到 `x1sv` 在服务器端执行 `docker compose up -d --build`
 
 ### 服务器部署约束
 
-- 发布镜像当前在服务器端基于仓库内 `Dockerfile` 构建。
+- 发布镜像当前在服务器端基于仓库内 `docker-compose.yml` 触发构建。
 - 服务器端部署目录为 `/home/docker-images/long/deploy-artifacts`。
 - workflow 当前在服务器端执行：
 
@@ -291,14 +291,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 cd /home/docker-images/long/deploy-artifacts
 docker network inspect docker-compose_app-net >/dev/null 2>&1 || \
   docker network create docker-compose_app-net
-docker build -t long:latest .
-docker run -d \
-  --name long \
-  --network docker-compose_app-net \
-  --restart unless-stopped \
-  -e CONSUL_ADDR=... \
-  -e CONSUL_CONFIG_KEY=... \
-  long:latest
+CONSUL_ADDR=... CONSUL_CONFIG_KEY=... docker compose up -d --build
 ```
 
 ## 测试特性
