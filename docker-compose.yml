@@ -1,9 +1,13 @@
 services:
   long:
-    image: 82.157.208.173:5000/long:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: long:latest
     container_name: long
     restart: unless-stopped
-    network_mode: docker-compose_app-net
+    networks:
+      - docker-compose_app-net
     ports:
       - "16002:16002"
     environment:

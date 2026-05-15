@@ -86,6 +86,7 @@ jobs:
         run: |
           mkdir -p deploy-artifacts
           cp Dockerfile deploy-artifacts/
+          cp docker-compose.yml deploy-artifacts/
           cp backend/long deploy-artifacts/
           cp -r backend/public deploy-artifacts/
 
@@ -123,13 +124,7 @@ jobs:
             docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1 || \
               docker network create ${DOCKER_NETWORK}
 
-            docker build -t ${IMAGE_NAME}:latest .
-
-            docker run -d \
-              --name ${CONTAINER_NAME} \
-              --network ${DOCKER_NETWORK} \
-              --restart unless-stopped \
-              -e CONSUL_ADDR=\"${CONSUL_ADDR}\" \
-              -e CONSUL_CONFIG_KEY=\"${CONSUL_CONFIG_KEY}\" \
-              ${IMAGE_NAME}:latest
+            CONSUL_ADDR=\"${CONSUL_ADDR}\" \
+            CONSUL_CONFIG_KEY=\"${CONSUL_CONFIG_KEY}\" \
+              docker compose up -d --build
           "
