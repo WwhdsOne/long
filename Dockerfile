@@ -2,7 +2,7 @@ FROM cgr.dev/chainguard/static:latest
 
 WORKDIR /app
 
-COPY backend/long ./long
+COPY long ./long
 
 EXPOSE 16002
 
