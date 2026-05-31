@@ -1028,12 +1028,13 @@ func (s *Store) getUserState(ctx context.Context, nickname string, includeProfil
 	userState.InscriptionStones = resources.InscriptionStones
 	userState.TalentPoints = resources.TalentPoints
 	userState.MyBossKills = resources.BossKills
-	if userState.MyBossKills <= 0 {
+	if resources.HasRecord && userState.MyBossKills <= 0 {
 		fallbackKills, fallbackErr := s.historyBossKillsForNickname(ctx, normalizedNickname)
 		if fallbackErr != nil {
 			return UserState{}, fallbackErr
 		}
 		userState.MyBossKills = fallbackKills
+		_ = s.client.HSet(ctx, s.resourceKey(normalizedNickname), "boss_kills", strconv.FormatInt(fallbackKills, 10)).Err()
 	}
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)
@@ -4076,6 +4077,7 @@ type playerResources struct {
 	InscriptionStones int64
 	TalentPoints      int64
 	BossKills         int64
+	HasRecord         bool
 }
 
 type PlayerResources struct {
@@ -4098,12 +4100,21 @@ func (s *Store) resourcesForNickname(ctx context.Context, nickname string) (play
 		return playerResources{}, err
 	}
 
+	hasRecord := false
+	for _, value := range values {
+		if value != nil {
+			hasRecord = true
+			break
+		}
+	}
+
 	return playerResources{
 		Gold:              int64Value(values, 0),
 		Stones:            int64Value(values, 1),
 		InscriptionStones: int64Value(values, 2),
 		TalentPoints:      int64Value(values, 3),
 		BossKills:         int64Value(values, 4),
+		HasRecord:         hasRecord,
 	}, nil
 }
 

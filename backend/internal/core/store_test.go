@@ -23,6 +23,7 @@ type countingRedisClient struct {
 	hmgetKeys   map[string]int
 	hgetallKeys map[string]int
 	smemberKeys map[string]int
+	zrevrangeKeys map[string]int
 }
 
 func newCountingRedisClient(client redis.UniversalClient) *countingRedisClient {
@@ -31,6 +32,7 @@ func newCountingRedisClient(client redis.UniversalClient) *countingRedisClient {
 		hmgetKeys:       make(map[string]int),
 		hgetallKeys:     make(map[string]int),
 		smemberKeys:     make(map[string]int),
+		zrevrangeKeys:   make(map[string]int),
 	}
 }
 
@@ -49,10 +51,16 @@ func (c *countingRedisClient) SMembers(ctx context.Context, key string) *redis.S
 	return c.UniversalClient.SMembers(ctx, key)
 }
 
+func (c *countingRedisClient) ZRevRange(ctx context.Context, key string, start, stop int64) *redis.StringSliceCmd {
+	c.zrevrangeKeys[key]++
+	return c.UniversalClient.ZRevRange(ctx, key, start, stop)
+}
+
 func (c *countingRedisClient) reset() {
 	clear(c.hmgetKeys)
 	clear(c.hgetallKeys)
 	clear(c.smemberKeys)
+	clear(c.zrevrangeKeys)
 }
 
 func newTestStore(t *testing.T) (*Store, func()) {
@@ -751,6 +759,9 @@ func TestHistoryBossKillsFallbackForPlayer(t *testing.T) {
 	defer cleanup()
 
 	ctx := context.Background()
+	if err := store.client.HSet(ctx, store.resourceKey("阿明"), "gold", 0).Err(); err != nil {
+		t.Fatalf("seed player resources: %v", err)
+	}
 	if err := store.SaveBossToHistory(ctx, &Boss{
 		ID:         "history-boss-2",
 		Name:       "历史 Boss 2",
@@ -776,6 +787,88 @@ func TestHistoryBossKillsFallbackForPlayer(t *testing.T) {
 	}
 }
 
+func TestHistoryBossKillsFallbackCachesRecoveredCount(t *testing.T) {
+	store, counter, cleanup := newCountingTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, store.resourceKey("阿明"), "gold", 0).Err(); err != nil {
+		t.Fatalf("seed player resources: %v", err)
+	}
+	if err := store.SaveBossToHistory(ctx, &Boss{
+		ID:         "history-boss-cache",
+		Name:       "历史 Boss 缓存",
+		RoomID:     "1",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  time.Now().Unix(),
+		DefeatedAt: time.Now().Unix(),
+	}); err != nil {
+		t.Fatalf("save boss history: %v", err)
+	}
+	if _, err := store.client.ZAdd(ctx, store.bossDamageKey("history-boss-cache"), redis.Z{Score: 12, Member: "阿明"}).Result(); err != nil {
+		t.Fatalf("seed history boss damage: %v", err)
+	}
+
+	state, err := store.GetUserState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user state first time: %v", err)
+	}
+	if state.MyBossKills != 1 {
+		t.Fatalf("expected my boss kills fallback to be 1, got %d", state.MyBossKills)
+	}
+	cached, err := store.client.HGet(ctx, store.resourceKey("阿明"), "boss_kills").Result()
+	if err != nil {
+		t.Fatalf("read cached boss kills: %v", err)
+	}
+	if cached != "1" {
+		t.Fatalf("expected cached boss kills to be 1, got %q", cached)
+	}
+
+	counter.reset()
+	state, err = store.GetUserState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user state second time: %v", err)
+	}
+	if state.MyBossKills != 1 {
+		t.Fatalf("expected cached my boss kills to stay 1, got %d", state.MyBossKills)
+	}
+	if counter.zrevrangeKeys[store.bossHistoryKey] != 0 {
+		t.Fatalf("expected cached boss kills to skip history scan, got %+v", counter.zrevrangeKeys)
+	}
+}
+
+func TestGetUserStateFreshPlayerSkipsHistoryBossKillFallback(t *testing.T) {
+	store, counter, cleanup := newCountingTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.SaveBossToHistory(ctx, &Boss{
+		ID:         "history-boss-newbie",
+		Name:       "历史 Boss 新号",
+		RoomID:     "1",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  time.Now().Unix(),
+		DefeatedAt: time.Now().Unix(),
+	}); err != nil {
+		t.Fatalf("save boss history: %v", err)
+	}
+	counter.reset()
+
+	state, err := store.GetUserState(ctx, "新玩家")
+	if err != nil {
+		t.Fatalf("get user state: %v", err)
+	}
+	if state.MyBossKills != 0 {
+		t.Fatalf("expected fresh player my boss kills to stay 0, got %d", state.MyBossKills)
+	}
+	if counter.zrevrangeKeys[store.bossHistoryKey] != 0 {
+		t.Fatalf("expected fresh player state load to skip boss history scan, got %+v", counter.zrevrangeKeys)
+	}
+}
 func TestSwitchPlayerRoomAllowsHall(t *testing.T) {
 	store, cleanup := newTestRoomStore(t)
 	defer cleanup()
