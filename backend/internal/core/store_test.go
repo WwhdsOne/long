@@ -787,6 +787,58 @@ func TestHistoryBossKillsFallbackForPlayer(t *testing.T) {
 	}
 }
 
+func TestHistoryBossKillsFallbackCachesRecoveredCount(t *testing.T) {
+	store, counter, cleanup := newCountingTestStore(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	if err := store.client.HSet(ctx, store.resourceKey("阿明"), "gold", 0).Err(); err != nil {
+		t.Fatalf("seed player resources: %v", err)
+	}
+	if err := store.SaveBossToHistory(ctx, &Boss{
+		ID:         "history-boss-cache",
+		Name:       "历史 Boss 缓存",
+		RoomID:     "1",
+		Status:     bossStatusDefeated,
+		MaxHP:      100,
+		CurrentHP:  0,
+		StartedAt:  time.Now().Unix(),
+		DefeatedAt: time.Now().Unix(),
+	}); err != nil {
+		t.Fatalf("save boss history: %v", err)
+	}
+	if _, err := store.client.ZAdd(ctx, store.bossDamageKey("history-boss-cache"), redis.Z{Score: 12, Member: "阿明"}).Result(); err != nil {
+		t.Fatalf("seed history boss damage: %v", err)
+	}
+
+	state, err := store.GetUserState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user state first time: %v", err)
+	}
+	if state.MyBossKills != 1 {
+		t.Fatalf("expected my boss kills fallback to be 1, got %d", state.MyBossKills)
+	}
+	cached, err := store.client.HGet(ctx, store.resourceKey("阿明"), "boss_kills").Result()
+	if err != nil {
+		t.Fatalf("read cached boss kills: %v", err)
+	}
+	if cached != "1" {
+		t.Fatalf("expected cached boss kills to be 1, got %q", cached)
+	}
+
+	counter.reset()
+	state, err = store.GetUserState(ctx, "阿明")
+	if err != nil {
+		t.Fatalf("get user state second time: %v", err)
+	}
+	if state.MyBossKills != 1 {
+		t.Fatalf("expected cached my boss kills to stay 1, got %d", state.MyBossKills)
+	}
+	if counter.zrevrangeKeys[store.bossHistoryKey] != 0 {
+		t.Fatalf("expected cached boss kills to skip history scan, got %+v", counter.zrevrangeKeys)
+	}
+}
+
 func TestGetUserStateFreshPlayerSkipsHistoryBossKillFallback(t *testing.T) {
 	store, counter, cleanup := newCountingTestStore(t)
 	defer cleanup()

@@ -1034,6 +1034,7 @@ func (s *Store) getUserState(ctx context.Context, nickname string, includeProfil
 			return UserState{}, fallbackErr
 		}
 		userState.MyBossKills = fallbackKills
+		_ = s.client.HSet(ctx, s.resourceKey(normalizedNickname), "boss_kills", strconv.FormatInt(fallbackKills, 10)).Err()
 	}
 
 	userStats, err := s.GetUserStats(ctx, normalizedNickname)

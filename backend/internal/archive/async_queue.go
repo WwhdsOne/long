@@ -2,10 +2,10 @@ package archive
 
 import (
 	"context"
+	"log"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"long/internal/xlog"
 )
 
 // AsyncQueueConfig 控制通用异步队列行为。
@@ -25,6 +25,7 @@ type AsyncQueue[T any] struct {
 	handle       func(context.Context, T) error
 	wg           sync.WaitGroup
 	closeOnce    sync.Once
+	closed       atomic.Bool
 }
 
 // NewAsyncQueue 创建通用异步队列。
@@ -54,13 +55,22 @@ func (q *AsyncQueue[T]) Start() {
 	}
 }
 
-// Enqueue 投递任务；队列满时返回 false。
-func (q *AsyncQueue[T]) Enqueue(item T) bool {
+// Enqueue 投递任务；队列满或队列已关闭时返回 false。
+func (q *AsyncQueue[T]) Enqueue(item T) (ok bool) {
+	if q.closed.Load() {
+		return false
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			// Close 与发送并发时，向已关闭 channel 发送会 panic，这里统一降级为返回 false。
+			ok = false
+		}
+	}()
 	select {
 	case q.ch <- item:
 		return true
 	default:
-		xlog.L().Error("async queue is full")
+		log.Printf("async queue is full: %s", q.name)
 		return false
 	}
 }
@@ -68,6 +78,7 @@ func (q *AsyncQueue[T]) Enqueue(item T) bool {
 // Close 关闭队列并等待 worker 退出。
 func (q *AsyncQueue[T]) Close() error {
 	q.closeOnce.Do(func() {
+		q.closed.Store(true)
 		close(q.ch)
 		q.wg.Wait()
 	})
@@ -83,7 +94,7 @@ func (q *AsyncQueue[T]) worker() {
 			ctx, cancel = context.WithTimeout(ctx, q.writeTimeout)
 		}
 		if err := q.handle(ctx, item); err != nil {
-			xlog.L().Error("async queue handle failed", xlog.Err(err))
+			log.Printf("async queue handle failed: %s: %v", q.name, err)
 		}
 		cancel()
 	}
