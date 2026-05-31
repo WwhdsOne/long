@@ -6,7 +6,8 @@ services:
     image: long:latest
     container_name: long
     restart: unless-stopped
-    network_mode: docker-compose_app-net
+    networks:
+      - docker-compose_app-net
     ports:
       - "16002:16002"
     environment:
@@ -19,3 +20,7 @@ services:
     volumes:
       - /etc/letsencrypt/live/x1sv.wclick.top/fullchain.pem:/certs/fullchain.pem:ro
       - /etc/letsencrypt/live/x1sv.wclick.top/privkey.pem:/certs/privkey.pem:ro
+
+networks:
+  docker-compose_app-net:
+    external: true

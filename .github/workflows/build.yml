@@ -56,37 +56,8 @@ jobs:
           rm -rf release release.tar.gz
           mkdir -p release
 
-          cp Dockerfile .dockerignore release/
+          cp Dockerfile .dockerignore docker-compose.yml release/
           cp backend/long release/long
-
-          cat > release/docker-compose.yml <<EOF
-          services:
-            ${IMAGE_NAME}:
-              image: ${IMAGE_NAME}:latest
-              build:
-                context: .
-                dockerfile: Dockerfile
-              container_name: ${CONTAINER_NAME}
-              restart: unless-stopped
-              networks:
-                - docker-compose_app-net
-              ports:
-                - "16002:16002"
-              environment:
-                CONSUL_ADDR: \${CONSUL_ADDR}
-                CONSUL_CONFIG_KEY: \${CONSUL_CONFIG_KEY}
-                LONG_LISTEN_HOST: 0.0.0.0
-                LONG_LISTEN_PORT: 16002
-                LONG_TLS_CERT_FILE: /certs/fullchain.pem
-                LONG_TLS_KEY_FILE: /certs/privkey.pem
-              volumes:
-                - /etc/letsencrypt/live/x1sv.wclick.top/fullchain.pem:/certs/fullchain.pem:ro
-                - /etc/letsencrypt/live/x1sv.wclick.top/privkey.pem:/certs/privkey.pem:ro
-
-          networks:
-            docker-compose_app-net:
-              external: true
-          EOF
 
           tar -C release -czf release.tar.gz .
 
