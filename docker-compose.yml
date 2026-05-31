@@ -6,8 +6,7 @@ services:
     image: long:latest
     container_name: long
     restart: unless-stopped
-    networks:
-      - docker-compose_app-net
+    network_mode: docker-compose_app-net
     ports:
       - "16002:16002"
     environment:
