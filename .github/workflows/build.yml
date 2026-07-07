@@ -83,6 +83,8 @@ jobs:
             tar -xzf release.tar.gz
             docker network inspect docker-compose_app-net >/dev/null 2>&1 || \
               docker network create docker-compose_app-net
+            docker compose down --remove-orphans 2>/dev/null || true
+            docker rm -f ${{ env.CONTAINER_NAME }} >/dev/null 2>&1 || true
             CONSUL_ADDR='${{ secrets.CONSUL_ADDR }}' \
             CONSUL_CONFIG_KEY='${{ secrets.CONSUL_CONFIG_KEY }}' \
               docker compose up -d --build --force-recreate
