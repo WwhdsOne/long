@@ -39,6 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("演示CI/CD")
+	fmt.Println("7.7下午14.14")
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
