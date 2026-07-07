@@ -38,9 +38,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Println("hello world")
-	fmt.Println("fix")
-	fmt.Println("本次新增提交内容")
+	fmt.Println("演示CI/CD")
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
