@@ -39,6 +39,7 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("hello world")
+	fmt.Println("fix")
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -456,7 +457,7 @@ func renderStartupInfo(cfg config.Config, listenAddr string, httpsEnabled bool) 
 			"  Mongo: %t (%s)\n"+
 			"  日志: level=%s format=%s\n"+
 			"  OSS: %t\n"+
-		"  LLM: %t",
+			"  LLM: %t",
 		listenAddr,
 		httpsEnabled,
 		cfg.Redis.Host,

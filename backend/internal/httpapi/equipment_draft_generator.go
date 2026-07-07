@@ -353,8 +353,7 @@ func wrapEquipmentDraftGenerateError(prompt string, draft core.EquipmentDefiniti
 	if err == nil {
 		return nil
 	}
-	var generateErr *EquipmentDraftGenerateError
-	if errors.As(err, &generateErr) {
+	if generateErr, ok := errors.AsType[*EquipmentDraftGenerateError](err); ok {
 		if strings.TrimSpace(generateErr.Prompt) == "" {
 			generateErr.Prompt = prompt
 		}

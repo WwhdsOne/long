@@ -64,7 +64,7 @@ func buildMarkdown(r ReportSummary) string {
 			sb.WriteString("| 排名 | 玩家 | 操作次数 |\n")
 			sb.WriteString("|------|------|----------|\n")
 			for i, p := range r.Player.TopPlayers {
-				sb.WriteString(fmt.Sprintf("| %d | %s | %s |\n", i+1, p.Nickname, formatNum(p.EventCount)))
+				fmt.Fprintf(&sb, "| %d | %s | %s |\n", i+1, p.Nickname, formatNum(p.EventCount))
 			}
 			sb.WriteString("\n")
 		}
@@ -85,7 +85,7 @@ func buildMarkdown(r ReportSummary) string {
 			sb.WriteString("| 排名 | 玩家 | 总伤害 |\n")
 			sb.WriteString("|------|------|--------|\n")
 			for i, d := range r.Boss.TopDamagers {
-				sb.WriteString(fmt.Sprintf("| %d | %s | %s |\n", i+1, d.Nickname, formatNum(d.TotalDamage)))
+				fmt.Fprintf(&sb, "| %d | %s | %s |\n", i+1, d.Nickname, formatNum(d.TotalDamage))
 			}
 			sb.WriteString("\n")
 		}
@@ -95,7 +95,7 @@ func buildMarkdown(r ReportSummary) string {
 			sb.WriteString("| 排名 | 装备 | 掉落次数 |\n")
 			sb.WriteString("|------|------|----------|\n")
 			for i, l := range r.Boss.TopLoot {
-				sb.WriteString(fmt.Sprintf("| %d | %s | %s |\n", i+1, l.ItemName, formatNum(l.Count)))
+				fmt.Fprintf(&sb, "| %d | %s | %s |\n", i+1, l.ItemName, formatNum(l.Count))
 			}
 			sb.WriteString("\n")
 		}
@@ -114,7 +114,7 @@ func buildMarkdown(r ReportSummary) string {
 			sb.WriteString("| 排名 | 商品ID | 购买次数 |\n")
 			sb.WriteString("|------|--------|----------|\n")
 			for i, item := range r.Economy.TopShopItems {
-				sb.WriteString(fmt.Sprintf("| %d | %s | %s |\n", i+1, item.ItemID, formatNum(item.Count)))
+				fmt.Fprintf(&sb, "| %d | %s | %s |\n", i+1, item.ItemID, formatNum(item.Count))
 			}
 			sb.WriteString("\n")
 		}
@@ -144,7 +144,7 @@ func writeKVTable(sb *strings.Builder, rows [][2]string) {
 	sb.WriteString("| 指标 | 数值 |\n")
 	sb.WriteString("|------|------|\n")
 	for _, row := range rows {
-		sb.WriteString(fmt.Sprintf("| %s | %s |\n", row[0], row[1]))
+		fmt.Fprintf(sb, "| %s | %s |\n", row[0], row[1])
 	}
 	sb.WriteString("\n")
 }
@@ -165,9 +165,9 @@ func formatNum(n int64) string {
 	}
 
 	var result strings.Builder
-	result.WriteString(fmt.Sprintf("%d", parts[0]))
+	fmt.Fprintf(&result, "%d", parts[0])
 	for i := 1; i < len(parts); i++ {
-		result.WriteString(fmt.Sprintf(",%03d", parts[i]))
+		fmt.Fprintf(&result, ",%03d", parts[i])
 	}
 	return result.String()
 }

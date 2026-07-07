@@ -230,8 +230,7 @@ func writeEquipmentDraftFailureLog(ctx context.Context, writer EquipmentDraftFai
 		CreatedAt:    time.Now().Unix(),
 	}
 
-	var generateErr *EquipmentDraftGenerateError
-	if errors.As(err, &generateErr) {
+	if generateErr, ok := errors.AsType[*EquipmentDraftGenerateError](err); ok {
 		if strings.TrimSpace(generateErr.Prompt) != "" {
 			item.Prompt = strings.TrimSpace(generateErr.Prompt)
 		}

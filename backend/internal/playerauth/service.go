@@ -124,7 +124,7 @@ func (s *Service) Verify(ctx context.Context, token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if resetUnix > 0 && registered.IssuedAt != nil && registered.IssuedAt.Time.Unix() < resetUnix {
+	if resetUnix > 0 && registered.IssuedAt != nil && registered.IssuedAt.Unix() < resetUnix {
 		return "", ErrInvalidToken
 	}
 

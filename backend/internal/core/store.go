@@ -2178,8 +2178,8 @@ func (s *Store) applyBossPartDamage(ctx context.Context, boss *Boss, nickname st
 	// 死兆收割被动：根据死兆层数档位提供增伤（不消耗层数）
 	if !magicOnly && compiledTalents.Has("crit_omen_reap") && len(compiledTalents.Crit.OmenReapThresholds) > 0 {
 		reapMult := 1.0
-		for i := len(compiledTalents.Crit.OmenReapThresholds) - 1; i >= 0; i-- {
-			if combatState.OmenStacks >= compiledTalents.Crit.OmenReapThresholds[i] {
+		for i, v := range slices.Backward(compiledTalents.Crit.OmenReapThresholds) {
+			if combatState.OmenStacks >= v {
 				reapMult = compiledTalents.Crit.OmenReapDamageMults[i]
 				break
 			}
