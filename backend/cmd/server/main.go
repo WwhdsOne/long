@@ -40,6 +40,7 @@ func main() {
 	}
 	fmt.Println("hello world")
 	fmt.Println("fix")
+	fmt.Println("本次新增提交内容")
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
